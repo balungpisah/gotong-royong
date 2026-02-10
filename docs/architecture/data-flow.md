@@ -209,7 +209,7 @@ sequenceDiagram
         Cache->>API: Cached reputation data
         API->>User: 200 OK (reputation)
     else Cache Miss
-        API->>Markov: GET /users/{markov_id}/reputation
+        API->>Markov: GET /api/v1/users/{markov_user_id}/reputation
         Markov->>API: Reputation data (score, tier, breakdown)
         API->>Cache: Store in Redis (TTL: 5 min)
         API->>User: 200 OK (reputation)
@@ -448,8 +448,8 @@ sequenceDiagram
 
     Note over C,Markov: Day 4: Reputation Query
 
-    C->>API: GET /users/alice/reputation
-    API->>Markov: GET /reputation (cache miss)
+    C->>API: GET /users/{id}/reputation
+    API->>Markov: GET /api/v1/users/{markov_user_id}/reputation (cache miss)
     Markov->>API: reputation: 2635 (was 2550)
     API->>C: Display updated reputation
 ```

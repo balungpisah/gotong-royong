@@ -197,7 +197,7 @@ graph TB
 
 ### Markov Engine Integration
 
-**Mode**: Native (direct database access from Markov, webhooks from Gotong Royong)
+**Mode**: Native (Gotong controls its own database; Markov receives webhooks and serves reputation API reads)
 
 **Flow**:
 ```

@@ -19,6 +19,18 @@ Gotong Royong integrates with the Markov Credential Engine using a **Native Inte
 - Simplified security model (webhook signatures only)
 - Easier to version and deploy independently
 
+## Integration Prerequisites
+
+Before enabling production traffic between Gotong Royong and Markov:
+
+1. Configure a shared webhook secret in both systems.
+   - Markov: `GOTONG_ROYONG_WEBHOOK_SECRET`
+   - Gotong Royong: outbound webhook signer secret (must match Markov)
+2. Ensure each Gotong user is linked in Markov using platform identity format `gotong_royong:{user_id}`.
+3. Use Markov reputation endpoint `GET /api/v1/users/{id}/reputation`, where `{id}` is either:
+   - Markov UUID, or
+   - platform-scoped identity (for Gotong): `gotong_royong:{user_id}`
+
 ## Architecture Diagram
 
 ```mermaid
@@ -51,7 +63,7 @@ sequenceDiagram
     alt Cache hit
         Cache->>GR: Return cached reputation
     else Cache miss
-        GR->>Markov: GET /users/{id}/reputation
+        GR->>Markov: GET /api/v1/users/{id}/reputation
         Markov->>GR: Reputation data
         GR->>Cache: Store in cache (TTL: 5m)
     end
