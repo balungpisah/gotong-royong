@@ -79,6 +79,8 @@ pub struct VaultEntry {
     pub audit: Option<serde_json::Value>,
     pub request_id: String,
     pub correlation_id: String,
+    pub event_hash: String,
+    pub retention_tag: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -103,6 +105,8 @@ pub struct VaultTimelineEvent {
     pub correlation_id: String,
     pub occurred_at_ms: i64,
     pub metadata: Option<serde_json::Value>,
+    pub event_hash: String,
+    pub retention_tag: String,
 }
 
 #[derive(Clone)]
@@ -217,7 +221,10 @@ impl VaultService {
             audit: command.audit,
             request_id: command.request_id.clone(),
             correlation_id: command.correlation_id.clone(),
+            event_hash: String::new(),
+            retention_tag: String::new(),
         };
+        let entry = apply_vault_entry_audit(entry)?;
         let snapshot = VaultActorSnapshot::new(
             &actor,
             role,
@@ -235,7 +242,7 @@ impl VaultService {
             entry.correlation_id.clone(),
             now,
             Some(serde_json::json!({ "source": "create_draft" })),
-        );
+        )?;
         match self.repository.create_entry(&entry, &event).await {
             Ok(entry) => Ok(entry),
             Err(DomainError::Conflict) => self
@@ -309,6 +316,7 @@ impl VaultService {
         entry.updated_at_ms = now;
         entry.request_id = command.request_id.clone();
         entry.correlation_id = command.correlation_id.clone();
+        let entry = apply_vault_entry_audit(entry)?;
 
         let snapshot = VaultActorSnapshot::new(
             &actor,
@@ -327,7 +335,7 @@ impl VaultService {
             entry.correlation_id.clone(),
             now,
             Some(serde_json::json!({ "source": "update_draft" })),
-        );
+        )?;
         self.update_with_idempotency(&entry, event).await
     }
 
@@ -382,6 +390,7 @@ impl VaultService {
         entry.updated_at_ms = now;
         entry.request_id = command.request_id.clone();
         entry.correlation_id = command.correlation_id.clone();
+        let entry = apply_vault_entry_audit(entry)?;
 
         let snapshot = VaultActorSnapshot::new(
             &actor,
@@ -404,7 +413,7 @@ impl VaultService {
                 "sealed_hash": entry.sealed_hash,
                 "encryption_key_id": entry.encryption_key_id,
             })),
-        );
+        )?;
         self.update_with_idempotency(&entry, event).await
     }
 
@@ -429,6 +438,7 @@ impl VaultService {
         entry.updated_at_ms = now;
         entry.request_id = command.request_id.clone();
         entry.correlation_id = command.correlation_id.clone();
+        let entry = apply_vault_entry_audit(entry)?;
 
         let snapshot = VaultActorSnapshot::new(
             &actor,
@@ -447,7 +457,7 @@ impl VaultService {
             entry.correlation_id.clone(),
             now,
             Some(serde_json::json!({ "source": "publish" })),
-        );
+        )?;
         self.update_with_idempotency(&entry, event).await
     }
 
@@ -473,6 +483,7 @@ impl VaultService {
         entry.updated_at_ms = now;
         entry.request_id = command.request_id.clone();
         entry.correlation_id = command.correlation_id.clone();
+        let entry = apply_vault_entry_audit(entry)?;
 
         let snapshot = VaultActorSnapshot::new(
             &actor,
@@ -491,7 +502,7 @@ impl VaultService {
             entry.correlation_id.clone(),
             now,
             Some(serde_json::json!({ "source": "revoke" })),
-        );
+        )?;
         self.update_with_idempotency(&entry, event).await
     }
 
@@ -517,6 +528,7 @@ impl VaultService {
         entry.updated_at_ms = now;
         entry.request_id = command.request_id.clone();
         entry.correlation_id = command.correlation_id.clone();
+        let entry = apply_vault_entry_audit(entry)?;
 
         let snapshot = VaultActorSnapshot::new(
             &actor,
@@ -535,7 +547,7 @@ impl VaultService {
             entry.correlation_id.clone(),
             now,
             Some(serde_json::json!({ "source": "expire" })),
-        );
+        )?;
         self.update_with_idempotency(&entry, event).await
     }
 
@@ -568,6 +580,7 @@ impl VaultService {
         entry.updated_at_ms = now;
         entry.request_id = command.request_id.clone();
         entry.correlation_id = command.correlation_id.clone();
+        let entry = apply_vault_entry_audit(entry)?;
 
         let snapshot = VaultActorSnapshot::new(
             &actor,
@@ -586,7 +599,7 @@ impl VaultService {
             entry.correlation_id.clone(),
             now,
             Some(serde_json::json!({ "wali_id": command.wali_id })),
-        );
+        )?;
         self.update_with_idempotency(&entry, event).await
     }
 
@@ -616,6 +629,7 @@ impl VaultService {
         entry.updated_at_ms = now;
         entry.request_id = command.request_id.clone();
         entry.correlation_id = command.correlation_id.clone();
+        let entry = apply_vault_entry_audit(entry)?;
 
         let snapshot = VaultActorSnapshot::new(
             &actor,
@@ -634,7 +648,7 @@ impl VaultService {
             entry.correlation_id.clone(),
             now,
             Some(serde_json::json!({ "wali_id": command.wali_id })),
-        );
+        )?;
         self.update_with_idempotency(&entry, event).await
     }
 
@@ -882,6 +896,120 @@ fn ensure_sealed_only(entry: &VaultEntry) -> DomainResult<()> {
     Ok(())
 }
 
+fn vault_retention_tag(vault_entry_id: &str) -> String {
+    format!("vault_entry:{vault_entry_id}")
+}
+
+fn vault_timeline_retention_tag(
+    vault_entry_id: &str,
+    event_type: &VaultTimelineEventType,
+) -> String {
+    format!(
+        "vault_timeline:{vault_entry_id}:{}",
+        vault_timeline_event_to_string(event_type)
+    )
+}
+
+fn apply_vault_entry_audit(mut entry: VaultEntry) -> DomainResult<VaultEntry> {
+    entry.retention_tag = vault_retention_tag(&entry.vault_entry_id);
+    let payload = VaultEntryAuditPayload {
+        vault_entry_id: entry.vault_entry_id.clone(),
+        author_id: entry.author_id.clone(),
+        author_username: entry.author_username.clone(),
+        state: vault_state_to_string(&entry.state).to_string(),
+        created_at_ms: entry.created_at_ms,
+        updated_at_ms: entry.updated_at_ms,
+        sealed_at_ms: entry.sealed_at_ms,
+        sealed_hash: entry.sealed_hash.clone(),
+        encryption_key_id: entry.encryption_key_id.clone(),
+        attachment_refs: entry.attachment_refs.clone(),
+        wali: entry.wali.clone(),
+        payload: entry.payload.clone(),
+        publish_target: entry.publish_target.clone(),
+        retention_policy: entry.retention_policy.clone(),
+        audit: entry.audit.clone(),
+        request_id: entry.request_id.clone(),
+        correlation_id: entry.correlation_id.clone(),
+        retention_tag: entry.retention_tag.clone(),
+    };
+    entry.event_hash = crate::util::immutable_event_hash(&payload)?;
+    Ok(entry)
+}
+
+fn apply_vault_timeline_audit(mut event: VaultTimelineEvent) -> DomainResult<VaultTimelineEvent> {
+    event.retention_tag = vault_timeline_retention_tag(&event.vault_entry_id, &event.event_type);
+    let payload = VaultTimelineAuditPayload {
+        event_id: event.event_id.clone(),
+        vault_entry_id: event.vault_entry_id.clone(),
+        event_type: vault_timeline_event_to_string(&event.event_type).to_string(),
+        actor: event.actor.clone(),
+        request_id: event.request_id.clone(),
+        correlation_id: event.correlation_id.clone(),
+        occurred_at_ms: event.occurred_at_ms,
+        metadata: event.metadata.clone(),
+        retention_tag: event.retention_tag.clone(),
+    };
+    event.event_hash = crate::util::immutable_event_hash(&payload)?;
+    Ok(event)
+}
+
+fn vault_state_to_string(state: &VaultState) -> &'static str {
+    match state {
+        VaultState::Draft => "draft",
+        VaultState::Sealed => "sealed",
+        VaultState::Published => "published",
+        VaultState::Revoked => "revoked",
+        VaultState::Expired => "expired",
+    }
+}
+
+fn vault_timeline_event_to_string(value: &VaultTimelineEventType) -> &'static str {
+    match value {
+        VaultTimelineEventType::WitnessDrafted => "witness_drafted",
+        VaultTimelineEventType::WitnessSealed => "witness_sealed",
+        VaultTimelineEventType::WitnessTrusteeAdded => "witness_trustee_added",
+        VaultTimelineEventType::WitnessTrusteeRemoved => "witness_trustee_removed",
+        VaultTimelineEventType::WitnessPublished => "witness_published",
+        VaultTimelineEventType::WitnessRevoked => "witness_revoked",
+        VaultTimelineEventType::WitnessExpired => "witness_expired",
+    }
+}
+
+#[derive(Clone, Serialize)]
+struct VaultEntryAuditPayload {
+    vault_entry_id: String,
+    author_id: String,
+    author_username: String,
+    state: String,
+    created_at_ms: i64,
+    updated_at_ms: i64,
+    sealed_at_ms: Option<i64>,
+    sealed_hash: Option<String>,
+    encryption_key_id: Option<String>,
+    attachment_refs: Vec<String>,
+    wali: Vec<String>,
+    payload: Option<serde_json::Value>,
+    publish_target: Option<String>,
+    retention_policy: Option<serde_json::Value>,
+    audit: Option<serde_json::Value>,
+    request_id: String,
+    correlation_id: String,
+    retention_tag: String,
+}
+
+#[derive(Clone, Serialize)]
+struct VaultTimelineAuditPayload {
+    event_id: String,
+    vault_entry_id: String,
+    event_type: String,
+    actor: VaultActorSnapshot,
+    request_id: String,
+    correlation_id: String,
+    occurred_at_ms: i64,
+    metadata: Option<serde_json::Value>,
+    retention_tag: String,
+}
+
 fn make_event(
     vault_entry_id: &str,
     event_type: VaultTimelineEventType,
@@ -890,8 +1018,8 @@ fn make_event(
     correlation_id: String,
     occurred_at_ms: i64,
     metadata: Option<serde_json::Value>,
-) -> VaultTimelineEvent {
-    VaultTimelineEvent {
+) -> DomainResult<VaultTimelineEvent> {
+    let event = VaultTimelineEvent {
         event_id: crate::util::uuid_v7_without_dashes(),
         vault_entry_id: vault_entry_id.to_string(),
         event_type,
@@ -900,7 +1028,10 @@ fn make_event(
         correlation_id,
         occurred_at_ms,
         metadata,
-    }
+        event_hash: String::new(),
+        retention_tag: String::new(),
+    };
+    apply_vault_timeline_audit(event)
 }
 
 #[cfg(test)]

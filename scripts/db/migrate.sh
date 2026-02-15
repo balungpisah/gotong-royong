@@ -73,3 +73,11 @@ fi
   --namespace "$SURREAL_NS" \
   --database "$SURREAL_DB" \
   "$WORKDIR/database/migrations/0008_discovery_schema.surql"
+
+"${SUR_CMD[@]}" import \
+  --endpoint "$SURREAL_ENDPOINT" \
+  --user "$SURREAL_USER" \
+  --pass "$SURREAL_PASS" \
+  --namespace "$SURREAL_NS" \
+  --database "$SURREAL_DB" \
+  "$WORKDIR/database/migrations/0009_audit_retention_fields.surql"

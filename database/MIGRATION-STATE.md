@@ -13,6 +13,9 @@ This file tracks the migration ordering and execution state for the SurrealDB sc
 3. `0003_permissions_private_channels.surql` (reserved for PR-04)
 4. `0004_moderation_schema.surql`
 5. `0006_vault_schema.surql`
+6. `0007_siaga_schema.surql`
+7. `0008_discovery_schema.surql`
+8. `0009_audit_retention_fields.surql` (BE-012)
 
 ## Notes
 

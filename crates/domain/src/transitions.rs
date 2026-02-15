@@ -77,6 +77,8 @@ pub struct TrackStateTransition {
     pub actor: TransitionActorSnapshot,
     pub occurred_at_ms: i64,
     pub gate: TransitionGateSnapshot,
+    pub event_hash: String,
+    pub retention_tag: String,
 }
 
 #[derive(Clone)]
@@ -131,20 +133,31 @@ impl TrackTransitionService {
             status: input.gate_status,
             metadata: input.gate_metadata,
         };
+        let track = input.track.clone();
+        let from_stage = input.from_stage.clone();
+        let to_stage = input.to_stage.clone();
+        let retention_tag = transition_retention_tag(&track_state_transition_from_track_stages(
+            &track,
+            &from_stage,
+            &to_stage,
+        ));
         let transition = TrackStateTransition {
-            track: input.track,
+            track,
             transition_id,
             entity_id: input.entity_id,
             request_id: input.request_id,
             correlation_id: input.correlation_id,
-            from_stage: input.from_stage,
-            to_stage: input.to_stage,
+            from_stage,
+            to_stage,
             transition_type: input.transition_type,
             mechanism: input.mechanism,
             actor: actor_snapshot,
             occurred_at_ms: happened_at_ms,
             gate,
+            event_hash: String::new(),
+            retention_tag,
         };
+        let transition = track_transition_with_hash(transition)?;
 
         match self.repository.create(&transition).await {
             Ok(transition) => Ok(transition),
@@ -173,6 +186,68 @@ impl TrackTransitionService {
         let active_stage = transitions.pop().map(|transition| transition.to_stage);
         Ok(active_stage)
     }
+}
+
+fn track_state_transition_from_track_stages(
+    track: &str,
+    from_stage: &str,
+    to_stage: &str,
+) -> String {
+    let track = track.trim().to_lowercase();
+    let from_stage = from_stage.trim().to_lowercase();
+    let to_stage = to_stage.trim().to_lowercase();
+    format!("{track}:{from_stage}->{to_stage}")
+}
+
+fn transition_retention_tag(composite: &str) -> String {
+    format!("transition:{composite}")
+}
+
+fn track_transition_with_hash(
+    mut transition: TrackStateTransition,
+) -> DomainResult<TrackStateTransition> {
+    let payload = TrackTransitionAuditPayload {
+        track: transition.track.clone(),
+        transition_id: transition.transition_id.clone(),
+        entity_id: transition.entity_id.clone(),
+        request_id: transition.request_id.clone(),
+        correlation_id: transition.correlation_id.clone(),
+        from_stage: transition.from_stage.clone(),
+        to_stage: transition.to_stage.clone(),
+        transition_type: transition_mechanism_to_str(&transition.transition_type).to_string(),
+        mechanism: transition_mechanism_to_str(&transition.mechanism).to_string(),
+        actor: transition.actor.clone(),
+        occurred_at_ms: transition.occurred_at_ms,
+        gate: transition.gate.clone(),
+        retention_tag: transition.retention_tag.clone(),
+    };
+    transition.event_hash = crate::util::immutable_event_hash(&payload)?;
+    Ok(transition)
+}
+
+fn transition_mechanism_to_str(mechanism: &TransitionMechanism) -> &'static str {
+    match mechanism {
+        TransitionMechanism::UserAction => "user_action",
+        TransitionMechanism::Timer => "timer",
+        TransitionMechanism::Webhook => "webhook",
+    }
+}
+
+#[derive(Clone, Serialize)]
+struct TrackTransitionAuditPayload {
+    track: String,
+    transition_id: String,
+    entity_id: String,
+    request_id: String,
+    correlation_id: String,
+    from_stage: String,
+    to_stage: String,
+    transition_type: String,
+    mechanism: String,
+    actor: TransitionActorSnapshot,
+    occurred_at_ms: i64,
+    gate: TransitionGateSnapshot,
+    retention_tag: String,
 }
 
 fn validate_transition_command(
@@ -504,6 +579,13 @@ mod tests {
 
         assert_eq!(first.transition_id, second.transition_id);
         assert_eq!(first.entity_id, second.entity_id);
+        assert_eq!(first.event_hash, second.event_hash);
+        assert_eq!(first.retention_tag, second.retention_tag);
+        assert_eq!(
+            first.event_hash.len(),
+            64,
+            "event hash must be deterministic and sha-256 hex length"
+        );
     }
 
     #[tokio::test]
@@ -612,5 +694,45 @@ mod tests {
             err,
             DomainError::Validation(msg) if msg == "non-system role must use user_action mechanism"
         ));
+    }
+
+    #[test]
+    fn transition_retention_tag_is_deterministic() {
+        let transition = TrackStateTransition {
+            track: "Track-A".to_string(),
+            transition_id: "transition-id".to_string(),
+            entity_id: "entity-id".to_string(),
+            request_id: "request-id".to_string(),
+            correlation_id: "corr-id".to_string(),
+            from_stage: "garap".to_string(),
+            to_stage: "periksa".to_string(),
+            transition_type: TransitionMechanism::UserAction,
+            mechanism: TransitionMechanism::UserAction,
+            actor: TransitionActorSnapshot {
+                user_id: "user-1".to_string(),
+                username: "alice".to_string(),
+                token_role: Role::User.as_str().to_string(),
+                track_roles: vec![TrackRole::Participant],
+                request_id: "request-id".to_string(),
+                correlation_id: "corr-id".to_string(),
+                request_ts_ms: 1,
+            },
+            occurred_at_ms: 1,
+            gate: TransitionGateSnapshot {
+                status: "open".to_string(),
+                metadata: None,
+            },
+            event_hash: String::new(),
+            retention_tag: transition_retention_tag(&track_state_transition_from_track_stages(
+                "Track-A", "garap", "periksa",
+            )),
+        };
+        assert_eq!(
+            transition.retention_tag,
+            "transition:track-a:garap->periksa"
+        );
+        let with_hash =
+            track_transition_with_hash(transition).expect("transition hash can be computed");
+        assert_eq!(with_hash.event_hash.len(), 64);
     }
 }

@@ -225,6 +225,7 @@ Status: READY FOR BACKEND DESIGN/HANDOFF
    - Acceptance:
      1. 7-day responder identity rule for siaga works
      2. vault revoked payload deletion verified
+     3. stored audit rows include deterministic `event_hash` and `retention_tag` for moderated, siaga, vault, and transition records
 
 18. Ticket `BE-013`: operations observability baseline
    - Scope: whole backend

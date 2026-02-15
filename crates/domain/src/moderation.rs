@@ -120,6 +120,8 @@ pub struct ModerationDecision {
     pub violations: Vec<ModerationViolation>,
     pub request_id: String,
     pub correlation_id: String,
+    pub event_hash: String,
+    pub retention_tag: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -143,6 +145,8 @@ pub struct ContentModeration {
     pub request_id: String,
     pub correlation_id: String,
     pub request_ts_ms: i64,
+    pub event_hash: String,
+    pub retention_tag: String,
 }
 
 impl ContentModeration {
@@ -168,6 +172,8 @@ impl ContentModeration {
             request_id: "boot".to_string(),
             correlation_id: "boot".to_string(),
             request_ts_ms: now,
+            event_hash: String::new(),
+            retention_tag: String::new(),
         }
     }
 
@@ -454,7 +460,10 @@ impl ModerationService {
             violations: input.violations,
             request_id: input.request_id.clone(),
             correlation_id: input.correlation_id.clone(),
+            event_hash: String::new(),
+            retention_tag: String::new(),
         };
+        let decision = apply_decision_audit(decision)?;
 
         let decision = match self.repository.create_decision(&decision).await {
             Ok(decision) => decision,
@@ -464,11 +473,13 @@ impl ModerationService {
                     .get_decision_by_request(&input.content_id, &input.request_id)
                     .await?
                     .ok_or(DomainError::Conflict)?;
+                let decision = apply_decision_audit(decision)?;
+                let content = apply_content_audit(existing.unwrap_or_else(|| {
+                    ContentModeration::new(input.content_id.clone(), author_id, author_username)
+                }))?;
 
                 return Ok(ModerationApplyResult {
-                    content: existing.unwrap_or_else(|| {
-                        ContentModeration::new(input.content_id.clone(), author_id, author_username)
-                    }),
+                    content,
                     decision,
                     schedule_auto_release: false,
                 });
@@ -483,6 +494,7 @@ impl ModerationService {
             state.content_type = input.content_type;
         }
         state.apply_decision(&decision);
+        let state = apply_content_audit(state)?;
         let content = self.repository.upsert_content_moderation(&state).await?;
 
         let schedule_auto_release =
@@ -518,8 +530,8 @@ impl ModerationService {
 
         if current.request_id != input.hold_decision_request_id {
             return Ok(ModerationApplyResult {
-                content: current.clone(),
-                decision: build_auto_release_noop_decision(
+                content: apply_content_audit(current.clone())?,
+                decision: apply_decision_audit(build_auto_release_noop_decision(
                     &current,
                     &actor,
                     &token_role,
@@ -527,15 +539,15 @@ impl ModerationService {
                     request_ts_ms,
                     "auto_release_stale_request",
                     "auto release skipped because hold decision id does not match latest decision",
-                ),
+                ))?,
                 schedule_auto_release: false,
             });
         }
 
         if current.moderation_status != ModerationStatus::UnderReview {
             return Ok(ModerationApplyResult {
-                content: current.clone(),
-                decision: build_auto_release_noop_decision(
+                content: apply_content_audit(current.clone())?,
+                decision: apply_decision_audit(build_auto_release_noop_decision(
                     &current,
                     &actor,
                     &token_role,
@@ -543,15 +555,15 @@ impl ModerationService {
                     request_ts_ms,
                     "auto_release_not_applicable",
                     "auto release skipped because content is not under review",
-                ),
+                ))?,
                 schedule_auto_release: false,
             });
         }
 
         if !current.auto_release_if_no_action {
             return Ok(ModerationApplyResult {
-                content: current.clone(),
-                decision: build_auto_release_noop_decision(
+                content: apply_content_audit(current.clone())?,
+                decision: apply_decision_audit(build_auto_release_noop_decision(
                     &current,
                     &actor,
                     &token_role,
@@ -559,7 +571,7 @@ impl ModerationService {
                     request_ts_ms,
                     "auto_release_disabled",
                     "auto release disabled for current moderation decision",
-                ),
+                ))?,
                 schedule_auto_release: false,
             });
         }
@@ -722,6 +734,131 @@ fn ensure_auto_release_role(token_role: &Role) -> DomainResult<()> {
     ))
 }
 
+fn moderation_content_retention_tag(content_id: &str) -> String {
+    format!("moderation_content:{content_id}")
+}
+
+fn moderation_decision_retention_tag(content_id: &str, request_id: &str) -> String {
+    format!("moderation_decision:{content_id}:{request_id}")
+}
+
+fn moderation_status_to_string(value: &ModerationStatus) -> &'static str {
+    match value {
+        ModerationStatus::Processing => "processing",
+        ModerationStatus::UnderReview => "under_review",
+        ModerationStatus::Published => "published",
+        ModerationStatus::Rejected => "rejected",
+    }
+}
+
+fn moderation_action_to_string(value: &ModerationAction) -> &'static str {
+    match value {
+        ModerationAction::PublishNow => "publish_now",
+        ModerationAction::PublishWithWarning => "publish_with_warning",
+        ModerationAction::HoldForReview => "hold_for_review",
+        ModerationAction::Block => "block",
+    }
+}
+
+#[derive(Clone, Serialize)]
+struct ModerationDecisionAuditPayload {
+    decision_id: String,
+    content_id: String,
+    content_type: Option<String>,
+    moderation_status: String,
+    moderation_action: String,
+    reason_code: Option<String>,
+    confidence: f64,
+    decided_at_ms: i64,
+    actor: ModerationActorSnapshot,
+    hold_expires_at_ms: Option<i64>,
+    auto_release_if_no_action: bool,
+    appeal_window_until_ms: Option<i64>,
+    reasoning: Option<String>,
+    violations: Vec<ModerationViolation>,
+    request_id: String,
+    correlation_id: String,
+    retention_tag: String,
+}
+
+#[derive(Clone, Serialize)]
+struct ModerationContentAuditPayload {
+    content_id: String,
+    content_type: Option<String>,
+    author_id: String,
+    author_username: Option<String>,
+    moderation_status: String,
+    moderation_action: String,
+    reason_code: Option<String>,
+    confidence: f64,
+    decided_at_ms: i64,
+    decided_by: String,
+    hold_expires_at_ms: Option<i64>,
+    auto_release_if_no_action: bool,
+    appeal_window_until_ms: Option<i64>,
+    reasoning: Option<String>,
+    violations: Vec<ModerationViolation>,
+    last_decision_id: Option<String>,
+    request_id: String,
+    correlation_id: String,
+    request_ts_ms: i64,
+    retention_tag: String,
+}
+
+fn apply_decision_audit(mut decision: ModerationDecision) -> DomainResult<ModerationDecision> {
+    decision.retention_tag =
+        moderation_decision_retention_tag(&decision.content_id, &decision.request_id);
+    let payload = ModerationDecisionAuditPayload {
+        decision_id: decision.decision_id.clone(),
+        content_id: decision.content_id.clone(),
+        content_type: decision.content_type.clone(),
+        moderation_status: moderation_status_to_string(&decision.moderation_status).to_string(),
+        moderation_action: moderation_action_to_string(&decision.moderation_action).to_string(),
+        reason_code: decision.reason_code.clone(),
+        confidence: decision.confidence,
+        decided_at_ms: decision.decided_at_ms,
+        actor: decision.actor.clone(),
+        hold_expires_at_ms: decision.hold_expires_at_ms,
+        auto_release_if_no_action: decision.auto_release_if_no_action,
+        appeal_window_until_ms: decision.appeal_window_until_ms,
+        reasoning: decision.reasoning.clone(),
+        violations: decision.violations.clone(),
+        request_id: decision.request_id.clone(),
+        correlation_id: decision.correlation_id.clone(),
+        retention_tag: decision.retention_tag.clone(),
+    };
+    decision.event_hash = crate::util::immutable_event_hash(&payload)?;
+    Ok(decision)
+}
+
+fn apply_content_audit(mut content: ContentModeration) -> DomainResult<ContentModeration> {
+    content.retention_tag = moderation_content_retention_tag(&content.content_id);
+    let payload = ModerationContentAuditPayload {
+        content_id: content.content_id.clone(),
+        content_type: content.content_type.clone(),
+        author_id: content.author_id.clone(),
+        author_username: content.author_username.clone(),
+        moderation_status: moderation_status_to_string(&content.moderation_status).to_string(),
+        moderation_action: moderation_action_to_string(&content.moderation_action).to_string(),
+        reason_code: content.reason_code.clone(),
+        confidence: content.confidence,
+        decided_at_ms: content.decided_at_ms,
+        decided_by: content.decided_by.clone(),
+        hold_expires_at_ms: content.hold_expires_at_ms,
+        auto_release_if_no_action: content.auto_release_if_no_action,
+        appeal_window_until_ms: content.appeal_window_until_ms,
+        reasoning: content.reasoning.clone(),
+        violations: content.violations.clone(),
+        last_decision_id: content.last_decision_id.clone(),
+        request_id: content.request_id.clone(),
+        correlation_id: content.correlation_id.clone(),
+        request_ts_ms: content.request_ts_ms,
+        retention_tag: content.retention_tag.clone(),
+    };
+    content.event_hash = crate::util::immutable_event_hash(&payload)?;
+    Ok(content)
+}
+
 fn build_auto_release_noop_decision(
     current: &ContentModeration,
     actor: &ActorIdentity,
@@ -757,6 +894,8 @@ fn build_auto_release_noop_decision(
         violations: current.violations.clone(),
         request_id: input.request_id.clone(),
         correlation_id: input.correlation_id.clone(),
+        event_hash: String::new(),
+        retention_tag: String::new(),
     }
 }
 

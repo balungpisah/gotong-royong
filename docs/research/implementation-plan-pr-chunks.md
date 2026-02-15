@@ -65,7 +65,7 @@ Out of scope:
 - `PR-12`: DONE
 - `PR-13`: DONE
 - `PR-14`: DONE
-- `PR-15`: NOT STARTED
+- `PR-15`: IN PROGRESS
 
 ## Detailed PR Plan
 
@@ -402,7 +402,7 @@ Exit criteria:
 ## PR-15 — Audit, Observability, and Release Gates (`BE-012`, `BE-013`)
 
 Status:
-- NOT STARTED (2026-02-15)
+- IN PROGRESS (2026-02-15)
 
 Goal:
 - Finalize production hardening and beta safety gates.
@@ -416,11 +416,17 @@ Deliverables:
 - Surreal beta go/no-go suite for reconnect resilience.
 - Cross-instance real-time fanout strategy for WS/SSE (Redis or equivalent) with deterministic replay compatibility and permission revalidation.
 - Rollback runbook and rehearsal report.
+- Add immutable audit hash and retention-tag columns for transition/vault/siaga/moderation rows (in progress).
+- Map domain-level audit hash generation and persistence across transition/vault/siaga/moderation paths.
 
 Validation:
 - All P0 gates pass in staging.
 - Rollback drill succeeds with documented timing and checks.
 - Realtime transport can be safely scaled beyond one API instance without dropping stream delivery.
+
+PR-15 completion note:
+- Surreal schema/check migration for audit columns has been prepared (`0009_audit_retention_fields.surql` + paired check) and wired into migration scripts.
+- Observability/release-gate hardening remains to be completed.
 
 Exit criteria:
 - Backend is ready for staged production rollout.

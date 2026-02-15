@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::DomainResult;
 use crate::auth::Role;
 use crate::error::DomainError;
 use crate::identity::ActorIdentity;
@@ -110,6 +111,8 @@ pub struct SiagaBroadcast {
     pub correlation_id: String,
     pub responders: Vec<SiagaResponder>,
     pub closure: Option<SiagaClosure>,
+    pub event_hash: String,
+    pub retention_tag: String,
 }
 
 impl SiagaBroadcast {
@@ -164,6 +167,8 @@ pub struct SiagaTimelineEvent {
     pub correlation_id: String,
     pub occurred_at_ms: i64,
     pub metadata: Option<serde_json::Value>,
+    pub event_hash: String,
+    pub retention_tag: String,
 }
 
 #[derive(Clone)]
@@ -261,7 +266,7 @@ impl SiagaService {
             now_ms,
         );
 
-        let broadcast = SiagaBroadcast {
+        let mut broadcast = SiagaBroadcast {
             siaga_id: siaga_id.clone(),
             scope_id: input.scope_id,
             author_id: actor.user_id,
@@ -278,22 +283,24 @@ impl SiagaService {
             correlation_id: input.correlation_id.clone(),
             responders: vec![],
             closure: None,
+            event_hash: String::new(),
+            retention_tag: String::new(),
         };
+        broadcast = apply_siaga_broadcast_audit(broadcast)?;
 
-        let event = SiagaTimelineEvent {
-            event_id: crate::util::uuid_v7_without_dashes(),
+        let event = make_siaga_event(
             siaga_id,
-            event_type: SiagaTimelineEventType::SiagaBroadcastCreated,
-            actor: snapshot,
-            request_id: input.request_id,
-            correlation_id: input.correlation_id,
-            occurred_at_ms: now_ms,
-            metadata: Some(serde_json::json!({
+            SiagaTimelineEventType::SiagaBroadcastCreated,
+            snapshot,
+            input.request_id,
+            input.correlation_id,
+            now_ms,
+            Some(serde_json::json!({
                 "emergency_type": broadcast.emergency_type,
                 "severity": broadcast.severity,
                 "title": broadcast.title,
             })),
-        };
+        )?;
 
         match self.repository.create_broadcast(&broadcast, &event).await {
             Ok(broadcast) => Ok(broadcast),
@@ -373,6 +380,7 @@ impl SiagaService {
         updated.updated_at_ms = now_ms;
         updated.request_id = input.request_id.clone();
         updated.correlation_id = input.correlation_id.clone();
+        let updated = apply_siaga_broadcast_audit(updated)?;
 
         let actor_snapshot = SiagaActorSnapshot::new(
             &actor,
@@ -383,16 +391,15 @@ impl SiagaService {
             now_ms,
         );
 
-        let event = SiagaTimelineEvent {
-            event_id: crate::util::uuid_v7_without_dashes(),
-            siaga_id: updated.siaga_id.clone(),
-            event_type: SiagaTimelineEventType::SiagaBroadcastUpdated,
-            actor: actor_snapshot,
-            request_id: input.request_id,
-            correlation_id: input.correlation_id,
-            occurred_at_ms: now_ms,
-            metadata: Some(serde_json::json!({ "state": updated.state })),
-        };
+        let event = make_siaga_event(
+            updated.siaga_id.clone(),
+            SiagaTimelineEventType::SiagaBroadcastUpdated,
+            actor_snapshot,
+            input.request_id,
+            input.correlation_id,
+            now_ms,
+            Some(serde_json::json!({ "state": updated.state })),
+        )?;
 
         match self.repository.update_broadcast(&updated, &event).await {
             Ok(broadcast) => Ok(broadcast),
@@ -442,6 +449,7 @@ impl SiagaService {
         updated.updated_at_ms = now_ms;
         updated.request_id = input.request_id.clone();
         updated.correlation_id = input.correlation_id.clone();
+        let updated = apply_siaga_broadcast_audit(updated)?;
 
         let actor_snapshot = SiagaActorSnapshot::new(
             &actor,
@@ -451,16 +459,15 @@ impl SiagaService {
             input.correlation_id.clone(),
             now_ms,
         );
-        let event = SiagaTimelineEvent {
-            event_id: crate::util::uuid_v7_without_dashes(),
-            siaga_id: updated.siaga_id.clone(),
-            event_type: SiagaTimelineEventType::SiagaBroadcastActivated,
-            actor: actor_snapshot,
-            request_id: input.request_id,
-            correlation_id: input.correlation_id,
-            occurred_at_ms: now_ms,
-            metadata: Some(serde_json::json!({ "state": updated.state })),
-        };
+        let event = make_siaga_event(
+            updated.siaga_id.clone(),
+            SiagaTimelineEventType::SiagaBroadcastActivated,
+            actor_snapshot,
+            input.request_id,
+            input.correlation_id,
+            now_ms,
+            Some(serde_json::json!({ "state": updated.state })),
+        )?;
 
         match self.repository.update_broadcast(&updated, &event).await {
             Ok(updated) => Ok(updated),
@@ -531,20 +538,20 @@ impl SiagaService {
         updated.updated_at_ms = now_ms;
         updated.request_id = input.request_id.clone();
         updated.correlation_id = input.correlation_id.clone();
+        let updated = apply_siaga_broadcast_audit(updated)?;
 
-        let event = SiagaTimelineEvent {
-            event_id: crate::util::uuid_v7_without_dashes(),
-            siaga_id: updated.siaga_id.clone(),
+        let event = make_siaga_event(
+            updated.siaga_id.clone(),
             event_type,
-            actor: actor_snapshot,
-            request_id: input.request_id,
-            correlation_id: input.correlation_id,
-            occurred_at_ms: now_ms,
-            metadata: Some(serde_json::json!({
+            actor_snapshot,
+            input.request_id,
+            input.correlation_id,
+            now_ms,
+            Some(serde_json::json!({
                 "responder_id": actor.user_id.clone(),
                 "status": input.status.clone(),
             })),
-        };
+        )?;
 
         match self.repository.update_broadcast(&updated, &event).await {
             Ok(updated) => Ok(updated),
@@ -598,6 +605,7 @@ impl SiagaService {
         updated.updated_at_ms = now_ms;
         updated.request_id = input.request_id.clone();
         updated.correlation_id = input.correlation_id.clone();
+        let updated = apply_siaga_broadcast_audit(updated)?;
 
         let actor_snapshot = SiagaActorSnapshot::new(
             &actor,
@@ -607,19 +615,18 @@ impl SiagaService {
             input.correlation_id.clone(),
             now_ms,
         );
-        let event = SiagaTimelineEvent {
-            event_id: crate::util::uuid_v7_without_dashes(),
-            siaga_id: updated.siaga_id.clone(),
-            event_type: SiagaTimelineEventType::SiagaResponderUpdated,
-            actor: actor_snapshot,
-            request_id: input.request_id,
-            correlation_id: input.correlation_id,
-            occurred_at_ms: now_ms,
-            metadata: Some(serde_json::json!({
+        let event = make_siaga_event(
+            updated.siaga_id.clone(),
+            SiagaTimelineEventType::SiagaResponderUpdated,
+            actor_snapshot,
+            input.request_id,
+            input.correlation_id,
+            now_ms,
+            Some(serde_json::json!({
                 "responder_id": responder_id,
                 "status": input.status,
             })),
-        };
+        )?;
 
         match self.repository.update_broadcast(&updated, &event).await {
             Ok(updated) => Ok(updated),
@@ -681,6 +688,7 @@ impl SiagaService {
         updated.updated_at_ms = now_ms;
         updated.request_id = input.request_id.clone();
         updated.correlation_id = input.correlation_id.clone();
+        let updated = apply_siaga_broadcast_audit(updated)?;
 
         let actor_snapshot = SiagaActorSnapshot::new(
             &actor,
@@ -690,19 +698,18 @@ impl SiagaService {
             input.correlation_id.clone(),
             now_ms,
         );
-        let event = SiagaTimelineEvent {
-            event_id: crate::util::uuid_v7_without_dashes(),
-            siaga_id: updated.siaga_id.clone(),
-            event_type: SiagaTimelineEventType::SiagaBroadcastClosed,
-            actor: actor_snapshot,
-            request_id: input.request_id,
-            correlation_id: input.correlation_id,
-            occurred_at_ms: now_ms,
-            metadata: Some(serde_json::json!({
+        let event = make_siaga_event(
+            updated.siaga_id.clone(),
+            SiagaTimelineEventType::SiagaBroadcastClosed,
+            actor_snapshot,
+            input.request_id,
+            input.correlation_id,
+            now_ms,
+            Some(serde_json::json!({
                 "summary": updated.closure.as_ref().map(|closure| closure.summary.clone()),
                 "responder_count": updated.counters().total_responders,
             })),
-        };
+        )?;
 
         match self.repository.update_broadcast(&updated, &event).await {
             Ok(updated) => Ok(updated),
@@ -754,6 +761,7 @@ impl SiagaService {
         updated.updated_at_ms = now_ms;
         updated.request_id = input.request_id.clone();
         updated.correlation_id = input.correlation_id.clone();
+        let updated = apply_siaga_broadcast_audit(updated)?;
 
         let actor_snapshot = SiagaActorSnapshot::new(
             &actor,
@@ -763,16 +771,15 @@ impl SiagaService {
             input.correlation_id.clone(),
             now_ms,
         );
-        let event = SiagaTimelineEvent {
-            event_id: crate::util::uuid_v7_without_dashes(),
-            siaga_id: updated.siaga_id.clone(),
-            event_type: SiagaTimelineEventType::SiagaBroadcastCancelled,
-            actor: actor_snapshot,
-            request_id: input.request_id,
-            correlation_id: input.correlation_id,
-            occurred_at_ms: now_ms,
-            metadata: Some(serde_json::json!({ "reason": input.reason })),
-        };
+        let event = make_siaga_event(
+            updated.siaga_id.clone(),
+            SiagaTimelineEventType::SiagaBroadcastCancelled,
+            actor_snapshot,
+            input.request_id,
+            input.correlation_id,
+            now_ms,
+            Some(serde_json::json!({ "reason": input.reason })),
+        )?;
 
         match self.repository.update_broadcast(&updated, &event).await {
             Ok(updated) => Ok(updated),
@@ -806,6 +813,138 @@ fn ensure_active_state(broadcast: &SiagaBroadcast) -> crate::DomainResult<()> {
     Err(DomainError::Validation(
         "operation allowed only in active state".into(),
     ))
+}
+
+fn siaga_broadcast_retention_tag(siaga_id: &str) -> String {
+    format!("siaga_broadcast:{siaga_id}")
+}
+
+fn siaga_timeline_retention_tag(siaga_id: &str, event_type: &SiagaTimelineEventType) -> String {
+    format!(
+        "siaga_timeline:{siaga_id}:{}",
+        siaga_timeline_event_to_string(event_type)
+    )
+}
+
+fn siaga_broadcast_event_type_to_string(event_type: &SiagaState) -> &'static str {
+    match event_type {
+        SiagaState::Draft => "draft",
+        SiagaState::Active => "active",
+        SiagaState::Resolved => "resolved",
+        SiagaState::Cancelled => "cancelled",
+    }
+}
+
+fn siaga_timeline_event_to_string(event_type: &SiagaTimelineEventType) -> &'static str {
+    match event_type {
+        SiagaTimelineEventType::SiagaBroadcastCreated => "siaga_broadcast_created",
+        SiagaTimelineEventType::SiagaBroadcastActivated => "siaga_broadcast_activated",
+        SiagaTimelineEventType::SiagaBroadcastUpdated => "siaga_broadcast_updated",
+        SiagaTimelineEventType::SiagaResponderJoined => "siaga_responder_joined",
+        SiagaTimelineEventType::SiagaResponderUpdated => "siaga_responder_updated",
+        SiagaTimelineEventType::SiagaBroadcastClosed => "siaga_broadcast_closed",
+        SiagaTimelineEventType::SiagaBroadcastCancelled => "siaga_broadcast_cancelled",
+    }
+}
+
+fn apply_siaga_broadcast_audit(mut broadcast: SiagaBroadcast) -> DomainResult<SiagaBroadcast> {
+    broadcast.retention_tag = siaga_broadcast_retention_tag(&broadcast.siaga_id);
+    let payload = SiagaBroadcastAuditPayload {
+        siaga_id: broadcast.siaga_id.clone(),
+        scope_id: broadcast.scope_id.clone(),
+        author_id: broadcast.author_id.clone(),
+        author_username: broadcast.author_username.clone(),
+        emergency_type: broadcast.emergency_type.clone(),
+        severity: broadcast.severity,
+        location: broadcast.location.clone(),
+        title: broadcast.title.clone(),
+        text: broadcast.text.clone(),
+        state: siaga_broadcast_event_type_to_string(&broadcast.state).to_string(),
+        created_at_ms: broadcast.created_at_ms,
+        updated_at_ms: broadcast.updated_at_ms,
+        request_id: broadcast.request_id.clone(),
+        correlation_id: broadcast.correlation_id.clone(),
+        responders: broadcast.responders.clone(),
+        closure: broadcast.closure.clone(),
+        retention_tag: broadcast.retention_tag.clone(),
+    };
+    broadcast.event_hash = crate::util::immutable_event_hash(&payload)?;
+    Ok(broadcast)
+}
+
+fn apply_siaga_timeline_audit(mut event: SiagaTimelineEvent) -> DomainResult<SiagaTimelineEvent> {
+    event.retention_tag = siaga_timeline_retention_tag(&event.siaga_id, &event.event_type);
+    let payload = SiagaTimelineAuditPayload {
+        event_id: event.event_id.clone(),
+        siaga_id: event.siaga_id.clone(),
+        event_type: siaga_timeline_event_to_string(&event.event_type).to_string(),
+        actor: event.actor.clone(),
+        request_id: event.request_id.clone(),
+        correlation_id: event.correlation_id.clone(),
+        occurred_at_ms: event.occurred_at_ms,
+        metadata: event.metadata.clone(),
+        retention_tag: event.retention_tag.clone(),
+    };
+    event.event_hash = crate::util::immutable_event_hash(&payload)?;
+    Ok(event)
+}
+
+fn make_siaga_event(
+    siaga_id: String,
+    event_type: SiagaTimelineEventType,
+    actor: SiagaActorSnapshot,
+    request_id: String,
+    correlation_id: String,
+    occurred_at_ms: i64,
+    metadata: Option<serde_json::Value>,
+) -> DomainResult<SiagaTimelineEvent> {
+    let event = SiagaTimelineEvent {
+        event_id: crate::util::uuid_v7_without_dashes(),
+        siaga_id,
+        event_type,
+        actor,
+        request_id,
+        correlation_id,
+        occurred_at_ms,
+        metadata,
+        event_hash: String::new(),
+        retention_tag: String::new(),
+    };
+    apply_siaga_timeline_audit(event)
+}
+
+#[derive(Clone, Serialize)]
+struct SiagaBroadcastAuditPayload {
+    siaga_id: String,
+    scope_id: String,
+    author_id: String,
+    author_username: String,
+    emergency_type: String,
+    severity: u8,
+    location: String,
+    title: String,
+    text: String,
+    state: String,
+    created_at_ms: i64,
+    updated_at_ms: i64,
+    request_id: String,
+    correlation_id: String,
+    responders: Vec<SiagaResponder>,
+    closure: Option<SiagaClosure>,
+    retention_tag: String,
+}
+
+#[derive(Clone, Serialize)]
+struct SiagaTimelineAuditPayload {
+    event_id: String,
+    siaga_id: String,
+    event_type: String,
+    actor: SiagaActorSnapshot,
+    request_id: String,
+    correlation_id: String,
+    occurred_at_ms: i64,
+    metadata: Option<serde_json::Value>,
+    retention_tag: String,
 }
 
 fn validate_create_broadcast(

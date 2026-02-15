@@ -1003,6 +1003,33 @@ impl SurrealTrackTransitionRepository {
 
     fn map_row_to_transition(row: SurrealTrackTransitionRow) -> DomainResult<TrackStateTransition> {
         let occurred_at_ms = Self::parse_occurred_at_ms(&row.occurred_at)?;
+        let track = row.track.clone();
+        let transition_type = Self::parse_mechanism(&row.transition_type)?;
+        let mechanism = Self::parse_mechanism(&row.mechanism)?;
+        let retention_tag = row.retention_tag.clone().unwrap_or_else(|| {
+            transition_retention_tag(&row.track, &row.from_stage, &row.to_stage)
+        });
+        let event_hash = match row.event_hash {
+            Some(event_hash) => event_hash,
+            None => {
+                let payload = TrackTransitionAuditPayload {
+                    track,
+                    transition_id: row.transition_id.clone(),
+                    entity_id: row.entity_id.clone(),
+                    request_id: row.request_id.clone(),
+                    correlation_id: row.correlation_id.clone(),
+                    from_stage: row.from_stage.clone(),
+                    to_stage: row.to_stage.clone(),
+                    transition_type: mechanism_to_string(&transition_type),
+                    mechanism: mechanism_to_string(&mechanism),
+                    actor: row.actor.clone(),
+                    occurred_at_ms,
+                    gate: row.gate.clone(),
+                    retention_tag: retention_tag.clone(),
+                };
+                gotong_domain::util::immutable_event_hash(&payload).unwrap_or_default()
+            }
+        };
         Ok(TrackStateTransition {
             track: row.track,
             transition_id: row.transition_id,
@@ -1016,6 +1043,8 @@ impl SurrealTrackTransitionRepository {
             actor: row.actor,
             occurred_at_ms,
             gate: row.gate,
+            event_hash,
+            retention_tag,
         })
     }
 
@@ -1041,6 +1070,8 @@ impl SurrealTrackTransitionRepository {
                 .format(&Rfc3339)
                 .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
             gate: transition.gate.clone(),
+            event_hash: transition.event_hash.clone(),
+            retention_tag: transition.retention_tag.clone(),
         })
     }
 
@@ -1084,6 +1115,10 @@ struct SurrealTrackTransitionRow {
     actor: TransitionActorSnapshot,
     occurred_at: String,
     gate: TransitionGateSnapshot,
+    #[serde(default)]
+    event_hash: Option<String>,
+    #[serde(default)]
+    retention_tag: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1102,6 +1137,33 @@ struct SurrealTrackTransitionCreateRow {
     #[serde(rename = "occurred_at")]
     occurred_at: String,
     gate: TransitionGateSnapshot,
+    event_hash: String,
+    retention_tag: String,
+}
+
+#[derive(Clone, Serialize)]
+struct TrackTransitionAuditPayload {
+    track: String,
+    transition_id: String,
+    entity_id: String,
+    request_id: String,
+    correlation_id: String,
+    from_stage: String,
+    to_stage: String,
+    transition_type: String,
+    mechanism: String,
+    actor: TransitionActorSnapshot,
+    occurred_at_ms: i64,
+    gate: TransitionGateSnapshot,
+    retention_tag: String,
+}
+
+fn transition_retention_tag(track: &str, from_stage: &str, to_stage: &str) -> String {
+    let track = track.trim().to_lowercase();
+    let from_stage = from_stage.trim().to_lowercase();
+    let to_stage = to_stage.trim().to_lowercase();
+    let composite = format!("{track}:{from_stage}->{to_stage}");
+    format!("transition:{composite}")
 }
 
 fn mechanism_to_string(mechanism: &TransitionMechanism) -> String {
@@ -2680,6 +2742,14 @@ impl SurrealVaultRepository {
                 serde_json::from_value::<SurrealVaultEntryRow>(row)
                     .map_err(|err| DomainError::Validation(format!("invalid vault row: {err}")))
                     .and_then(|row| {
+                        let vault_entry_id = row.vault_entry_id.clone();
+                        let retention_tag = row
+                            .retention_tag
+                            .clone()
+                            .unwrap_or_else(|| vault_entry_retention_tag(&vault_entry_id));
+                        let event_hash = row.event_hash.clone().unwrap_or_else(|| {
+                            Self::vault_entry_audit_hash(&row, &retention_tag).unwrap_or_default()
+                        });
                         let created_at_ms = Self::parse_datetime_ms(&row.created_at)?;
                         let updated_at_ms = Self::parse_datetime_ms(&row.updated_at)?;
                         let sealed_at_ms = match row.sealed_at {
@@ -2687,7 +2757,7 @@ impl SurrealVaultRepository {
                             None => None,
                         };
                         Ok(VaultEntry {
-                            vault_entry_id: row.vault_entry_id,
+                            vault_entry_id,
                             author_id: row.author_id,
                             author_username: row.author_username,
                             state: Self::parse_state(&row.state)?,
@@ -2704,6 +2774,8 @@ impl SurrealVaultRepository {
                             audit: row.audit,
                             request_id: row.request_id,
                             correlation_id: row.correlation_id,
+                            event_hash,
+                            retention_tag,
                         })
                     })
             })
@@ -2719,15 +2791,26 @@ impl SurrealVaultRepository {
                     })
                     .and_then(|row| {
                         let occurred_at_ms = Self::parse_datetime_ms(&row.occurred_at)?;
+                        let event_type = Self::parse_event_type(&row.event_type)?;
+                        let vault_entry_id = row.vault_entry_id.clone();
+                        let retention_tag = row.retention_tag.clone().unwrap_or_else(|| {
+                            vault_timeline_retention_tag(&vault_entry_id, &event_type)
+                        });
+                        let event_hash = row.event_hash.clone().unwrap_or_else(|| {
+                            Self::vault_timeline_audit_hash(&row, &retention_tag)
+                                .unwrap_or_default()
+                        });
                         Ok(VaultTimelineEvent {
                             event_id: row.event_id,
-                            vault_entry_id: row.vault_entry_id,
-                            event_type: Self::parse_event_type(&row.event_type)?,
+                            vault_entry_id,
+                            event_type: event_type.clone(),
                             actor: row.actor,
                             request_id: row.request_id,
                             correlation_id: row.correlation_id,
                             occurred_at_ms,
                             metadata: row.metadata,
+                            event_hash,
+                            retention_tag,
                         })
                     })
             })
@@ -2775,6 +2858,8 @@ impl SurrealVaultRepository {
             audit: entry.audit.clone(),
             request_id: entry.request_id.clone(),
             correlation_id: entry.correlation_id.clone(),
+            event_hash: entry.event_hash.clone(),
+            retention_tag: entry.retention_tag.clone(),
         })
     }
 
@@ -2795,6 +2880,8 @@ impl SurrealVaultRepository {
                 .format(&Rfc3339)
                 .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
             metadata: event.metadata.clone(),
+            event_hash: event.event_hash.clone(),
+            retention_tag: event.retention_tag.clone(),
         })
     }
 
@@ -2915,6 +3002,10 @@ struct SurrealVaultEntryRow {
     audit: Option<serde_json::Value>,
     request_id: String,
     correlation_id: String,
+    #[serde(default)]
+    event_hash: Option<String>,
+    #[serde(default)]
+    retention_tag: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -2936,6 +3027,8 @@ struct SurrealVaultEntryCreateRow {
     audit: Option<serde_json::Value>,
     request_id: String,
     correlation_id: String,
+    event_hash: String,
+    retention_tag: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2948,6 +3041,10 @@ struct SurrealVaultTimelineRow {
     correlation_id: String,
     occurred_at: String,
     metadata: Option<serde_json::Value>,
+    #[serde(default)]
+    event_hash: Option<String>,
+    #[serde(default)]
+    retention_tag: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2968,6 +3065,105 @@ struct SurrealVaultTimelineCreateRow {
     #[serde(rename = "occurred_at")]
     occurred_at: String,
     metadata: Option<serde_json::Value>,
+    event_hash: String,
+    retention_tag: String,
+}
+
+#[derive(Clone, Serialize)]
+struct VaultEntryAuditPayload {
+    vault_entry_id: String,
+    author_id: String,
+    author_username: String,
+    state: String,
+    created_at_ms: i64,
+    updated_at_ms: i64,
+    sealed_at_ms: Option<i64>,
+    sealed_hash: Option<String>,
+    encryption_key_id: Option<String>,
+    attachment_refs: Vec<String>,
+    wali: Vec<String>,
+    payload: Option<serde_json::Value>,
+    publish_target: Option<String>,
+    retention_policy: Option<serde_json::Value>,
+    audit: Option<serde_json::Value>,
+    request_id: String,
+    correlation_id: String,
+    retention_tag: String,
+}
+
+#[derive(Clone, Serialize)]
+struct VaultTimelineAuditPayload {
+    event_id: String,
+    vault_entry_id: String,
+    event_type: String,
+    actor: VaultActorSnapshot,
+    request_id: String,
+    correlation_id: String,
+    occurred_at_ms: i64,
+    metadata: Option<serde_json::Value>,
+    retention_tag: String,
+}
+
+fn vault_entry_retention_tag(vault_entry_id: &str) -> String {
+    format!("vault_entry:{vault_entry_id}")
+}
+
+fn vault_timeline_retention_tag(
+    vault_entry_id: &str,
+    event_type: &VaultTimelineEventType,
+) -> String {
+    format!("vault_timeline:{vault_entry_id}:{event_type:?}")
+}
+
+impl SurrealVaultRepository {
+    fn vault_entry_audit_hash(
+        row: &SurrealVaultEntryRow,
+        retention_tag: &str,
+    ) -> DomainResult<String> {
+        let payload = VaultEntryAuditPayload {
+            vault_entry_id: row.vault_entry_id.clone(),
+            author_id: row.author_id.clone(),
+            author_username: row.author_username.clone(),
+            state: row.state.clone(),
+            created_at_ms: Self::parse_datetime_ms(&row.created_at)?,
+            updated_at_ms: Self::parse_datetime_ms(&row.updated_at)?,
+            sealed_at_ms: match &row.sealed_at {
+                Some(value) => Some(Self::parse_datetime_ms(value)?),
+                None => None,
+            },
+            sealed_hash: row.sealed_hash.clone(),
+            encryption_key_id: row.encryption_key_id.clone(),
+            attachment_refs: row.attachment_refs.clone(),
+            wali: row.wali.clone(),
+            payload: row.payload.clone(),
+            publish_target: row.publish_target.clone(),
+            retention_policy: row.retention_policy.clone(),
+            audit: row.audit.clone(),
+            request_id: row.request_id.clone(),
+            correlation_id: row.correlation_id.clone(),
+            retention_tag: retention_tag.to_string(),
+        };
+        gotong_domain::util::immutable_event_hash(&payload)
+    }
+
+    fn vault_timeline_audit_hash(
+        row: &SurrealVaultTimelineRow,
+        retention_tag: &str,
+    ) -> DomainResult<String> {
+        let parsed_state = Self::parse_event_type(&row.event_type)?;
+        let payload = VaultTimelineAuditPayload {
+            event_id: row.event_id.clone(),
+            vault_entry_id: row.vault_entry_id.clone(),
+            event_type: Self::event_type_to_string(&parsed_state).to_string(),
+            actor: row.actor.clone(),
+            request_id: row.request_id.clone(),
+            correlation_id: row.correlation_id.clone(),
+            occurred_at_ms: Self::parse_datetime_ms(&row.occurred_at)?,
+            metadata: row.metadata.clone(),
+            retention_tag: retention_tag.to_string(),
+        };
+        gotong_domain::util::immutable_event_hash(&payload)
+    }
 }
 
 impl VaultRepository for SurrealVaultRepository {
@@ -3595,8 +3791,16 @@ impl SurrealSiagaRepository {
     }
 
     fn map_row_to_broadcast(row: SurrealSiagaBroadcastRow) -> DomainResult<SiagaBroadcast> {
+        let siaga_id = row.siaga_id.clone();
+        let retention_tag = row
+            .retention_tag
+            .clone()
+            .unwrap_or_else(|| siaga_broadcast_retention_tag(&siaga_id));
+        let event_hash = row.event_hash.clone().unwrap_or_else(|| {
+            Self::siaga_broadcast_audit_hash(&row, &retention_tag).unwrap_or_default()
+        });
         Ok(SiagaBroadcast {
-            siaga_id: row.siaga_id,
+            siaga_id,
             scope_id: row.scope_id,
             author_id: row.author_id,
             author_username: row.author_username,
@@ -3612,6 +3816,8 @@ impl SurrealSiagaRepository {
             correlation_id: row.correlation_id,
             responders: row.responders,
             closure: row.closure,
+            event_hash,
+            retention_tag,
         })
     }
 
@@ -3629,15 +3835,26 @@ impl SurrealSiagaRepository {
 
     fn map_timeline_row(row: SurrealSiagaTimelineRow) -> DomainResult<SiagaTimelineEvent> {
         let occurred_at_ms = Self::parse_datetime_ms(&row.occurred_at)?;
+        let event_type = Self::parse_event_type(&row.event_type)?;
+        let siaga_id = row.siaga_id.clone();
+        let retention_tag = row
+            .retention_tag
+            .clone()
+            .unwrap_or_else(|| siaga_timeline_retention_tag(&siaga_id, &event_type));
+        let event_hash = row.event_hash.clone().unwrap_or_else(|| {
+            Self::siaga_timeline_audit_hash(&row, &event_type, &retention_tag).unwrap_or_default()
+        });
         Ok(SiagaTimelineEvent {
             event_id: row.event_id,
-            siaga_id: row.siaga_id,
-            event_type: Self::parse_event_type(&row.event_type)?,
+            siaga_id,
+            event_type,
             actor: row.actor,
             request_id: row.request_id,
             correlation_id: row.correlation_id,
             occurred_at_ms,
             metadata: row.metadata,
+            event_hash,
+            retention_tag,
         })
     }
 
@@ -3683,6 +3900,8 @@ impl SurrealSiagaRepository {
             correlation_id: broadcast.correlation_id.clone(),
             responders: broadcast.responders.clone(),
             closure: broadcast.closure.clone(),
+            event_hash: broadcast.event_hash.clone(),
+            retention_tag: broadcast.retention_tag.clone(),
         })
     }
 
@@ -3703,6 +3922,8 @@ impl SurrealSiagaRepository {
                 .format(&Rfc3339)
                 .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
             metadata: event.metadata.clone(),
+            event_hash: event.event_hash.clone(),
+            retention_tag: event.retention_tag.clone(),
         })
     }
 
@@ -3793,6 +4014,8 @@ struct SurrealSiagaBroadcastCreateRow {
     correlation_id: String,
     responders: Vec<SiagaResponder>,
     closure: Option<SiagaClosure>,
+    event_hash: String,
+    retention_tag: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -3813,6 +4036,10 @@ struct SurrealSiagaBroadcastRow {
     correlation_id: String,
     responders: Vec<SiagaResponder>,
     closure: Option<SiagaClosure>,
+    #[serde(default)]
+    event_hash: Option<String>,
+    #[serde(default)]
+    retention_tag: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -3827,6 +4054,8 @@ struct SurrealSiagaTimelineCreateRow {
     #[serde(rename = "occurred_at")]
     occurred_at: String,
     metadata: Option<serde_json::Value>,
+    event_hash: String,
+    retention_tag: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -3839,11 +4068,115 @@ struct SurrealSiagaTimelineRow {
     correlation_id: String,
     occurred_at: String,
     metadata: Option<serde_json::Value>,
+    #[serde(default)]
+    event_hash: Option<String>,
+    #[serde(default)]
+    retention_tag: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct SurrealSiagaTimelineRequestRow {
     siaga_id: String,
+}
+
+#[derive(Clone, Serialize)]
+struct SiagaBroadcastAuditPayload {
+    siaga_id: String,
+    scope_id: String,
+    author_id: String,
+    author_username: String,
+    emergency_type: String,
+    severity: u8,
+    location: String,
+    title: String,
+    text: String,
+    state: String,
+    created_at_ms: i64,
+    updated_at_ms: i64,
+    request_id: String,
+    correlation_id: String,
+    responders: Vec<SiagaResponder>,
+    closure: Option<SiagaClosure>,
+    retention_tag: String,
+}
+
+#[derive(Clone, Serialize)]
+struct SiagaTimelineAuditPayload {
+    event_id: String,
+    siaga_id: String,
+    event_type: String,
+    actor: SiagaActorSnapshot,
+    request_id: String,
+    correlation_id: String,
+    occurred_at_ms: i64,
+    metadata: Option<serde_json::Value>,
+    retention_tag: String,
+}
+
+fn siaga_broadcast_retention_tag(siaga_id: &str) -> String {
+    format!("siaga_broadcast:{siaga_id}")
+}
+
+fn siaga_timeline_retention_tag(siaga_id: &str, event_type: &SiagaTimelineEventType) -> String {
+    format!(
+        "siaga_timeline:{siaga_id}:{}",
+        match event_type {
+            SiagaTimelineEventType::SiagaBroadcastCreated => "siaga_broadcast_created",
+            SiagaTimelineEventType::SiagaBroadcastActivated => "siaga_broadcast_activated",
+            SiagaTimelineEventType::SiagaBroadcastUpdated => "siaga_broadcast_updated",
+            SiagaTimelineEventType::SiagaResponderJoined => "siaga_responder_joined",
+            SiagaTimelineEventType::SiagaResponderUpdated => "siaga_responder_updated",
+            SiagaTimelineEventType::SiagaBroadcastClosed => "siaga_broadcast_closed",
+            SiagaTimelineEventType::SiagaBroadcastCancelled => "siaga_broadcast_cancelled",
+        }
+    )
+}
+
+impl SurrealSiagaRepository {
+    fn siaga_broadcast_audit_hash(
+        row: &SurrealSiagaBroadcastRow,
+        retention_tag: &str,
+    ) -> DomainResult<String> {
+        let payload = SiagaBroadcastAuditPayload {
+            siaga_id: row.siaga_id.clone(),
+            scope_id: row.scope_id.clone(),
+            author_id: row.author_id.clone(),
+            author_username: row.author_username.clone(),
+            emergency_type: row.emergency_type.clone(),
+            severity: row.severity,
+            location: row.location.clone(),
+            title: row.title.clone(),
+            text: row.text.clone(),
+            state: row.state.clone(),
+            created_at_ms: Self::parse_datetime_ms(&row.created_at)?,
+            updated_at_ms: Self::parse_datetime_ms(&row.updated_at)?,
+            request_id: row.request_id.clone(),
+            correlation_id: row.correlation_id.clone(),
+            responders: row.responders.clone(),
+            closure: row.closure.clone(),
+            retention_tag: retention_tag.to_string(),
+        };
+        gotong_domain::util::immutable_event_hash(&payload)
+    }
+
+    fn siaga_timeline_audit_hash(
+        row: &SurrealSiagaTimelineRow,
+        event_type: &SiagaTimelineEventType,
+        retention_tag: &str,
+    ) -> DomainResult<String> {
+        let payload = SiagaTimelineAuditPayload {
+            event_id: row.event_id.clone(),
+            siaga_id: row.siaga_id.clone(),
+            event_type: Self::event_type_to_string(event_type).to_string(),
+            actor: row.actor.clone(),
+            request_id: row.request_id.clone(),
+            correlation_id: row.correlation_id.clone(),
+            occurred_at_ms: Self::parse_datetime_ms(&row.occurred_at)?,
+            metadata: row.metadata.clone(),
+            retention_tag: retention_tag.to_string(),
+        };
+        gotong_domain::util::immutable_event_hash(&payload)
+    }
 }
 
 impl SurrealSiagaRepository {
@@ -4359,6 +4692,8 @@ impl SurrealModerationRepository {
             request_id: content.request_id.clone(),
             correlation_id: content.correlation_id.clone(),
             request_ts_ms: content.request_ts_ms,
+            event_hash: content.event_hash.clone(),
+            retention_tag: content.retention_tag.clone(),
         })
     }
 
@@ -4392,10 +4727,20 @@ impl SurrealModerationRepository {
             violations: decision.violations.clone(),
             request_id: decision.request_id.clone(),
             correlation_id: decision.correlation_id.clone(),
+            event_hash: decision.event_hash.clone(),
+            retention_tag: decision.retention_tag.clone(),
         })
     }
 
     fn map_content_row(row: SurrealModerationContentRow) -> DomainResult<ContentModeration> {
+        let retention_tag = row
+            .retention_tag
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| moderation_content_retention_tag(&row.content_id));
+        let event_hash = row.event_hash.as_ref().cloned().unwrap_or_else(|| {
+            Self::moderation_content_audit_hash(&row, &retention_tag).unwrap_or_default()
+        });
         Ok(ContentModeration {
             content_id: row.content_id,
             content_type: row.content_type,
@@ -4424,10 +4769,19 @@ impl SurrealModerationRepository {
             request_id: row.request_id,
             correlation_id: row.correlation_id,
             request_ts_ms: row.request_ts_ms,
+            event_hash,
+            retention_tag,
         })
     }
 
     fn map_decision_row(row: SurrealModerationDecisionRow) -> DomainResult<ModerationDecision> {
+        let retention_tag =
+            row.retention_tag.as_ref().cloned().unwrap_or_else(|| {
+                moderation_decision_retention_tag(&row.content_id, &row.request_id)
+            });
+        let event_hash = row.event_hash.as_ref().cloned().unwrap_or_else(|| {
+            Self::moderation_decision_audit_hash(&row, &retention_tag).unwrap_or_default()
+        });
         Ok(ModerationDecision {
             decision_id: row.decision_id,
             content_id: row.content_id,
@@ -4453,6 +4807,8 @@ impl SurrealModerationRepository {
             violations: row.violations,
             request_id: row.request_id,
             correlation_id: row.correlation_id,
+            event_hash,
+            retention_tag,
         })
     }
 
@@ -4515,6 +4871,8 @@ struct SurrealModerationContentCreateRow {
     request_id: String,
     correlation_id: String,
     request_ts_ms: i64,
+    event_hash: String,
+    retention_tag: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -4538,6 +4896,10 @@ struct SurrealModerationContentRow {
     request_id: String,
     correlation_id: String,
     request_ts_ms: i64,
+    #[serde(default)]
+    event_hash: Option<String>,
+    #[serde(default)]
+    retention_tag: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -4558,6 +4920,8 @@ struct SurrealModerationDecisionCreateRow {
     violations: Vec<ModerationViolation>,
     request_id: String,
     correlation_id: String,
+    event_hash: String,
+    retention_tag: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -4578,6 +4942,136 @@ struct SurrealModerationDecisionRow {
     violations: Vec<ModerationViolation>,
     request_id: String,
     correlation_id: String,
+    #[serde(default)]
+    event_hash: Option<String>,
+    #[serde(default)]
+    retention_tag: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+struct ModerationContentAuditPayload {
+    content_id: String,
+    content_type: Option<String>,
+    author_id: String,
+    author_username: Option<String>,
+    moderation_status: String,
+    moderation_action: String,
+    reason_code: Option<String>,
+    confidence: f64,
+    decided_at_ms: i64,
+    decided_by: String,
+    hold_expires_at_ms: Option<i64>,
+    auto_release_if_no_action: bool,
+    appeal_window_until_ms: Option<i64>,
+    reasoning: Option<String>,
+    violations: Vec<ModerationViolation>,
+    last_decision_id: Option<String>,
+    request_id: String,
+    correlation_id: String,
+    request_ts_ms: i64,
+    retention_tag: String,
+}
+
+#[derive(Clone, Serialize)]
+struct ModerationDecisionAuditPayload {
+    decision_id: String,
+    content_id: String,
+    content_type: Option<String>,
+    moderation_status: String,
+    moderation_action: String,
+    reason_code: Option<String>,
+    confidence: f64,
+    decided_at_ms: i64,
+    actor: ModerationActorSnapshot,
+    hold_expires_at_ms: Option<i64>,
+    auto_release_if_no_action: bool,
+    appeal_window_until_ms: Option<i64>,
+    reasoning: Option<String>,
+    violations: Vec<ModerationViolation>,
+    request_id: String,
+    correlation_id: String,
+    retention_tag: String,
+}
+
+fn moderation_content_retention_tag(content_id: &str) -> String {
+    format!("moderation_content:{content_id}")
+}
+
+fn moderation_decision_retention_tag(content_id: &str, request_id: &str) -> String {
+    format!("moderation_decision:{content_id}:{request_id}")
+}
+
+impl SurrealModerationRepository {
+    fn moderation_content_audit_hash(
+        row: &SurrealModerationContentRow,
+        retention_tag: &str,
+    ) -> DomainResult<String> {
+        let payload = ModerationContentAuditPayload {
+            content_id: row.content_id.clone(),
+            content_type: row.content_type.clone(),
+            author_id: row.author_id.clone(),
+            author_username: row.author_username.clone(),
+            moderation_status: row.moderation_status.clone(),
+            moderation_action: row.moderation_action.clone(),
+            reason_code: row.reason_code.clone(),
+            confidence: row.confidence,
+            decided_at_ms: Self::parse_timestamp(&row.decided_at)?,
+            decided_by: row.decided_by.clone(),
+            hold_expires_at_ms: row
+                .hold_expires_at
+                .as_deref()
+                .map(Self::parse_timestamp)
+                .transpose()?,
+            auto_release_if_no_action: row.auto_release_if_no_action,
+            appeal_window_until_ms: row
+                .appeal_window_until
+                .as_deref()
+                .map(Self::parse_timestamp)
+                .transpose()?,
+            reasoning: row.reasoning.clone(),
+            violations: row.violations.clone(),
+            last_decision_id: row.last_decision_id.clone(),
+            request_id: row.request_id.clone(),
+            correlation_id: row.correlation_id.clone(),
+            request_ts_ms: row.request_ts_ms,
+            retention_tag: retention_tag.to_string(),
+        };
+        gotong_domain::util::immutable_event_hash(&payload)
+    }
+
+    fn moderation_decision_audit_hash(
+        row: &SurrealModerationDecisionRow,
+        retention_tag: &str,
+    ) -> DomainResult<String> {
+        let payload = ModerationDecisionAuditPayload {
+            decision_id: row.decision_id.clone(),
+            content_id: row.content_id.clone(),
+            content_type: row.content_type.clone(),
+            moderation_status: row.moderation_status.clone(),
+            moderation_action: row.moderation_action.clone(),
+            reason_code: row.reason_code.clone(),
+            confidence: row.confidence,
+            decided_at_ms: Self::parse_timestamp(&row.decided_at)?,
+            actor: row.actor.clone(),
+            hold_expires_at_ms: row
+                .hold_expires_at
+                .as_deref()
+                .map(Self::parse_timestamp)
+                .transpose()?,
+            auto_release_if_no_action: row.auto_release_if_no_action,
+            appeal_window_until_ms: row
+                .appeal_window_until
+                .as_deref()
+                .map(Self::parse_timestamp)
+                .transpose()?,
+            reasoning: row.reasoning.clone(),
+            violations: row.violations.clone(),
+            request_id: row.request_id.clone(),
+            correlation_id: row.correlation_id.clone(),
+            retention_tag: retention_tag.to_string(),
+        };
+        gotong_domain::util::immutable_event_hash(&payload)
+    }
 }
 
 impl ModerationRepository for SurrealModerationRepository {
