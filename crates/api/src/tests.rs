@@ -5,8 +5,8 @@ use axum::body::Body;
 use axum::body::to_bytes;
 use axum::http::{Request, StatusCode};
 use gotong_domain::discovery::{
-    DiscoveryService, FEED_SOURCE_CONTRIBUTION, FeedIngestInput, NOTIF_TYPE_SYSTEM,
-    NotificationIngestInput,
+    DiscoveryService, FEED_SOURCE_CONTRIBUTION, FeedIngestInput, FeedListQuery, NOTIF_TYPE_SYSTEM,
+    NotificationIngestInput, SearchListQuery,
 };
 use gotong_domain::idempotency::InMemoryIdempotencyStore;
 use gotong_domain::identity::ActorIdentity;
@@ -1084,6 +1084,218 @@ async fn discovery_feed_and_search_endpoints() {
         .collect();
     assert_eq!(private_feed_ids.len(), 1);
     assert_eq!(private_feed_ids[0], feed_a.feed_id.as_str());
+}
+
+#[tokio::test]
+async fn discovery_feed_pagination_skips_hidden_rows_for_actor_visibility() {
+    let (state, app) = test_app_state_router();
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let reader = actor_identity_for_tests("reader-user");
+    let hidden_actor = actor_identity_for_tests("hidden-user");
+
+    for idx in 0..6_usize {
+        let is_visible = idx >= 3;
+        let occurred_at_ms = 1_000 - (idx as i64 * 100);
+        service
+            .ingest_feed(FeedIngestInput {
+                source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+                source_id: format!("seed-hidden-pagination-{idx}"),
+                actor: if is_visible {
+                    reader.clone()
+                } else {
+                    hidden_actor.clone()
+                },
+                title: format!("seed {idx}"),
+                summary: Some("pagination test payload".to_string()),
+                track: None,
+                stage: None,
+                scope_id: None,
+                privacy_level: Some(if is_visible { "public" } else { "private" }.to_string()),
+                occurred_at_ms: Some(occurred_at_ms),
+                request_id: format!("pagination-feed-{idx}"),
+                correlation_id: format!("pagination-corr-{idx}"),
+                request_ts_ms: Some(occurred_at_ms),
+                participant_ids: Vec::new(),
+                payload: None,
+            })
+            .await
+            .expect("seed feed row");
+    }
+
+    let first_page = service
+        .list_feed(FeedListQuery {
+            actor_id: reader.user_id.clone(),
+            cursor: None,
+            limit: Some(2),
+            scope_id: None,
+            track: None,
+            stage: None,
+            privacy_level: None,
+            from_ms: None,
+            to_ms: None,
+            involvement_only: false,
+        })
+        .await
+        .expect("first page");
+
+    assert_eq!(first_page.items.len(), 2);
+    let first_page_ts: Vec<i64> = first_page
+        .items
+        .iter()
+        .map(|item| item.occurred_at_ms)
+        .collect();
+    assert_eq!(first_page_ts, vec![700, 600]);
+    let cursor = first_page.next_cursor.expect("cursor present");
+
+    let second_page = service
+        .list_feed(FeedListQuery {
+            actor_id: reader.user_id.clone(),
+            cursor: Some(cursor),
+            limit: Some(2),
+            scope_id: None,
+            track: None,
+            stage: None,
+            privacy_level: None,
+            from_ms: None,
+            to_ms: None,
+            involvement_only: false,
+        })
+        .await
+        .expect("second page");
+
+    assert_eq!(second_page.items.len(), 1);
+    assert_eq!(second_page.items[0].occurred_at_ms, 500);
+    assert!(second_page.next_cursor.is_none());
+
+    let response = Request::builder()
+        .method("GET")
+        .uri("/v1/feed?limit=2")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(response).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let feed_list: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let count = feed_list
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items")
+        .len();
+    assert_eq!(count, 2);
+}
+
+#[tokio::test]
+async fn discovery_search_pagination_skips_hidden_rows_for_actor_visibility() {
+    let (state, app) = test_app_state_router();
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let reader = actor_identity_for_tests("reader-user");
+    let hidden_actor = actor_identity_for_tests("hidden-user");
+
+    for idx in 0..6_usize {
+        let is_visible = idx >= 3;
+        let occurred_at_ms = 1_000 - (idx as i64 * 100);
+        service
+            .ingest_feed(FeedIngestInput {
+                source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+                source_id: format!("seed-search-hidden-pagination-{idx}"),
+                actor: if is_visible {
+                    reader.clone()
+                } else {
+                    hidden_actor.clone()
+                },
+                title: format!("seed-search {idx}"),
+                summary: Some("pagination search payload".to_string()),
+                track: None,
+                stage: None,
+                scope_id: None,
+                privacy_level: Some(if is_visible { "public" } else { "private" }.to_string()),
+                occurred_at_ms: Some(occurred_at_ms),
+                request_id: format!("search-pagination-feed-{idx}"),
+                correlation_id: format!("search-pagination-corr-{idx}"),
+                request_ts_ms: Some(occurred_at_ms),
+                participant_ids: Vec::new(),
+                payload: None,
+            })
+            .await
+            .expect("seed feed row");
+    }
+
+    let first_page = service
+        .search(SearchListQuery {
+            actor_id: reader.user_id.clone(),
+            query_text: "seed-search".into(),
+            cursor: None,
+            limit: Some(2),
+            scope_id: None,
+            track: None,
+            stage: None,
+            privacy_level: None,
+            from_ms: None,
+            to_ms: None,
+            involvement_only: false,
+            exclude_vault: false,
+        })
+        .await
+        .expect("first page");
+
+    assert_eq!(first_page.items.len(), 2);
+    let first_page_ts: Vec<i64> = first_page
+        .items
+        .iter()
+        .map(|result| result.item.occurred_at_ms)
+        .collect();
+    assert_eq!(first_page_ts, vec![700, 600]);
+    let cursor = first_page.next_cursor.expect("cursor present");
+
+    let second_page = service
+        .search(SearchListQuery {
+            actor_id: reader.user_id.clone(),
+            query_text: "seed-search".into(),
+            cursor: Some(cursor),
+            limit: Some(2),
+            scope_id: None,
+            track: None,
+            stage: None,
+            privacy_level: None,
+            from_ms: None,
+            to_ms: None,
+            involvement_only: false,
+            exclude_vault: false,
+        })
+        .await
+        .expect("second page");
+
+    assert_eq!(second_page.items.len(), 1);
+    assert_eq!(second_page.items[0].item.occurred_at_ms, 500);
+    assert!(second_page.next_cursor.is_none());
+
+    let search_request = Request::builder()
+        .method("GET")
+        .uri("/v1/search?query_text=seed-search&limit=2")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let search_response = app.clone().oneshot(search_request).await.expect("response");
+    assert_eq!(search_response.status(), StatusCode::OK);
+    let body = to_bytes(search_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let search_list: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let count = search_list
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items")
+        .len();
+    assert_eq!(count, 2);
 }
 
 #[tokio::test]

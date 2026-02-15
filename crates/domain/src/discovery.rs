@@ -12,6 +12,7 @@ use crate::{DomainResult, error::DomainError, identity::ActorIdentity};
 
 const DEFAULT_LIMIT: usize = 20;
 const MAX_LIMIT: usize = 50;
+const MAX_SEARCH_FETCH_LIMIT: usize = 1_024;
 const ONE_WEEK_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
 pub const FEED_SOURCE_CONTRIBUTION: &str = "contribution";
@@ -231,27 +232,52 @@ impl DiscoveryService {
     pub async fn list_feed(&self, query: FeedListQuery) -> DomainResult<PagedFeed> {
         validate_actor_id(&query.actor_id)?;
         let limit = normalize_limit(query.limit)?;
-        let (cursor_ms, cursor_feed_id) = parse_feed_cursor(query.cursor.as_deref())?;
+        let (mut cursor_ms, mut cursor_feed_id) = parse_feed_cursor(query.cursor.as_deref())?;
         let actor_id = query.actor_id.clone();
+        let mut items = Vec::new();
+        let fetch_limit = limit + 1;
 
-        let repo_query = FeedRepositoryQuery {
-            actor_id: actor_id.clone(),
-            cursor_occurred_at_ms: cursor_ms,
-            cursor_feed_id,
-            limit: limit + 1,
-            scope_id: query.scope_id,
-            track: query.track,
-            stage: query.stage,
-            privacy_level: query.privacy_level,
-            from_ms: query.from_ms,
-            to_ms: query.to_ms,
-            involvement_only: query.involvement_only,
-        };
-        let mut items = self.feed_repo.list_feed(&repo_query).await?;
-        items.retain(|item| is_visible_to_actor(&actor_id, item));
+        loop {
+            let repo_query = FeedRepositoryQuery {
+                actor_id: actor_id.clone(),
+                cursor_occurred_at_ms: cursor_ms,
+                cursor_feed_id: cursor_feed_id.clone(),
+                limit: fetch_limit,
+                scope_id: query.scope_id.clone(),
+                track: query.track.clone(),
+                stage: query.stage.clone(),
+                privacy_level: query.privacy_level.clone(),
+                from_ms: query.from_ms,
+                to_ms: query.to_ms,
+                involvement_only: query.involvement_only,
+            };
+            let rows = self.feed_repo.list_feed(&repo_query).await?;
+            for item in rows.iter() {
+                if is_visible_to_actor(&actor_id, item) {
+                    items.push(item.clone());
+                }
+            }
+
+            if items.len() > limit || rows.len() < fetch_limit {
+                break;
+            }
+
+            if let Some(last_row) = rows.last() {
+                if cursor_ms == Some(last_row.occurred_at_ms)
+                    && cursor_feed_id.as_deref() == Some(last_row.feed_id.as_str())
+                {
+                    break;
+                }
+                cursor_ms = Some(last_row.occurred_at_ms);
+                cursor_feed_id = Some(last_row.feed_id.clone());
+            } else {
+                break;
+            }
+        }
 
         let next_cursor = items
-            .get(limit)
+            .get(limit.saturating_sub(1))
+            .filter(|_| items.len() > limit)
             .map(|item| make_feed_cursor(item.occurred_at_ms, &item.feed_id));
         if items.len() > limit {
             items.truncate(limit);
@@ -268,34 +294,55 @@ impl DiscoveryService {
         let limit = normalize_limit(query.limit)?;
         let query_text = query.query_text.trim().to_string();
         let search_cursor = parse_search_cursor(query.cursor.as_deref())?;
+        let mut results = Vec::new();
+        let mut seen_feed_ids = std::collections::HashSet::new();
+        let fetch_limit = limit + 1;
+        let mut query_limit = fetch_limit;
 
-        let repo_query = FeedRepositorySearchQuery {
-            actor_id: query.actor_id.clone(),
-            limit: limit + 1,
-            scope_id: query.scope_id,
-            track: query.track,
-            stage: query.stage,
-            privacy_level: query.privacy_level,
-            from_ms: query.from_ms,
-            to_ms: query.to_ms,
-            involvement_only: query.involvement_only,
-            exclude_vault: query.exclude_vault,
-            query_text: query_text.clone(),
-        };
+        loop {
+            let repo_query = FeedRepositorySearchQuery {
+                actor_id: query.actor_id.clone(),
+                limit: query_limit,
+                scope_id: query.scope_id.clone(),
+                track: query.track.clone(),
+                stage: query.stage.clone(),
+                privacy_level: query.privacy_level.clone(),
+                from_ms: query.from_ms,
+                to_ms: query.to_ms,
+                involvement_only: query.involvement_only,
+                exclude_vault: query.exclude_vault,
+                query_text: query_text.clone(),
+            };
 
-        let mut rows = self.feed_repo.search_feed(&repo_query).await?;
-        rows.retain(|item| is_visible_to_actor(&query.actor_id, item));
-
-        let mut results = Vec::with_capacity(rows.len());
-        for item in rows {
-            if query.exclude_vault && item.source_type == FEED_SOURCE_VAULT {
-                continue;
+            let rows = self.feed_repo.search_feed(&repo_query).await?;
+            for item in rows.iter() {
+                if !is_visible_to_actor(&query.actor_id, item) {
+                    continue;
+                }
+                if query.exclude_vault && item.source_type == FEED_SOURCE_VAULT {
+                    continue;
+                }
+                if !matches_search_text(item, &query_text) {
+                    continue;
+                }
+                if !seen_feed_ids.insert(item.feed_id.clone()) {
+                    continue;
+                }
+                let score = score_query_match(item, &query_text);
+                results.push(SearchResult {
+                    item: item.clone(),
+                    score,
+                });
             }
-            if !matches_search_text(&item, &query_text) {
-                continue;
+
+            if results.len() > limit || rows.len() < fetch_limit {
+                break;
             }
-            let score = score_query_match(&item, &query_text);
-            results.push(SearchResult { item, score });
+
+            if rows.len() < query_limit || query_limit >= MAX_SEARCH_FETCH_LIMIT {
+                break;
+            }
+            query_limit = (query_limit * 2).min(MAX_SEARCH_FETCH_LIMIT);
         }
 
         results.sort_by(|left, right| {
@@ -312,13 +359,16 @@ impl DiscoveryService {
             });
         }
 
-        let next_cursor = results.get(limit).map(|result| {
-            make_search_cursor(
-                result.score,
-                result.item.occurred_at_ms,
-                &result.item.feed_id,
-            )
-        });
+        let next_cursor = results
+            .get(limit.saturating_sub(1))
+            .filter(|_| results.len() > limit)
+            .map(|result| {
+                make_search_cursor(
+                    result.score,
+                    result.item.occurred_at_ms,
+                    &result.item.feed_id,
+                )
+            });
         if results.len() > limit {
             results.truncate(limit);
         }

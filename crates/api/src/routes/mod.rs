@@ -22,7 +22,8 @@ use gotong_domain::{
     },
     contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
     discovery::{
-        DiscoveryService, FeedListQuery, InAppNotification, NotificationListQuery, PagedFeed,
+        DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_TRANSITION, FEED_SOURCE_VOUCH,
+        FeedIngestInput, FeedListQuery, InAppNotification, NotificationListQuery, PagedFeed,
         PagedNotifications, SearchListQuery, SearchPage, WeeklyDigest,
     },
     error::DomainError,
@@ -368,9 +369,22 @@ async fn create_contribution(
             };
 
             let contribution = service
-                .create(actor, request_id, correlation_id, input)
+                .create(
+                    actor.clone(),
+                    request_id.clone(),
+                    correlation_id.clone(),
+                    input,
+                )
                 .await
                 .map_err(map_domain_error)?;
+            ingest_discovery_contribution_feed(
+                &state,
+                &actor,
+                request_id.to_string(),
+                correlation_id.to_string(),
+                &contribution,
+            )
+            .await?;
 
             let response = IdempotencyResponse {
                 status_code: StatusCode::CREATED.as_u16(),
@@ -787,9 +801,22 @@ async fn submit_vouch(
             };
 
             let vouch = service
-                .submit(actor, request_id, correlation_id, input)
+                .submit(
+                    actor.clone(),
+                    request_id.clone(),
+                    correlation_id.clone(),
+                    input,
+                )
                 .await
                 .map_err(map_domain_error)?;
+            ingest_discovery_vouch_feed(
+                &state,
+                &actor,
+                request_id.clone(),
+                correlation_id.clone(),
+                &vouch,
+            )
+            .await?;
 
             let response = IdempotencyResponse {
                 status_code: StatusCode::CREATED.as_u16(),
@@ -1020,8 +1047,8 @@ async fn create_transition(
                 transition_action: payload.transition_action,
                 transition_type: payload.transition_type,
                 mechanism: payload.mechanism,
-                request_id,
-                correlation_id,
+                request_id: request_id.clone(),
+                correlation_id: correlation_id.clone(),
                 track_roles: payload.track_roles,
                 gate_status: payload.gate_status,
                 gate_metadata: payload.gate_metadata,
@@ -1030,9 +1057,16 @@ async fn create_transition(
                 closes_at_ms,
             };
             let transition = service
-                .track_state_transition(actor, token_role, input)
+                .track_state_transition(actor.clone(), token_role, input)
                 .await
                 .map_err(map_domain_error)?;
+            ingest_discovery_transition_feed(
+                &state,
+                &transition,
+                request_id.to_string(),
+                correlation_id.to_string(),
+            )
+            .await?;
 
             if transition.transition_type == TransitionMechanism::Timer {
                 let closes_at_ms = closes_at_ms.ok_or(ApiError::Internal)?;
@@ -1685,6 +1719,119 @@ async fn remove_vault_trustee(
 
 fn is_vault_visible_to_actor(actor: &ActorIdentity, entry: &VaultEntry) -> bool {
     entry.author_id == actor.user_id || entry.wali.iter().any(|wali_id| wali_id == &actor.user_id)
+}
+
+async fn ingest_discovery_contribution_feed(
+    state: &AppState,
+    actor: &ActorIdentity,
+    request_id: String,
+    correlation_id: String,
+    contribution: &Contribution,
+) -> Result<(), ApiError> {
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let input = FeedIngestInput {
+        source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+        source_id: contribution.contribution_id.clone(),
+        actor: actor.clone(),
+        title: contribution.title.clone(),
+        summary: contribution.description.clone(),
+        track: None,
+        stage: None,
+        scope_id: None,
+        privacy_level: Some("public".to_string()),
+        occurred_at_ms: Some(contribution.created_at_ms),
+        request_id,
+        correlation_id,
+        request_ts_ms: Some(contribution.created_at_ms),
+        participant_ids: vec![],
+        payload: None,
+    };
+    service.ingest_feed(input).await.map_err(map_domain_error)?;
+    Ok(())
+}
+
+async fn ingest_discovery_vouch_feed(
+    state: &AppState,
+    actor: &ActorIdentity,
+    request_id: String,
+    correlation_id: String,
+    vouch: &Vouch,
+) -> Result<(), ApiError> {
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let summary = vouch
+        .message
+        .clone()
+        .or_else(|| Some(format!("Vouch from {}", vouch.voucher_username)));
+    let input = FeedIngestInput {
+        source_type: FEED_SOURCE_VOUCH.to_string(),
+        source_id: vouch.vouch_id.clone(),
+        actor: actor.clone(),
+        title: format!("Vouch for {}", vouch.vouchee_id),
+        summary,
+        track: None,
+        stage: None,
+        scope_id: None,
+        privacy_level: Some("public".to_string()),
+        occurred_at_ms: Some(vouch.created_at_ms),
+        request_id,
+        correlation_id,
+        request_ts_ms: Some(vouch.created_at_ms),
+        participant_ids: vec![vouch.vouchee_id.clone()],
+        payload: Some(serde_json::json!({
+            "vouchee_id": vouch.vouchee_id,
+            "skill_id": vouch.skill_id,
+            "weight_hint": vouch.weight_hint,
+            "message": vouch.message,
+        })),
+    };
+    service.ingest_feed(input).await.map_err(map_domain_error)?;
+    Ok(())
+}
+
+async fn ingest_discovery_transition_feed(
+    state: &AppState,
+    transition: &TrackStateTransition,
+    request_id: String,
+    correlation_id: String,
+) -> Result<(), ApiError> {
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let actor = ActorIdentity {
+        user_id: transition.actor.user_id.clone(),
+        username: transition.actor.username.clone(),
+    };
+    let input = FeedIngestInput {
+        source_type: FEED_SOURCE_TRANSITION.to_string(),
+        source_id: transition.transition_id.clone(),
+        actor,
+        title: format!(
+            "{} moved {} → {}",
+            transition.entity_id, transition.from_stage, transition.to_stage
+        ),
+        summary: Some(format!(
+            "Track {} transition by {}",
+            transition.track, transition.actor.user_id
+        )),
+        track: Some(transition.track.clone()),
+        stage: Some(transition.to_stage.clone()),
+        scope_id: None,
+        privacy_level: Some("public".to_string()),
+        occurred_at_ms: Some(transition.occurred_at_ms),
+        request_id,
+        correlation_id,
+        request_ts_ms: Some(transition.occurred_at_ms),
+        participant_ids: vec![
+            transition.actor.user_id.clone(),
+            transition.entity_id.clone(),
+        ],
+        payload: Some(serde_json::json!({
+            "track": transition.track,
+            "from_stage": transition.from_stage,
+            "to_stage": transition.to_stage,
+            "gate_status": transition.gate.status,
+        })),
+    };
+    service.ingest_feed(input).await.map_err(map_domain_error)?;
+    Ok(())
 }
 
 #[derive(Debug, Deserialize)]
