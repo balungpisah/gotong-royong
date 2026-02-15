@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use futures_util::StreamExt;
 use gotong_domain::chat::ChatMessage;
 use gotong_domain::idempotency::{IdempotencyConfig, IdempotencyService};
 use gotong_domain::ports::idempotency::IdempotencyStore;
@@ -16,6 +17,7 @@ use gotong_domain::ports::{
     vouches::VouchRepository,
     webhook::WebhookOutboxRepository,
 };
+use gotong_domain::util::uuid_v7_without_dashes;
 use gotong_infra::config::AppConfig;
 use gotong_infra::db::DbConfig;
 use gotong_infra::idempotency::RedisIdempotencyStore;
@@ -29,7 +31,10 @@ use gotong_infra::repositories::{
     SurrealModerationRepository, SurrealSiagaRepository, SurrealTrackTransitionRepository,
     SurrealVaultRepository, SurrealWebhookOutboxRepository,
 };
+use redis::Client;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{RwLock, broadcast};
+use tracing::warn;
 
 type RepositoryBundle = (
     Arc<dyn ContributionRepository>,
@@ -69,14 +74,61 @@ pub struct AppState {
 #[derive(Clone)]
 pub struct ChatRealtimeBus {
     senders: Arc<RwLock<HashMap<String, broadcast::Sender<ChatMessage>>>>,
+    active_bridges: Arc<RwLock<HashSet<String>>>,
     buffer_size: usize,
+    transport: ChatRealtimeTransport,
+    instance_id: String,
+}
+
+#[derive(Clone)]
+enum ChatRealtimeTransport {
+    Local,
+    Redis {
+        channel_prefix: String,
+        client: Option<Client>,
+    },
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct ChatRealtimeEnvelope {
+    thread_id: String,
+    sender_id: String,
+    message: ChatMessage,
 }
 
 impl ChatRealtimeBus {
-    pub fn new() -> Self {
+    pub fn new(config: &gotong_infra::config::AppConfig) -> Self {
+        let transport = match config
+            .chat_realtime_transport
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "redis" => {
+                let redis_url = config.redis_url.clone();
+                let client = Client::open(redis_url.clone()).ok();
+                if client.is_none() {
+                    warn!(
+                        redis_url = %redis_url,
+                        "invalid redis url for redis realtime transport; using local transport fallback"
+                    );
+                    ChatRealtimeTransport::Local
+                } else {
+                    ChatRealtimeTransport::Redis {
+                        channel_prefix: config.chat_realtime_channel_prefix.clone(),
+                        client,
+                    }
+                }
+            }
+            _ => ChatRealtimeTransport::Local,
+        };
+
         Self {
             senders: Arc::new(RwLock::new(HashMap::new())),
             buffer_size: 64,
+            active_bridges: Arc::new(RwLock::new(HashSet::new())),
+            transport,
+            instance_id: uuid_v7_without_dashes(),
         }
     }
 
@@ -90,15 +142,171 @@ impl ChatRealtimeBus {
         sender
     }
 
+    fn channel_name(&self, thread_id: &str) -> Option<String> {
+        match &self.transport {
+            ChatRealtimeTransport::Redis { channel_prefix, .. } => {
+                Some(format!("{channel_prefix}:{thread_id}"))
+            }
+            ChatRealtimeTransport::Local => None,
+        }
+    }
+
+    fn channel_redis_client(&self) -> Option<Client> {
+        match &self.transport {
+            ChatRealtimeTransport::Redis { client, .. } => client.clone(),
+            ChatRealtimeTransport::Local => None,
+        }
+    }
+
+    async fn publish_to_redis(&self, envelope: &ChatRealtimeEnvelope) {
+        let Some(redis_conn) = self.channel_redis_client() else {
+            return;
+        };
+        let Some(channel) = self.channel_name(&envelope.thread_id) else {
+            return;
+        };
+
+        let serialized = match serde_json::to_string(envelope) {
+            Ok(value) => value,
+            Err(err) => {
+                warn!(error = %err, "chat realtime envelope serialization failed");
+                return;
+            }
+        };
+
+        let mut redis_conn = match redis_conn.get_multiplexed_async_connection().await {
+            Ok(connection) => connection,
+            Err(err) => {
+                warn!(error = %err, "chat realtime redis connection failed");
+                return;
+            }
+        };
+
+        if let Err(err) = redis::cmd("PUBLISH")
+            .arg(channel)
+            .arg(serialized)
+            .query_async::<_, i64>(&mut redis_conn)
+            .await
+        {
+            warn!(error = %err, "chat realtime redis publish failed");
+        }
+    }
+
+    async fn spawn_redis_bridge(&self, thread_id: String) {
+        let (channel, client) = match &self.transport {
+            ChatRealtimeTransport::Redis {
+                client,
+                channel_prefix,
+                ..
+            } if client.is_some() => {
+                let Some(url_client) = client.clone() else {
+                    return;
+                };
+                (format!("{channel_prefix}:{thread_id}"), Some(url_client))
+            }
+            _ => return,
+        };
+
+        let sender_map = self.senders.clone();
+        let local_instance = self.instance_id.clone();
+        tokio::spawn(async move {
+            let mut pubsub = match client.unwrap().get_async_pubsub().await {
+                Ok(pubsub) => pubsub,
+                Err(err) => {
+                    warn!(error = %err, "chat realtime redis subscription failed");
+                    return;
+                }
+            };
+            if let Err(err) = pubsub.subscribe(channel.clone()).await {
+                warn!(error = %err, "chat realtime redis channel subscribe failed");
+                return;
+            }
+            let mut stream = pubsub.on_message();
+            loop {
+                match stream.next().await {
+                    Some(message) => {
+                        let payload: String = match message.get_payload() {
+                            Ok(payload) => payload,
+                            Err(err) => {
+                                warn!(error = %err, "chat realtime redis payload decode failed");
+                                continue;
+                            }
+                        };
+
+                        let envelope: ChatRealtimeEnvelope = match serde_json::from_str(&payload) {
+                            Ok(envelope) => envelope,
+                            Err(err) => {
+                                warn!(error = %err, "chat realtime envelope parse failed");
+                                continue;
+                            }
+                        };
+
+                        if envelope.sender_id == local_instance {
+                            continue;
+                        }
+
+                        let sender = {
+                            let senders = sender_map.read().await;
+                            senders.get(&envelope.thread_id).cloned()
+                        };
+                        let Some(sender) = sender else {
+                            continue;
+                        };
+                        if sender.send(envelope.message).is_err() {
+                            warn!(
+                                "chat realtime broadcast failed for thread {}",
+                                envelope.thread_id
+                            );
+                        }
+                    }
+                    None => {
+                        warn!("chat realtime redis stream ended");
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    async fn ensure_redis_bridge(&self, thread_id: &str) {
+        let mut active = self.active_bridges.write().await;
+        if !active.insert(thread_id.to_string()) {
+            return;
+        }
+        drop(active);
+        self.spawn_redis_bridge(thread_id.to_string()).await;
+    }
+
     pub async fn publish(&self, thread_id: &str, message: ChatMessage) {
+        let message_for_redis = message.clone();
         let sender = self.sender_for(thread_id).await;
         if sender.send(message).is_err() {
             let mut senders = self.senders.write().await;
             senders.remove(thread_id);
         }
+
+        let envelope = ChatRealtimeEnvelope {
+            thread_id: thread_id.to_string(),
+            sender_id: self.instance_id.clone(),
+            message: message_for_redis,
+        };
+
+        match &self.transport {
+            ChatRealtimeTransport::Redis { .. } => {
+                let bus = self.clone();
+                let envelope = envelope.clone();
+                tokio::spawn(async move {
+                    bus.publish_to_redis(&envelope).await;
+                });
+            }
+            ChatRealtimeTransport::Local => {}
+        }
     }
 
     pub async fn subscribe(&self, thread_id: &str) -> broadcast::Receiver<ChatMessage> {
+        if matches!(self.transport, ChatRealtimeTransport::Redis { .. }) {
+            self.ensure_redis_bridge(thread_id).await;
+        }
         self.sender_for(thread_id).await.subscribe()
     }
 }
@@ -121,6 +329,7 @@ impl AppState {
         ) = repositories_for_config(&config).await?;
         let transition_job_queue = transition_job_queue_for_config(&config).await?;
         let idempotency = IdempotencyService::new(Arc::new(store), IdempotencyConfig::default());
+        let chat_realtime = ChatRealtimeBus::new(&config);
         Ok(Self {
             config,
             idempotency,
@@ -135,7 +344,7 @@ impl AppState {
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
-            chat_realtime: ChatRealtimeBus::new(),
+            chat_realtime,
             transition_job_queue,
         })
     }
@@ -155,6 +364,7 @@ impl AppState {
             notification_repo,
             webhook_outbox_repo,
         ) = memory_repositories();
+        let chat_realtime = ChatRealtimeBus::new(&config);
         Self {
             config,
             idempotency: IdempotencyService::new(store, IdempotencyConfig::default()),
@@ -169,7 +379,7 @@ impl AppState {
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
-            chat_realtime: ChatRealtimeBus::new(),
+            chat_realtime,
             transition_job_queue: None,
         }
     }
@@ -192,6 +402,7 @@ impl AppState {
         webhook_outbox_repo: Arc<dyn WebhookOutboxRepository>,
     ) -> Self {
         let idempotency = IdempotencyService::new(store, IdempotencyConfig::default());
+        let chat_realtime = ChatRealtimeBus::new(&config);
         Self {
             config,
             idempotency,
@@ -206,7 +417,7 @@ impl AppState {
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
-            chat_realtime: ChatRealtimeBus::new(),
+            chat_realtime,
             transition_job_queue: None,
         }
     }
@@ -291,6 +502,7 @@ async fn transition_job_queue_for_config(config: &AppConfig) -> anyhow::Result<T
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::time::Duration;
 
     fn app_config(app_env: &str, data_backend: &str) -> AppConfig {
         AppConfig {
@@ -310,6 +522,8 @@ mod tests {
             s3_region: "us-east-1".to_string(),
             s3_access_key: "test-access-key".to_string(),
             s3_secret_key: "test-secret-key".to_string(),
+            chat_realtime_transport: "local".to_string(),
+            chat_realtime_channel_prefix: "gotong:chat:realtime:test".to_string(),
             worker_queue_prefix: "gotong:jobs".to_string(),
             worker_poll_interval_ms: 1000,
             worker_promote_batch: 10,
@@ -340,5 +554,98 @@ mod tests {
         let test_config = app_config("test", "memory");
         assert!(repositories_for_config(&dev_config).await.is_ok());
         assert!(repositories_for_config(&test_config).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn chat_realtime_bus_local_mode_delivers_to_its_subscriber() {
+        let config = AppConfig {
+            chat_realtime_transport: "local".to_string(),
+            ..app_config("test", "memory")
+        };
+        let bus = ChatRealtimeBus::new(&config);
+        let thread_id = "thread-local-test";
+
+        let mut receiver = bus.subscribe(thread_id).await;
+        let message = ChatMessage {
+            thread_id: thread_id.to_string(),
+            message_id: "msg-local-1".to_string(),
+            author_id: "user-1".to_string(),
+            body: "hello".to_string(),
+            attachments: Vec::new(),
+            created_at_ms: 1,
+            edited_at_ms: None,
+            deleted_at_ms: None,
+            request_id: "req-1".to_string(),
+            correlation_id: "corr-1".to_string(),
+        };
+        bus.publish(thread_id, message.clone()).await;
+        let received = tokio::time::timeout(Duration::from_secs(2), receiver.recv())
+            .await
+            .expect("message timed out")
+            .expect("stream closed");
+        assert_eq!(received, message);
+    }
+
+    #[tokio::test]
+    async fn chat_realtime_bus_redis_fanout_across_instances() {
+        let base_config = app_config("test", "memory");
+        if !redis_is_available(&base_config.redis_url).await {
+            return;
+        }
+
+        let prefix = format!("gotong:chat:test:{}", uuid_v7_without_dashes());
+        let config = AppConfig {
+            chat_realtime_transport: "redis".to_string(),
+            chat_realtime_channel_prefix: prefix.clone(),
+            ..base_config
+        };
+
+        let bus_a = ChatRealtimeBus::new(&config);
+        let bus_b = ChatRealtimeBus::new(&config);
+        let thread_id = "thread-redis-fanout";
+        let mut receiver_a = bus_a.subscribe(thread_id).await;
+        let mut receiver_b = bus_b.subscribe(thread_id).await;
+
+        let message = ChatMessage {
+            thread_id: thread_id.to_string(),
+            message_id: "msg-redis-1".to_string(),
+            author_id: "user-1".to_string(),
+            body: "hello".to_string(),
+            attachments: Vec::new(),
+            created_at_ms: 1,
+            edited_at_ms: None,
+            deleted_at_ms: None,
+            request_id: "req-1".to_string(),
+            correlation_id: "corr-1".to_string(),
+        };
+
+        bus_a.publish(thread_id, message.clone()).await;
+
+        let first = tokio::time::timeout(Duration::from_secs(3), receiver_a.recv())
+            .await
+            .expect("message timed out")
+            .expect("stream closed");
+        let second = tokio::time::timeout(Duration::from_secs(3), receiver_b.recv())
+            .await
+            .expect("message timed out")
+            .expect("stream closed");
+        assert_eq!(first, message);
+        assert_eq!(second, message);
+    }
+
+    async fn redis_is_available(redis_url: &str) -> bool {
+        let client = match redis::Client::open(redis_url) {
+            Ok(client) => client,
+            Err(_) => return false,
+        };
+        let mut conn = match client.get_multiplexed_async_connection().await {
+            Ok(conn) => conn,
+            Err(_) => return false,
+        };
+        redis::cmd("PING")
+            .query_async::<_, String>(&mut conn)
+            .await
+            .map(|response| response == "PONG")
+            .unwrap_or(false)
     }
 }

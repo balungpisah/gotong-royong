@@ -46,6 +46,8 @@ fn test_config() -> AppConfig {
         s3_region: "us-east-1".to_string(),
         s3_access_key: "test-access-key".to_string(),
         s3_secret_key: "test-secret-key".to_string(),
+        chat_realtime_transport: "local".to_string(),
+        chat_realtime_channel_prefix: "gotong:chat:realtime:test".to_string(),
         worker_queue_prefix: "gotong:jobs".to_string(),
         worker_poll_interval_ms: 1000,
         worker_promote_batch: 10,

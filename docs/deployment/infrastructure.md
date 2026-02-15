@@ -8,6 +8,7 @@ Canonical profile:
 - Rust 2024 backend (Axum + Tokio + Tower)
 - SurrealDB `v3.0.0-beta.4`
 - Redis for ephemeral/idempotency/rate control
+- Realtime transport: local bus by default; Redis pub/sub when multi-replica
 - S3-compatible object storage for evidence payloads
 - OpenTelemetry + structured tracing
 
@@ -75,6 +76,8 @@ services:
       - SURREAL_USER=root
       - SURREAL_PASS=${SURREAL_PASS}
       - REDIS_URL=redis://redis:6379
+      - CHAT_REALTIME_TRANSPORT=redis
+      - CHAT_REALTIME_CHANNEL_PREFIX=gotong:chat:realtime
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET=gotong-royong-evidence
       - S3_ACCESS_KEY=${S3_ACCESS_KEY}
@@ -112,6 +115,8 @@ Note:
 Required environment variables:
 - `SURREAL_ENDPOINT`, `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`
 - `REDIS_URL`
+- `CHAT_REALTIME_TRANSPORT` (`local` in dev, `redis` in multi-replica production)
+- `CHAT_REALTIME_CHANNEL_PREFIX`
 - `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`
 - `JWT_SECRET`
 - `GOTONG_ROYONG_WEBHOOK_SECRET`
@@ -143,6 +148,8 @@ Rollback mechanism:
 - Deploy previous pinned API image
 - Switch DB/runtime profile to predefined stable target
 - Validate health probes and replay queue integrity
+- Validate realtime transport behavior via `chat_realtime_transport` compatibility and shared channel prefix checks
+- Follow the detailed rehearsed steps in `docs/deployment/rollback-rehearsal-runbook.md`
 
 ## Security Baseline
 

@@ -411,10 +411,10 @@ Deliverables:
 - Retention governance matrix and immutable audit event hashing.
 - Metrics/tracing dashboards and alert rules.
 - Surreal beta go/no-go suite for live payload shape/ordering/permission filtering/reconnect (implemented via scripts/surrealdb-go-no-go.sh and available in `docs/research/surrealdb-go-no-go-latest.md`).
-- Cross-instance real-time fanout strategy for WS/SSE (pending follow-up hardening).
-- Rollback runbook and rehearsal report (pending follow-up hardening).
-- Add immutable audit hash and retention-tag columns for transition/vault/siaga/moderation rows (in progress).
-- Map domain-level audit hash generation and persistence across transition/vault/siaga/moderation paths.
+- Cross-instance real-time fanout strategy for WS/SSE via Redis pub/sub (`CHAT_REALTIME_TRANSPORT=redis`) for multi-replica deployments.
+- Rollback rehearsal runbook documented in `docs/deployment/rollback-rehearsal-runbook.md`.
+- Domain-level immutable audit hash generation and persistence across transition/vault/siaga/moderation paths (implemented).
+- Realtime transport switchable by environment and tested in `ChatRealtimeBus` fanout test coverage.
 
 Validation:
 - All P0 gates pass in staging.
@@ -422,6 +422,9 @@ Validation:
 - Realtime transport can be safely scaled beyond one API instance without dropping stream delivery.
 
 PR-15 completion note:
+- PR-15 follow-up hardening is complete:
+  - Cross-instance realtime fanout implemented in `ChatRealtimeBus` with dedup-safe redis bridge behavior.
+  - Rollback rehearsal playbook added and linked from infrastructure policy.
 - Observability baseline is now implemented:
   - `/metrics` endpoint with Prometheus renderer.
   - HTTP request/response metrics + 5xx visibility.

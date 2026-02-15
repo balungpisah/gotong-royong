@@ -18,6 +18,8 @@ pub struct AppConfig {
     pub s3_region: String,
     pub s3_access_key: String,
     pub s3_secret_key: String,
+    pub chat_realtime_transport: String,
+    pub chat_realtime_channel_prefix: String,
     pub worker_queue_prefix: String,
     pub worker_poll_interval_ms: u64,
     pub worker_promote_batch: usize,
@@ -49,6 +51,8 @@ impl AppConfig {
             .set_default("s3_region", "us-east-1")?
             .set_default("s3_access_key", "minioadmin")?
             .set_default("s3_secret_key", "minioadmin")?
+            .set_default("chat_realtime_transport", "local")?
+            .set_default("chat_realtime_channel_prefix", "gotong:chat:realtime")?
             .set_default("worker_queue_prefix", "gotong:jobs")?
             .set_default("worker_poll_interval_ms", 1000)?
             .set_default("worker_promote_batch", 50)?

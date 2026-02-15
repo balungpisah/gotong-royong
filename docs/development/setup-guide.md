@@ -53,6 +53,8 @@ SURREAL_PASS=root
 
 # Redis
 REDIS_URL=redis://127.0.0.1:6379
+CHAT_REALTIME_TRANSPORT=local
+CHAT_REALTIME_CHANNEL_PREFIX=gotong:chat:realtime
 
 # S3 / MinIO
 S3_ENDPOINT=http://127.0.0.1:9000
