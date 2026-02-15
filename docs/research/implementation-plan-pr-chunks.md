@@ -368,7 +368,7 @@ Deliverables:
 Notes:
 - Inbound ingestion endpoint is owned by Markov; Gotong only signs outbound payloads.
 - Core code path for outbox event creation, admin read endpoints, signed delivery worker, and retry/attempt tracking is in place.
-- DB migration/check scripts for webhook tables remain to be added in follow-up hardening work.
+- DB migration/check scripts are now added in `0011_webhook_outbox_schema.surql` and `database/checks/0011_webhook_outbox_check.surql`.
 
 Validation:
 - Signature generation and verification tests.

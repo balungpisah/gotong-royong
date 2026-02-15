@@ -21,6 +21,8 @@ CHECKS=(
   "0007_siaga_check.surql"
   "0008_discovery_check.surql"
   "0009_audit_retention_fields_check.surql"
+  "0010_contributions_evidence_vouch_check.surql"
+  "0011_webhook_outbox_check.surql"
 )
 
 run_check() {

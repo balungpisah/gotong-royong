@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use crate::observability;
 use futures_util::StreamExt;
 use gotong_domain::chat::ChatMessage;
 use gotong_domain::idempotency::{IdempotencyConfig, IdempotencyService};
@@ -27,9 +28,10 @@ use gotong_infra::repositories::{
     InMemoryDiscoveryNotificationRepository, InMemoryEvidenceRepository,
     InMemoryModerationRepository, InMemorySiagaRepository, InMemoryTrackTransitionRepository,
     InMemoryVaultRepository, InMemoryVouchRepository, InMemoryWebhookOutboxRepository,
-    SurrealChatRepository, SurrealDiscoveryFeedRepository, SurrealDiscoveryNotificationRepository,
-    SurrealModerationRepository, SurrealSiagaRepository, SurrealTrackTransitionRepository,
-    SurrealVaultRepository, SurrealWebhookOutboxRepository,
+    SurrealChatRepository, SurrealContributionRepository, SurrealDiscoveryFeedRepository,
+    SurrealDiscoveryNotificationRepository, SurrealEvidenceRepository, SurrealModerationRepository,
+    SurrealSiagaRepository, SurrealTrackTransitionRepository, SurrealVaultRepository,
+    SurrealVouchRepository, SurrealWebhookOutboxRepository,
 };
 use redis::Client;
 use serde::{Deserialize, Serialize};
@@ -106,6 +108,11 @@ impl ChatRealtimeBus {
                 let redis_url = config.redis_url.clone();
                 let client = Client::open(redis_url.clone()).ok();
                 if client.is_none() {
+                    observability::register_chat_realtime_bridge_event(
+                        "transport_init_fallback",
+                        "redis",
+                        "invalid_url",
+                    );
                     warn!(
                         redis_url = %redis_url,
                         "invalid redis url for redis realtime transport; using local transport fallback"
@@ -122,6 +129,11 @@ impl ChatRealtimeBus {
                 warn!(
                     transport = %other,
                     "unsupported CHAT_REALTIME_TRANSPORT value; falling back to local transport"
+                );
+                observability::register_chat_realtime_bridge_event(
+                    "transport_init_fallback",
+                    "unsupported",
+                    other,
                 );
                 ChatRealtimeTransport::Local
             }
@@ -181,6 +193,11 @@ impl ChatRealtimeBus {
         let mut redis_conn = match redis_conn.get_multiplexed_async_connection().await {
             Ok(connection) => connection,
             Err(err) => {
+                observability::register_chat_realtime_bridge_event(
+                    "publish_connection_failed",
+                    "redis",
+                    "connection",
+                );
                 warn!(error = %err, "chat realtime redis connection failed");
                 return;
             }
@@ -192,6 +209,11 @@ impl ChatRealtimeBus {
             .query_async::<_, i64>(&mut redis_conn)
             .await
         {
+            observability::register_chat_realtime_bridge_event(
+                "publish_command_failed",
+                "redis",
+                "publish",
+            );
             warn!(error = %err, "chat realtime redis publish failed");
         }
     }
@@ -223,6 +245,11 @@ impl ChatRealtimeBus {
                 let mut pubsub = match client.clone().unwrap().get_async_pubsub().await {
                     Ok(pubsub) => pubsub,
                     Err(err) => {
+                        observability::register_chat_realtime_bridge_event(
+                            "subscription_connect_failed",
+                            "redis",
+                            "connect",
+                        );
                         warn!(error = %err, "chat realtime redis subscription failed");
                         sleep(Duration::from_millis(backoff_ms)).await;
                         backoff_ms = (backoff_ms * 2).min(max_backoff_ms);
@@ -231,6 +258,11 @@ impl ChatRealtimeBus {
                 };
                 backoff_ms = 250_u64;
                 if let Err(err) = pubsub.subscribe(channel.clone()).await {
+                    observability::register_chat_realtime_bridge_event(
+                        "subscription_subscribe_failed",
+                        "redis",
+                        "subscribe",
+                    );
                     warn!(error = %err, "chat realtime redis channel subscribe failed");
                     sleep(Duration::from_millis(backoff_ms)).await;
                     backoff_ms = (backoff_ms * 2).min(max_backoff_ms);
@@ -244,6 +276,11 @@ impl ChatRealtimeBus {
                             let payload: String = match message.get_payload() {
                                 Ok(payload) => payload,
                                 Err(err) => {
+                                    observability::register_chat_realtime_bridge_event(
+                                        "message_payload_decode_failed",
+                                        "redis",
+                                        "decode",
+                                    );
                                     warn!(
                                         error = %err,
                                         "chat realtime redis payload decode failed"
@@ -256,6 +293,11 @@ impl ChatRealtimeBus {
                                 match serde_json::from_str(&payload) {
                                     Ok(envelope) => envelope,
                                     Err(err) => {
+                                        observability::register_chat_realtime_bridge_event(
+                                            "message_payload_parse_failed",
+                                            "redis",
+                                            "parse",
+                                        );
                                         warn!(error = %err, "chat realtime envelope parse failed");
                                         continue;
                                     }
@@ -280,11 +322,21 @@ impl ChatRealtimeBus {
                             }
                         }
                         None => {
+                            observability::register_chat_realtime_bridge_event(
+                                "stream_ended",
+                                "redis",
+                                "reconnect",
+                            );
                             warn!("chat realtime redis stream ended");
                             break;
                         }
                     }
                 }
+                observability::register_chat_realtime_bridge_event(
+                    "stream_reconnect_backoff",
+                    "redis",
+                    "reconnect",
+                );
                 warn!("chat realtime redis stream ended; reconnecting");
                 sleep(Duration::from_millis(backoff_ms)).await;
                 backoff_ms = (backoff_ms * 2).min(max_backoff_ms);
@@ -465,15 +517,18 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
             let transition_repo = SurrealTrackTransitionRepository::new(&db_config).await?;
             let vault_repo = SurrealVaultRepository::new(&db_config).await?;
             let chat_repo = SurrealChatRepository::new(&db_config).await?;
+            let contribution_repo = SurrealContributionRepository::new(&db_config).await?;
+            let evidence_repo = SurrealEvidenceRepository::new(&db_config).await?;
+            let vouch_repo = SurrealVouchRepository::new(&db_config).await?;
             let moderation_repo = SurrealModerationRepository::new(&db_config).await?;
             let siaga_repo = SurrealSiagaRepository::new(&db_config).await?;
             let feed_repo = SurrealDiscoveryFeedRepository::new(&db_config).await?;
             let notification_repo = SurrealDiscoveryNotificationRepository::new(&db_config).await?;
             let webhook_outbox_repo = SurrealWebhookOutboxRepository::new(&db_config).await?;
             Ok((
-                Arc::new(InMemoryContributionRepository::new()),
-                Arc::new(InMemoryEvidenceRepository::new()),
-                Arc::new(InMemoryVouchRepository::new()),
+                Arc::new(contribution_repo),
+                Arc::new(evidence_repo),
+                Arc::new(vouch_repo),
                 Arc::new(transition_repo),
                 Arc::new(vault_repo),
                 Arc::new(chat_repo),

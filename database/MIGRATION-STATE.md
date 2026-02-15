@@ -16,10 +16,11 @@ This file tracks the migration ordering and execution state for the SurrealDB sc
 6. `0007_siaga_schema.surql`
 7. `0008_discovery_schema.surql`
 8. `0009_audit_retention_fields.surql` (BE-012)
+9. `0010_contributions_evidence_vouch_schema.surql`
+10. `0011_webhook_outbox_schema.surql`
 
 ## Notes
 
 - Migrations are forward-only. Additive changes are preferred.
 - Each migration must have a paired check file under `database/checks/`.
 - Record applied timestamps and release SHA once CI automation is in place.
-- Core domain tables (users, contributions, evidence, vouches, outbox, webhook delivery log) are deferred to PR-06 and PR-13.

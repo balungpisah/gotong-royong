@@ -7,11 +7,11 @@ use gotong_domain::chat::{
     ChatDeliveryEvent, ChatMember, ChatMemberRole, ChatMessage, ChatReadCursor, ChatThread,
     ChatThreadQuery, ChatThreadWithMembers, MessageCatchup,
 };
-use gotong_domain::contributions::Contribution;
+use gotong_domain::contributions::{Contribution, ContributionType};
 use gotong_domain::discovery::FEED_SOURCE_VAULT;
 use gotong_domain::discovery::{FeedItem, InAppNotification};
 use gotong_domain::error::DomainError;
-use gotong_domain::evidence::Evidence;
+use gotong_domain::evidence::{Evidence, EvidenceType};
 use gotong_domain::moderation::{
     ContentModeration, ModerationAction, ModerationActorSnapshot, ModerationDecision,
     ModerationStatus, ModerationViolation,
@@ -40,7 +40,7 @@ use gotong_domain::transitions::{
 use gotong_domain::vault::{
     VaultActorSnapshot, VaultEntry, VaultState, VaultTimelineEvent, VaultTimelineEventType,
 };
-use gotong_domain::vouches::Vouch;
+use gotong_domain::vouches::{Vouch, VouchWeightHint};
 use gotong_domain::webhook::{
     WebhookDeliveryLog, WebhookDeliveryResult, WebhookOutboxEvent, WebhookOutboxListQuery,
     WebhookOutboxStatus, WebhookOutboxUpdate,
@@ -634,6 +634,745 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
                 .take(0)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             Self::decode_delivery_logs(rows)
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealContributionRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealContributionRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn to_rfc3339(timestamp_ms: i64) -> DomainResult<String> {
+        let dt = OffsetDateTime::from_unix_timestamp_nanos(timestamp_ms as i128 * 1_000_000)
+            .map_err(|err| DomainError::Validation(format!("invalid timestamp: {err}")))?;
+        Ok(dt
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()))
+    }
+
+    fn parse_datetime_ms(value: &str) -> DomainResult<i64> {
+        let datetime = OffsetDateTime::parse(value, &Rfc3339).map_err(|err| {
+            DomainError::Validation(format!("invalid contribution datetime '{value}': {err}"))
+        })?;
+        Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+
+    fn contribution_type_to_string(value: &ContributionType) -> &'static str {
+        match value {
+            ContributionType::TaskCompletion => "task_completion",
+            ContributionType::CodeReview => "code_review",
+            ContributionType::Documentation => "documentation",
+            ContributionType::Mentoring => "mentoring",
+            ContributionType::EventOrganization => "event_organization",
+            ContributionType::CommunityService => "community_service",
+            ContributionType::Custom => "custom",
+        }
+    }
+
+    fn parse_contribution_type(value: &str) -> DomainResult<ContributionType> {
+        match value {
+            "task_completion" => Ok(ContributionType::TaskCompletion),
+            "code_review" => Ok(ContributionType::CodeReview),
+            "documentation" => Ok(ContributionType::Documentation),
+            "mentoring" => Ok(ContributionType::Mentoring),
+            "event_organization" => Ok(ContributionType::EventOrganization),
+            "community_service" => Ok(ContributionType::CommunityService),
+            "custom" => Ok(ContributionType::Custom),
+            _ => Err(DomainError::Validation(format!(
+                "invalid contribution_type '{value}'"
+            ))),
+        }
+    }
+
+    fn build_payload(contribution: &Contribution) -> DomainResult<SurrealContributionCreateRow> {
+        let created_at = Self::to_rfc3339(contribution.created_at_ms)?;
+        let updated_at = Self::to_rfc3339(contribution.updated_at_ms)?;
+        Ok(SurrealContributionCreateRow {
+            contribution_id: contribution.contribution_id.clone(),
+            author_id: contribution.author_id.clone(),
+            author_username: contribution.author_username.clone(),
+            contribution_type: Self::contribution_type_to_string(&contribution.contribution_type)
+                .to_string(),
+            title: contribution.title.clone(),
+            description: contribution.description.clone(),
+            evidence_url: contribution.evidence_url.clone(),
+            skill_ids: contribution.skill_ids.clone(),
+            metadata: contribution.metadata.clone(),
+            request_id: contribution.request_id.clone(),
+            correlation_id: contribution.correlation_id.clone(),
+            created_at,
+            updated_at,
+        })
+    }
+
+    fn map_row(row: SurrealContributionRow) -> DomainResult<Contribution> {
+        Ok(Contribution {
+            contribution_id: row.contribution_id,
+            author_id: row.author_id,
+            author_username: row.author_username,
+            contribution_type: Self::parse_contribution_type(&row.contribution_type)?,
+            title: row.title,
+            description: row.description,
+            evidence_url: row.evidence_url,
+            skill_ids: row.skill_ids,
+            metadata: row.metadata,
+            request_id: row.request_id,
+            correlation_id: row.correlation_id,
+            created_at_ms: Self::parse_datetime_ms(&row.created_at)?,
+            updated_at_ms: Self::parse_datetime_ms(&row.updated_at)?,
+        })
+    }
+
+    fn decode_rows(rows: Vec<Value>) -> DomainResult<Vec<Contribution>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealContributionRow>(row)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid contribution row: {err}"))
+                    })
+                    .and_then(Self::map_row)
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealContributionCreateRow {
+    contribution_id: String,
+    author_id: String,
+    author_username: String,
+    contribution_type: String,
+    title: String,
+    description: Option<String>,
+    evidence_url: Option<String>,
+    skill_ids: Vec<String>,
+    metadata: Option<HashMap<String, Value>>,
+    request_id: String,
+    correlation_id: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealContributionRow {
+    contribution_id: String,
+    author_id: String,
+    author_username: String,
+    contribution_type: String,
+    title: String,
+    description: Option<String>,
+    evidence_url: Option<String>,
+    skill_ids: Vec<String>,
+    metadata: Option<HashMap<String, Value>>,
+    request_id: String,
+    correlation_id: String,
+    created_at: String,
+    updated_at: String,
+}
+
+impl ContributionRepository for SurrealContributionRepository {
+    fn create(
+        &self,
+        contribution: &Contribution,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Contribution>> {
+        let payload = match Self::build_payload(contribution) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let contribution_id = contribution.contribution_id.clone();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let payload = to_value(payload)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut response = client
+                .query("CREATE type::thing('contribution', $contribution_id) CONTENT $payload")
+                .bind(("contribution_id", contribution_id))
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut contributions = Self::decode_rows(rows)?;
+            contributions
+                .pop()
+                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+        })
+    }
+
+    fn get(
+        &self,
+        contribution_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<Contribution>>> {
+        let contribution_id = contribution_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM contribution WHERE contribution_id = $contribution_id LIMIT 1",
+                )
+                .bind(("contribution_id", contribution_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut contributions = Self::decode_rows(rows)?;
+            Ok(contributions.pop())
+        })
+    }
+
+    fn list_by_author(
+        &self,
+        author_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<Contribution>>> {
+        let author_id = author_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM contribution \
+                     WHERE author_id = $author_id \
+                     ORDER BY created_at DESC, contribution_id DESC",
+                )
+                .bind(("author_id", author_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut contributions = Self::decode_rows(rows)?;
+            contributions.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.contribution_id.cmp(&left.contribution_id))
+            });
+            Ok(contributions)
+        })
+    }
+
+    fn list_recent(
+        &self,
+        author_id: &str,
+        limit: usize,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<Contribution>>> {
+        let author_id = author_id.to_string();
+        let limit = limit as i64;
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM contribution \
+                     WHERE author_id = $author_id \
+                     ORDER BY created_at DESC, contribution_id DESC \
+                     LIMIT $limit",
+                )
+                .bind(("author_id", author_id))
+                .bind(("limit", limit))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut contributions = Self::decode_rows(rows)?;
+            contributions.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.contribution_id.cmp(&left.contribution_id))
+            });
+            Ok(contributions)
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealEvidenceRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealEvidenceRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn to_rfc3339(timestamp_ms: i64) -> DomainResult<String> {
+        let dt = OffsetDateTime::from_unix_timestamp_nanos(timestamp_ms as i128 * 1_000_000)
+            .map_err(|err| DomainError::Validation(format!("invalid timestamp: {err}")))?;
+        Ok(dt
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()))
+    }
+
+    fn parse_datetime_ms(value: &str) -> DomainResult<i64> {
+        let datetime = OffsetDateTime::parse(value, &Rfc3339).map_err(|err| {
+            DomainError::Validation(format!("invalid evidence datetime '{value}': {err}"))
+        })?;
+        Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+
+    fn evidence_type_to_string(value: &EvidenceType) -> &'static str {
+        match value {
+            EvidenceType::PhotoWithTimestamp => "photo_with_timestamp",
+            EvidenceType::GpsVerification => "gps_verification",
+            EvidenceType::WitnessAttestation => "witness_attestation",
+        }
+    }
+
+    fn parse_evidence_type(value: &str) -> DomainResult<EvidenceType> {
+        match value {
+            "photo_with_timestamp" => Ok(EvidenceType::PhotoWithTimestamp),
+            "gps_verification" => Ok(EvidenceType::GpsVerification),
+            "witness_attestation" => Ok(EvidenceType::WitnessAttestation),
+            _ => Err(DomainError::Validation(format!(
+                "invalid evidence_type '{value}'"
+            ))),
+        }
+    }
+
+    fn build_payload(evidence: &Evidence) -> DomainResult<SurrealEvidenceCreateRow> {
+        let created_at = Self::to_rfc3339(evidence.created_at_ms)?;
+        let updated_at = Self::to_rfc3339(evidence.updated_at_ms)?;
+        Ok(SurrealEvidenceCreateRow {
+            evidence_id: evidence.evidence_id.clone(),
+            contribution_id: evidence.contribution_id.clone(),
+            actor_id: evidence.actor_id.clone(),
+            actor_username: evidence.actor_username.clone(),
+            evidence_type: Self::evidence_type_to_string(&evidence.evidence_type).to_string(),
+            evidence_data: evidence.evidence_data.clone(),
+            proof: evidence.proof.clone(),
+            request_id: evidence.request_id.clone(),
+            correlation_id: evidence.correlation_id.clone(),
+            created_at,
+            updated_at,
+        })
+    }
+
+    fn map_row(row: SurrealEvidenceRow) -> DomainResult<Evidence> {
+        Ok(Evidence {
+            evidence_id: row.evidence_id,
+            contribution_id: row.contribution_id,
+            actor_id: row.actor_id,
+            actor_username: row.actor_username,
+            evidence_type: Self::parse_evidence_type(&row.evidence_type)?,
+            evidence_data: row.evidence_data,
+            proof: row.proof,
+            request_id: row.request_id,
+            correlation_id: row.correlation_id,
+            created_at_ms: Self::parse_datetime_ms(&row.created_at)?,
+            updated_at_ms: Self::parse_datetime_ms(&row.updated_at)?,
+        })
+    }
+
+    fn decode_rows(rows: Vec<Value>) -> DomainResult<Vec<Evidence>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealEvidenceRow>(row)
+                    .map_err(|err| DomainError::Validation(format!("invalid evidence row: {err}")))
+                    .and_then(Self::map_row)
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealEvidenceCreateRow {
+    evidence_id: String,
+    contribution_id: String,
+    actor_id: String,
+    actor_username: String,
+    evidence_type: String,
+    evidence_data: Value,
+    proof: Value,
+    request_id: String,
+    correlation_id: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealEvidenceRow {
+    evidence_id: String,
+    contribution_id: String,
+    actor_id: String,
+    actor_username: String,
+    evidence_type: String,
+    evidence_data: Value,
+    proof: Value,
+    request_id: String,
+    correlation_id: String,
+    created_at: String,
+    updated_at: String,
+}
+
+impl EvidenceRepository for SurrealEvidenceRepository {
+    fn create(
+        &self,
+        evidence: &Evidence,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Evidence>> {
+        let payload = match Self::build_payload(evidence) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let evidence_id = evidence.evidence_id.clone();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let payload = to_value(payload)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut response = client
+                .query("CREATE type::thing('evidence', $evidence_id) CONTENT $payload")
+                .bind(("evidence_id", evidence_id))
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut evidences = Self::decode_rows(rows)?;
+            evidences
+                .pop()
+                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+        })
+    }
+
+    fn get(
+        &self,
+        evidence_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<Evidence>>> {
+        let evidence_id = evidence_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query("SELECT * FROM evidence WHERE evidence_id = $evidence_id LIMIT 1")
+                .bind(("evidence_id", evidence_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut evidences = Self::decode_rows(rows)?;
+            Ok(evidences.pop())
+        })
+    }
+
+    fn list_by_contribution(
+        &self,
+        contribution_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<Evidence>>> {
+        let contribution_id = contribution_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM evidence \
+                     WHERE contribution_id = $contribution_id \
+                     ORDER BY created_at DESC, evidence_id DESC",
+                )
+                .bind(("contribution_id", contribution_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut evidences = Self::decode_rows(rows)?;
+            evidences.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.evidence_id.cmp(&left.evidence_id))
+            });
+            Ok(evidences)
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealVouchRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealVouchRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn to_rfc3339(timestamp_ms: i64) -> DomainResult<String> {
+        let dt = OffsetDateTime::from_unix_timestamp_nanos(timestamp_ms as i128 * 1_000_000)
+            .map_err(|err| DomainError::Validation(format!("invalid timestamp: {err}")))?;
+        Ok(dt
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()))
+    }
+
+    fn parse_datetime_ms(value: &str) -> DomainResult<i64> {
+        let datetime = OffsetDateTime::parse(value, &Rfc3339).map_err(|err| {
+            DomainError::Validation(format!("invalid vouch datetime '{value}': {err}"))
+        })?;
+        Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+
+    fn weight_hint_to_string(value: &Option<VouchWeightHint>) -> Option<&'static str> {
+        value.as_ref().map(|hint| match hint {
+            VouchWeightHint::Strong => "strong",
+            VouchWeightHint::Moderate => "moderate",
+            VouchWeightHint::Light => "light",
+        })
+    }
+
+    fn parse_weight_hint(value: &str) -> DomainResult<VouchWeightHint> {
+        match value {
+            "strong" => Ok(VouchWeightHint::Strong),
+            "moderate" => Ok(VouchWeightHint::Moderate),
+            "light" => Ok(VouchWeightHint::Light),
+            _ => Err(DomainError::Validation(format!(
+                "invalid vouch weight_hint '{value}'"
+            ))),
+        }
+    }
+
+    fn build_payload(vouch: &Vouch) -> DomainResult<SurrealVouchCreateRow> {
+        let created_at = Self::to_rfc3339(vouch.created_at_ms)?;
+        let updated_at = Self::to_rfc3339(vouch.updated_at_ms)?;
+        Ok(SurrealVouchCreateRow {
+            vouch_id: vouch.vouch_id.clone(),
+            voucher_id: vouch.voucher_id.clone(),
+            voucher_username: vouch.voucher_username.clone(),
+            vouchee_id: vouch.vouchee_id.clone(),
+            skill_id: vouch.skill_id.clone(),
+            weight_hint: Self::weight_hint_to_string(&vouch.weight_hint)
+                .map(|value| value.to_string()),
+            message: vouch.message.clone(),
+            request_id: vouch.request_id.clone(),
+            correlation_id: vouch.correlation_id.clone(),
+            created_at,
+            updated_at,
+        })
+    }
+
+    fn map_row(row: SurrealVouchRow) -> DomainResult<Vouch> {
+        Ok(Vouch {
+            vouch_id: row.vouch_id,
+            voucher_id: row.voucher_id,
+            voucher_username: row.voucher_username,
+            vouchee_id: row.vouchee_id,
+            skill_id: row.skill_id,
+            weight_hint: row
+                .weight_hint
+                .as_ref()
+                .map(|value| Self::parse_weight_hint(value))
+                .transpose()?,
+            message: row.message,
+            request_id: row.request_id,
+            correlation_id: row.correlation_id,
+            created_at_ms: Self::parse_datetime_ms(&row.created_at)?,
+            updated_at_ms: Self::parse_datetime_ms(&row.updated_at)?,
+        })
+    }
+
+    fn decode_rows(rows: Vec<Value>) -> DomainResult<Vec<Vouch>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealVouchRow>(row)
+                    .map_err(|err| DomainError::Validation(format!("invalid vouch row: {err}")))
+                    .and_then(Self::map_row)
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealVouchCreateRow {
+    vouch_id: String,
+    voucher_id: String,
+    voucher_username: String,
+    vouchee_id: String,
+    skill_id: Option<String>,
+    weight_hint: Option<String>,
+    message: Option<String>,
+    request_id: String,
+    correlation_id: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealVouchRow {
+    vouch_id: String,
+    voucher_id: String,
+    voucher_username: String,
+    vouchee_id: String,
+    skill_id: Option<String>,
+    weight_hint: Option<String>,
+    message: Option<String>,
+    request_id: String,
+    correlation_id: String,
+    created_at: String,
+    updated_at: String,
+}
+
+impl VouchRepository for SurrealVouchRepository {
+    fn create(&self, vouch: &Vouch) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vouch>> {
+        let payload = match Self::build_payload(vouch) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let vouch_id = vouch.vouch_id.clone();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let payload = to_value(payload)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut response = client
+                .query("CREATE type::thing('vouch', $vouch_id) CONTENT $payload")
+                .bind(("vouch_id", vouch_id))
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut vouches = Self::decode_rows(rows)?;
+            vouches
+                .pop()
+                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+        })
+    }
+
+    fn list_by_vouchee(
+        &self,
+        vouchee_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<Vouch>>> {
+        let vouchee_id = vouchee_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM vouch \
+                     WHERE vouchee_id = $vouchee_id \
+                     ORDER BY created_at DESC, vouch_id DESC",
+                )
+                .bind(("vouchee_id", vouchee_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut vouches = Self::decode_rows(rows)?;
+            vouches.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.vouch_id.cmp(&left.vouch_id))
+            });
+            Ok(vouches)
+        })
+    }
+
+    fn list_by_voucher(
+        &self,
+        voucher_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<Vouch>>> {
+        let voucher_id = voucher_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM vouch \
+                     WHERE voucher_id = $voucher_id \
+                     ORDER BY created_at DESC, vouch_id DESC",
+                )
+                .bind(("voucher_id", voucher_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut vouches = Self::decode_rows(rows)?;
+            vouches.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.vouch_id.cmp(&left.vouch_id))
+            });
+            Ok(vouches)
         })
     }
 }

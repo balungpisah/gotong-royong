@@ -11,6 +11,7 @@ const HTTP_REQUEST_DURATION_SECONDS: &str = "gotong_api_http_request_duration_se
 const HTTP_REQUEST_ERRORS_TOTAL: &str = "gotong_api_http_errors_total";
 const EDGEPOD_FALLBACK_TOTAL: &str = "gotong_api_edgepod_fallback_total";
 const EDGEPOD_FALLBACK_UNAVAILABLE_TOTAL: &str = "gotong_api_edgepod_model_unavailable_total";
+const CHAT_REALTIME_BRIDGE_EVENTS_TOTAL: &str = "gotong_api_chat_realtime_bridge_events_total";
 
 static METRICS_HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
 
@@ -76,4 +77,14 @@ pub fn register_edgepod_fallback(endpoint: &str, reason_code: &str) {
         )
         .increment(1);
     }
+}
+
+pub fn register_chat_realtime_bridge_event(event: &str, transport: &str, reason: &str) {
+    counter!(
+        CHAT_REALTIME_BRIDGE_EVENTS_TOTAL,
+        "event" => event.to_string(),
+        "transport" => transport.to_string(),
+        "reason" => reason.to_string()
+    )
+    .increment(1);
 }
