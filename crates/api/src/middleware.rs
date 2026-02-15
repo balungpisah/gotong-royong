@@ -153,12 +153,13 @@ pub async fn auth_middleware(
         }
     };
 
-    let role = data
-        .claims
-        .role
-        .as_deref()
-        .and_then(Role::from_str)
-        .unwrap_or(Role::User);
+    let role = match data.claims.role.as_deref().and_then(Role::from_str) {
+        Some(role) => role,
+        None => {
+            tracing::warn!("token missing or invalid role");
+            return ApiError::Unauthorized.into_response();
+        }
+    };
 
     req.extensions_mut().insert(AuthContext {
         user_id: Some(data.claims.sub),
@@ -193,6 +194,10 @@ pub async fn correlation_id_middleware(mut req: Request<Body>, next: Next) -> Re
         },
         None => Uuid::now_v7().to_string(),
     };
+
+    if let Ok(value) = HeaderValue::from_str(&correlation_id) {
+        req.headers_mut().insert(header_name.clone(), value);
+    }
 
     req.extensions_mut()
         .insert(CorrelationId(correlation_id.clone()));

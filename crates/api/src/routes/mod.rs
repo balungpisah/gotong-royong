@@ -27,14 +27,18 @@ pub fn router(state: AppState) -> Router {
         .layer(app_middleware::timeout_layer())
         .layer(app_middleware::trace_layer())
         .layer(app_middleware::set_request_id_layer())
-        .layer(middleware::from_fn(
-            app_middleware::correlation_id_middleware,
-        ))
         .layer(app_middleware::propagate_request_id_layer())
         .layer(middleware::from_fn_with_state(
             state.clone(),
             app_middleware::auth_middleware,
+        ))
+        .layer(middleware::from_fn(
+            app_middleware::correlation_id_middleware,
         ));
+
+    if !state.config.app_env.eq_ignore_ascii_case("test") {
+        app = app.layer(app_middleware::rate_limit_layer());
+    }
 
     if !state.config.app_env.eq_ignore_ascii_case("test") {
         app = app.layer(app_middleware::rate_limit_layer());
