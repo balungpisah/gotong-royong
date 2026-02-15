@@ -587,7 +587,7 @@ impl SiagaService {
             .responders
             .iter()
             .position(|responder| responder.responder_id == responder_id)
-            .ok_or_else(|| DomainError::NotFound)?;
+            .ok_or(DomainError::NotFound)?;
 
         let target = &mut updated.responders[responder_pos];
         target.status = input.status.clone();

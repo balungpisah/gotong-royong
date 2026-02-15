@@ -791,7 +791,7 @@ async fn list_moderation_review_queue(
     Query(query): Query<ModerationReviewQueueQuery>,
 ) -> Result<Json<Vec<ContentModeration>>, ApiError> {
     let token_role = auth.role;
-    let limit = query.limit.unwrap_or(50).max(1).min(200);
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
     let service = ModerationService::new(state.moderation_repo.clone());
     let queue = service
         .list_review_queue(&token_role, limit)
@@ -2189,34 +2189,29 @@ async fn handle_chat_websocket(
                             replayed = true;
                         }
 
-                        if !replayed {
-                            if sender
+                        if !replayed
+                            && sender
                                 .send(Message::Text(
                                     "{\"event_type\":\"error\",\"message\":\"missed_messages_reconnect\"}"
                                         .to_string(),
                                 ))
                                 .await
                                 .is_err()
-                            {
-                                return;
-                            }
+                        {
+                            return;
                         }
                     }
                 }
             }
             incoming = incoming.next() => {
                 match incoming {
-                    Some(Ok(msg)) => {
-                        match msg {
-                            Message::Close(_) => return,
-                            _ => {}
-                        }
-                    }
+                    Some(Ok(Message::Close(_))) => return,
+                    Some(Ok(_)) => {}
                     Some(Err(_)) | None => return,
                 }
             }
             _ = heartbeat.tick() => {
-                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                if sender.send(Message::Ping(Vec::new())).await.is_err() {
                     return;
                 }
             }

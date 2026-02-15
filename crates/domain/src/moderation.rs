@@ -407,7 +407,7 @@ impl ModerationService {
             .await?;
         let author_id = existing
             .as_ref()
-            .and_then(|current| Some(current.author_id.clone()))
+            .map(|current| current.author_id.clone())
             .or_else(|| input.author_id.clone())
             .ok_or_else(|| {
                 DomainError::Validation(
@@ -459,24 +459,19 @@ impl ModerationService {
         let decision = match self.repository.create_decision(&decision).await {
             Ok(decision) => decision,
             Err(DomainError::Conflict) => {
-                return Ok(self
+                let decision = self
                     .repository
                     .get_decision_by_request(&input.content_id, &input.request_id)
                     .await?
-                    .map(|decision| {
-                        Ok(ModerationApplyResult {
-                            content: existing.unwrap_or_else(|| {
-                                ContentModeration::new(
-                                    input.content_id.clone(),
-                                    author_id,
-                                    author_username,
-                                )
-                            }),
-                            decision,
-                            schedule_auto_release: false,
-                        })
-                    })
-                    .unwrap_or_else(|| Err(DomainError::Conflict))?);
+                    .ok_or(DomainError::Conflict)?;
+
+                return Ok(ModerationApplyResult {
+                    content: existing.unwrap_or_else(|| {
+                        ContentModeration::new(input.content_id.clone(), author_id, author_username)
+                    }),
+                    decision,
+                    schedule_auto_release: false,
+                });
             }
             Err(err) => return Err(err),
         };

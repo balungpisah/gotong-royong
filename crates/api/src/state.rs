@@ -148,6 +148,7 @@ impl AppState {
     }
 
     #[allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
     pub fn with_repositories(
         config: AppConfig,
         store: Arc<dyn IdempotencyStore>,

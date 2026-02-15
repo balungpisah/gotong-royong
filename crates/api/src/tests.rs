@@ -94,7 +94,7 @@ async fn contribution_evidence_vouch_flow() {
         .method("POST")
         .uri("/v1/contributions")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token.clone()))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "flow-req-1")
         .body(Body::from(contribution_request.to_string()))
         .unwrap();
@@ -119,7 +119,7 @@ async fn contribution_evidence_vouch_flow() {
         .method("GET")
         .uri("/v1/contributions?author_id=user-123")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app
@@ -154,7 +154,7 @@ async fn contribution_evidence_vouch_flow() {
         .method("POST")
         .uri("/v1/evidence")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token.clone()))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "flow-req-2")
         .body(Body::from(evidence_request.to_string()))
         .unwrap();
@@ -175,8 +175,8 @@ async fn contribution_evidence_vouch_flow() {
         .expect("evidence_id");
     let evidence_get_request = Request::builder()
         .method("GET")
-        .uri(format!("/v1/evidence/{}", evidence_id))
-        .header("authorization", format!("Bearer {}", token.clone()))
+        .uri(format!("/v1/evidence/{evidence_id}"))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app
@@ -195,7 +195,7 @@ async fn contribution_evidence_vouch_flow() {
         .method("POST")
         .uri("/v1/vouches")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token.clone()))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "flow-req-3")
         .body(Body::from(vouch_request.to_string()))
         .unwrap();
@@ -205,7 +205,7 @@ async fn contribution_evidence_vouch_flow() {
     let vouch_list_request = Request::builder()
         .method("GET")
         .uri("/v1/vouches?vouchee_id=user-456")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app.oneshot(vouch_list_request).await.expect("response");
@@ -236,7 +236,7 @@ async fn track_transition_end_to_end() {
         .method("POST")
         .uri("/v1/transitions")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "t-req-1")
         .body(Body::from(first_request.to_string()))
         .unwrap();
@@ -256,7 +256,7 @@ async fn track_transition_end_to_end() {
         .method("POST")
         .uri("/v1/transitions")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "t-req-1")
         .body(Body::from(first_request.to_string()))
         .unwrap();
@@ -277,7 +277,7 @@ async fn track_transition_end_to_end() {
     let timeline_request = Request::builder()
         .method("GET")
         .uri("/v1/transitions/entity-100/timeline")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app
@@ -299,7 +299,7 @@ async fn track_transition_end_to_end() {
     let active_request = Request::builder()
         .method("GET")
         .uri("/v1/transitions/entity-100/active")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app.clone().oneshot(active_request).await.expect("response");
@@ -312,8 +312,8 @@ async fn track_transition_end_to_end() {
 
     let get_request = Request::builder()
         .method("GET")
-        .uri(format!("/v1/transitions/{}", first_transition_id))
-        .header("authorization", format!("Bearer {}", token))
+        .uri(format!("/v1/transitions/{first_transition_id}"))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app.clone().oneshot(get_request).await.expect("response");
@@ -354,7 +354,7 @@ async fn track_transition_request_id_is_entity_scoped() {
         .method("POST")
         .uri("/v1/transitions")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "scoped-req-1")
         .body(Body::from(request_payload("entity-scope-a").to_string()))
         .unwrap();
@@ -374,7 +374,7 @@ async fn track_transition_request_id_is_entity_scoped() {
         .method("POST")
         .uri("/v1/transitions")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "scoped-req-1")
         .body(Body::from(request_payload("entity-scope-b").to_string()))
         .unwrap();
@@ -416,7 +416,7 @@ async fn track_transition_validates_gate_and_role_matrix() {
         .method("POST")
         .uri("/v1/transitions")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "bad-1")
         .body(Body::from(bad_gate_request.to_string()))
         .unwrap();
@@ -441,7 +441,7 @@ async fn track_transition_validates_gate_and_role_matrix() {
         .method("POST")
         .uri("/v1/transitions")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "bad-2")
         .body(Body::from(bad_role_request.to_string()))
         .unwrap();
@@ -466,7 +466,7 @@ async fn contribution_create_is_idempotent() {
             .method("POST")
             .uri("/v1/contributions")
             .header("content-type", "application/json")
-            .header("authorization", format!("Bearer {}", token))
+            .header("authorization", format!("Bearer {token}"))
             .header("x-request-id", request_id)
             .body(Body::from(contribution_request.to_string()))
             .unwrap()
@@ -516,7 +516,7 @@ async fn evidence_rejects_missing_contribution() {
         .method("POST")
         .uri("/v1/evidence")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::from(evidence_request.to_string()))
         .unwrap();
 
@@ -546,7 +546,7 @@ async fn protected_route_accepts_valid_token() {
         .method("POST")
         .uri("/v1/idempotent-echo")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::from(r#"{"entity_id":"t-1","message":"hello"}"#))
         .unwrap();
 
@@ -583,7 +583,7 @@ async fn chat_thread_and_message_flow() {
         .method("POST")
         .uri("/v1/chat/threads")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "chat-req-1")
         .header("x-correlation-id", "corr-chat-1")
         .body(Body::from(thread_request.to_string()))
@@ -605,7 +605,7 @@ async fn chat_thread_and_message_flow() {
         .method("POST")
         .uri("/v1/chat/threads")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "chat-req-1")
         .header("x-correlation-id", "corr-chat-1b")
         .body(Body::from(thread_request.to_string()))
@@ -627,7 +627,7 @@ async fn chat_thread_and_message_flow() {
     let list_request = Request::builder()
         .method("GET")
         .uri("/v1/chat/threads")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app.clone().oneshot(list_request).await.expect("response");
@@ -649,7 +649,7 @@ async fn chat_thread_and_message_flow() {
         .method("POST")
         .uri(format!("/v1/chat/threads/{thread_id}/messages/send"))
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "chat-msg-1")
         .body(Body::from(message_request.to_string()))
         .unwrap();
@@ -668,7 +668,7 @@ async fn chat_thread_and_message_flow() {
     let list_messages_request = Request::builder()
         .method("GET")
         .uri(format!("/v1/chat/threads/{thread_id}/messages"))
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app
@@ -691,7 +691,7 @@ async fn chat_thread_and_message_flow() {
         .method("POST")
         .uri(format!("/v1/chat/threads/{thread_id}/read-cursor"))
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "chat-cursor-1")
         .body(Body::from(mark_cursor_request.to_string()))
         .unwrap();
@@ -701,7 +701,7 @@ async fn chat_thread_and_message_flow() {
     let read_cursor_request = Request::builder()
         .method("GET")
         .uri(format!("/v1/chat/threads/{thread_id}/read-cursor"))
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app
@@ -719,7 +719,7 @@ async fn chat_thread_and_message_flow() {
     let members_request = Request::builder()
         .method("GET")
         .uri(format!("/v1/chat/threads/{thread_id}/members"))
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app.oneshot(members_request).await.expect("response");
@@ -749,7 +749,7 @@ async fn chat_read_cursor_is_member_only() {
         .method("POST")
         .uri("/v1/chat/threads")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", owner_token))
+        .header("authorization", format!("Bearer {owner_token}"))
         .header("x-request-id", "chat-priv-1")
         .header("x-correlation-id", "corr-chat-priv-1")
         .body(Body::from(thread_request.to_string()))
@@ -768,7 +768,7 @@ async fn chat_read_cursor_is_member_only() {
     let read_cursor_request = Request::builder()
         .method("GET")
         .uri(format!("/v1/chat/threads/{thread_id}/read-cursor"))
-        .header("authorization", format!("Bearer {}", outsider_token))
+        .header("authorization", format!("Bearer {outsider_token}"))
         .body(Body::empty())
         .unwrap();
     let response = app.oneshot(read_cursor_request).await.expect("response");
@@ -788,7 +788,7 @@ async fn chat_poll_messages_endpoint() {
         .method("POST")
         .uri("/v1/chat/threads")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "chat-poll-1")
         .body(Body::from(thread_request.to_string()))
         .unwrap();
@@ -812,7 +812,7 @@ async fn chat_poll_messages_endpoint() {
         .method("POST")
         .uri(format!("/v1/chat/threads/{thread_id}/messages/send"))
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "chat-poll-2")
         .body(Body::from(message_request.to_string()))
         .unwrap();
@@ -822,7 +822,7 @@ async fn chat_poll_messages_endpoint() {
     let poll_request = Request::builder()
         .method("GET")
         .uri(format!("/v1/chat/threads/{thread_id}/messages/poll"))
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app.oneshot(poll_request).await.expect("response");
@@ -848,7 +848,7 @@ async fn chat_messages_query_rejects_since_message_without_created_at() {
         .method("POST")
         .uri("/v1/chat/threads")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "chat-catchup-1")
         .body(Body::from(thread_request.to_string()))
         .unwrap();
@@ -872,7 +872,7 @@ async fn chat_messages_query_rejects_since_message_without_created_at() {
         .method("POST")
         .uri(format!("/v1/chat/threads/{thread_id}/messages/send"))
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .header("x-request-id", "chat-catchup-2")
         .body(Body::from(message_request.to_string()))
         .unwrap();
@@ -884,7 +884,7 @@ async fn chat_messages_query_rejects_since_message_without_created_at() {
         .uri(format!(
             "/v1/chat/threads/{thread_id}/messages/poll?since_message_id=msg-dummy"
         ))
-        .header("authorization", format!("Bearer {}", token))
+        .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
     let response = app.clone().oneshot(poll_request).await.expect("response");

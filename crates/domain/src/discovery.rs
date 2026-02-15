@@ -709,12 +709,12 @@ mod tests {
 
     #[test]
     fn parse_feed_cursor_rejects_invalid_shape() {
-        assert!(parse_feed_cursor(Some("bad").as_deref()).is_err());
+        assert!(parse_feed_cursor(Some("bad")).is_err());
     }
 
     #[test]
     fn parse_search_cursor_rejects_invalid_shape() {
-        assert!(parse_search_cursor(Some("bad").as_deref()).is_err());
+        assert!(parse_search_cursor(Some("bad")).is_err());
     }
 
     #[test]

@@ -2260,7 +2260,10 @@ impl SiagaRepository for SurrealSiagaRepository {
                 return Ok(existing);
             }
 
-            if let None = Self::get_broadcast_from_store(&client, &siaga_id).await? {
+            if Self::get_broadcast_from_store(&client, &siaga_id)
+                .await?
+                .is_none()
+            {
                 return Err(DomainError::NotFound);
             }
 
@@ -3124,17 +3127,14 @@ impl ChatRepositoryPort for InMemoryChatRepository {
                 let active_members = members.read().await;
                 let allowed: Vec<String> = active_members
                     .iter()
-                    .filter_map(|((thread_id, member_user), member)| {
-                        (member_user == &actor_id && member.left_at_ms.is_none())
-                            .then(|| thread_id.clone())
+                    .filter(|((_, member_user), member)| {
+                        member_user == &actor_id && member.left_at_ms.is_none()
                     })
+                    .map(|((thread_id, _), _)| thread_id.clone())
                     .collect();
-                output = output
-                    .into_iter()
-                    .filter(|thread| {
-                        thread.privacy_level == "public" || allowed.contains(&thread.thread_id)
-                    })
-                    .collect();
+                output.retain(|thread| {
+                    thread.privacy_level == "public" || allowed.contains(&thread.thread_id)
+                });
             }
 
             output.sort_by(|a, b| b.created_at_ms.cmp(&a.created_at_ms));
@@ -3158,7 +3158,6 @@ impl ChatRepositoryPort for InMemoryChatRepository {
                 })
                 .map(|((thread_id, _), _)| thread_id.clone())
                 .collect();
-            let thread_ids = thread_ids;
             let threads = threads.read().await;
             let mut output = Vec::new();
             for thread_id in thread_ids {
@@ -3309,7 +3308,6 @@ impl ChatRepositoryPort for InMemoryChatRepository {
                 .await
                 .values()
                 .filter(|message| message.thread_id == thread_id)
-                .cloned()
                 .filter(|message| {
                     cursor.since_created_at_ms.is_none_or(|threshold| {
                         message.created_at_ms > threshold
@@ -3319,6 +3317,7 @@ impl ChatRepositoryPort for InMemoryChatRepository {
                             })
                     })
                 })
+                .cloned()
                 .collect();
             messages.sort_by(|a, b| {
                 a.created_at_ms
@@ -3433,7 +3432,7 @@ impl SurrealChatRepository {
                     .map_err(|err| {
                         DomainError::Validation(format!("invalid chat thread row: {err}"))
                     })
-                    .and_then(|row| Self::map_chat_thread_row(row))
+                    .and_then(Self::map_chat_thread_row)
             })
             .collect()
     }
@@ -3456,7 +3455,7 @@ impl SurrealChatRepository {
                     .map_err(|err| {
                         DomainError::Validation(format!("invalid chat member row: {err}"))
                     })
-                    .and_then(|row| Self::map_chat_member_row(row))
+                    .and_then(Self::map_chat_member_row)
             })
             .collect()
     }
@@ -3487,7 +3486,7 @@ impl SurrealChatRepository {
                     .map_err(|err| {
                         DomainError::Validation(format!("invalid chat message row: {err}"))
                     })
-                    .and_then(|row| Self::map_chat_message_row(row))
+                    .and_then(Self::map_chat_message_row)
             })
             .collect()
     }
@@ -3522,7 +3521,7 @@ impl SurrealChatRepository {
                     .map_err(|err| {
                         DomainError::Validation(format!("invalid chat read cursor row: {err}"))
                     })
-                    .and_then(|row| Self::map_chat_read_cursor_row(row))
+                    .and_then(Self::map_chat_read_cursor_row)
             })
             .collect()
     }
@@ -3543,7 +3542,7 @@ impl SurrealChatRepository {
                     .map_err(|err| {
                         DomainError::Validation(format!("invalid chat delivery event row: {err}"))
                     })
-                    .and_then(|row| Self::map_chat_delivery_event_row(row))
+                    .and_then(Self::map_chat_delivery_event_row)
             })
             .collect()
     }
@@ -4078,7 +4077,7 @@ impl ChatRepositoryPort for SurrealChatRepository {
                 if let Some(since_message_id) = cursor.since_message_id {
                     statement.push_str(" AND (created_at > $threshold OR (created_at = $threshold AND message_id > $since_message_id))");
                     let mut response = client
-                        .query(&format!(
+                        .query(format!(
                             "{statement} ORDER BY created_at ASC, message_id ASC LIMIT $limit"
                         ))
                         .bind(("thread_id", thread_id))
@@ -4101,7 +4100,7 @@ impl ChatRepositoryPort for SurrealChatRepository {
                 }
                 statement.push_str(" AND created_at > $threshold");
                 let mut response = client
-                    .query(&format!(
+                    .query(format!(
                         "{statement} ORDER BY created_at ASC, message_id ASC LIMIT $limit"
                     ))
                     .bind(("thread_id", thread_id))
