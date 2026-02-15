@@ -15,3 +15,4 @@ pub mod siaga;
 pub mod transitions;
 pub mod vault;
 pub mod vouches;
+pub mod webhook;

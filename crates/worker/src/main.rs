@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gotong_domain::ports::jobs::{JobQueue, JobQueueError, JobType};
+use gotong_domain::ports::webhook::WebhookOutboxRepository;
 use gotong_domain::{
     auth::Role,
     identity::ActorIdentity,
@@ -13,17 +14,28 @@ use gotong_domain::{
     transitions::{
         TrackTransitionInput, TrackTransitionService, TransitionAction, TransitionMechanism,
     },
+    webhook::{
+        WebhookDeliveryLog, WebhookDeliveryResult, WebhookOutboxEvent, WebhookOutboxStatus,
+        WebhookOutboxUpdate,
+    },
 };
 use gotong_infra::{
     config::AppConfig,
     db::DbConfig,
     jobs::RedisJobQueue,
     logging::init_tracing,
-    repositories::{SurrealModerationRepository, SurrealTrackTransitionRepository},
+    repositories::{
+        SurrealModerationRepository, SurrealTrackTransitionRepository,
+        SurrealWebhookOutboxRepository,
+    },
 };
+use hmac::{Hmac, Mac};
 use serde_json::json;
+use sha2::Sha256;
 use tracing::{error, info, warn};
 use uuid::Uuid;
+
+type HmacSha256 = Hmac<Sha256>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -55,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut transition_repo = None;
     let mut moderation_repo = None;
+    let mut webhook_outbox_repo = None;
     let backend = config.data_backend.trim().to_ascii_lowercase();
     if matches!(backend.as_str(), "surreal" | "surrealdb" | "tikv") {
         let db_config = DbConfig::from_app_config(&config);
@@ -62,9 +75,18 @@ async fn main() -> anyhow::Result<()> {
         transition_repo = Some(Arc::new(repository) as Arc<dyn TrackTransitionRepository>);
         let moderation_repository = SurrealModerationRepository::new(&db_config).await?;
         moderation_repo = Some(Arc::new(moderation_repository) as Arc<dyn ModerationRepository>);
+        let webhook_repository = SurrealWebhookOutboxRepository::new(&db_config).await?;
+        webhook_outbox_repo =
+            Some(Arc::new(webhook_repository) as Arc<dyn WebhookOutboxRepository>);
     }
 
-    let worker = Worker::new(queue, config, transition_repo, moderation_repo);
+    let worker = Worker::new(
+        queue,
+        config,
+        transition_repo,
+        moderation_repo,
+        webhook_outbox_repo,
+    );
     info!("worker starting");
     worker.run().await?;
 
@@ -76,6 +98,7 @@ struct Worker {
     config: AppConfig,
     transition_repo: Option<Arc<dyn TrackTransitionRepository>>,
     moderation_repo: Option<Arc<dyn ModerationRepository>>,
+    webhook_outbox_repo: Option<Arc<dyn WebhookOutboxRepository>>,
 }
 
 impl Worker {
@@ -84,12 +107,14 @@ impl Worker {
         config: AppConfig,
         transition_repo: Option<Arc<dyn TrackTransitionRepository>>,
         moderation_repo: Option<Arc<dyn ModerationRepository>>,
+        webhook_outbox_repo: Option<Arc<dyn WebhookOutboxRepository>>,
     ) -> Self {
         Self {
             queue,
             config,
             transition_repo,
             moderation_repo,
+            webhook_outbox_repo,
         }
     }
 
@@ -129,9 +154,11 @@ impl Worker {
             match self.queue.dequeue(Duration::from_secs(2)).await {
                 Ok(Some(job)) => {
                     if let Err(err) = handle_job(
+                        &self.config,
                         &job,
                         self.transition_repo.as_ref(),
                         self.moderation_repo.as_ref(),
+                        self.webhook_outbox_repo.as_ref(),
                     )
                     .await
                     {
@@ -217,9 +244,11 @@ impl Worker {
 }
 
 async fn handle_job(
+    config: &AppConfig,
     job: &JobEnvelope,
     transition_repo: Option<&Arc<dyn TrackTransitionRepository>>,
     moderation_repo: Option<&Arc<dyn ModerationRepository>>,
+    webhook_outbox_repo: Option<&Arc<dyn WebhookOutboxRepository>>,
 ) -> anyhow::Result<()> {
     match job.job_type {
         JobType::TransitionClose => {
@@ -285,7 +314,14 @@ async fn handle_job(
                 .await?;
         }
         JobType::WebhookRetry => {
-            info!(job_id = %job.job_id, "handling webhook retry (stub)");
+            let Some(repo) = webhook_outbox_repo else {
+                warn!(
+                    job_id = %job.job_id,
+                    "skipping webhook retry job: webhook outbox repository is unavailable"
+                );
+                return Ok(());
+            };
+            handle_webhook_retry(config, repo.clone(), job).await?;
         }
         JobType::DigestSend => {
             info!(job_id = %job.job_id, "handling digest send (stub)");
@@ -335,4 +371,245 @@ fn parse_moderation_auto_release_payload(
         ));
     }
     Ok(payload)
+}
+
+#[derive(Debug)]
+struct WebhookRequestEnvelope {
+    request_body: Vec<u8>,
+    request_body_sha256: String,
+}
+
+enum WebhookDeliveryResultClass {
+    Success,
+    Retryable,
+    Terminal,
+}
+
+struct DeliveryResponse {
+    status_code: Option<u16>,
+    response_body_sha256: Option<String>,
+    error_message: String,
+}
+
+async fn handle_webhook_retry(
+    config: &AppConfig,
+    repo: Arc<dyn WebhookOutboxRepository>,
+    job: &JobEnvelope,
+) -> anyhow::Result<()> {
+    if !config.webhook_enabled {
+        return Ok(());
+    }
+
+    let payload = parse_webhook_retry_payload(job)?;
+    let event = repo
+        .get(&payload.event_id)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to load webhook outbox event: {err}"))?
+        .ok_or_else(|| anyhow::anyhow!("webhook event not found: {}", payload.event_id))?;
+
+    if matches!(
+        event.status,
+        WebhookOutboxStatus::Delivered | WebhookOutboxStatus::DeadLetter
+    ) {
+        return Ok(());
+    }
+
+    let request = build_webhook_request(&event)?;
+    let response = send_webhook_request(config, &request, &event).await;
+
+    let (delivery_class, status_code, response_body_sha256, error_message) = match response {
+        Ok(delivery) => (
+            classify_webhook_response(delivery.status_code),
+            delivery.status_code,
+            delivery.response_body_sha256,
+            delivery.error_message,
+        ),
+        Err(err) => (
+            WebhookDeliveryResultClass::Retryable,
+            None,
+            None,
+            err.to_string(),
+        ),
+    };
+
+    let update = webhook_outbox_update(&event, &delivery_class, status_code, &error_message, job);
+    repo.update(&event.event_id, &update)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to update webhook outbox event: {err}"))?;
+
+    let log = webhook_delivery_log(
+        &event,
+        job.attempt,
+        &delivery_class,
+        status_code,
+        request.request_body_sha256,
+        response_body_sha256,
+        error_message,
+    );
+    repo.append_log(&log)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to append webhook delivery log: {err}"))?;
+
+    if matches!(delivery_class, WebhookDeliveryResultClass::Retryable)
+        && job.attempt < job.max_attempts
+    {
+        return Err(anyhow::anyhow!(
+            "webhook delivery is retryable (status: {status_code:?})"
+        ));
+    }
+
+    Ok(())
+}
+
+fn parse_webhook_retry_payload(
+    job: &JobEnvelope,
+) -> anyhow::Result<gotong_domain::jobs::WebhookRetryPayload> {
+    let payload: gotong_domain::jobs::WebhookRetryPayload =
+        serde_json::from_value(job.payload.clone())
+            .map_err(|err| anyhow::anyhow!("invalid webhook retry payload: {err}"))?;
+    if payload.event_id.trim().is_empty() {
+        return Err(anyhow::anyhow!("webhook retry payload missing event_id"));
+    }
+    Ok(payload)
+}
+
+fn build_webhook_request(event: &WebhookOutboxEvent) -> anyhow::Result<WebhookRequestEnvelope> {
+    let request_body = serde_json::to_vec(&event.payload)
+        .map_err(|err| anyhow::anyhow!("failed to serialize webhook payload: {err}"))?;
+    let request_body_sha256 = hash_sha256_hex(&request_body);
+    Ok(WebhookRequestEnvelope {
+        request_body,
+        request_body_sha256,
+    })
+}
+
+async fn send_webhook_request(
+    config: &AppConfig,
+    request: &WebhookRequestEnvelope,
+    event: &WebhookOutboxEvent,
+) -> anyhow::Result<DeliveryResponse> {
+    let signature = webhook_signature(&config.webhook_secret, &request.request_body)?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()?;
+    let response = client
+        .post(&config.webhook_markov_url)
+        .header("Content-Type", "application/json")
+        .header("X-GR-Signature", format!("sha256={signature}"))
+        .header("X-Request-ID", event.request_id.clone())
+        .body(request.request_body.clone())
+        .send()
+        .await
+        .map_err(|err| anyhow::anyhow!("webhook request failed: {err}"))?;
+    let status_code = response.status().as_u16();
+    let response_bytes = response
+        .bytes()
+        .await
+        .map_err(|err| anyhow::anyhow!("failed reading webhook response body: {err}"))?
+        .to_vec();
+    let response_body_sha256 = if response_bytes.is_empty() {
+        None
+    } else {
+        Some(hash_sha256_hex(&response_bytes))
+    };
+    Ok(DeliveryResponse {
+        status_code: Some(status_code),
+        response_body_sha256,
+        error_message: format!("status code {status_code}"),
+    })
+}
+
+fn classify_webhook_response(status_code: Option<u16>) -> WebhookDeliveryResultClass {
+    match status_code {
+        Some(200 | 202) => WebhookDeliveryResultClass::Success,
+        Some(429) => WebhookDeliveryResultClass::Retryable,
+        Some(code) if (500..=599).contains(&code) => WebhookDeliveryResultClass::Retryable,
+        Some(_) => WebhookDeliveryResultClass::Terminal,
+        None => WebhookDeliveryResultClass::Retryable,
+    }
+}
+
+fn webhook_outbox_update(
+    event: &WebhookOutboxEvent,
+    delivery_class: &WebhookDeliveryResultClass,
+    status_code: Option<u16>,
+    error_message: &str,
+    job: &JobEnvelope,
+) -> WebhookOutboxUpdate {
+    let next_attempt_at_ms = if matches!(delivery_class, WebhookDeliveryResultClass::Retryable)
+        && job.attempt < event.max_attempts
+    {
+        let delay_ms = backoff_ms(1_000, job.attempt, 60_000);
+        Some(now_ms() + delay_ms as i64)
+    } else {
+        None
+    };
+
+    let status = match delivery_class {
+        WebhookDeliveryResultClass::Success => WebhookOutboxStatus::Delivered,
+        WebhookDeliveryResultClass::Retryable if job.attempt < event.max_attempts => {
+            WebhookOutboxStatus::Retrying
+        }
+        WebhookDeliveryResultClass::Retryable | WebhookDeliveryResultClass::Terminal => {
+            WebhookOutboxStatus::DeadLetter
+        }
+    };
+
+    let mut last_error = Some(error_message.to_string());
+    if matches!(delivery_class, WebhookDeliveryResultClass::Success) {
+        last_error = None;
+    }
+
+    WebhookOutboxUpdate {
+        status,
+        attempts: job.attempt,
+        max_attempts: event.max_attempts,
+        next_attempt_at_ms,
+        last_status_code: status_code,
+        last_error,
+        request_id: None,
+        correlation_id: None,
+    }
+}
+
+fn webhook_delivery_log(
+    event: &WebhookOutboxEvent,
+    attempt: u32,
+    delivery_class: &WebhookDeliveryResultClass,
+    status_code: Option<u16>,
+    request_body_sha256: String,
+    response_body_sha256: Option<String>,
+    error_message: String,
+) -> WebhookDeliveryLog {
+    let outcome = match delivery_class {
+        WebhookDeliveryResultClass::Success => WebhookDeliveryResult::Success,
+        WebhookDeliveryResultClass::Retryable => WebhookDeliveryResult::RetryableFailure,
+        WebhookDeliveryResultClass::Terminal => WebhookDeliveryResult::TerminalFailure,
+    };
+
+    WebhookDeliveryLog {
+        log_id: Uuid::now_v7().to_string(),
+        event_id: event.event_id.clone(),
+        attempt,
+        outcome,
+        status_code,
+        request_id: event.request_id.clone(),
+        correlation_id: event.correlation_id.clone(),
+        request_body_sha256,
+        response_body_sha256,
+        error_message: Some(error_message),
+        created_at_ms: now_ms(),
+    }
+}
+
+fn webhook_signature(secret: &str, payload: &[u8]) -> anyhow::Result<String> {
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .map_err(|err| anyhow::anyhow!("invalid webhook secret: {err}"))?;
+    mac.update(payload);
+    Ok(hex::encode(mac.finalize().into_bytes()))
+}
+
+fn hash_sha256_hex(payload: &[u8]) -> String {
+    use sha2::Digest;
+    hex::encode(Sha256::digest(payload))
 }

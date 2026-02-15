@@ -49,6 +49,10 @@ fn test_config() -> AppConfig {
         worker_promote_batch: 10,
         worker_backoff_base_ms: 1000,
         worker_backoff_max_ms: 60000,
+        webhook_enabled: false,
+        webhook_markov_url: "http://127.0.0.1:8080/webhook".to_string(),
+        webhook_secret: "dev_webhook_secret_32_chars_minimum".to_string(),
+        webhook_max_attempts: 5,
     }
 }
 

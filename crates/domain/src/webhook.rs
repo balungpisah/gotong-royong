@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use crate::error::DomainError;
 use crate::jobs::now_ms;
@@ -24,19 +25,27 @@ impl WebhookOutboxStatus {
         }
     }
 
-    pub fn from_str(value: &str) -> Option<Self> {
-        match value {
-            "pending" => Some(Self::Pending),
-            "in_flight" => Some(Self::InFlight),
-            "delivered" => Some(Self::Delivered),
-            "retrying" => Some(Self::Retrying),
-            "dead_letter" => Some(Self::DeadLetter),
-            _ => None,
-        }
+    pub fn parse(value: &str) -> Option<Self> {
+        value.parse().ok()
     }
 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Delivered | Self::DeadLetter)
+    }
+}
+
+impl FromStr for WebhookOutboxStatus {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "pending" => Ok(Self::Pending),
+            "in_flight" => Ok(Self::InFlight),
+            "delivered" => Ok(Self::Delivered),
+            "retrying" => Ok(Self::Retrying),
+            "dead_letter" => Ok(Self::DeadLetter),
+            _ => Err("unknown webhook status"),
+        }
     }
 }
 
@@ -57,12 +66,20 @@ impl WebhookDeliveryResult {
         }
     }
 
-    pub fn from_str(value: &str) -> Option<Self> {
+    pub fn parse(value: &str) -> Option<Self> {
+        value.parse().ok()
+    }
+}
+
+impl FromStr for WebhookDeliveryResult {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "success" => Some(Self::Success),
-            "retryable_failure" => Some(Self::RetryableFailure),
-            "terminal_failure" => Some(Self::TerminalFailure),
-            _ => None,
+            "success" => Ok(Self::Success),
+            "retryable_failure" => Ok(Self::RetryableFailure),
+            "terminal_failure" => Ok(Self::TerminalFailure),
+            _ => Err("unknown webhook delivery result"),
         }
     }
 }
@@ -116,9 +133,7 @@ impl WebhookOutboxEvent {
             .get("event_type")
             .and_then(|value| value.as_str())
             .filter(|value| !value.trim().is_empty())
-            .ok_or_else(|| {
-                DomainError::Validation("missing event_type in webhook payload".into())
-            })?
+            .ok_or_else(|| DomainError::Validation("missing event_type in webhook payload".into()))?
             .to_string();
 
         let actor_id = payload

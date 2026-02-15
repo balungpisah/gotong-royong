@@ -14,5 +14,6 @@ pub mod transitions;
 pub mod util;
 pub mod vault;
 pub mod vouches;
+pub mod webhook;
 
 pub type DomainResult<T> = Result<T, error::DomainError>;

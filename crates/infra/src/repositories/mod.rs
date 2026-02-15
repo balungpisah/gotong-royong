@@ -28,6 +28,7 @@ use gotong_domain::ports::siaga::SiagaRepository;
 use gotong_domain::ports::transitions::TrackTransitionRepository;
 use gotong_domain::ports::vault::VaultRepository;
 use gotong_domain::ports::vouches::VouchRepository;
+use gotong_domain::ports::webhook::WebhookOutboxRepository;
 use gotong_domain::siaga::{
     SiagaActorSnapshot, SiagaBroadcast, SiagaClosure, SiagaResponder, SiagaState,
     SiagaTimelineEvent, SiagaTimelineEventType,
@@ -40,6 +41,10 @@ use gotong_domain::vault::{
     VaultActorSnapshot, VaultEntry, VaultState, VaultTimelineEvent, VaultTimelineEventType,
 };
 use gotong_domain::vouches::Vouch;
+use gotong_domain::webhook::{
+    WebhookDeliveryLog, WebhookDeliveryResult, WebhookOutboxEvent, WebhookOutboxListQuery,
+    WebhookOutboxStatus, WebhookOutboxUpdate,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, to_value};
 use surrealdb::{
@@ -54,6 +59,583 @@ use tokio::sync::RwLock;
 #[derive(Default)]
 pub struct InMemoryContributionRepository {
     store: Arc<RwLock<HashMap<String, Contribution>>>,
+}
+
+#[derive(Default)]
+pub struct InMemoryWebhookOutboxRepository {
+    events: Arc<RwLock<HashMap<String, WebhookOutboxEvent>>>,
+    by_request: Arc<RwLock<HashMap<String, String>>>,
+    logs: Arc<RwLock<HashMap<String, Vec<WebhookDeliveryLog>>>>,
+}
+
+impl InMemoryWebhookOutboxRepository {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl WebhookOutboxRepository for InMemoryWebhookOutboxRepository {
+    fn create(
+        &self,
+        event: &WebhookOutboxEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<WebhookOutboxEvent>> {
+        let event = event.clone();
+        let events = self.events.clone();
+        let by_request = self.by_request.clone();
+        Box::pin(async move {
+            let mut events = events.write().await;
+            if events.contains_key(&event.event_id) {
+                return Err(DomainError::Conflict);
+            }
+            let mut by_request = by_request.write().await;
+            if by_request.contains_key(&event.request_id) {
+                return Err(DomainError::Conflict);
+            }
+            by_request.insert(event.request_id.clone(), event.event_id.clone());
+            events.insert(event.event_id.clone(), event.clone());
+            Ok(event)
+        })
+    }
+
+    fn get(
+        &self,
+        event_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<WebhookOutboxEvent>>> {
+        let event_id = event_id.to_string();
+        let events = self.events.clone();
+        Box::pin(async move {
+            let events = events.read().await;
+            Ok(events.get(&event_id).cloned())
+        })
+    }
+
+    fn get_by_request_id(
+        &self,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<WebhookOutboxEvent>>> {
+        let request_id = request_id.to_string();
+        let by_request = self.by_request.clone();
+        let events = self.events.clone();
+        Box::pin(async move {
+            let by_request = by_request.read().await;
+            let Some(event_id) = by_request.get(&request_id) else {
+                return Ok(None);
+            };
+            Ok(events.read().await.get(event_id).cloned())
+        })
+    }
+
+    fn list(
+        &self,
+        query: &WebhookOutboxListQuery,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<WebhookOutboxEvent>>> {
+        let query = query.clone();
+        let events = self.events.clone();
+        Box::pin(async move {
+            let mut events: Vec<_> = events.read().await.values().cloned().collect();
+            if let Some(status) = query.status {
+                events.retain(|event| event.status == status);
+            }
+            events.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.event_id.cmp(&left.event_id))
+            });
+            if query.limit > 0 {
+                events.truncate(query.limit);
+            }
+            Ok(events)
+        })
+    }
+
+    fn update(
+        &self,
+        event_id: &str,
+        update: &WebhookOutboxUpdate,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<WebhookOutboxEvent>> {
+        let event_id = event_id.to_string();
+        let update = update.clone();
+        let events = self.events.clone();
+        Box::pin(async move {
+            let mut events = events.write().await;
+            let event = events.get_mut(&event_id).ok_or(DomainError::NotFound)?;
+            event.status = update.status;
+            event.attempts = update.attempts;
+            event.max_attempts = update.max_attempts;
+            event.next_attempt_at_ms = update.next_attempt_at_ms;
+            event.last_status_code = update.last_status_code;
+            event.last_error = update.last_error.clone();
+            if let Some(request_id) = update.request_id {
+                event.request_id = request_id;
+            }
+            if let Some(correlation_id) = update.correlation_id {
+                event.correlation_id = correlation_id;
+            }
+            event.updated_at_ms = gotong_domain::jobs::now_ms();
+            Ok(event.clone())
+        })
+    }
+
+    fn append_log(
+        &self,
+        log: &WebhookDeliveryLog,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<WebhookDeliveryLog>> {
+        let log = log.clone();
+        let logs = self.logs.clone();
+        Box::pin(async move {
+            let mut logs = logs.write().await;
+            logs.entry(log.event_id.clone())
+                .or_default()
+                .push(log.clone());
+            Ok(log)
+        })
+    }
+
+    fn list_logs(
+        &self,
+        event_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<WebhookDeliveryLog>>> {
+        let event_id = event_id.to_string();
+        let logs = self.logs.clone();
+        Box::pin(async move {
+            let mut logs = logs
+                .read()
+                .await
+                .get(&event_id)
+                .cloned()
+                .unwrap_or_default();
+            logs.sort_by(|left, right| left.attempt.cmp(&right.attempt));
+            Ok(logs)
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealWebhookOutboxRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealWebhookOutboxRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn parse_rfc3339(value: &str) -> DomainResult<i64> {
+        let dt = OffsetDateTime::parse(value, &Rfc3339)
+            .map_err(|err| DomainError::Validation(format!("invalid timestamp: {err}")))?;
+        Ok((dt.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn to_rfc3339(epoch_ms: i64) -> DomainResult<String> {
+        let dt = OffsetDateTime::from_unix_timestamp_nanos(epoch_ms as i128 * 1_000_000)
+            .map_err(|err| DomainError::Validation(format!("invalid ms timestamp: {err}")))?;
+        Ok(dt
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()))
+    }
+
+    fn parse_status(value: &str) -> DomainResult<WebhookOutboxStatus> {
+        value
+            .parse::<WebhookOutboxStatus>()
+            .map_err(|_| DomainError::Validation(format!("invalid webhook status '{value}'")))
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+
+    fn decode_event_rows(rows: Vec<Value>) -> DomainResult<Vec<WebhookOutboxEvent>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealWebhookOutboxRow>(row)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid webhook outbox row: {err}"))
+                    })
+                    .and_then(|row| {
+                        Ok(WebhookOutboxEvent {
+                            event_id: row.event_id,
+                            event_type: row.event_type,
+                            payload: row.payload,
+                            actor_id: row.actor_id,
+                            actor_username: row.actor_username,
+                            request_id: row.request_id,
+                            correlation_id: row.correlation_id,
+                            status: Self::parse_status(&row.status)?,
+                            attempts: row.attempts,
+                            max_attempts: row.max_attempts,
+                            next_attempt_at_ms: row
+                                .next_attempt_at
+                                .as_deref()
+                                .map(Self::parse_rfc3339)
+                                .transpose()?,
+                            last_status_code: row.last_status_code,
+                            last_error: row.last_error,
+                            created_at_ms: Self::parse_rfc3339(&row.created_at)?,
+                            updated_at_ms: Self::parse_rfc3339(&row.updated_at)?,
+                        })
+                    })
+            })
+            .collect()
+    }
+
+    fn decode_delivery_logs(rows: Vec<Value>) -> DomainResult<Vec<WebhookDeliveryLog>> {
+        rows.into_iter()
+            .map(|row| -> DomainResult<WebhookDeliveryLog> {
+                let row =
+                    serde_json::from_value::<SurrealWebhookDeliveryLogRow>(row).map_err(|err| {
+                        DomainError::Validation(format!("invalid webhook delivery log row: {err}"))
+                    })?;
+                Ok(WebhookDeliveryLog {
+                    log_id: row.log_id,
+                    event_id: row.event_id,
+                    attempt: row.attempt,
+                    outcome: row.outcome.parse::<WebhookDeliveryResult>().map_err(|_| {
+                        DomainError::Validation(format!("invalid webhook outcome: {}", row.outcome))
+                    })?,
+                    status_code: row.status_code,
+                    request_id: row.request_id,
+                    correlation_id: row.correlation_id,
+                    request_body_sha256: row.request_body_sha256,
+                    response_body_sha256: row.response_body_sha256,
+                    error_message: row.error_message,
+                    created_at_ms: Self::parse_rfc3339(&row.created_at)?,
+                })
+            })
+            .collect()
+    }
+
+    fn build_event_payload(
+        event: &WebhookOutboxEvent,
+    ) -> DomainResult<SurrealWebhookOutboxCreateRow> {
+        let created_at = Self::to_rfc3339(event.created_at_ms)?;
+        let updated_at = Self::to_rfc3339(event.updated_at_ms)?;
+        Ok(SurrealWebhookOutboxCreateRow {
+            event_id: event.event_id.clone(),
+            event_type: event.event_type.clone(),
+            payload: event.payload.clone(),
+            actor_id: event.actor_id.clone(),
+            actor_username: event.actor_username.clone(),
+            request_id: event.request_id.clone(),
+            correlation_id: event.correlation_id.clone(),
+            status: event.status.as_str().to_string(),
+            attempts: event.attempts,
+            max_attempts: event.max_attempts,
+            next_attempt_at: event.next_attempt_at_ms.map(Self::to_rfc3339).transpose()?,
+            last_status_code: event.last_status_code,
+            last_error: event.last_error.clone(),
+            created_at,
+            updated_at,
+        })
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SurrealWebhookOutboxCreateRow {
+    event_id: String,
+    event_type: String,
+    payload: serde_json::Value,
+    actor_id: String,
+    actor_username: String,
+    request_id: String,
+    correlation_id: String,
+    status: String,
+    attempts: u32,
+    max_attempts: u32,
+    next_attempt_at: Option<String>,
+    last_status_code: Option<u16>,
+    last_error: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealWebhookOutboxRow {
+    event_id: String,
+    event_type: String,
+    payload: serde_json::Value,
+    actor_id: String,
+    actor_username: String,
+    request_id: String,
+    correlation_id: String,
+    status: String,
+    attempts: u32,
+    max_attempts: u32,
+    #[serde(rename = "next_attempt_at")]
+    next_attempt_at: Option<String>,
+    last_status_code: Option<u16>,
+    last_error: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SurrealWebhookDeliveryLogCreateRow {
+    log_id: String,
+    event_id: String,
+    attempt: u32,
+    outcome: String,
+    status_code: Option<u16>,
+    request_id: String,
+    correlation_id: String,
+    request_body_sha256: String,
+    response_body_sha256: Option<String>,
+    error_message: Option<String>,
+    created_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealWebhookDeliveryLogRow {
+    log_id: String,
+    event_id: String,
+    attempt: u32,
+    outcome: String,
+    status_code: Option<u16>,
+    request_id: String,
+    correlation_id: String,
+    request_body_sha256: String,
+    response_body_sha256: Option<String>,
+    error_message: Option<String>,
+    created_at: String,
+}
+
+impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
+    fn create(
+        &self,
+        event: &WebhookOutboxEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<WebhookOutboxEvent>> {
+        let row = match Self::build_event_payload(event) {
+            Ok(row) => row,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let client = self.client.clone();
+        Box::pin(async move {
+            let payload = to_value(row)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut response = client
+                .query("CREATE webhook_outbox_event CONTENT $payload")
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut events = Self::decode_event_rows(rows)?;
+            events
+                .pop()
+                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+        })
+    }
+
+    fn get(
+        &self,
+        event_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<WebhookOutboxEvent>>> {
+        let event_id = event_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query("SELECT * FROM webhook_outbox_event WHERE event_id = $event_id LIMIT 1")
+                .bind(("event_id", event_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut events = Self::decode_event_rows(rows)?;
+            Ok(events.pop())
+        })
+    }
+
+    fn get_by_request_id(
+        &self,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<WebhookOutboxEvent>>> {
+        let request_id = request_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query("SELECT * FROM webhook_outbox_event WHERE request_id = $request_id LIMIT 1")
+                .bind(("request_id", request_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut events = Self::decode_event_rows(rows)?;
+            Ok(events.pop())
+        })
+    }
+
+    fn list(
+        &self,
+        query: &WebhookOutboxListQuery,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<WebhookOutboxEvent>>> {
+        let query = query.clone();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = match query.status {
+                Some(status) => client
+                    .query(
+                        "SELECT * FROM webhook_outbox_event WHERE status = $status ORDER BY created_at DESC, event_id DESC LIMIT $limit",
+                    )
+                    .bind(("status", status.as_str()))
+                    .bind(("limit", query.limit as i64))
+                    .await,
+                None => client
+                    .query(
+                        "SELECT * FROM webhook_outbox_event ORDER BY created_at DESC, event_id DESC LIMIT $limit",
+                    )
+                    .bind(("limit", query.limit as i64))
+                    .await,
+            }
+            .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_event_rows(rows)
+        })
+    }
+
+    fn update(
+        &self,
+        event_id: &str,
+        update: &WebhookOutboxUpdate,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<WebhookOutboxEvent>> {
+        let event_id = event_id.to_string();
+        let client = self.client.clone();
+        let event_id_for_query = event_id.clone();
+        let update = update.clone();
+        Box::pin(async move {
+            let mut query = String::from("UPDATE webhook_outbox_event");
+            query.push_str(
+                " SET status = $status, attempts = $attempts, max_attempts = $max_attempts, ",
+            );
+            query.push_str(
+                "last_status_code = $last_status_code, last_error = $last_error, updated_at = $updated_at",
+            );
+            if update.next_attempt_at_ms.is_some() {
+                query.push_str(", next_attempt_at = $next_attempt_at");
+            } else {
+                query.push_str(", next_attempt_at = NONE");
+            }
+            if update.request_id.is_some() {
+                query.push_str(", request_id = $request_id");
+            }
+            if update.correlation_id.is_some() {
+                query.push_str(", correlation_id = $correlation_id");
+            }
+            query.push_str(" WHERE event_id = $event_id RETURN AFTER *");
+            let updated_at = Self::to_rfc3339(gotong_domain::jobs::now_ms())?;
+            let next_attempt_at = update
+                .next_attempt_at_ms
+                .map(Self::to_rfc3339)
+                .transpose()?;
+            let mut pending = client
+                .query(&query)
+                .bind(("status", update.status.as_str()));
+            pending = pending.bind(("attempts", update.attempts as i64));
+            pending = pending.bind(("max_attempts", update.max_attempts as i64));
+            pending = pending.bind(("last_status_code", update.last_status_code));
+            pending = pending.bind(("last_error", update.last_error));
+            pending = pending.bind(("updated_at", updated_at));
+            if let Some(next_attempt_at) = next_attempt_at {
+                pending = pending.bind(("next_attempt_at", next_attempt_at));
+            }
+            if let Some(request_id) = update.request_id.as_ref() {
+                pending = pending.bind(("request_id", request_id.to_string()));
+            }
+            if let Some(correlation_id) = update.correlation_id.as_ref() {
+                pending = pending.bind(("correlation_id", correlation_id.to_string()));
+            }
+            pending = pending.bind(("event_id", event_id_for_query));
+            let mut response = pending.await.map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut events = Self::decode_event_rows(rows)?;
+            events.pop().ok_or(DomainError::NotFound)
+        })
+    }
+
+    fn append_log(
+        &self,
+        log: &WebhookDeliveryLog,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<WebhookDeliveryLog>> {
+        let row = SurrealWebhookDeliveryLogCreateRow {
+            log_id: log.log_id.clone(),
+            event_id: log.event_id.clone(),
+            attempt: log.attempt,
+            outcome: log.outcome.as_str().to_string(),
+            status_code: log.status_code,
+            request_id: log.request_id.clone(),
+            correlation_id: log.correlation_id.clone(),
+            request_body_sha256: log.request_body_sha256.clone(),
+            response_body_sha256: log.response_body_sha256.clone(),
+            error_message: log.error_message.clone(),
+            created_at: match SurrealWebhookOutboxRepository::to_rfc3339(log.created_at_ms) {
+                Ok(created_at) => created_at,
+                Err(err) => return Box::pin(async move { Err(err) }),
+            },
+        };
+        let client = self.client.clone();
+        Box::pin(async move {
+            let payload = to_value(row)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut response = client
+                .query("CREATE webhook_delivery_log CONTENT $payload")
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut logs = Self::decode_delivery_logs(rows)?;
+            logs.pop()
+                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+        })
+    }
+
+    fn list_logs(
+        &self,
+        event_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<WebhookDeliveryLog>>> {
+        let event_id = event_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM webhook_delivery_log WHERE event_id = $event_id ORDER BY attempt DESC",
+                )
+                .bind(("event_id", event_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_delivery_logs(rows)
+        })
+    }
 }
 
 impl InMemoryContributionRepository {

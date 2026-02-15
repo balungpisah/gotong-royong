@@ -30,7 +30,10 @@ use gotong_domain::{
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
     idempotency::{BeginOutcome, timer_request_id},
     identity::ActorIdentity,
-    jobs::{ModerationAutoReleasePayload, TransitionClosePayload, new_job},
+    jobs::{
+        JobDefaults, ModerationAutoReleasePayload, TransitionClosePayload, WebhookRetryPayload,
+        new_job,
+    },
     moderation::{
         ContentModeration, ModerationApplyCommand, ModerationDecision, ModerationService,
     },
@@ -45,6 +48,9 @@ use gotong_domain::{
         SealVault, UpdateVaultDraft, VaultEntry, VaultService, VaultTimelineEvent,
     },
     vouches::{Vouch, VouchCreate, VouchService, VouchWeightHint},
+    webhook::{
+        WebhookDeliveryLog, WebhookOutboxEvent, WebhookOutboxListQuery, WebhookOutboxStatus,
+    },
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -136,6 +142,15 @@ pub fn router(state: AppState) -> Router {
             post(mark_notification_read),
         )
         .route("/v1/notifications", get(list_discovery_notifications))
+        .route("/v1/admin/webhooks/outbox", get(list_webhook_outbox))
+        .route(
+            "/v1/admin/webhooks/outbox/:event_id",
+            get(get_webhook_outbox_event),
+        )
+        .route(
+            "/v1/admin/webhooks/outbox/:event_id/logs",
+            get(list_webhook_outbox_logs),
+        )
         .route(
             "/v1/chat/threads",
             post(create_chat_thread).get(list_chat_threads),
@@ -377,6 +392,22 @@ async fn create_contribution(
                 )
                 .await
                 .map_err(map_domain_error)?;
+            if state.config.webhook_enabled {
+                if let Err(err) = enqueue_webhook_outbox_event(
+                    &state,
+                    &request_id,
+                    &correlation_id,
+                    ContributionService::into_tandang_event_payload(&contribution),
+                )
+                .await
+                {
+                    tracing::warn!(
+                        error = %err,
+                        event_type = "contribution_created",
+                        "failed to enqueue contribution webhook outbox event"
+                    );
+                }
+            }
             ingest_discovery_contribution_feed(
                 &state,
                 &actor,
@@ -650,9 +681,25 @@ async fn submit_evidence(
             };
 
             let evidence = service
-                .submit(actor, request_id, correlation_id, input)
+                .submit(actor, request_id.clone(), correlation_id.clone(), input)
                 .await
                 .map_err(map_domain_error)?;
+            if state.config.webhook_enabled {
+                if let Err(err) = enqueue_webhook_outbox_event(
+                    &state,
+                    &request_id,
+                    &correlation_id,
+                    EvidenceService::into_tandang_event_payload(&evidence),
+                )
+                .await
+                {
+                    tracing::warn!(
+                        error = %err,
+                        event_type = "por_evidence",
+                        "failed to enqueue evidence webhook outbox event"
+                    );
+                }
+            }
 
             let response = IdempotencyResponse {
                 status_code: StatusCode::CREATED.as_u16(),
@@ -770,6 +817,155 @@ struct ListVouchesQuery {
     pub voucher_id: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ListWebhookOutboxQuery {
+    pub status: Option<String>,
+    pub limit: Option<usize>,
+}
+
+async fn list_webhook_outbox(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<ListWebhookOutboxQuery>,
+) -> Result<Json<Vec<WebhookOutboxEvent>>, ApiError> {
+    require_admin_role(&auth.role)?;
+
+    let query = WebhookOutboxListQuery {
+        status: match query.status.as_deref() {
+            Some(status) => Some(
+            WebhookOutboxStatus::parse(status).ok_or_else(|| {
+                ApiError::Validation(
+                    "invalid webhook status filter; use pending|in_flight|delivered|retrying|dead_letter".into(),
+                )
+                })?,
+            ),
+            None => None,
+        },
+        limit: query.limit.unwrap_or(100).clamp(1, 500),
+    };
+
+    let events = state
+        .webhook_outbox_repo
+        .list(&query)
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = %err, "failed to list webhook outbox");
+            ApiError::Internal
+        })?;
+    Ok(Json(events))
+}
+
+async fn get_webhook_outbox_event(
+    State(state): State<AppState>,
+    Path(event_id): Path<String>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<WebhookOutboxEvent>, ApiError> {
+    require_admin_role(&auth.role)?;
+    let event = state
+        .webhook_outbox_repo
+        .get(&event_id)
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = %err, "failed to get webhook outbox event");
+            ApiError::Internal
+        })?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(event))
+}
+
+async fn list_webhook_outbox_logs(
+    State(state): State<AppState>,
+    Path(event_id): Path<String>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<Vec<WebhookDeliveryLog>>, ApiError> {
+    require_admin_role(&auth.role)?;
+    let event = state
+        .webhook_outbox_repo
+        .get(&event_id)
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = %err, "failed to validate webhook outbox event existence");
+            ApiError::Internal
+        })?
+        .ok_or(ApiError::NotFound)?;
+    let _ = event;
+    let logs = state
+        .webhook_outbox_repo
+        .list_logs(&event_id)
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = %err, "failed to list webhook outbox logs");
+            ApiError::Internal
+        })?;
+    Ok(Json(logs))
+}
+
+fn require_admin_role(role: &gotong_domain::auth::Role) -> Result<(), ApiError> {
+    if role.is_admin() {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden)
+    }
+}
+
+async fn enqueue_webhook_outbox_event(
+    state: &AppState,
+    request_id: &str,
+    correlation_id: &str,
+    payload: Value,
+) -> Result<(), ApiError> {
+    let event = WebhookOutboxEvent::new(
+        payload,
+        request_id.to_string(),
+        correlation_id.to_string(),
+        state.config.webhook_max_attempts,
+    )
+    .map_err(|_| ApiError::Validation("invalid webhook payload".into()))?;
+    let event = match state.webhook_outbox_repo.create(&event).await {
+        Ok(event) => event,
+        Err(gotong_domain::error::DomainError::Conflict) => state
+            .webhook_outbox_repo
+            .get_by_request_id(request_id)
+            .await
+            .map_err(|err| {
+                tracing::warn!(
+                    error = %err,
+                    "failed to fetch existing webhook outbox event after conflict"
+                );
+                ApiError::Internal
+            })?
+            .ok_or(ApiError::Conflict)?,
+        Err(err) => {
+            tracing::warn!(error = %err, "failed to persist webhook outbox event");
+            return Err(ApiError::Internal);
+        }
+    };
+    let queue = state
+        .transition_job_queue
+        .as_ref()
+        .ok_or(ApiError::Internal)?;
+    let job_payload = serde_json::to_value(WebhookRetryPayload {
+        event_id: event.event_id.clone(),
+    })
+    .map_err(|_| ApiError::Internal)?;
+    let defaults = JobDefaults {
+        max_attempts: state.config.webhook_max_attempts.max(1),
+    };
+    let job = new_job(
+        event.event_id,
+        JobType::WebhookRetry,
+        job_payload,
+        request_id.to_string(),
+        correlation_id.to_string(),
+        defaults,
+    );
+    queue.enqueue(&job).await.map_err(|err| {
+        tracing::warn!(error = %err, "failed to enqueue webhook retry job");
+        ApiError::Internal
+    })?;
+    Ok(())
+}
+
 async fn submit_vouch(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -809,6 +1005,22 @@ async fn submit_vouch(
                 )
                 .await
                 .map_err(map_domain_error)?;
+            if state.config.webhook_enabled {
+                if let Err(err) = enqueue_webhook_outbox_event(
+                    &state,
+                    &request_id,
+                    &correlation_id,
+                    VouchService::into_tandang_event_payload(&vouch),
+                )
+                .await
+                {
+                    tracing::warn!(
+                        error = %err,
+                        event_type = "vouch_submitted",
+                        "failed to enqueue vouch webhook outbox event"
+                    );
+                }
+            }
             ingest_discovery_vouch_feed(
                 &state,
                 &actor,

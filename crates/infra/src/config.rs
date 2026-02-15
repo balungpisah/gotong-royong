@@ -23,6 +23,10 @@ pub struct AppConfig {
     pub worker_promote_batch: usize,
     pub worker_backoff_base_ms: u64,
     pub worker_backoff_max_ms: u64,
+    pub webhook_enabled: bool,
+    pub webhook_markov_url: String,
+    pub webhook_secret: String,
+    pub webhook_max_attempts: u32,
 }
 
 impl AppConfig {
@@ -50,9 +54,27 @@ impl AppConfig {
             .set_default("worker_promote_batch", 50)?
             .set_default("worker_backoff_base_ms", 1000)?
             .set_default("worker_backoff_max_ms", 60000)?
+            .set_default("webhook_enabled", false)?
+            .set_default(
+                "webhook_markov_url",
+                "https://api.markov.local/v1/platforms/gotong_royong/webhook",
+            )?
+            .set_default("webhook_secret", "dev_webhook_secret_32_chars_minimum")?
+            .set_default("webhook_max_attempts", 5u32)?
             .add_source(config::Environment::default().separator("__"))
             .build()?;
-        cfg.try_deserialize()
+        let config = cfg.try_deserialize::<AppConfig>()?;
+        if config.webhook_enabled && config.webhook_markov_url.trim().is_empty() {
+            return Err(config::ConfigError::Message(
+                "webhook is enabled but webhook_markov_url is empty".to_string(),
+            ));
+        }
+        if config.webhook_enabled && config.webhook_secret.trim().len() < 4 {
+            return Err(config::ConfigError::Message(
+                "webhook is enabled but webhook_secret is too short".to_string(),
+            ));
+        }
+        Ok(config)
     }
 
     pub fn is_production(&self) -> bool {

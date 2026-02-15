@@ -14,6 +14,7 @@ use gotong_domain::ports::{
     transitions::TrackTransitionRepository,
     vault::VaultRepository,
     vouches::VouchRepository,
+    webhook::WebhookOutboxRepository,
 };
 use gotong_infra::config::AppConfig;
 use gotong_infra::db::DbConfig;
@@ -23,10 +24,10 @@ use gotong_infra::repositories::{
     InMemoryChatRepository, InMemoryContributionRepository, InMemoryDiscoveryFeedRepository,
     InMemoryDiscoveryNotificationRepository, InMemoryEvidenceRepository,
     InMemoryModerationRepository, InMemorySiagaRepository, InMemoryTrackTransitionRepository,
-    InMemoryVaultRepository, InMemoryVouchRepository, SurrealChatRepository,
-    SurrealDiscoveryFeedRepository, SurrealDiscoveryNotificationRepository,
+    InMemoryVaultRepository, InMemoryVouchRepository, InMemoryWebhookOutboxRepository,
+    SurrealChatRepository, SurrealDiscoveryFeedRepository, SurrealDiscoveryNotificationRepository,
     SurrealModerationRepository, SurrealSiagaRepository, SurrealTrackTransitionRepository,
-    SurrealVaultRepository,
+    SurrealVaultRepository, SurrealWebhookOutboxRepository,
 };
 use tokio::sync::{RwLock, broadcast};
 
@@ -41,6 +42,7 @@ type RepositoryBundle = (
     Arc<dyn SiagaRepository>,
     Arc<dyn FeedRepository>,
     Arc<dyn NotificationRepository>,
+    Arc<dyn WebhookOutboxRepository>,
 );
 type TransitionJobQueue = Option<Arc<dyn JobQueue>>;
 
@@ -59,6 +61,7 @@ pub struct AppState {
     pub siaga_repo: Arc<dyn SiagaRepository>,
     pub feed_repo: Arc<dyn FeedRepository>,
     pub notification_repo: Arc<dyn NotificationRepository>,
+    pub webhook_outbox_repo: Arc<dyn WebhookOutboxRepository>,
     pub chat_realtime: ChatRealtimeBus,
     pub transition_job_queue: TransitionJobQueue,
 }
@@ -114,6 +117,7 @@ impl AppState {
             siaga_repo,
             feed_repo,
             notification_repo,
+            webhook_outbox_repo,
         ) = repositories_for_config(&config).await?;
         let transition_job_queue = transition_job_queue_for_config(&config).await?;
         let idempotency = IdempotencyService::new(Arc::new(store), IdempotencyConfig::default());
@@ -130,6 +134,7 @@ impl AppState {
             siaga_repo,
             feed_repo,
             notification_repo,
+            webhook_outbox_repo,
             chat_realtime: ChatRealtimeBus::new(),
             transition_job_queue,
         })
@@ -148,6 +153,7 @@ impl AppState {
             siaga_repo,
             feed_repo,
             notification_repo,
+            webhook_outbox_repo,
         ) = memory_repositories();
         Self {
             config,
@@ -162,6 +168,7 @@ impl AppState {
             siaga_repo,
             feed_repo,
             notification_repo,
+            webhook_outbox_repo,
             chat_realtime: ChatRealtimeBus::new(),
             transition_job_queue: None,
         }
@@ -182,6 +189,7 @@ impl AppState {
         siaga_repo: Arc<dyn SiagaRepository>,
         feed_repo: Arc<dyn FeedRepository>,
         notification_repo: Arc<dyn NotificationRepository>,
+        webhook_outbox_repo: Arc<dyn WebhookOutboxRepository>,
     ) -> Self {
         let idempotency = IdempotencyService::new(store, IdempotencyConfig::default());
         Self {
@@ -197,6 +205,7 @@ impl AppState {
             siaga_repo,
             feed_repo,
             notification_repo,
+            webhook_outbox_repo,
             chat_realtime: ChatRealtimeBus::new(),
             transition_job_queue: None,
         }
@@ -223,6 +232,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
             let siaga_repo = SurrealSiagaRepository::new(&db_config).await?;
             let feed_repo = SurrealDiscoveryFeedRepository::new(&db_config).await?;
             let notification_repo = SurrealDiscoveryNotificationRepository::new(&db_config).await?;
+            let webhook_outbox_repo = SurrealWebhookOutboxRepository::new(&db_config).await?;
             Ok((
                 Arc::new(InMemoryContributionRepository::new()),
                 Arc::new(InMemoryEvidenceRepository::new()),
@@ -234,6 +244,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
                 Arc::new(siaga_repo),
                 Arc::new(feed_repo),
                 Arc::new(notification_repo),
+                Arc::new(webhook_outbox_repo),
             ))
         }
         _ => anyhow::bail!("unsupported DATA_BACKEND '{}'", config.data_backend),
@@ -252,6 +263,7 @@ fn memory_repositories() -> RepositoryBundle {
         Arc::new(InMemorySiagaRepository::new()),
         Arc::new(InMemoryDiscoveryFeedRepository::new()),
         Arc::new(InMemoryDiscoveryNotificationRepository::new()),
+        Arc::new(InMemoryWebhookOutboxRepository::new()),
     )
 }
 
@@ -303,6 +315,10 @@ mod tests {
             worker_promote_batch: 10,
             worker_backoff_base_ms: 1000,
             worker_backoff_max_ms: 60000,
+            webhook_enabled: false,
+            webhook_markov_url: "http://127.0.0.1:5000/webhook".to_string(),
+            webhook_secret: "test-webhook-secret-32-chars-minimum".to_string(),
+            webhook_max_attempts: 5,
         }
     }
 

@@ -33,6 +33,11 @@ pub struct ModerationAutoReleasePayload {
     pub request_ts_ms: i64,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct WebhookRetryPayload {
+    pub event_id: String,
+}
+
 impl TransitionClosePayload {
     pub fn request_id(&self) -> String {
         self.request_id.clone()
