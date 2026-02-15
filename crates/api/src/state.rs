@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
+use gotong_domain::chat::ChatMessage;
 use gotong_domain::idempotency::{IdempotencyConfig, IdempotencyService};
 use gotong_domain::ports::idempotency::IdempotencyStore;
 use gotong_domain::ports::{
@@ -15,6 +17,7 @@ use gotong_infra::repositories::{
     InMemoryTrackTransitionRepository, InMemoryVouchRepository, SurrealChatRepository,
     SurrealTrackTransitionRepository,
 };
+use tokio::sync::{RwLock, broadcast};
 
 type RepositoryBundle = (
     Arc<dyn ContributionRepository>,
@@ -34,7 +37,42 @@ pub struct AppState {
     pub vouch_repo: Arc<dyn VouchRepository>,
     pub transition_repo: Arc<dyn TrackTransitionRepository>,
     pub chat_repo: Arc<dyn ChatRepository>,
+    pub chat_realtime: ChatRealtimeBus,
     pub transition_job_queue: TransitionJobQueue,
+}
+
+#[derive(Clone)]
+pub struct ChatRealtimeBus {
+    senders: Arc<RwLock<HashMap<String, broadcast::Sender<ChatMessage>>>>,
+    buffer_size: usize,
+}
+
+impl ChatRealtimeBus {
+    pub fn new() -> Self {
+        Self {
+            senders: Arc::new(RwLock::new(HashMap::new())),
+            buffer_size: 64,
+        }
+    }
+
+    async fn sender_for(&self, thread_id: &str) -> broadcast::Sender<ChatMessage> {
+        let mut senders = self.senders.write().await;
+        if let Some(sender) = senders.get(thread_id) {
+            return sender.clone();
+        }
+        let sender = broadcast::channel(self.buffer_size).0;
+        senders.insert(thread_id.to_string(), sender.clone());
+        sender
+    }
+
+    pub async fn publish(&self, thread_id: &str, message: ChatMessage) {
+        let sender = self.sender_for(thread_id).await;
+        let _ = sender.send(message);
+    }
+
+    pub async fn subscribe(&self, thread_id: &str) -> broadcast::Receiver<ChatMessage> {
+        self.sender_for(thread_id).await.subscribe()
+    }
 }
 
 impl AppState {
@@ -52,6 +90,7 @@ impl AppState {
             vouch_repo,
             transition_repo,
             chat_repo,
+            chat_realtime: ChatRealtimeBus::new(),
             transition_job_queue,
         })
     }
@@ -68,6 +107,7 @@ impl AppState {
             vouch_repo,
             transition_repo,
             chat_repo,
+            chat_realtime: ChatRealtimeBus::new(),
             transition_job_queue: None,
         }
     }
@@ -91,6 +131,7 @@ impl AppState {
             vouch_repo,
             transition_repo,
             chat_repo,
+            chat_realtime: ChatRealtimeBus::new(),
             transition_job_queue: None,
         }
     }

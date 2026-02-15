@@ -1,18 +1,24 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::convert::Infallible;
+use std::time::Duration;
 
+use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Extension, Path, Query, State};
 use axum::{
     Json, Router,
+    extract::ws::close_code,
     http::{HeaderMap, StatusCode},
     middleware,
+    response::sse::{Event, KeepAlive, Sse},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use futures_util::{SinkExt, StreamExt};
 use gotong_domain::{
     auth::TrackRole,
     chat::{
         ChatMember, ChatMessage, ChatReadCursor, ChatService, ChatThread, ChatThreadCreate,
-        SendMessageInput, build_message_catchup,
+        MessageCatchup, SendMessageInput, build_message_catchup,
     },
     contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
     error::DomainError,
@@ -30,6 +36,9 @@ use gotong_domain::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use tokio::sync::mpsc;
+use tokio::time::interval;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use validator::Validate;
 
 use crate::middleware::AuthContext;
@@ -77,6 +86,18 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/v1/chat/threads/:thread_id/messages/send",
             post(send_chat_message),
+        )
+        .route(
+            "/v1/chat/threads/:thread_id/messages/poll",
+            get(poll_chat_messages),
+        )
+        .route(
+            "/v1/chat/threads/:thread_id/messages/stream",
+            get(stream_chat_messages_sse),
+        )
+        .route(
+            "/v1/chat/threads/:thread_id/messages/ws",
+            get(stream_chat_messages_ws),
         )
         .route(
             "/v1/chat/threads/:thread_id/read-cursor",
@@ -661,11 +682,17 @@ struct ChatThreadsQuery {
     scope_id: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct ChatMessagesQuery {
     since_created_at_ms: Option<i64>,
     since_message_id: Option<String>,
     limit: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct ChatStreamEnvelope {
+    event_type: &'static str,
+    message: ChatMessage,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -688,6 +715,36 @@ struct SendChatMessageRequest {
 struct MarkChatReadCursorRequest {
     #[validate(length(min = 1, max = 128))]
     message_id: String,
+}
+
+fn build_message_catchup_from_query(query: &ChatMessagesQuery) -> MessageCatchup {
+    build_message_catchup(
+        query.limit,
+        query.since_created_at_ms,
+        query.since_message_id.clone(),
+    )
+}
+
+fn chat_message_stream_events(message: ChatMessage) -> Event {
+    Event::default()
+        .event("message")
+        .json_data(ChatStreamEnvelope {
+            event_type: "message",
+            message,
+        })
+        .unwrap_or_else(|_| {
+            Event::default()
+                .event("error")
+                .data("failed-to-serialize-message")
+        })
+}
+
+fn websocket_payload(message: &ChatMessage) -> String {
+    serde_json::to_string(&ChatStreamEnvelope {
+        event_type: "message",
+        message: message.clone(),
+    })
+    .unwrap_or_else(|_| "{\"event_type\":\"error\",\"message\":{}}".to_string())
 }
 
 async fn create_chat_thread(
@@ -878,17 +935,34 @@ async fn list_chat_messages(
     Query(query): Query<ChatMessagesQuery>,
 ) -> Result<Json<Vec<ChatMessage>>, ApiError> {
     let actor = actor_identity(&auth)?;
+    let messages = list_chat_messages_by_query(&state, &actor, &thread_id, query).await?;
+    Ok(Json(messages))
+}
+
+async fn poll_chat_messages(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(thread_id): Path<String>,
+    Query(query): Query<ChatMessagesQuery>,
+) -> Result<Json<Vec<ChatMessage>>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let messages = list_chat_messages_by_query(&state, &actor, &thread_id, query).await?;
+    Ok(Json(messages))
+}
+
+async fn list_chat_messages_by_query(
+    state: &AppState,
+    actor: &ActorIdentity,
+    thread_id: &str,
+    query: ChatMessagesQuery,
+) -> Result<Vec<ChatMessage>, ApiError> {
     let service = ChatService::new(state.chat_repo.clone());
-    let cursor = build_message_catchup(
-        query.limit,
-        query.since_created_at_ms,
-        query.since_message_id,
-    );
+    let cursor = build_message_catchup_from_query(&query);
     let messages = service
-        .list_messages(&thread_id, &actor, cursor)
+        .list_messages(thread_id, actor, cursor)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(messages))
+    Ok(messages)
 }
 
 async fn send_chat_message(
@@ -917,8 +991,9 @@ async fn send_chat_message(
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
             let service = ChatService::new(state.chat_repo.clone());
+            let thread_id_for_input = thread_id.clone();
             let input = SendMessageInput {
-                thread_id,
+                thread_id: thread_id_for_input,
                 body: payload.body,
                 attachments: payload.attachments,
                 request_id,
@@ -929,6 +1004,10 @@ async fn send_chat_message(
                 .send_message(&actor, input)
                 .await
                 .map_err(map_domain_error)?;
+            state
+                .chat_realtime
+                .publish(&thread_id, message.clone())
+                .await;
             let response = IdempotencyResponse {
                 status_code: StatusCode::CREATED.as_u16(),
                 body: serde_json::to_value(&message).map_err(|_| ApiError::Internal)?,
@@ -992,6 +1071,201 @@ async fn mark_chat_read_cursor(
             Ok(to_response(response))
         }
     }
+}
+
+async fn stream_chat_messages_ws(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Query(query): Query<ChatMessagesQuery>,
+    Extension(auth): Extension<AuthContext>,
+    ws: WebSocketUpgrade,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    assert_chat_stream_access(&state, &thread_id, &actor).await?;
+    let receiver = state.chat_realtime.subscribe(&thread_id).await;
+    let backlog = list_chat_messages_by_query(&state, &actor, &thread_id, query).await?;
+    let state_clone = state.clone();
+    let actor_clone = actor.clone();
+    let thread_id_clone = thread_id.clone();
+    Ok(ws.on_upgrade(move |socket| async move {
+        handle_chat_websocket(
+            socket,
+            state_clone,
+            thread_id_clone,
+            actor_clone,
+            backlog,
+            receiver,
+        )
+        .await;
+    }))
+}
+
+async fn stream_chat_messages_sse(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Query(query): Query<ChatMessagesQuery>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    assert_chat_stream_access(&state, &thread_id, &actor).await?;
+    let (tx, rx) = mpsc::unbounded_channel::<Result<Event, Infallible>>();
+    let mut receiver = state.chat_realtime.subscribe(&thread_id).await;
+    let mut messages = list_chat_messages_by_query(&state, &actor, &thread_id, query).await?;
+    let mut seen = HashSet::new();
+
+    for message in messages.drain(..) {
+        seen.insert(message.message_id.clone());
+        let _ = tx.send(Ok(chat_message_stream_events(message)));
+    }
+
+    let sender = tx.clone();
+    let state_clone = state.clone();
+    let thread_id = thread_id.clone();
+    let actor_id = actor.user_id.clone();
+    let actor_name = actor.username.clone();
+    let actor_identity = ActorIdentity {
+        user_id: actor_id,
+        username: actor_name,
+    };
+    tokio::spawn(async move {
+        let mut heartbeat = interval(Duration::from_secs(15));
+        let mut seen_messages = seen;
+        loop {
+            tokio::select! {
+                event = receiver.recv() => {
+                    match event {
+                        Ok(message) => {
+                            if !seen_messages.insert(message.message_id.clone()) {
+                                continue;
+                            }
+                            if assert_chat_stream_access(&state_clone, &thread_id, &actor_identity)
+                                .await
+                                .is_err()
+                            {
+                                let _ = sender.send(Ok(Event::default().event("closed").data("permission_lost")));
+                                break;
+                            }
+                            let _ = sender.send(Ok(chat_message_stream_events(message)));
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                            let _ = sender.send(Ok(
+                                Event::default().event("replay").data("missed_messages")
+                            ));
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+                _ = heartbeat.tick() => {
+                    if sender.send(Ok(Event::default().event("ping").data("keep-alive"))).is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    });
+
+    Ok(Sse::new(UnboundedReceiverStream::new(rx))
+        .keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
+        .into_response())
+}
+
+async fn handle_chat_websocket(
+    socket: WebSocket,
+    state: AppState,
+    thread_id: String,
+    actor: ActorIdentity,
+    mut backlog: Vec<ChatMessage>,
+    mut receiver: tokio::sync::broadcast::Receiver<ChatMessage>,
+) {
+    let (mut sender, mut incoming) = socket.split();
+    let mut seen = HashSet::new();
+
+    for message in backlog.drain(..) {
+        seen.insert(message.message_id.clone());
+        if sender
+            .send(Message::Text(websocket_payload(&message)))
+            .await
+            .is_err()
+        {
+            return;
+        }
+    }
+
+    let mut heartbeat = interval(Duration::from_secs(15));
+    loop {
+        tokio::select! {
+            event = receiver.recv() => {
+                match event {
+                    Ok(message) => {
+                        if assert_chat_stream_access(&state, &thread_id, &actor).await.is_err() {
+                            let _ = sender
+                                .send(Message::Close(Some(CloseFrame {
+                                    code: close_code::POLICY,
+                                    reason: "permission lost".into(),
+                                })))
+                                .await;
+                            return;
+                        }
+                        if !seen.insert(message.message_id.clone()) {
+                            continue;
+                        }
+                        if sender.send(Message::Text(websocket_payload(&message))).await.is_err() {
+                            return;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        let _ = sender
+                            .send(Message::Close(Some(CloseFrame {
+                                code: close_code::AWAY,
+                                reason: "stream closed".into(),
+                            })))
+                            .await;
+                        return;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                        if sender
+                            .send(Message::Text(
+                                "{\"event_type\":\"error\",\"message\":\"missed_messages_reconnect\"}"
+                                    .to_string(),
+                            ))
+                            .await
+                            .is_err()
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+            incoming = incoming.next() => {
+                match incoming {
+                    Some(Ok(msg)) => {
+                        match msg {
+                            Message::Close(_) => return,
+                            _ => {}
+                        }
+                    }
+                    Some(Err(_)) | None => return,
+                }
+            }
+            _ = heartbeat.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    return;
+                }
+            }
+        }
+    }
+}
+
+async fn assert_chat_stream_access(
+    state: &AppState,
+    thread_id: &str,
+    actor: &ActorIdentity,
+) -> Result<(), ApiError> {
+    let service = ChatService::new(state.chat_repo.clone());
+    service
+        .assert_actor_is_member(actor, thread_id)
+        .await
+        .map_err(map_domain_error)
 }
 
 async fn get_chat_read_cursor(

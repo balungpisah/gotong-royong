@@ -63,7 +63,7 @@ Out of scope:
 
 - `PR-01` to `PR-06`: DONE
 - `PR-07`: DONE
-- `PR-08`: IN PROGRESS (domain + in-memory/surreal repos + schema + HTTP endpoints + API tests committed; realtime transport still pending)
+- `PR-08`: DONE
 - `PR-09` to `PR-15`: NOT STARTED
 
 ## Detailed PR Plan
@@ -234,10 +234,10 @@ Exit criteria:
 ## PR-08 — Realtime Chat Core
 
 Status:
-- IN PROGRESS (2026-02-15)
+- DONE (2026-02-15)
 
 Recent note:
-- HTTP chat endpoints are available (`/v1/chat/threads`, thread messaging, membership, read-cursor) with in-memory/Surreal storage and idempotency tests wired. Realtime channel and reconnect catch-up remain pending and are tracked in this PR.
+- WS primary stream, SSE fallback, and polling endpoints were added on top of existing chat API (`/v1/chat/threads/*/messages/{stream,ws,poll}`), including catch-up from query snapshots.
 
 Goal:
 - Deliver chat baseline with stable ordering and reconnect semantics.
