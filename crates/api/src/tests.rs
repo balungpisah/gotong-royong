@@ -4,7 +4,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use axum::body::Body;
 use axum::body::to_bytes;
 use axum::http::{Request, StatusCode};
+use gotong_domain::discovery::{
+    DiscoveryService, FEED_SOURCE_CONTRIBUTION, FeedIngestInput, NOTIF_TYPE_SYSTEM,
+    NotificationIngestInput,
+};
 use gotong_domain::idempotency::InMemoryIdempotencyStore;
+use gotong_domain::identity::ActorIdentity;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::Serialize;
 use serde_json::json;
@@ -69,11 +74,27 @@ fn test_token_with_identity(secret: &str, role: &str, sub: &str) -> String {
     .expect("token")
 }
 
+fn actor_identity_for_tests(user_id: &str) -> ActorIdentity {
+    ActorIdentity {
+        user_id: user_id.to_string(),
+        username: format!("{user_id}-name"),
+    }
+}
+
 fn test_app() -> axum::Router {
+    test_app_state_router().1
+}
+
+fn test_app_state() -> AppState {
     let config = test_config();
     let store = InMemoryIdempotencyStore::new("test");
-    let state = AppState::with_idempotency_store(config, Arc::new(store));
-    routes::router(state)
+    AppState::with_idempotency_store(config, Arc::new(store))
+}
+
+fn test_app_state_router() -> (AppState, axum::Router) {
+    let state = test_app_state();
+    let app = routes::router(state.clone());
+    (state, app)
 }
 
 #[tokio::test]
@@ -889,4 +910,308 @@ async fn chat_messages_query_rejects_since_message_without_created_at() {
         .unwrap();
     let response = app.clone().oneshot(poll_request).await.expect("response");
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn discovery_feed_and_search_endpoints() {
+    let (state, app) = test_app_state_router();
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+
+    let actor = actor_identity_for_tests("user-123");
+    let second_actor = actor_identity_for_tests("user-456");
+
+    let feed_a = service
+        .ingest_feed(FeedIngestInput {
+            source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+            source_id: "seed-a".into(),
+            actor: actor.clone(),
+            title: "Need help in neighborhood".into(),
+            summary: Some("Need help fixing flood barrier".into()),
+            track: Some("resolve".into()),
+            stage: Some("garap".into()),
+            scope_id: Some("scope-rw-01".into()),
+            privacy_level: Some("public".into()),
+            occurred_at_ms: Some(1_000),
+            request_id: "feed-ingest-1".into(),
+            correlation_id: "corr-feed-1".into(),
+            request_ts_ms: Some(1_000),
+            participant_ids: vec!["user-456".into()],
+            payload: None,
+        })
+        .await
+        .expect("seed feed-a");
+
+    let feed_b = service
+        .ingest_feed(FeedIngestInput {
+            source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+            source_id: "seed-b".into(),
+            actor: second_actor.clone(),
+            title: "Cleanup support requested".into(),
+            summary: Some("Need cleanup support this weekend".into()),
+            track: Some("resolve".into()),
+            stage: Some("garap".into()),
+            scope_id: Some("scope-rw-01".into()),
+            privacy_level: Some("public".into()),
+            occurred_at_ms: Some(2_000),
+            request_id: "feed-ingest-2".into(),
+            correlation_id: "corr-feed-2".into(),
+            request_ts_ms: Some(2_000),
+            participant_ids: vec!["user-789".into()],
+            payload: None,
+        })
+        .await
+        .expect("seed feed-b");
+
+    let _feed_c = service
+        .ingest_feed(FeedIngestInput {
+            source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+            source_id: "seed-c".into(),
+            actor: second_actor,
+            title: "Neighborhood event announcement".into(),
+            summary: Some("Community cleanup event scheduled".into()),
+            track: Some("bantu".into()),
+            stage: Some("garap".into()),
+            scope_id: Some("scope-rw-01".into()),
+            privacy_level: Some("private".into()),
+            occurred_at_ms: Some(3_000),
+            request_id: "feed-ingest-3".into(),
+            correlation_id: "corr-feed-3".into(),
+            request_ts_ms: Some(3_000),
+            participant_ids: vec!["user-123".into()],
+            payload: None,
+        })
+        .await
+        .expect("seed feed-c");
+
+    let feed_list_request = Request::builder()
+        .method("GET")
+        .uri("/v1/feed?scope_id=scope-rw-01&track=resolve&limit=10")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(feed_list_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let feed_list: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let feed_items = feed_list
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items");
+    let feed_ids: Vec<&str> = feed_items
+        .iter()
+        .map(|item| {
+            item.get("feed_id")
+                .and_then(|value| value.as_str())
+                .unwrap()
+        })
+        .collect();
+    assert!(feed_ids.iter().any(|id| *id == feed_a.feed_id));
+    assert!(feed_ids.iter().any(|id| *id == feed_b.feed_id));
+    assert_eq!(feed_ids.len(), 2);
+
+    let search_request = Request::builder()
+        .method("GET")
+        .uri("/v1/search?query_text=cleanup&scope_id=scope-rw-01&limit=10")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(search_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let search_list: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let search_items = search_list
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items");
+    let search_ids: Vec<&str> = search_items
+        .iter()
+        .map(|item| {
+            item.get("item")
+                .and_then(|value| value.get("feed_id"))
+                .and_then(|value| value.as_str())
+                .expect("feed_id")
+        })
+        .collect();
+    assert!(
+        search_ids
+            .iter()
+            .any(|id| *id == feed_a.feed_id || *id == feed_b.feed_id)
+    );
+
+    let private_feed_request = Request::builder()
+        .method("GET")
+        .uri("/v1/feed?scope_id=scope-rw-01&track=resolve&involvement_only=true")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(private_feed_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let private_feed: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let private_feed_ids: Vec<&str> = private_feed
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items")
+        .iter()
+        .map(|item| {
+            item.get("feed_id")
+                .and_then(|value| value.as_str())
+                .unwrap()
+        })
+        .collect();
+    assert_eq!(private_feed_ids.len(), 1);
+    assert_eq!(private_feed_ids[0], feed_a.feed_id.as_str());
+}
+
+#[tokio::test]
+async fn discovery_notifications_endpoints() {
+    let (state, app) = test_app_state_router();
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+
+    let actor = actor_identity_for_tests("user-321");
+    let token = test_token_with_identity("test-secret", "user", &actor.user_id);
+
+    let notification_one = service
+        .ingest_notification(NotificationIngestInput {
+            recipient_id: actor.user_id.clone(),
+            actor: actor.clone(),
+            notification_type: NOTIF_TYPE_SYSTEM.to_string(),
+            source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+            source_id: "seed-a".into(),
+            title: "Transition updated".into(),
+            body: "Seed seed-a moved to periksa".into(),
+            payload: None,
+            privacy_level: Some("public".into()),
+            request_id: "notif-ingest-1".into(),
+            correlation_id: "corr-notif-1".into(),
+            request_ts_ms: Some(1_234),
+            dedupe_key: Some("notif-uniq-1".into()),
+        })
+        .await
+        .expect("seed notification");
+
+    let list_request = Request::builder()
+        .method("GET")
+        .uri("/v1/notifications?limit=10")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(list_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let list: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let unread_count = list
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items")
+        .len();
+    assert_eq!(unread_count, 1);
+
+    let read_request = Request::builder()
+        .method("POST")
+        .uri(format!(
+            "/v1/notifications/{}/read",
+            notification_one.notification_id
+        ))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(read_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let read_notification: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(
+        read_notification.get("notification_id"),
+        Some(&json!(notification_one.notification_id))
+    );
+    assert!(read_notification.get("read_at_ms").is_some());
+
+    let unread_count_request = Request::builder()
+        .method("GET")
+        .uri("/v1/notifications/unread-count")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(unread_count_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let unread: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(unread.get("unread_count"), Some(&json!(0)));
+
+    let include_read_request = Request::builder()
+        .method("GET")
+        .uri("/v1/notifications?include_read=true")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(include_read_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let read_list: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let read_items = read_list
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items");
+    assert_eq!(read_items.len(), 1);
+
+    let digest_request = Request::builder()
+        .method("GET")
+        .uri("/v1/notifications/weekly-digest?window_start_ms=0&window_end_ms=9999999999999")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(digest_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let digest: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(digest.get("user_id"), Some(&json!(actor.user_id)));
+    assert_eq!(
+        digest
+            .get("events")
+            .and_then(|value| value.as_array())
+            .expect("events")
+            .len(),
+        1
+    );
 }

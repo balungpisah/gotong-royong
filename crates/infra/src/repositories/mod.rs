@@ -8,6 +8,8 @@ use gotong_domain::chat::{
     ChatThreadQuery, ChatThreadWithMembers, MessageCatchup,
 };
 use gotong_domain::contributions::Contribution;
+use gotong_domain::discovery::FEED_SOURCE_VAULT;
+use gotong_domain::discovery::{FeedItem, InAppNotification};
 use gotong_domain::error::DomainError;
 use gotong_domain::evidence::Evidence;
 use gotong_domain::moderation::{
@@ -16,6 +18,10 @@ use gotong_domain::moderation::{
 };
 use gotong_domain::ports::chat::ChatRepository as ChatRepositoryPort;
 use gotong_domain::ports::contributions::ContributionRepository;
+use gotong_domain::ports::discovery::{
+    FeedRepository, FeedRepositoryQuery, FeedRepositorySearchQuery, NotificationRepository,
+    NotificationRepositoryListQuery,
+};
 use gotong_domain::ports::evidence::EvidenceRepository;
 use gotong_domain::ports::moderation::ModerationRepository;
 use gotong_domain::ports::siaga::SiagaRepository;
@@ -852,6 +858,1148 @@ impl VaultRepository for InMemoryVaultRepository {
             Ok(entries.read().await.get(vault_entry_id).cloned())
         })
     }
+}
+
+type FeedSourceRequestKey = (String, String, String);
+
+#[derive(Default)]
+pub struct InMemoryDiscoveryFeedRepository {
+    by_id: Arc<RwLock<HashMap<String, FeedItem>>>,
+    by_source_request: Arc<RwLock<HashMap<FeedSourceRequestKey, String>>>,
+}
+
+impl InMemoryDiscoveryFeedRepository {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl FeedRepository for InMemoryDiscoveryFeedRepository {
+    fn create_feed_item(
+        &self,
+        item: &FeedItem,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<FeedItem>> {
+        let item = item.clone();
+        let by_id = self.by_id.clone();
+        let by_source_request = self.by_source_request.clone();
+        Box::pin(async move {
+            let mut by_id = by_id.write().await;
+            if by_id.contains_key(&item.feed_id) {
+                return Err(DomainError::Conflict);
+            }
+            let source_key: FeedSourceRequestKey = (
+                item.source_type.clone(),
+                item.source_id.clone(),
+                item.request_id.clone(),
+            );
+            let mut by_source_request = by_source_request.write().await;
+            if by_source_request.contains_key(&source_key) {
+                return Err(DomainError::Conflict);
+            }
+            by_source_request.insert(source_key, item.feed_id.clone());
+            by_id.insert(item.feed_id.clone(), item.clone());
+            Ok(item)
+        })
+    }
+
+    fn get_by_source_request(
+        &self,
+        source_type: &str,
+        source_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<FeedItem>>> {
+        let source_key = (
+            source_type.to_string(),
+            source_id.to_string(),
+            request_id.to_string(),
+        );
+        let by_source_request = self.by_source_request.clone();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let by_source_request = by_source_request.read().await;
+            let Some(feed_id) = by_source_request.get(&source_key) else {
+                return Ok(None);
+            };
+            Ok(by_id.read().await.get(feed_id).cloned())
+        })
+    }
+
+    fn list_feed(
+        &self,
+        query: &FeedRepositoryQuery,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<FeedItem>>> {
+        let query = query.clone();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let mut items: Vec<FeedItem> = by_id
+                .read()
+                .await
+                .values()
+                .filter(|item| {
+                    if let Some(scope_id) = query.scope_id.as_ref() {
+                        if item.scope_id.as_deref() != Some(scope_id.as_str()) {
+                            return false;
+                        }
+                    }
+                    if let Some(track) = query.track.as_ref() {
+                        if item.track.as_deref() != Some(track.as_str()) {
+                            return false;
+                        }
+                    }
+                    if let Some(stage) = query.stage.as_ref() {
+                        if item.stage.as_deref() != Some(stage.as_str()) {
+                            return false;
+                        }
+                    }
+                    if let Some(privacy_level) = query.privacy_level.as_ref() {
+                        if item.privacy_level.as_deref() != Some(privacy_level.as_str()) {
+                            return false;
+                        }
+                    }
+                    if let Some(from_ms) = query.from_ms {
+                        if item.occurred_at_ms < from_ms {
+                            return false;
+                        }
+                    }
+                    if let Some(to_ms) = query.to_ms {
+                        if item.occurred_at_ms > to_ms {
+                            return false;
+                        }
+                    }
+                    if query.involvement_only
+                        && item.actor_id != query.actor_id
+                        && !item.participant_ids.iter().any(|id| id == &query.actor_id)
+                    {
+                        return false;
+                    }
+                    true
+                })
+                .cloned()
+                .collect();
+            items.sort_by(|left, right| {
+                right
+                    .occurred_at_ms
+                    .cmp(&left.occurred_at_ms)
+                    .then_with(|| right.feed_id.cmp(&left.feed_id))
+            });
+            let items = if let (Some(cursor_ms), Some(cursor_feed_id)) =
+                (query.cursor_occurred_at_ms, query.cursor_feed_id.as_ref())
+            {
+                items
+                    .into_iter()
+                    .filter(|item| {
+                        item.occurred_at_ms < cursor_ms
+                            || (item.occurred_at_ms == cursor_ms && item.feed_id < *cursor_feed_id)
+                    })
+                    .collect()
+            } else {
+                items
+            };
+            Ok(items.into_iter().take(query.limit).collect())
+        })
+    }
+
+    fn search_feed(
+        &self,
+        query: &FeedRepositorySearchQuery,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<FeedItem>>> {
+        let query = query.clone();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let mut items: Vec<FeedItem> = by_id
+                .read()
+                .await
+                .values()
+                .filter(|item| {
+                    if let Some(scope_id) = query.scope_id.as_ref() {
+                        if item.scope_id.as_deref() != Some(scope_id.as_str()) {
+                            return false;
+                        }
+                    }
+                    if let Some(track) = query.track.as_ref() {
+                        if item.track.as_deref() != Some(track.as_str()) {
+                            return false;
+                        }
+                    }
+                    if let Some(stage) = query.stage.as_ref() {
+                        if item.stage.as_deref() != Some(stage.as_str()) {
+                            return false;
+                        }
+                    }
+                    if let Some(privacy_level) = query.privacy_level.as_ref() {
+                        if item.privacy_level.as_deref() != Some(privacy_level.as_str()) {
+                            return false;
+                        }
+                    }
+                    if query.exclude_vault && item.source_type == FEED_SOURCE_VAULT {
+                        return false;
+                    }
+                    if let Some(from_ms) = query.from_ms {
+                        if item.occurred_at_ms < from_ms {
+                            return false;
+                        }
+                    }
+                    if let Some(to_ms) = query.to_ms {
+                        if item.occurred_at_ms > to_ms {
+                            return false;
+                        }
+                    }
+                    if query.involvement_only
+                        && item.actor_id != query.actor_id
+                        && !item.participant_ids.iter().any(|id| id == &query.actor_id)
+                    {
+                        return false;
+                    }
+                    true
+                })
+                .cloned()
+                .collect();
+            items.sort_by(|left, right| {
+                right
+                    .occurred_at_ms
+                    .cmp(&left.occurred_at_ms)
+                    .then_with(|| right.feed_id.cmp(&left.feed_id))
+            });
+            Ok(items.into_iter().take(query.limit).collect())
+        })
+    }
+}
+
+#[derive(Default)]
+pub struct InMemoryDiscoveryNotificationRepository {
+    by_id: Arc<RwLock<HashMap<String, InAppNotification>>>,
+    by_dedupe_key: Arc<RwLock<HashMap<(String, String), String>>>,
+}
+
+impl InMemoryDiscoveryNotificationRepository {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl NotificationRepository for InMemoryDiscoveryNotificationRepository {
+    fn create_notification(
+        &self,
+        notification: &InAppNotification,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<InAppNotification>> {
+        let notification = notification.clone();
+        let by_id = self.by_id.clone();
+        let by_dedupe_key = self.by_dedupe_key.clone();
+        Box::pin(async move {
+            let dedupe_key = (
+                notification.user_id.clone(),
+                notification.dedupe_key.clone(),
+            );
+            let mut by_dedupe_key = by_dedupe_key.write().await;
+            if by_dedupe_key.contains_key(&dedupe_key) {
+                return Err(DomainError::Conflict);
+            }
+            by_dedupe_key.insert(dedupe_key, notification.notification_id.clone());
+            by_id
+                .write()
+                .await
+                .insert(notification.notification_id.clone(), notification.clone());
+            Ok(notification)
+        })
+    }
+
+    fn get_by_dedupe_key(
+        &self,
+        user_id: &str,
+        dedupe_key: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<InAppNotification>>> {
+        let by_dedupe_key = self.by_dedupe_key.clone();
+        let by_id = self.by_id.clone();
+        let key = (user_id.to_string(), dedupe_key.to_string());
+        Box::pin(async move {
+            let by_dedupe_key = by_dedupe_key.read().await;
+            let Some(notification_id) = by_dedupe_key.get(&key) else {
+                return Ok(None);
+            };
+            Ok(by_id.read().await.get(notification_id).cloned())
+        })
+    }
+
+    fn list_notifications(
+        &self,
+        query: &NotificationRepositoryListQuery,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<InAppNotification>>> {
+        let query = query.clone();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let mut items: Vec<InAppNotification> = by_id
+                .read()
+                .await
+                .values()
+                .filter(|notification| {
+                    if notification.user_id != query.user_id {
+                        return false;
+                    }
+                    if !query.include_read && notification.read_at_ms.is_some() {
+                        return false;
+                    }
+                    true
+                })
+                .cloned()
+                .collect();
+            items.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.notification_id.cmp(&left.notification_id))
+            });
+            let items = if let (Some(cursor_ms), Some(cursor_notification_id)) = (
+                query.cursor_created_at_ms,
+                query.cursor_notification_id.as_ref(),
+            ) {
+                items
+                    .into_iter()
+                    .filter(|item| {
+                        item.created_at_ms < cursor_ms
+                            || (item.created_at_ms == cursor_ms
+                                && item.notification_id < *cursor_notification_id)
+                    })
+                    .collect()
+            } else {
+                items
+            };
+            Ok(items.into_iter().take(query.limit).collect())
+        })
+    }
+
+    fn list_notifications_in_window(
+        &self,
+        user_id: &str,
+        window_start_ms: i64,
+        window_end_ms: i64,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<InAppNotification>>> {
+        let user_id = user_id.to_string();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let mut items: Vec<InAppNotification> = by_id
+                .read()
+                .await
+                .values()
+                .filter(|notification| {
+                    notification.user_id == user_id
+                        && notification.created_at_ms >= window_start_ms
+                        && notification.created_at_ms <= window_end_ms
+                })
+                .cloned()
+                .collect();
+            items.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.notification_id.cmp(&left.notification_id))
+            });
+            Ok(items)
+        })
+    }
+
+    fn mark_as_read(
+        &self,
+        user_id: &str,
+        notification_id: &str,
+        read_at_ms: i64,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<InAppNotification>> {
+        let user_id = user_id.to_string();
+        let notification_id = notification_id.to_string();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let mut by_id = by_id.write().await;
+            let Some(mut notification) = by_id.remove(&notification_id) else {
+                return Err(DomainError::NotFound);
+            };
+            if notification.user_id != user_id {
+                by_id.insert(notification_id, notification);
+                return Err(DomainError::Forbidden(
+                    "notification belongs to another user".into(),
+                ));
+            }
+            notification.read_at_ms = Some(read_at_ms);
+            by_id.insert(notification.notification_id.clone(), notification.clone());
+            Ok(notification)
+        })
+    }
+
+    fn unread_count(
+        &self,
+        user_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<usize>> {
+        let user_id = user_id.to_string();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let count = by_id
+                .read()
+                .await
+                .values()
+                .filter(|notification| {
+                    notification.user_id == user_id && notification.read_at_ms.is_none()
+                })
+                .count();
+            Ok(count)
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealDiscoveryFeedRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealDiscoveryFeedRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn parse_datetime_ms(value: &str) -> DomainResult<i64> {
+        let datetime = OffsetDateTime::parse(value, &Rfc3339)
+            .map_err(|err| DomainError::Validation(format!("invalid datetime: {err}")))?;
+        Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn to_rfc3339(timestamp_ms: i64) -> DomainResult<String> {
+        let datetime =
+            OffsetDateTime::from_unix_timestamp_nanos((timestamp_ms as i128) * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid timestamp: {err}")))?;
+        Ok(datetime
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()))
+    }
+
+    fn map_rows(rows: Vec<Value>) -> DomainResult<Vec<FeedItem>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealDiscoveryFeedRow>(row)
+                    .map_err(|err| DomainError::Validation(format!("invalid feed row: {err}")))
+                    .and_then(|row| {
+                        let occurred_at_ms = Self::parse_datetime_ms(&row.occurred_at)?;
+                        let created_at_ms = Self::parse_datetime_ms(&row.created_at)?;
+                        Ok(FeedItem {
+                            feed_id: row.feed_id,
+                            source_type: row.source_type,
+                            source_id: row.source_id,
+                            actor_id: row.actor_id,
+                            actor_username: row.actor_username,
+                            title: row.title,
+                            summary: row.summary,
+                            track: row.track,
+                            stage: row.stage,
+                            scope_id: row.scope_id,
+                            privacy_level: row.privacy_level,
+                            occurred_at_ms,
+                            created_at_ms,
+                            request_id: row.request_id,
+                            correlation_id: row.correlation_id,
+                            participant_ids: row.participant_ids,
+                            payload: row.payload,
+                        })
+                    })
+            })
+            .collect()
+    }
+
+    fn to_create_payload(item: &FeedItem) -> DomainResult<SurrealDiscoveryFeedCreateRow> {
+        let occurred_at = Self::to_rfc3339(item.occurred_at_ms)?;
+        let created_at = Self::to_rfc3339(item.created_at_ms)?;
+        Ok(SurrealDiscoveryFeedCreateRow {
+            feed_id: item.feed_id.clone(),
+            source_type: item.source_type.clone(),
+            source_id: item.source_id.clone(),
+            actor_id: item.actor_id.clone(),
+            actor_username: item.actor_username.clone(),
+            title: item.title.clone(),
+            summary: item.summary.clone(),
+            track: item.track.clone(),
+            stage: item.stage.clone(),
+            scope_id: item.scope_id.clone(),
+            privacy_level: item.privacy_level.clone(),
+            occurred_at,
+            created_at,
+            request_id: item.request_id.clone(),
+            correlation_id: item.correlation_id.clone(),
+            participant_ids: item.participant_ids.clone(),
+            payload: item.payload.clone(),
+        })
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+}
+
+impl FeedRepository for SurrealDiscoveryFeedRepository {
+    fn create_feed_item(
+        &self,
+        item: &FeedItem,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<FeedItem>> {
+        let item = item.clone();
+        let payload = match Self::to_create_payload(&item) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let client = self.client.clone();
+        Box::pin(async move {
+            let payload = to_value(payload)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut response = client
+                .query("CREATE discovery_feed_item CONTENT $payload")
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            rows.pop()
+                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+        })
+    }
+
+    fn get_by_source_request(
+        &self,
+        source_type: &str,
+        source_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<FeedItem>>> {
+        let source_type = source_type.to_string();
+        let source_id = source_id.to_string();
+        let request_id = request_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM discovery_feed_item \
+                     WHERE source_type = $source_type AND source_id = $source_id AND request_id = $request_id LIMIT 1",
+                )
+                .bind(("source_type", source_type))
+                .bind(("source_id", source_id))
+                .bind(("request_id", request_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            Ok(rows.pop())
+        })
+    }
+
+    fn list_feed(
+        &self,
+        query: &FeedRepositoryQuery,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<FeedItem>>> {
+        let query = query.clone();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut clauses = Vec::new();
+            if query.scope_id.is_some() {
+                clauses.push("scope_id = $scope_id");
+            }
+            if query.track.is_some() {
+                clauses.push("track = $track");
+            }
+            if query.stage.is_some() {
+                clauses.push("stage = $stage");
+            }
+            if query.privacy_level.is_some() {
+                clauses.push("privacy_level = $privacy_level");
+            }
+            if query.from_ms.is_some() {
+                clauses.push("occurred_at >= $from_occurred_at");
+            }
+            if query.to_ms.is_some() {
+                clauses.push("occurred_at <= $to_occurred_at");
+            }
+            if query.cursor_occurred_at_ms.is_some() && query.cursor_feed_id.is_some() {
+                clauses.push(
+                    "(occurred_at < $cursor_occurred_at OR (occurred_at = $cursor_occurred_at AND feed_id < $cursor_feed_id))",
+                );
+            }
+
+            let mut statement = String::from("SELECT * FROM discovery_feed_item");
+            if !clauses.is_empty() {
+                statement.push_str(" WHERE ");
+                statement.push_str(&clauses.join(" AND "));
+            }
+            statement.push_str(" ORDER BY occurred_at DESC, feed_id DESC LIMIT $limit");
+
+            let mut db_query = client.query(statement).bind(("limit", query.limit as i64));
+
+            if let Some(scope_id) = query.scope_id.as_deref() {
+                db_query = db_query.bind(("scope_id", scope_id.to_string()));
+            }
+            if let Some(track) = query.track.as_deref() {
+                db_query = db_query.bind(("track", track.to_string()));
+            }
+            if let Some(stage) = query.stage.as_deref() {
+                db_query = db_query.bind(("stage", stage.to_string()));
+            }
+            if let Some(privacy_level) = query.privacy_level.as_deref() {
+                db_query = db_query.bind(("privacy_level", privacy_level.to_string()));
+            }
+            if let Some(from_ms) = query.from_ms {
+                let cursor = Self::to_rfc3339(from_ms)?;
+                db_query = db_query.bind(("from_occurred_at", cursor));
+            }
+            if let Some(to_ms) = query.to_ms {
+                let cursor = Self::to_rfc3339(to_ms)?;
+                db_query = db_query.bind(("to_occurred_at", cursor));
+            }
+            if let (Some(cursor_ms), Some(cursor_feed_id)) =
+                (query.cursor_occurred_at_ms, query.cursor_feed_id.as_deref())
+            {
+                let cursor = Self::to_rfc3339(cursor_ms)?;
+                db_query = db_query
+                    .bind(("cursor_occurred_at", cursor))
+                    .bind(("cursor_feed_id", cursor_feed_id.to_string()));
+            }
+
+            let mut response = db_query.await.map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut items = Self::map_rows(rows)?;
+            if query.involvement_only {
+                items.retain(|item| {
+                    item.actor_id == query.actor_id
+                        || item
+                            .participant_ids
+                            .iter()
+                            .any(|participant| participant == &query.actor_id)
+                });
+            }
+            Ok(items)
+        })
+    }
+
+    fn search_feed(
+        &self,
+        query: &FeedRepositorySearchQuery,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<FeedItem>>> {
+        let query = query.clone();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut clauses = Vec::new();
+            if query.scope_id.is_some() {
+                clauses.push("scope_id = $scope_id");
+            }
+            if query.track.is_some() {
+                clauses.push("track = $track");
+            }
+            if query.stage.is_some() {
+                clauses.push("stage = $stage");
+            }
+            if query.privacy_level.is_some() {
+                clauses.push("privacy_level = $privacy_level");
+            }
+            if query.exclude_vault {
+                clauses.push("source_type != $exclude_source_type");
+            }
+            if query.from_ms.is_some() {
+                clauses.push("occurred_at >= $from_occurred_at");
+            }
+            if query.to_ms.is_some() {
+                clauses.push("occurred_at <= $to_occurred_at");
+            }
+
+            let mut statement = String::from("SELECT * FROM discovery_feed_item");
+            if !clauses.is_empty() {
+                statement.push_str(" WHERE ");
+                statement.push_str(&clauses.join(" AND "));
+            }
+            statement.push_str(" ORDER BY occurred_at DESC, feed_id DESC LIMIT $limit");
+
+            let mut db_query = client.query(statement).bind(("limit", query.limit as i64));
+
+            if let Some(scope_id) = query.scope_id.as_deref() {
+                db_query = db_query.bind(("scope_id", scope_id.to_string()));
+            }
+            if let Some(track) = query.track.as_deref() {
+                db_query = db_query.bind(("track", track.to_string()));
+            }
+            if let Some(stage) = query.stage.as_deref() {
+                db_query = db_query.bind(("stage", stage.to_string()));
+            }
+            if let Some(privacy_level) = query.privacy_level.as_deref() {
+                db_query = db_query.bind(("privacy_level", privacy_level.to_string()));
+            }
+            if query.exclude_vault {
+                db_query = db_query.bind(("exclude_source_type", FEED_SOURCE_VAULT.to_string()));
+            }
+            if let Some(from_ms) = query.from_ms {
+                let from = Self::to_rfc3339(from_ms)?;
+                db_query = db_query.bind(("from_occurred_at", from));
+            }
+            if let Some(to_ms) = query.to_ms {
+                let to = Self::to_rfc3339(to_ms)?;
+                db_query = db_query.bind(("to_occurred_at", to));
+            }
+
+            let mut response = db_query.await.map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            rows.sort_by(|left, right| {
+                right
+                    .occurred_at_ms
+                    .cmp(&left.occurred_at_ms)
+                    .then_with(|| right.feed_id.cmp(&left.feed_id))
+            });
+            if query.involvement_only {
+                rows.retain(|item| {
+                    item.actor_id == query.actor_id
+                        || item
+                            .participant_ids
+                            .iter()
+                            .any(|participant| participant == &query.actor_id)
+                });
+            }
+            Ok(rows)
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealDiscoveryNotificationRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealDiscoveryNotificationRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn parse_datetime_ms(value: &str) -> DomainResult<i64> {
+        let datetime = OffsetDateTime::parse(value, &Rfc3339)
+            .map_err(|err| DomainError::Validation(format!("invalid datetime: {err}")))?;
+        Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn to_rfc3339(timestamp_ms: i64) -> DomainResult<String> {
+        let datetime =
+            OffsetDateTime::from_unix_timestamp_nanos((timestamp_ms as i128) * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid timestamp: {err}")))?;
+        Ok(datetime
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()))
+    }
+
+    fn map_rows(rows: Vec<Value>) -> DomainResult<Vec<InAppNotification>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealDiscoveryNotificationRow>(row)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid notification row: {err}"))
+                    })
+                    .and_then(|row| {
+                        let read_at_ms = match row.read_at {
+                            Some(value) => Some(Self::parse_datetime_ms(&value)?),
+                            None => None,
+                        };
+                        Ok(InAppNotification {
+                            notification_id: row.notification_id,
+                            user_id: row.user_id,
+                            actor_id: row.actor_id,
+                            actor_username: row.actor_username,
+                            notification_type: row.notification_type,
+                            source_type: row.source_type,
+                            source_id: row.source_id,
+                            title: row.title,
+                            body: row.body,
+                            payload: row.payload,
+                            created_at_ms: Self::parse_datetime_ms(&row.created_at)?,
+                            read_at_ms,
+                            privacy_level: row.privacy_level,
+                            request_id: row.request_id,
+                            correlation_id: row.correlation_id,
+                            dedupe_key: row.dedupe_key,
+                        })
+                    })
+            })
+            .collect()
+    }
+
+    fn to_create_payload(
+        notification: &InAppNotification,
+    ) -> DomainResult<SurrealDiscoveryNotificationCreateRow> {
+        let created_at = Self::to_rfc3339(notification.created_at_ms)?;
+        Ok(SurrealDiscoveryNotificationCreateRow {
+            notification_id: notification.notification_id.clone(),
+            user_id: notification.user_id.clone(),
+            actor_id: notification.actor_id.clone(),
+            actor_username: notification.actor_username.clone(),
+            notification_type: notification.notification_type.clone(),
+            source_type: notification.source_type.clone(),
+            source_id: notification.source_id.clone(),
+            title: notification.title.clone(),
+            body: notification.body.clone(),
+            payload: notification.payload.clone(),
+            created_at,
+            read_at: notification.read_at_ms.map(Self::to_rfc3339).transpose()?,
+            privacy_level: notification.privacy_level.clone(),
+            request_id: notification.request_id.clone(),
+            correlation_id: notification.correlation_id.clone(),
+            dedupe_key: notification.dedupe_key.clone(),
+        })
+    }
+
+    fn decode_count(rows: Vec<Value>, field: &str, label: &str) -> DomainResult<usize> {
+        let Some(row) = rows.into_iter().next() else {
+            return Err(DomainError::Validation(format!("missing {label}")));
+        };
+        let Some(value) = row.get(field) else {
+            return Err(DomainError::Validation(format!("{label} missing")));
+        };
+        let count = value
+            .as_u64()
+            .or_else(|| value.as_i64().and_then(|value| value.try_into().ok()))
+            .ok_or_else(|| DomainError::Validation(format!("invalid {label}")))?;
+        Ok(count as usize)
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+}
+
+impl NotificationRepository for SurrealDiscoveryNotificationRepository {
+    fn create_notification(
+        &self,
+        notification: &InAppNotification,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<InAppNotification>> {
+        let notification = notification.clone();
+        let payload = match Self::to_create_payload(&notification) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let client = self.client.clone();
+        Box::pin(async move {
+            let payload = to_value(payload)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut response = client
+                .query("CREATE discovery_notification CONTENT $payload")
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            rows.pop()
+                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+        })
+    }
+
+    fn get_by_dedupe_key(
+        &self,
+        user_id: &str,
+        dedupe_key: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<InAppNotification>>> {
+        let user_id = user_id.to_string();
+        let dedupe_key = dedupe_key.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM discovery_notification \
+                     WHERE user_id = $user_id AND dedupe_key = $dedupe_key LIMIT 1",
+                )
+                .bind(("user_id", user_id))
+                .bind(("dedupe_key", dedupe_key))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            Ok(rows.pop())
+        })
+    }
+
+    fn list_notifications(
+        &self,
+        query: &NotificationRepositoryListQuery,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<InAppNotification>>> {
+        let query = query.clone();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut filters = vec!["user_id = $user_id".to_string()];
+            if query.cursor_created_at_ms.is_some() && query.cursor_notification_id.is_some() {
+                filters.push(
+                    "((created_at < $cursor_created_at) OR (created_at = $cursor_created_at AND notification_id < $cursor_notification_id))".to_string(),
+                );
+            }
+            if !query.include_read {
+                filters.push("read_at IS NONE".to_string());
+            }
+
+            let mut statement = String::from("SELECT * FROM discovery_notification");
+            if !filters.is_empty() {
+                statement.push_str(" WHERE ");
+                statement.push_str(&filters.join(" AND "));
+            }
+            statement.push_str(" ORDER BY created_at DESC, notification_id DESC LIMIT $limit");
+
+            let mut db_query = client
+                .query(statement)
+                .bind(("user_id", query.user_id.clone()))
+                .bind(("limit", query.limit as i64));
+
+            if let Some(cursor_ms) = query.cursor_created_at_ms {
+                if let Some(cursor_notification_id) = query.cursor_notification_id.as_deref() {
+                    let cursor_created_at = Self::to_rfc3339(cursor_ms)?;
+                    db_query = db_query
+                        .bind(("cursor_created_at", cursor_created_at))
+                        .bind(("cursor_notification_id", cursor_notification_id.to_string()));
+                }
+            }
+
+            let mut response = db_query.await.map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let rows = Self::map_rows(rows)?;
+            Ok(rows)
+        })
+    }
+
+    fn list_notifications_in_window(
+        &self,
+        user_id: &str,
+        window_start_ms: i64,
+        window_end_ms: i64,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<InAppNotification>>> {
+        let user_id = user_id.to_string();
+        let window_start = match Self::to_rfc3339(window_start_ms) {
+            Ok(value) => value,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let window_end = match Self::to_rfc3339(window_end_ms) {
+            Ok(value) => value,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query("SELECT * FROM discovery_notification \
+                     WHERE user_id = $user_id AND created_at >= $window_start AND created_at <= $window_end \
+                     ORDER BY created_at DESC, notification_id DESC")
+                .bind(("user_id", user_id))
+                .bind(("window_start", window_start))
+                .bind(("window_end", window_end))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::map_rows(rows)
+        })
+    }
+
+    fn mark_as_read(
+        &self,
+        user_id: &str,
+        notification_id: &str,
+        read_at_ms: i64,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<InAppNotification>> {
+        let user_id = user_id.to_string();
+        let notification_id = notification_id.to_string();
+        let client = self.client.clone();
+        let read_at = match Self::to_rfc3339(read_at_ms) {
+            Ok(value) => value,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM discovery_notification \
+                     WHERE notification_id = $notification_id LIMIT 1",
+                )
+                .bind(("notification_id", notification_id.clone()))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            let Some(notification) = rows.pop() else {
+                return Err(DomainError::NotFound);
+            };
+            if notification.user_id != user_id {
+                return Err(DomainError::Forbidden(
+                    "notification belongs to another user".into(),
+                ));
+            }
+            if notification.read_at_ms.is_some() {
+                return Ok(notification);
+            }
+
+            let mut response = client
+                .query(
+                    "UPDATE discovery_notification \
+                     SET read_at = $read_at \
+                     WHERE notification_id = $notification_id \
+                     RETURN AFTER *",
+                )
+                .bind(("read_at", read_at))
+                .bind(("notification_id", notification_id.clone()))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            rows.pop().ok_or(DomainError::NotFound)
+        })
+    }
+
+    fn unread_count(
+        &self,
+        user_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<usize>> {
+        let user_id = user_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT count() AS unread_count \
+                     FROM discovery_notification \
+                     WHERE user_id = $user_id AND read_at IS NONE",
+                )
+                .bind(("user_id", user_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_count(rows, "unread_count", "unread_count")
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealDiscoveryFeedRow {
+    feed_id: String,
+    source_type: String,
+    source_id: String,
+    actor_id: String,
+    actor_username: String,
+    title: String,
+    summary: Option<String>,
+    track: Option<String>,
+    stage: Option<String>,
+    scope_id: Option<String>,
+    privacy_level: Option<String>,
+    occurred_at: String,
+    created_at: String,
+    request_id: String,
+    correlation_id: String,
+    participant_ids: Vec<String>,
+    payload: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SurrealDiscoveryFeedCreateRow {
+    feed_id: String,
+    source_type: String,
+    source_id: String,
+    actor_id: String,
+    actor_username: String,
+    title: String,
+    summary: Option<String>,
+    track: Option<String>,
+    stage: Option<String>,
+    scope_id: Option<String>,
+    privacy_level: Option<String>,
+    occurred_at: String,
+    created_at: String,
+    request_id: String,
+    correlation_id: String,
+    participant_ids: Vec<String>,
+    payload: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealDiscoveryNotificationRow {
+    notification_id: String,
+    user_id: String,
+    actor_id: String,
+    actor_username: String,
+    notification_type: String,
+    source_type: String,
+    source_id: String,
+    title: String,
+    body: String,
+    payload: Option<serde_json::Value>,
+    created_at: String,
+    read_at: Option<String>,
+    privacy_level: Option<String>,
+    request_id: String,
+    correlation_id: String,
+    dedupe_key: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealDiscoveryNotificationCreateRow {
+    notification_id: String,
+    user_id: String,
+    actor_id: String,
+    actor_username: String,
+    notification_type: String,
+    source_type: String,
+    source_id: String,
+    title: String,
+    body: String,
+    payload: Option<serde_json::Value>,
+    created_at: String,
+    read_at: Option<String>,
+    privacy_level: Option<String>,
+    request_id: String,
+    correlation_id: String,
+    dedupe_key: String,
 }
 
 #[derive(Clone)]

@@ -65,3 +65,11 @@ cat "$WORKDIR/database/checks/0006_vault_check.surql" | "${SUR_CMD[@]}" sql \
   --namespace "$SURREAL_NS" \
   --database "$SURREAL_DB" \
   --json
+
+cat "$WORKDIR/database/checks/0008_discovery_check.surql" | "${SUR_CMD[@]}" sql \
+  --endpoint "$SURREAL_ENDPOINT" \
+  --user "$SURREAL_USER" \
+  --pass "$SURREAL_PASS" \
+  --namespace "$SURREAL_NS" \
+  --database "$SURREAL_DB" \
+  --json

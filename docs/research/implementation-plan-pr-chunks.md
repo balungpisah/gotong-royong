@@ -61,9 +61,9 @@ Out of scope:
 
 ## PR Lock State
 
-- `PR-01` to `PR-10`: DONE
-- `PR-11`: DONE
-- `PR-12` to `PR-15`: NOT STARTED
+- `PR-01` to `PR-11`: DONE
+- `PR-12`: DONE
+- `PR-13` to `PR-15`: NOT STARTED
 
 ## Detailed PR Plan
 
@@ -327,7 +327,7 @@ Exit criteria:
 ## PR-12 — Feed/Search/Notifications (`BE-008`, `BE-009`, `BE-010`)
 
 Status:
-- NOT STARTED (2026-02-15)
+- DONE (2026-02-15)
 
 Goal:
 - Deliver derived read services for user-facing activity surfaces.
@@ -340,6 +340,10 @@ Deliverables:
 Validation:
 - Cursor determinism and privacy redaction tests.
 - Dedupe and embargo handling tests in notification paths.
+
+Implementation marks:
+- API endpoints wired for `/v1/feed`, `/v1/search`, `/v1/notifications`.
+- Idempotent notification read/digest/query paths are implemented and covered by integration tests.
 
 Exit criteria:
 - `UI-10`, `UI-11`, and `UI-12` contracts are functional.

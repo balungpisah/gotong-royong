@@ -21,6 +21,10 @@ use gotong_domain::{
         MessageCatchup, SendMessageInput, build_message_catchup,
     },
     contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
+    discovery::{
+        DiscoveryService, FeedListQuery, InAppNotification, NotificationListQuery, PagedFeed,
+        PagedNotifications, SearchListQuery, SearchPage, WeeklyDigest,
+    },
     error::DomainError,
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
     idempotency::{BeginOutcome, timer_request_id},
@@ -116,6 +120,21 @@ pub fn router(state: AppState) -> Router {
             get(list_moderation_review_queue),
         )
         .route("/v1/moderations/:content_id", get(get_moderation_view))
+        .route("/v1/feed", get(list_discovery_feed))
+        .route("/v1/search", get(list_discovery_search))
+        .route(
+            "/v1/notifications/weekly-digest",
+            get(discovery_weekly_digest),
+        )
+        .route(
+            "/v1/notifications/unread-count",
+            get(discovery_unread_count),
+        )
+        .route(
+            "/v1/notifications/:notification_id/read",
+            post(mark_notification_read),
+        )
+        .route("/v1/notifications", get(list_discovery_notifications))
         .route(
             "/v1/chat/threads",
             post(create_chat_thread).get(list_chat_threads),
@@ -393,6 +412,171 @@ async fn list_contributions(
         .await
         .map_err(map_domain_error)?;
     Ok(Json(contributions))
+}
+
+#[derive(Debug, Deserialize)]
+struct FeedListQueryParams {
+    pub cursor: Option<String>,
+    pub limit: Option<usize>,
+    pub scope_id: Option<String>,
+    pub track: Option<String>,
+    pub stage: Option<String>,
+    pub privacy_level: Option<String>,
+    pub from_ms: Option<i64>,
+    pub to_ms: Option<i64>,
+    pub involvement_only: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchListQueryParams {
+    #[serde(alias = "query")]
+    pub query_text: Option<String>,
+    pub cursor: Option<String>,
+    pub limit: Option<usize>,
+    pub scope_id: Option<String>,
+    pub track: Option<String>,
+    pub stage: Option<String>,
+    pub privacy_level: Option<String>,
+    pub from_ms: Option<i64>,
+    pub to_ms: Option<i64>,
+    pub involvement_only: Option<bool>,
+    pub exclude_vault: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NotificationsListQueryParams {
+    pub cursor: Option<String>,
+    pub limit: Option<usize>,
+    pub include_read: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WeeklyDigestQuery {
+    pub window_start_ms: Option<i64>,
+    pub window_end_ms: Option<i64>,
+}
+
+#[derive(Serialize)]
+struct DiscoveryUnreadCountResponse {
+    unread_count: usize,
+}
+
+async fn list_discovery_feed(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<FeedListQueryParams>,
+) -> Result<Json<PagedFeed>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let request = FeedListQuery {
+        actor_id: actor.user_id,
+        cursor: query.cursor,
+        limit: query.limit,
+        scope_id: query.scope_id,
+        track: query.track,
+        stage: query.stage,
+        privacy_level: query.privacy_level,
+        from_ms: query.from_ms,
+        to_ms: query.to_ms,
+        involvement_only: query.involvement_only.unwrap_or(false),
+    };
+    let response = service.list_feed(request).await.map_err(map_domain_error)?;
+    Ok(Json(response))
+}
+
+async fn list_discovery_search(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<SearchListQueryParams>,
+) -> Result<Json<SearchPage>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let query_text = query
+        .query_text
+        .as_deref()
+        .map(str::trim)
+        .filter(|query_text| !query_text.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| ApiError::Validation("query_text is required".into()))?;
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let request = SearchListQuery {
+        actor_id: actor.user_id,
+        query_text,
+        cursor: query.cursor,
+        limit: query.limit,
+        scope_id: query.scope_id,
+        track: query.track,
+        stage: query.stage,
+        privacy_level: query.privacy_level,
+        from_ms: query.from_ms,
+        to_ms: query.to_ms,
+        involvement_only: query.involvement_only.unwrap_or(false),
+        exclude_vault: query.exclude_vault.unwrap_or(false),
+    };
+    let response = service.search(request).await.map_err(map_domain_error)?;
+    Ok(Json(response))
+}
+
+async fn list_discovery_notifications(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<NotificationsListQueryParams>,
+) -> Result<Json<PagedNotifications>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let request = NotificationListQuery {
+        actor_id: actor.user_id,
+        cursor: query.cursor,
+        limit: query.limit,
+        include_read: query.include_read,
+    };
+    let response = service
+        .list_notifications(request)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(response))
+}
+
+async fn mark_notification_read(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(notification_id): Path<String>,
+) -> Result<Json<InAppNotification>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let response = service
+        .mark_notification_read(&actor.user_id, &notification_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(response))
+}
+
+async fn discovery_unread_count(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<DiscoveryUnreadCountResponse>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let response = service
+        .unread_notification_count(&actor.user_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(DiscoveryUnreadCountResponse {
+        unread_count: response,
+    }))
+}
+
+async fn discovery_weekly_digest(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<WeeklyDigestQuery>,
+) -> Result<Json<WeeklyDigest>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let response = service
+        .weekly_digest(&actor.user_id, query.window_start_ms, query.window_end_ms)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(response))
 }
 
 async fn get_contribution(
