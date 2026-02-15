@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Duration;
 
 use gotong_domain::ports::idempotency::{
@@ -6,13 +5,13 @@ use gotong_domain::ports::idempotency::{
 };
 use redis::AsyncCommands;
 use redis::aio::ConnectionManager;
-use tokio::sync::Mutex;
 
 const DEFAULT_PREFIX: &str = "gotong:idemp";
+const PUT_RETRY_LIMIT: usize = 2;
 
 #[derive(Clone)]
 pub struct RedisIdempotencyStore {
-    manager: Arc<Mutex<ConnectionManager>>,
+    manager: ConnectionManager,
     prefix: String,
 }
 
@@ -31,7 +30,7 @@ impl RedisIdempotencyStore {
             .await
             .map_err(|err| IdempotencyError::Unavailable(err.to_string()))?;
         Ok(Self {
-            manager: Arc::new(Mutex::new(manager)),
+            manager,
             prefix: prefix.into(),
         })
     }
@@ -62,9 +61,8 @@ impl IdempotencyStore for RedisIdempotencyStore {
     ) -> gotong_domain::ports::BoxFuture<'_, Result<Option<IdempotencyRecord>, IdempotencyError>>
     {
         let cache_key = self.cache_key(key);
-        let manager = self.manager.clone();
         Box::pin(async move {
-            let mut conn = manager.lock().await;
+            let mut conn = self.manager.clone();
             let value: Option<String> = conn
                 .get(cache_key)
                 .await
@@ -83,37 +81,44 @@ impl IdempotencyStore for RedisIdempotencyStore {
         ttl: Duration,
     ) -> gotong_domain::ports::BoxFuture<'_, Result<PutOutcome, IdempotencyError>> {
         let cache_key = self.cache_key(key);
-        let manager = self.manager.clone();
         let record = record.clone();
         Box::pin(async move {
             let payload = Self::serialize_record(&record).await?;
             let ttl_ms = Self::ttl_ms(ttl);
-            let mut conn = manager.lock().await;
-            let result: Option<String> = redis::cmd("SET")
-                .arg(&cache_key)
-                .arg(payload)
-                .arg("NX")
-                .arg("PX")
-                .arg(ttl_ms)
-                .query_async(&mut *conn)
-                .await
-                .map_err(|err| IdempotencyError::Store(err.to_string()))?;
+            for attempt in 0..PUT_RETRY_LIMIT {
+                let mut conn = self.manager.clone();
+                let result: Option<String> = redis::cmd("SET")
+                    .arg(&cache_key)
+                    .arg(payload.clone())
+                    .arg("NX")
+                    .arg("PX")
+                    .arg(ttl_ms)
+                    .query_async(&mut conn)
+                    .await
+                    .map_err(|err| IdempotencyError::Store(err.to_string()))?;
 
-            if result.is_some() {
-                return Ok(PutOutcome::Stored);
+                if result.is_some() {
+                    return Ok(PutOutcome::Stored);
+                }
+
+                let existing: Option<String> = conn
+                    .get(&cache_key)
+                    .await
+                    .map_err(|err| IdempotencyError::Store(err.to_string()))?;
+                if let Some(payload) = existing {
+                    return Ok(PutOutcome::Existing(
+                        Self::deserialize_record(&payload).await?,
+                    ));
+                }
+
+                if attempt + 1 >= PUT_RETRY_LIMIT {
+                    break;
+                }
             }
 
-            let existing: Option<String> = conn
-                .get(&cache_key)
-                .await
-                .map_err(|err| IdempotencyError::Store(err.to_string()))?;
-            let record = match existing {
-                Some(payload) => Some(Self::deserialize_record(&payload).await?),
-                None => None,
-            };
-            Ok(record
-                .map(PutOutcome::Existing)
-                .unwrap_or(PutOutcome::Stored))
+            Err(IdempotencyError::Store(
+                "failed to claim idempotency key".into(),
+            ))
         })
     }
 
@@ -124,19 +129,18 @@ impl IdempotencyStore for RedisIdempotencyStore {
         ttl: Duration,
     ) -> gotong_domain::ports::BoxFuture<'_, Result<(), IdempotencyError>> {
         let cache_key = self.cache_key(key);
-        let manager = self.manager.clone();
         let record = record.clone();
         Box::pin(async move {
             let payload = Self::serialize_record(&record).await?;
             let ttl_ms = Self::ttl_ms(ttl);
-            let mut conn = manager.lock().await;
+            let mut conn = self.manager.clone();
             let result: Option<String> = redis::cmd("SET")
                 .arg(&cache_key)
                 .arg(&payload)
                 .arg("XX")
                 .arg("PX")
                 .arg(ttl_ms)
-                .query_async(&mut *conn)
+                    .query_async(&mut conn)
                 .await
                 .map_err(|err| IdempotencyError::Store(err.to_string()))?;
 
@@ -146,7 +150,7 @@ impl IdempotencyStore for RedisIdempotencyStore {
                     .arg(payload)
                     .arg("PX")
                     .arg(ttl_ms)
-                    .query_async(&mut *conn)
+                    .query_async(&mut conn)
                     .await
                     .map_err(|err| IdempotencyError::Store(err.to_string()))?;
             }

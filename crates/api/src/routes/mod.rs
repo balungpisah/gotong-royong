@@ -80,7 +80,7 @@ async fn idempotent_echo(
     let request_id = request_id
         .header_value()
         .to_str()
-        .unwrap_or("unknown")
+        .map_err(|_| ApiError::Validation("invalid request id".into()))?
         .to_string();
     let key = IdempotencyKey::new("echo", payload.entity_id.clone(), request_id);
 
