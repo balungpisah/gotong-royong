@@ -63,7 +63,8 @@ Out of scope:
 
 - `PR-01` to `PR-11`: DONE
 - `PR-12`: DONE
-- `PR-13` to `PR-15`: NOT STARTED
+- `PR-13`: DONE
+- `PR-14` to `PR-15`: NOT STARTED
 
 ## Detailed PR Plan
 
@@ -351,7 +352,7 @@ Exit criteria:
 ## PR-13 — Markov Webhook Integration + Outbox
 
 Status:
-- NOT STARTED (2026-02-15)
+- DONE (2026-02-15)
 
 Goal:
 - Implement outbound-only webhook publishing to Markov/Tandang with replay-safe delivery.
@@ -365,6 +366,8 @@ Deliverables:
 - Outbound queue metrics and audit logs.
 Notes:
 - Inbound ingestion endpoint is owned by Markov; Gotong only signs outbound payloads.
+- Core code path for outbox event creation, admin read endpoints, signed delivery worker, and retry/attempt tracking is in place.
+- DB migration/check scripts for webhook tables remain to be added in follow-up hardening work.
 
 Validation:
 - Signature generation and verification tests.
