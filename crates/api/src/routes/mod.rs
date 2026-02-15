@@ -271,6 +271,11 @@ async fn submit_evidence(
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
 
+    ContributionService::new(state.contribution_repo.clone())
+        .get(&payload.contribution_id)
+        .await
+        .map_err(map_domain_error)?;
+
     let key = IdempotencyKey::new("evidence_submit", actor.user_id.clone(), request_id.clone());
 
     let outcome = state.idempotency.begin(&key).await.map_err(|err| {

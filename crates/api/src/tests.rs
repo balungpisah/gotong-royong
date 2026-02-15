@@ -208,6 +208,81 @@ async fn contribution_evidence_vouch_flow() {
 }
 
 #[tokio::test]
+async fn contribution_create_is_idempotent() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let contribution_request = json!({
+        "contribution_type": "task_completion",
+        "title": "Idempotent task",
+        "description": "This is a repeated create",
+        "skill_ids": ["skill-1"]
+    });
+
+    let make_request = |request_id: &str| {
+        Request::builder()
+            .method("POST")
+            .uri("/v1/contributions")
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {}", token))
+            .header("x-request-id", request_id)
+            .body(Body::from(contribution_request.to_string()))
+            .unwrap()
+    };
+
+    let response_one = app
+        .clone()
+        .oneshot(make_request("idem-1"))
+        .await
+        .expect("response");
+    assert_eq!(response_one.status(), StatusCode::CREATED);
+    let response_one_body = to_bytes(response_one.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let contribution_one: serde_json::Value =
+        serde_json::from_slice(&response_one_body).expect("json");
+
+    let response_two = app.oneshot(make_request("idem-1")).await.expect("response");
+    assert_eq!(response_two.status(), StatusCode::CREATED);
+    let response_two_body = to_bytes(response_two.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let contribution_two: serde_json::Value =
+        serde_json::from_slice(&response_two_body).expect("json");
+
+    assert_eq!(contribution_one, contribution_two);
+}
+
+#[tokio::test]
+async fn evidence_rejects_missing_contribution() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let evidence_request = json!({
+        "contribution_id": "missing-contribution",
+        "evidence_type": "photo_with_timestamp",
+        "evidence_data": {
+            "notes": "orphan"
+        },
+        "proof": {
+            "timestamp": "2026-02-14T01:00:00Z",
+            "media_hash": "abcd1234abcd1234abcd1234abcd1234"
+        }
+    });
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/evidence")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(evidence_request.to_string()))
+        .unwrap();
+
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn protected_route_rejects_unauthenticated() {
     let app = test_app();
     let request = Request::builder()
