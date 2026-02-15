@@ -98,12 +98,10 @@ struct ChatRealtimeEnvelope {
 
 impl ChatRealtimeBus {
     pub fn new(config: &gotong_infra::config::AppConfig) -> Self {
-        let transport = match config
-            .chat_realtime_transport
-            .trim()
-            .to_ascii_lowercase()
-            .as_str()
-        {
+        let transport = config.chat_realtime_transport.trim().to_ascii_lowercase();
+        let transport = transport.as_str();
+        let transport = match transport {
+            "local" => ChatRealtimeTransport::Local,
             "redis" => {
                 let redis_url = config.redis_url.clone();
                 let client = Client::open(redis_url.clone()).ok();
@@ -120,7 +118,13 @@ impl ChatRealtimeBus {
                     }
                 }
             }
-            _ => ChatRealtimeTransport::Local,
+            other => {
+                warn!(
+                    transport = %other,
+                    "unsupported CHAT_REALTIME_TRANSPORT value; falling back to local transport"
+                );
+                ChatRealtimeTransport::Local
+            }
         };
 
         Self {
@@ -210,60 +214,80 @@ impl ChatRealtimeBus {
         let sender_map = self.senders.clone();
         let local_instance = self.instance_id.clone();
         tokio::spawn(async move {
-            let mut pubsub = match client.unwrap().get_async_pubsub().await {
-                Ok(pubsub) => pubsub,
-                Err(err) => {
-                    warn!(error = %err, "chat realtime redis subscription failed");
-                    return;
-                }
-            };
-            if let Err(err) = pubsub.subscribe(channel.clone()).await {
-                warn!(error = %err, "chat realtime redis channel subscribe failed");
-                return;
-            }
-            let mut stream = pubsub.on_message();
+            use tokio::time::{Duration, sleep};
+
+            let mut backoff_ms = 250_u64;
+            let max_backoff_ms = 5_000_u64;
+
             loop {
-                match stream.next().await {
-                    Some(message) => {
-                        let payload: String = match message.get_payload() {
-                            Ok(payload) => payload,
-                            Err(err) => {
-                                warn!(error = %err, "chat realtime redis payload decode failed");
-                                continue;
-                            }
-                        };
-
-                        let envelope: ChatRealtimeEnvelope = match serde_json::from_str(&payload) {
-                            Ok(envelope) => envelope,
-                            Err(err) => {
-                                warn!(error = %err, "chat realtime envelope parse failed");
-                                continue;
-                            }
-                        };
-
-                        if envelope.sender_id == local_instance {
-                            continue;
-                        }
-
-                        let sender = {
-                            let senders = sender_map.read().await;
-                            senders.get(&envelope.thread_id).cloned()
-                        };
-                        let Some(sender) = sender else {
-                            continue;
-                        };
-                        if sender.send(envelope.message).is_err() {
-                            warn!(
-                                "chat realtime broadcast failed for thread {}",
-                                envelope.thread_id
-                            );
-                        }
+                let mut pubsub = match client.clone().unwrap().get_async_pubsub().await {
+                    Ok(pubsub) => pubsub,
+                    Err(err) => {
+                        warn!(error = %err, "chat realtime redis subscription failed");
+                        sleep(Duration::from_millis(backoff_ms)).await;
+                        backoff_ms = (backoff_ms * 2).min(max_backoff_ms);
+                        continue;
                     }
-                    None => {
-                        warn!("chat realtime redis stream ended");
-                        break;
+                };
+                backoff_ms = 250_u64;
+                if let Err(err) = pubsub.subscribe(channel.clone()).await {
+                    warn!(error = %err, "chat realtime redis channel subscribe failed");
+                    sleep(Duration::from_millis(backoff_ms)).await;
+                    backoff_ms = (backoff_ms * 2).min(max_backoff_ms);
+                    continue;
+                }
+
+                let mut stream = pubsub.on_message();
+                loop {
+                    match stream.next().await {
+                        Some(message) => {
+                            let payload: String = match message.get_payload() {
+                                Ok(payload) => payload,
+                                Err(err) => {
+                                    warn!(
+                                        error = %err,
+                                        "chat realtime redis payload decode failed"
+                                    );
+                                    continue;
+                                }
+                            };
+
+                            let envelope: ChatRealtimeEnvelope =
+                                match serde_json::from_str(&payload) {
+                                    Ok(envelope) => envelope,
+                                    Err(err) => {
+                                        warn!(error = %err, "chat realtime envelope parse failed");
+                                        continue;
+                                    }
+                                };
+
+                            if envelope.sender_id == local_instance {
+                                continue;
+                            }
+
+                            let sender = {
+                                let senders = sender_map.read().await;
+                                senders.get(&envelope.thread_id).cloned()
+                            };
+                            let Some(sender) = sender else {
+                                continue;
+                            };
+                            if sender.send(envelope.message).is_err() {
+                                warn!(
+                                    "chat realtime broadcast failed for thread {}",
+                                    envelope.thread_id
+                                );
+                            }
+                        }
+                        None => {
+                            warn!("chat realtime redis stream ended");
+                            break;
+                        }
                     }
                 }
+                warn!("chat realtime redis stream ended; reconnecting");
+                sleep(Duration::from_millis(backoff_ms)).await;
+                backoff_ms = (backoff_ms * 2).min(max_backoff_ms);
             }
         });
     }
@@ -283,6 +307,8 @@ impl ChatRealtimeBus {
         if sender.send(message).is_err() {
             let mut senders = self.senders.write().await;
             senders.remove(thread_id);
+            let mut active_bridges = self.active_bridges.write().await;
+            active_bridges.remove(thread_id);
         }
 
         let envelope = ChatRealtimeEnvelope {
