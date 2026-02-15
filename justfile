@@ -25,3 +25,8 @@ surreal-probe:
 	SURREAL_BIN=docs/research/samples/surrealdb/bin/surreal-v3.0.0-beta.4 \
 	LOCKED_TARGET_VERSION=3.0.0-beta.4 \
 	docs/research/samples/surrealdb/pattern_probe.sh docs/research/surrealdb-pattern-sampling-v3-beta4.md
+
+release-gates-surreal:
+	SURREAL_BIN=docs/research/samples/surrealdb/bin/surreal-v3.0.0-beta.4 \
+	LOCKED_TARGET_VERSION=3.0.0-beta.4 \
+	scripts/surrealdb-go-no-go.sh docs/research/surrealdb-go-no-go-latest.md

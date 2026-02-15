@@ -129,6 +129,12 @@ Release gates (must pass):
 - permission-filtering tests
 - reconnect resilience tests
 
+Execute locally/CI before production rollout:
+
+```bash
+just release-gates-surreal
+```
+
 Rollback triggers:
 - Any P0 gate failure in release candidate runs
 - Production SEV-1 tied to DB/runtime behavior

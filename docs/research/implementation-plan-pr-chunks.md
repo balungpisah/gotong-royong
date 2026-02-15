@@ -410,10 +410,7 @@ Goal:
 Deliverables:
 - Retention governance matrix and immutable audit event hashing.
 - Metrics/tracing dashboards and alert rules.
-- Surreal beta go/no-go suite for live payload shape (defined, execution pending).
-- Surreal beta go/no-go suite for ordering (defined, execution pending).
-- Surreal beta go/no-go suite for permission filtering (defined, execution pending).
-- Surreal beta go/no-go suite for reconnect resilience (defined, execution pending).
+- Surreal beta go/no-go suite for live payload shape/ordering/permission filtering/reconnect (implemented via scripts/surrealdb-go-no-go.sh and available in `docs/research/surrealdb-go-no-go-latest.md`).
 - Cross-instance real-time fanout strategy for WS/SSE (pending follow-up hardening).
 - Rollback runbook and rehearsal report (pending follow-up hardening).
 - Add immutable audit hash and retention-tag columns for transition/vault/siaga/moderation rows (in progress).
