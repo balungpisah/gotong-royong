@@ -23,6 +23,16 @@ pub struct TransitionClosePayload {
     pub gate_metadata: Option<serde_json::Value>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ModerationAutoReleasePayload {
+    pub content_id: String,
+    pub hold_decision_request_id: String,
+    pub request_id: String,
+    pub correlation_id: String,
+    pub scheduled_ms: i64,
+    pub request_ts_ms: i64,
+}
+
 impl TransitionClosePayload {
     pub fn request_id(&self) -> String {
         self.request_id.clone()

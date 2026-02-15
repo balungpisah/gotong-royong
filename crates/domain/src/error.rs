@@ -8,4 +8,6 @@ pub enum DomainError {
     NotFound,
     #[error("conflict")]
     Conflict,
+    #[error("forbidden: {0}")]
+    Forbidden(String),
 }

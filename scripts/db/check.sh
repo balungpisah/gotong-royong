@@ -49,3 +49,11 @@ cat "$WORKDIR/database/checks/0004_transition_prereq_check.surql" | "${SUR_CMD[@
   --namespace "$SURREAL_NS" \
   --database "$SURREAL_DB" \
   --json
+
+cat "$WORKDIR/database/checks/0005_moderation_check.surql" | "${SUR_CMD[@]}" sql \
+  --endpoint "$SURREAL_ENDPOINT" \
+  --user "$SURREAL_USER" \
+  --pass "$SURREAL_PASS" \
+  --namespace "$SURREAL_NS" \
+  --database "$SURREAL_DB" \
+  --json

@@ -6,14 +6,20 @@ use gotong_domain::{
     auth::Role,
     identity::ActorIdentity,
     jobs::{TransitionClosePayload, backoff_ms, now_ms},
-    ports::{jobs::JobEnvelope, transitions::TrackTransitionRepository},
+    moderation::{ModerationAutoReleaseCommand, ModerationService},
+    ports::{
+        jobs::JobEnvelope, moderation::ModerationRepository, transitions::TrackTransitionRepository,
+    },
     transitions::{
         TrackTransitionInput, TrackTransitionService, TransitionAction, TransitionMechanism,
     },
 };
 use gotong_infra::{
-    config::AppConfig, db::DbConfig, jobs::RedisJobQueue, logging::init_tracing,
-    repositories::SurrealTrackTransitionRepository,
+    config::AppConfig,
+    db::DbConfig,
+    jobs::RedisJobQueue,
+    logging::init_tracing,
+    repositories::{SurrealModerationRepository, SurrealTrackTransitionRepository},
 };
 use serde_json::json;
 use tracing::{error, info, warn};
@@ -48,14 +54,17 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let mut transition_repo = None;
+    let mut moderation_repo = None;
     let backend = config.data_backend.trim().to_ascii_lowercase();
     if matches!(backend.as_str(), "surreal" | "surrealdb" | "tikv") {
         let db_config = DbConfig::from_app_config(&config);
         let repository = SurrealTrackTransitionRepository::new(&db_config).await?;
         transition_repo = Some(Arc::new(repository) as Arc<dyn TrackTransitionRepository>);
+        let moderation_repository = SurrealModerationRepository::new(&db_config).await?;
+        moderation_repo = Some(Arc::new(moderation_repository) as Arc<dyn ModerationRepository>);
     }
 
-    let worker = Worker::new(queue, config, transition_repo);
+    let worker = Worker::new(queue, config, transition_repo, moderation_repo);
     info!("worker starting");
     worker.run().await?;
 
@@ -66,6 +75,7 @@ struct Worker {
     queue: RedisJobQueue,
     config: AppConfig,
     transition_repo: Option<Arc<dyn TrackTransitionRepository>>,
+    moderation_repo: Option<Arc<dyn ModerationRepository>>,
 }
 
 impl Worker {
@@ -73,11 +83,13 @@ impl Worker {
         queue: RedisJobQueue,
         config: AppConfig,
         transition_repo: Option<Arc<dyn TrackTransitionRepository>>,
+        moderation_repo: Option<Arc<dyn ModerationRepository>>,
     ) -> Self {
         Self {
             queue,
             config,
             transition_repo,
+            moderation_repo,
         }
     }
 
@@ -116,7 +128,13 @@ impl Worker {
 
             match self.queue.dequeue(Duration::from_secs(2)).await {
                 Ok(Some(job)) => {
-                    if let Err(err) = handle_job(&job, self.transition_repo.as_ref()).await {
+                    if let Err(err) = handle_job(
+                        &job,
+                        self.transition_repo.as_ref(),
+                        self.moderation_repo.as_ref(),
+                    )
+                    .await
+                    {
                         let job_id = job.job_id.clone();
                         if let Err(handle_err) = self.handle_failure(job, err).await {
                             warn!(
@@ -201,6 +219,7 @@ impl Worker {
 async fn handle_job(
     job: &JobEnvelope,
     transition_repo: Option<&Arc<dyn TrackTransitionRepository>>,
+    moderation_repo: Option<&Arc<dyn ModerationRepository>>,
 ) -> anyhow::Result<()> {
     match job.job_type {
         JobType::TransitionClose => {
@@ -240,7 +259,30 @@ async fn handle_job(
                 .await?;
         }
         JobType::ModerationAutoRelease => {
-            info!(job_id = %job.job_id, "handling moderation auto-release (stub)");
+            let Some(repo) = moderation_repo else {
+                warn!(
+                    job_id = %job.job_id,
+                    "skipping moderation auto-release job: moderation repository is unavailable"
+                );
+                return Ok(());
+            };
+            let payload = parse_moderation_auto_release_payload(job)?;
+            let actor = ActorIdentity {
+                user_id: "system".to_string(),
+                username: "system".to_string(),
+            };
+            let service = ModerationService::new(repo.clone());
+            let command = ModerationAutoReleaseCommand {
+                content_id: payload.content_id,
+                hold_decision_request_id: payload.hold_decision_request_id,
+                request_id: payload.request_id,
+                correlation_id: payload.correlation_id,
+                scheduled_ms: payload.scheduled_ms,
+                request_ts_ms: Some(payload.request_ts_ms),
+            };
+            service
+                .apply_auto_release(actor, Role::System, command)
+                .await?;
         }
         JobType::WebhookRetry => {
             info!(job_id = %job.job_id, "handling webhook retry (stub)");
@@ -263,5 +305,24 @@ fn parse_transition_close_payload(job: &JobEnvelope) -> anyhow::Result<Transitio
         ));
     }
 
+    Ok(payload)
+}
+
+fn parse_moderation_auto_release_payload(
+    job: &JobEnvelope,
+) -> anyhow::Result<gotong_domain::jobs::ModerationAutoReleasePayload> {
+    let payload: gotong_domain::jobs::ModerationAutoReleasePayload =
+        serde_json::from_value(job.payload.clone())
+            .map_err(|err| anyhow::anyhow!("invalid moderation auto-release payload: {err}"))?;
+    if payload.scheduled_ms < 0 {
+        return Err(anyhow::anyhow!(
+            "invalid moderation auto-release payload: scheduled_ms must be non-negative"
+        ));
+    }
+    if payload.request_id.trim().is_empty() {
+        return Err(anyhow::anyhow!(
+            "invalid moderation auto-release payload: request_id is required"
+        ));
+    }
     Ok(payload)
 }

@@ -25,7 +25,10 @@ use gotong_domain::{
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
     idempotency::{BeginOutcome, timer_request_id},
     identity::ActorIdentity,
-    jobs::{TransitionClosePayload, new_job},
+    jobs::{ModerationAutoReleasePayload, TransitionClosePayload, new_job},
+    moderation::{
+        ContentModeration, ModerationApplyCommand, ModerationDecision, ModerationService,
+    },
     ports::idempotency::{IdempotencyKey, IdempotencyResponse},
     ports::jobs::JobType,
     transitions::{
@@ -69,6 +72,12 @@ pub fn router(state: AppState) -> Router {
             get(get_active_transition_stage),
         )
         .route("/v1/transitions/:transition_id", get(get_transition_by_id))
+        .route("/v1/moderations", post(apply_moderation))
+        .route(
+            "/v1/moderations/review-queue",
+            get(list_moderation_review_queue),
+        )
+        .route("/v1/moderations/:content_id", get(get_moderation_view))
         .route(
             "/v1/chat/threads",
             post(create_chat_thread).get(list_chat_threads),
@@ -438,6 +447,42 @@ struct CreateTransitionRequest {
     pub closes_at_ms: Option<i64>,
 }
 
+#[derive(Debug, Deserialize, Validate)]
+struct ApplyModerationRequest {
+    #[validate(length(min = 1, max = 128))]
+    pub content_id: String,
+    pub content_type: Option<String>,
+    pub author_id: Option<String>,
+    pub author_username: Option<String>,
+    pub moderation_status: gotong_domain::moderation::ModerationStatus,
+    pub moderation_action: gotong_domain::moderation::ModerationAction,
+    pub reason_code: Option<String>,
+    pub confidence: f64,
+    #[serde(default)]
+    pub hold_duration_minutes: Option<i64>,
+    #[serde(default)]
+    pub auto_release_if_no_action: bool,
+    #[serde(default)]
+    pub appeal_window_minutes: Option<i64>,
+    pub reasoning: Option<String>,
+    #[serde(default)]
+    pub violations: Vec<gotong_domain::moderation::ModerationViolation>,
+    #[serde(default)]
+    pub request_ts_ms: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModerationReviewQueueQuery {
+    pub limit: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct ModerationApplyResponse {
+    pub content: ContentModeration,
+    pub decision: ModerationDecision,
+    pub schedule_auto_release: bool,
+}
+
 #[derive(Debug, Deserialize)]
 struct ListVouchesQuery {
     pub vouchee_id: Option<String>,
@@ -526,6 +571,150 @@ async fn list_vouches(
     };
 
     Ok(Json(response))
+}
+
+async fn apply_moderation(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<ApplyModerationRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let token_role = auth.role.clone();
+
+    let key = IdempotencyKey::new(
+        "moderation_apply",
+        format!("{}:{}", actor.user_id, payload.content_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = ModerationService::new(state.moderation_repo.clone());
+            let command = ModerationApplyCommand {
+                content_id: payload.content_id,
+                content_type: payload.content_type,
+                author_id: payload.author_id,
+                author_username: payload.author_username,
+                moderation_status: payload.moderation_status,
+                moderation_action: payload.moderation_action,
+                reason_code: payload.reason_code,
+                confidence: payload.confidence,
+                hold_duration_minutes: payload.hold_duration_minutes,
+                auto_release_if_no_action: payload.auto_release_if_no_action,
+                appeal_window_minutes: payload.appeal_window_minutes,
+                reasoning: payload.reasoning,
+                violations: payload.violations,
+                request_id: request_id.clone(),
+                correlation_id: correlation_id.clone(),
+                request_ts_ms: payload.request_ts_ms,
+            };
+
+            let result = service
+                .upsert_moderation_decision(actor, token_role.clone(), command)
+                .await
+                .map_err(map_domain_error)?;
+
+            if result.schedule_auto_release {
+                let hold_expires_at_ms = result
+                    .content
+                    .hold_expires_at_ms
+                    .ok_or(ApiError::Internal)?;
+                let auto_payload = ModerationAutoReleasePayload {
+                    content_id: result.content.content_id.clone(),
+                    hold_decision_request_id: result.decision.request_id.clone(),
+                    request_id: format!(
+                        "moderation_auto:{}:{}",
+                        result.content.content_id, result.decision.request_id
+                    ),
+                    correlation_id: result.decision.correlation_id.clone(),
+                    scheduled_ms: hold_expires_at_ms,
+                    request_ts_ms: result.decision.decided_at_ms,
+                };
+                let job = new_job(
+                    result.decision.decision_id.clone(),
+                    JobType::ModerationAutoRelease,
+                    serde_json::to_value(&auto_payload).map_err(|_| ApiError::Internal)?,
+                    auto_payload.request_id.clone(),
+                    result.decision.correlation_id.clone(),
+                    gotong_domain::jobs::JobDefaults::default(),
+                )
+                .with_run_at(hold_expires_at_ms);
+
+                if let Some(queue) = state.transition_job_queue.as_ref() {
+                    queue.enqueue(&job).await.map_err(|err| {
+                        tracing::error!(error = %err, "failed to enqueue moderation auto-release job");
+                        ApiError::Internal
+                    })?;
+                }
+            }
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(ModerationApplyResponse {
+                    content: result.content,
+                    decision: result.decision,
+                    schedule_auto_release: result.schedule_auto_release,
+                })
+                .map_err(|_| ApiError::Internal)?,
+            };
+
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn get_moderation_view(
+    State(state): State<AppState>,
+    Path(content_id): Path<String>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let token_role = auth.role;
+    let service = ModerationService::new(state.moderation_repo.clone());
+    let view = service
+        .get_moderation_view(&content_id, &actor, &token_role)
+        .await
+        .map_err(map_domain_error)?;
+
+    let response = IdempotencyResponse {
+        status_code: StatusCode::OK.as_u16(),
+        body: serde_json::to_value(view).map_err(|_| ApiError::Internal)?,
+    };
+    Ok(to_response(response))
+}
+
+async fn list_moderation_review_queue(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<ModerationReviewQueueQuery>,
+) -> Result<Json<Vec<ContentModeration>>, ApiError> {
+    let token_role = auth.role;
+    let limit = query.limit.unwrap_or(50).max(1).min(200);
+    let service = ModerationService::new(state.moderation_repo.clone());
+    let queue = service
+        .list_review_queue(&token_role, limit)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(queue))
 }
 
 async fn create_transition(
@@ -1463,6 +1652,7 @@ fn map_domain_error(err: DomainError) -> ApiError {
         DomainError::Validation(message) => ApiError::Validation(message),
         DomainError::NotFound => ApiError::NotFound,
         DomainError::Conflict => ApiError::Conflict,
+        DomainError::Forbidden(_) => ApiError::Forbidden,
     }
 }
 

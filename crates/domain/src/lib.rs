@@ -6,6 +6,7 @@ pub mod evidence;
 pub mod idempotency;
 pub mod identity;
 pub mod jobs;
+pub mod moderation;
 pub mod ports;
 pub mod transitions;
 pub mod util;

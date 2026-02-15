@@ -64,7 +64,7 @@ Out of scope:
 - `PR-01` to `PR-06`: DONE
 - `PR-07`: DONE
 - `PR-08`: DONE
-- `PR-09` to `PR-15`: NOT STARTED
+- `PR-09`: DONE, `PR-10` to `PR-15`: NOT STARTED
 
 ## Detailed PR Plan
 
@@ -259,7 +259,7 @@ Exit criteria:
 ## PR-09 — Moderation Services (`BE-003`, `BE-004`)
 
 Status:
-- NOT STARTED (2026-02-15)
+- DONE (2026-02-15)
 
 Goal:
 - Implement moderation source-of-truth and enforceable policy runtime.

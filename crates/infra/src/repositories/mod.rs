@@ -10,9 +10,14 @@ use gotong_domain::chat::{
 use gotong_domain::contributions::Contribution;
 use gotong_domain::error::DomainError;
 use gotong_domain::evidence::Evidence;
+use gotong_domain::moderation::{
+    ContentModeration, ModerationAction, ModerationActorSnapshot, ModerationDecision,
+    ModerationStatus, ModerationViolation,
+};
 use gotong_domain::ports::chat::ChatRepository as ChatRepositoryPort;
 use gotong_domain::ports::contributions::ContributionRepository;
 use gotong_domain::ports::evidence::EvidenceRepository;
+use gotong_domain::ports::moderation::ModerationRepository;
 use gotong_domain::ports::transitions::TrackTransitionRepository;
 use gotong_domain::ports::vouches::VouchRepository;
 use gotong_domain::transitions::TrackStateTransition;
@@ -608,6 +613,657 @@ impl TrackTransitionRepository for SurrealTrackTransitionRepository {
                 .take(0)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             Self::decode_transition_rows(rows)
+        })
+    }
+}
+
+#[derive(Default)]
+pub struct InMemoryModerationRepository {
+    content_by_id: Arc<RwLock<HashMap<String, ContentModeration>>>,
+    decisions_by_id: Arc<RwLock<HashMap<String, ModerationDecision>>>,
+    decisions_by_request: Arc<RwLock<HashMap<(String, String), String>>>,
+}
+
+impl InMemoryModerationRepository {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl ModerationRepository for InMemoryModerationRepository {
+    fn upsert_content_moderation(
+        &self,
+        content: &ContentModeration,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<ContentModeration>> {
+        let content = content.clone();
+        let store = self.content_by_id.clone();
+        Box::pin(async move {
+            let mut items = store.write().await;
+            items.insert(content.content_id.clone(), content.clone());
+            Ok(content)
+        })
+    }
+
+    fn get_content_moderation(
+        &self,
+        content_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<ContentModeration>>> {
+        let content_id = content_id.to_string();
+        let store = self.content_by_id.clone();
+        Box::pin(async move { Ok(store.read().await.get(&content_id).cloned()) })
+    }
+
+    fn list_content_by_status(
+        &self,
+        status: &str,
+        limit: usize,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<ContentModeration>>> {
+        let status = status.to_string();
+        let store = self.content_by_id.clone();
+        Box::pin(async move {
+            let mut items: Vec<_> = store
+                .read()
+                .await
+                .values()
+                .filter(|content| content.moderation_status.to_string() == status)
+                .cloned()
+                .collect();
+            items.sort_by(|left, right| {
+                left.decided_at_ms
+                    .cmp(&right.decided_at_ms)
+                    .then_with(|| left.content_id.cmp(&right.content_id))
+            });
+            items.truncate(limit);
+            Ok(items)
+        })
+    }
+
+    fn create_decision(
+        &self,
+        decision: &ModerationDecision,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<ModerationDecision>> {
+        let decision = decision.clone();
+        let decisions = self.decisions_by_id.clone();
+        let by_request = self.decisions_by_request.clone();
+        Box::pin(async move {
+            let mut decisions_by_id = decisions.write().await;
+            if decisions_by_id.contains_key(&decision.decision_id) {
+                return Err(DomainError::Conflict);
+            }
+
+            let mut by_request = by_request.write().await;
+            let key = (decision.content_id.clone(), decision.request_id.clone());
+            if by_request.contains_key(&key) {
+                return Err(DomainError::Conflict);
+            }
+
+            by_request.insert(key, decision.decision_id.clone());
+            decisions_by_id.insert(decision.decision_id.clone(), decision.clone());
+            Ok(decision)
+        })
+    }
+
+    fn get_decision_by_request(
+        &self,
+        content_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<ModerationDecision>>> {
+        let key = (content_id.to_string(), request_id.to_string());
+        let by_request = self.decisions_by_request.clone();
+        let decisions_by_id = self.decisions_by_id.clone();
+        Box::pin(async move {
+            let Some(decision_id) = by_request.read().await.get(&key).cloned() else {
+                return Ok(None);
+            };
+            let decisions_by_id = decisions_by_id.read().await;
+            Ok(decisions_by_id.get(&decision_id).cloned())
+        })
+    }
+
+    fn list_decisions(
+        &self,
+        content_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<ModerationDecision>>> {
+        let content_id = content_id.to_string();
+        let decisions = self.decisions_by_id.clone();
+        Box::pin(async move {
+            let mut decisions: Vec<_> = decisions
+                .read()
+                .await
+                .values()
+                .filter(|decision| decision.content_id == content_id)
+                .cloned()
+                .collect();
+            decisions.sort_by(|left, right| {
+                left.decided_at_ms
+                    .cmp(&right.decided_at_ms)
+                    .then_with(|| left.decision_id.cmp(&right.decision_id))
+            });
+            Ok(decisions)
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealModerationRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealModerationRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn to_rfc3339(timestamp_ms: i64) -> DomainResult<String> {
+        let dt = OffsetDateTime::from_unix_timestamp_nanos(timestamp_ms as i128 * 1_000_000)
+            .map_err(|err| DomainError::Validation(format!("invalid timestamp: {err}")))?;
+        Ok(dt
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()))
+    }
+
+    fn parse_timestamp(value: &str) -> DomainResult<i64> {
+        let datetime = OffsetDateTime::parse(value, &Rfc3339).map_err(|err| {
+            DomainError::Validation(format!("invalid moderation datetime '{value}': {err}"))
+        })?;
+        Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn status_to_string(status: &ModerationStatus) -> String {
+        match status {
+            ModerationStatus::Processing => "processing".to_string(),
+            ModerationStatus::UnderReview => "under_review".to_string(),
+            ModerationStatus::Published => "published".to_string(),
+            ModerationStatus::Rejected => "rejected".to_string(),
+        }
+    }
+
+    fn action_to_string(action: &ModerationAction) -> String {
+        match action {
+            ModerationAction::PublishNow => "publish_now".to_string(),
+            ModerationAction::PublishWithWarning => "publish_with_warning".to_string(),
+            ModerationAction::HoldForReview => "hold_for_review".to_string(),
+            ModerationAction::Block => "block".to_string(),
+        }
+    }
+
+    fn parse_status(status: &str) -> DomainResult<ModerationStatus> {
+        match status {
+            "processing" => Ok(ModerationStatus::Processing),
+            "under_review" => Ok(ModerationStatus::UnderReview),
+            "published" => Ok(ModerationStatus::Published),
+            "rejected" => Ok(ModerationStatus::Rejected),
+            _ => Err(DomainError::Validation(format!(
+                "invalid moderation status '{status}'"
+            ))),
+        }
+    }
+
+    fn parse_action(action: &str) -> DomainResult<ModerationAction> {
+        match action {
+            "publish_now" => Ok(ModerationAction::PublishNow),
+            "publish_with_warning" => Ok(ModerationAction::PublishWithWarning),
+            "hold_for_review" => Ok(ModerationAction::HoldForReview),
+            "block" => Ok(ModerationAction::Block),
+            _ => Err(DomainError::Validation(format!(
+                "invalid moderation action '{action}'"
+            ))),
+        }
+    }
+
+    fn to_content_payload(
+        content: &ContentModeration,
+    ) -> DomainResult<SurrealModerationContentCreateRow> {
+        let decided_at = Self::to_rfc3339(content.decided_at_ms)?;
+        let hold_expires_at = content
+            .hold_expires_at_ms
+            .map(Self::to_rfc3339)
+            .transpose()?;
+        let appeal_window_until = content
+            .appeal_window_until_ms
+            .map(Self::to_rfc3339)
+            .transpose()?;
+
+        Ok(SurrealModerationContentCreateRow {
+            content_id: content.content_id.clone(),
+            content_type: content.content_type.clone(),
+            author_id: content.author_id.clone(),
+            author_username: content.author_username.clone(),
+            moderation_status: Self::status_to_string(&content.moderation_status),
+            moderation_action: Self::action_to_string(&content.moderation_action),
+            reason_code: content.reason_code.clone(),
+            confidence: content.confidence,
+            decided_at,
+            decided_by: content.decided_by.clone(),
+            hold_expires_at,
+            auto_release_if_no_action: content.auto_release_if_no_action,
+            appeal_window_until,
+            reasoning: content.reasoning.clone(),
+            violations: content.violations.clone(),
+            last_decision_id: content.last_decision_id.clone(),
+            request_id: content.request_id.clone(),
+            correlation_id: content.correlation_id.clone(),
+            request_ts_ms: content.request_ts_ms,
+        })
+    }
+
+    fn to_decision_payload(
+        decision: &ModerationDecision,
+    ) -> DomainResult<SurrealModerationDecisionCreateRow> {
+        let decided_at = Self::to_rfc3339(decision.decided_at_ms)?;
+        let hold_expires_at = decision
+            .hold_expires_at_ms
+            .map(Self::to_rfc3339)
+            .transpose()?;
+        let appeal_window_until = decision
+            .appeal_window_until_ms
+            .map(Self::to_rfc3339)
+            .transpose()?;
+
+        Ok(SurrealModerationDecisionCreateRow {
+            decision_id: decision.decision_id.clone(),
+            content_id: decision.content_id.clone(),
+            content_type: decision.content_type.clone(),
+            moderation_status: Self::status_to_string(&decision.moderation_status),
+            moderation_action: Self::action_to_string(&decision.moderation_action),
+            reason_code: decision.reason_code.clone(),
+            confidence: decision.confidence,
+            decided_at,
+            actor: decision.actor.clone(),
+            hold_expires_at,
+            auto_release_if_no_action: decision.auto_release_if_no_action,
+            appeal_window_until,
+            reasoning: decision.reasoning.clone(),
+            violations: decision.violations.clone(),
+            request_id: decision.request_id.clone(),
+            correlation_id: decision.correlation_id.clone(),
+        })
+    }
+
+    fn map_content_row(row: SurrealModerationContentRow) -> DomainResult<ContentModeration> {
+        Ok(ContentModeration {
+            content_id: row.content_id,
+            content_type: row.content_type,
+            author_id: row.author_id,
+            author_username: row.author_username,
+            moderation_status: Self::parse_status(&row.moderation_status)?,
+            moderation_action: Self::parse_action(&row.moderation_action)?,
+            reason_code: row.reason_code,
+            confidence: row.confidence,
+            decided_at_ms: Self::parse_timestamp(&row.decided_at)?,
+            decided_by: row.decided_by,
+            hold_expires_at_ms: row
+                .hold_expires_at
+                .as_deref()
+                .map(Self::parse_timestamp)
+                .transpose()?,
+            auto_release_if_no_action: row.auto_release_if_no_action,
+            violations: row.violations,
+            appeal_window_until_ms: row
+                .appeal_window_until
+                .as_deref()
+                .map(Self::parse_timestamp)
+                .transpose()?,
+            reasoning: row.reasoning,
+            last_decision_id: row.last_decision_id,
+            request_id: row.request_id,
+            correlation_id: row.correlation_id,
+            request_ts_ms: row.request_ts_ms,
+        })
+    }
+
+    fn map_decision_row(row: SurrealModerationDecisionRow) -> DomainResult<ModerationDecision> {
+        Ok(ModerationDecision {
+            decision_id: row.decision_id,
+            content_id: row.content_id,
+            content_type: row.content_type,
+            moderation_status: Self::parse_status(&row.moderation_status)?,
+            moderation_action: Self::parse_action(&row.moderation_action)?,
+            reason_code: row.reason_code,
+            confidence: row.confidence,
+            decided_at_ms: Self::parse_timestamp(&row.decided_at)?,
+            actor: row.actor,
+            hold_expires_at_ms: row
+                .hold_expires_at
+                .as_deref()
+                .map(Self::parse_timestamp)
+                .transpose()?,
+            auto_release_if_no_action: row.auto_release_if_no_action,
+            appeal_window_until_ms: row
+                .appeal_window_until
+                .as_deref()
+                .map(Self::parse_timestamp)
+                .transpose()?,
+            reasoning: row.reasoning,
+            violations: row.violations,
+            request_id: row.request_id,
+            correlation_id: row.correlation_id,
+        })
+    }
+
+    fn decode_content_rows(rows: Vec<Value>) -> DomainResult<Vec<ContentModeration>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealModerationContentRow>(row)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid content moderation row: {err}"))
+                    })
+                    .and_then(Self::map_content_row)
+            })
+            .collect()
+    }
+
+    fn decode_decision_rows(rows: Vec<Value>) -> DomainResult<Vec<ModerationDecision>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealModerationDecisionRow>(row)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid moderation decision row: {err}"))
+                    })
+                    .and_then(Self::map_decision_row)
+            })
+            .collect()
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealModerationContentCreateRow {
+    content_id: String,
+    content_type: Option<String>,
+    author_id: String,
+    author_username: Option<String>,
+    moderation_status: String,
+    moderation_action: String,
+    reason_code: Option<String>,
+    confidence: f64,
+    decided_at: String,
+    decided_by: String,
+    hold_expires_at: Option<String>,
+    auto_release_if_no_action: bool,
+    appeal_window_until: Option<String>,
+    reasoning: Option<String>,
+    violations: Vec<ModerationViolation>,
+    last_decision_id: Option<String>,
+    request_id: String,
+    correlation_id: String,
+    request_ts_ms: i64,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealModerationContentRow {
+    content_id: String,
+    content_type: Option<String>,
+    author_id: String,
+    author_username: Option<String>,
+    moderation_status: String,
+    moderation_action: String,
+    reason_code: Option<String>,
+    confidence: f64,
+    decided_at: String,
+    decided_by: String,
+    hold_expires_at: Option<String>,
+    auto_release_if_no_action: bool,
+    appeal_window_until: Option<String>,
+    reasoning: Option<String>,
+    violations: Vec<ModerationViolation>,
+    last_decision_id: Option<String>,
+    request_id: String,
+    correlation_id: String,
+    request_ts_ms: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealModerationDecisionCreateRow {
+    decision_id: String,
+    content_id: String,
+    content_type: Option<String>,
+    moderation_status: String,
+    moderation_action: String,
+    reason_code: Option<String>,
+    confidence: f64,
+    decided_at: String,
+    actor: ModerationActorSnapshot,
+    hold_expires_at: Option<String>,
+    auto_release_if_no_action: bool,
+    appeal_window_until: Option<String>,
+    reasoning: Option<String>,
+    violations: Vec<ModerationViolation>,
+    request_id: String,
+    correlation_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealModerationDecisionRow {
+    decision_id: String,
+    content_id: String,
+    content_type: Option<String>,
+    moderation_status: String,
+    moderation_action: String,
+    reason_code: Option<String>,
+    confidence: f64,
+    decided_at: String,
+    actor: ModerationActorSnapshot,
+    hold_expires_at: Option<String>,
+    auto_release_if_no_action: bool,
+    appeal_window_until: Option<String>,
+    reasoning: Option<String>,
+    violations: Vec<ModerationViolation>,
+    request_id: String,
+    correlation_id: String,
+}
+
+impl ModerationRepository for SurrealModerationRepository {
+    fn upsert_content_moderation(
+        &self,
+        content: &ContentModeration,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<ContentModeration>> {
+        let payload = match Self::to_content_payload(content) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let content_id = content.content_id.clone();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let payload = to_value(payload)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut response = client
+                .query("UPSERT type::thing('content_moderation', $content_id) CONTENT $payload")
+                .bind(("content_id", content_id))
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let row = rows
+                .into_iter()
+                .next()
+                .ok_or_else(|| DomainError::Validation("upsert returned no row".to_string()))?;
+            Self::decode_content_rows(vec![row])?
+                .into_iter()
+                .next()
+                .ok_or_else(|| DomainError::Validation("upsert returned malformed row".to_string()))
+        })
+    }
+
+    fn get_content_moderation(
+        &self,
+        content_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<ContentModeration>>> {
+        let content_id = content_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query("SELECT * FROM type::thing('content_moderation', $content_id)")
+                .bind(("content_id", content_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let mut rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            if rows.is_empty() {
+                return Ok(None);
+            }
+            let row = rows.remove(0);
+            Ok(Some(
+                Self::decode_content_rows(vec![row])?
+                    .into_iter()
+                    .next()
+                    .ok_or(DomainError::Validation("invalid row shape".to_string()))?,
+            ))
+        })
+    }
+
+    fn list_content_by_status(
+        &self,
+        status: &str,
+        limit: usize,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<ContentModeration>>> {
+        let status = status.to_string();
+        let limit = limit as i64;
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM content_moderation \
+                     WHERE moderation_status = $status \
+                     ORDER BY decided_at ASC, content_id ASC LIMIT $limit",
+                )
+                .bind(("status", status))
+                .bind(("limit", limit))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_content_rows(rows)
+        })
+    }
+
+    fn create_decision(
+        &self,
+        decision: &ModerationDecision,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<ModerationDecision>> {
+        let payload = match Self::to_decision_payload(decision) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let decision_id = decision.decision_id.clone();
+        let content_id = decision.content_id.clone();
+        let request_id = decision.request_id.clone();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut existing = client
+                .query(
+                    "SELECT decision_id FROM moderation_decision \
+                     WHERE content_id = $content_id AND request_id = $request_id LIMIT 1",
+                )
+                .bind(("content_id", content_id))
+                .bind(("request_id", request_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = existing
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            if !rows.is_empty() {
+                return Err(DomainError::Conflict);
+            }
+
+            let payload = to_value(payload)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut response = client
+                .query("CREATE type::thing('moderation_decision', $decision_id) CONTENT $payload")
+                .bind(("decision_id", decision_id))
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let row = rows
+                .into_iter()
+                .next()
+                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))?;
+            Self::decode_decision_rows(vec![row])?
+                .into_iter()
+                .next()
+                .ok_or_else(|| DomainError::Validation("create returned malformed row".to_string()))
+        })
+    }
+
+    fn get_decision_by_request(
+        &self,
+        content_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<ModerationDecision>>> {
+        let content_id = content_id.to_string();
+        let request_id = request_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM moderation_decision \
+                     WHERE content_id = $content_id AND request_id = $request_id LIMIT 1",
+                )
+                .bind(("content_id", content_id))
+                .bind(("request_id", request_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            if rows.is_empty() {
+                return Ok(None);
+            }
+            let mut decisions = Self::decode_decision_rows(rows)?;
+            Ok(decisions.pop())
+        })
+    }
+
+    fn list_decisions(
+        &self,
+        content_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<ModerationDecision>>> {
+        let content_id = content_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM moderation_decision \
+                     WHERE content_id = $content_id ORDER BY decided_at ASC, decision_id ASC",
+                )
+                .bind(("content_id", content_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_decision_rows(rows)
         })
     }
 }
