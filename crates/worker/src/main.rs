@@ -121,8 +121,8 @@ impl Worker {
         mut job: JobEnvelope,
         err: anyhow::Error,
     ) -> Result<(), JobQueueError> {
-        self.queue.ack(&job.job_id).await?;
         if job.attempt >= job.max_attempts {
+            self.queue.ack(&job.job_id).await?;
             error!(
                 job_id = %job.job_id,
                 attempt = job.attempt,
@@ -139,7 +139,24 @@ impl Worker {
         );
         job.attempt = job.attempt.saturating_add(1);
         job.run_at_ms = now_ms() + delay as i64;
-        self.queue.enqueue(&job).await?;
+        if let Err(enqueue_err) = self.queue.enqueue(&job).await {
+            warn!(
+                job_id = %job.job_id,
+                attempt = job.attempt,
+                error = %enqueue_err,
+                "failed to enqueue retry job; attempting to move processing job back to ready queue"
+            );
+            if let Err(requeue_err) = self.queue.restore_processing_with_retry_delay(&job).await {
+                warn!(
+                    job_id = %job.job_id,
+                    error = %requeue_err,
+                    "failed to restore processing job for retry"
+                );
+            }
+            return Err(enqueue_err);
+        }
+
+        self.queue.ack(&job.job_id).await?;
 
         error!(
             job_id = %job.job_id,

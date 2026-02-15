@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use gotong_domain::ports::jobs::{JobEnvelope, JobQueue, JobQueueError};
 use redis::AsyncCommands;
+use redis::Value;
 use redis::aio::ConnectionManager;
 
 const DEFAULT_PREFIX: &str = "gotong:jobs";
@@ -45,6 +46,49 @@ impl RedisJobQueue {
 
     fn deserialize(payload: &str) -> Result<JobEnvelope, JobQueueError> {
         serde_json::from_str(payload).map_err(|err| JobQueueError::Serialization(err.to_string()))
+    }
+
+    pub async fn restore_processing_with_retry_delay(
+        &self,
+        job: &JobEnvelope,
+    ) -> Result<(), JobQueueError> {
+        let payload = Self::serialize(job)?;
+        let payload_key = self.payload_key.clone();
+        let processing_key = self.processing_key.clone();
+        let ready_key = self.ready_key.clone();
+        let delayed_key = self.delayed_key.clone();
+        let job_id = job.job_id.clone();
+        let run_at_ms = job.run_at_ms;
+        let now_ms = gotong_domain::jobs::now_ms();
+        let mut conn = self.manager.clone();
+
+        let mut pipeline = redis::pipe();
+        pipeline.atomic();
+        pipeline
+            .cmd("HSET")
+            .arg(&payload_key)
+            .arg(&job_id)
+            .arg(payload);
+        pipeline
+            .cmd("LREM")
+            .arg(&processing_key)
+            .arg(1)
+            .arg(&job_id);
+        if run_at_ms <= now_ms {
+            pipeline.cmd("LPUSH").arg(&ready_key).arg(&job_id);
+        } else {
+            pipeline
+                .cmd("ZADD")
+                .arg(&delayed_key)
+                .arg(run_at_ms)
+                .arg(&job_id);
+        }
+
+        let _: Vec<Value> = pipeline
+            .query_async(&mut conn)
+            .await
+            .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+        Ok(())
     }
 }
 

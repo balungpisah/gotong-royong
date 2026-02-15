@@ -30,13 +30,18 @@ Status: READY FOR BACKEND DESIGN/HANDOFF
         - `propose`: `author` or `pic`, with `system` allowed only for timer close apply
         - `object`: `participant|saksi|author|pic` with participant objection forcing vote window
         - `vote`: `author|saksi|participant|pic` with snapshot of eligibility at gate open
-     6. enforce gated prerequisites:
+    6. enforce gated prerequisites:
         - Garap → Periksa requires PoR refs
         - Periksa → Tuntas requires challenge window gate config
+    7. snapshot actor context at command time into immutable transition metadata (`actor_snapshot`):
+        - actor user id, username, token role, and membership context (`author|pic|participant|saksi` snapshot)
+        - request provenance (`request_id`, `correlation_id`, `request_ts_ms`)
+    8. enforce role/gate decisions in one atomic command path (no split across eventual-consistency transitions)
    - Acceptance:
      1. replayed transitions return original canonical transition record
      2. scheduler emits closure/reject event with same `transition_id`
      3. `gate.status` transitions to applied/rejected only once at gate close
+     4. retries with same `(entity_id, request_id)` are replay-safe
 
 2. Ticket `BE-002`: Track transition state projections
    - Scope: `UI-03` + history audit
@@ -44,6 +49,8 @@ Status: READY FOR BACKEND DESIGN/HANDOFF
      1. create read model for stage history and active state
      2. expose timeline and audit filters by `entity_id`
      3. support query by `scope_id`, `track`, and stage state for feed and governance
+     - PR-07 scope: minimal read model (`active stage + linear timeline`) derived from the append-only event stream.
+     - PR-12 scope: richer filters and indexes for feed/governance surfaces.
    - Acceptance:
      1. history order is deterministic
      2. transitions never mutate; append-only event store for transitions

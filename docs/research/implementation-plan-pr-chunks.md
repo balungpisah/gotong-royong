@@ -199,14 +199,20 @@ Deliverables:
 - `track_state_transition` command path.
 - Role matrix + gate prerequisite validation.
 - Append-only transition event ledger.
-- Projections for active stage and transition timeline.
+- Transition-actor snapshot captured at request time (immutable actor identity, role, and membership context for deterministic auditability).
+- Single atomic command path for gate validation + transition persistence (no cross-service eventual consistency split for command correctness).
+- Minimal, append-only transition event ledger with de-duplication keyed by `(entity_id, request_id)`.
+- Read-model projections for PR-07 are intentionally minimal: active-stage and timeline queries from the same event stream.
+  - Full projection optimization/features can be expanded in PR-12 without breaking compatibility.
 
 Validation:
 - Deterministic ordering and immutable history tests pass.
 - Replay returns same transition record.
+- Snapshot integrity is stable under later role/membership changes.
 
 Exit criteria:
 - `UI-03` backend contract is executable end-to-end.
+- `track_state_transition` writes are safe under retries and idempotent replays.
 
 ## PR-08 — Realtime Chat Core
 
