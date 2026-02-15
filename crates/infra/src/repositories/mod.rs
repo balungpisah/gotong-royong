@@ -1027,7 +1027,12 @@ impl SurrealTrackTransitionRepository {
                     gate: row.gate.clone(),
                     retention_tag: retention_tag.clone(),
                 };
-                gotong_domain::util::immutable_event_hash(&payload).unwrap_or_default()
+                gotong_domain::util::immutable_event_hash(&payload).map_err(|err| {
+                    DomainError::Validation(format!(
+                        "missing transition event_hash for request_id '{}' and recompute failed: {err}",
+                        row.request_id
+                    ))
+                })?
             }
         };
         Ok(TrackStateTransition {
@@ -2713,15 +2718,7 @@ impl SurrealVaultRepository {
     }
 
     fn event_type_to_string(value: &VaultTimelineEventType) -> &'static str {
-        match value {
-            VaultTimelineEventType::WitnessDrafted => "witness_drafted",
-            VaultTimelineEventType::WitnessSealed => "witness_sealed",
-            VaultTimelineEventType::WitnessTrusteeAdded => "witness_trustee_added",
-            VaultTimelineEventType::WitnessTrusteeRemoved => "witness_trustee_removed",
-            VaultTimelineEventType::WitnessPublished => "witness_published",
-            VaultTimelineEventType::WitnessRevoked => "witness_revoked",
-            VaultTimelineEventType::WitnessExpired => "witness_expired",
-        }
+        vault_timeline_event_type_to_string(value)
     }
 
     fn map_surreal_error(err: surrealdb::Error) -> DomainError {
@@ -2747,9 +2744,16 @@ impl SurrealVaultRepository {
                             .retention_tag
                             .clone()
                             .unwrap_or_else(|| vault_entry_retention_tag(&vault_entry_id));
-                        let event_hash = row.event_hash.clone().unwrap_or_else(|| {
-                            Self::vault_entry_audit_hash(&row, &retention_tag).unwrap_or_default()
-                        });
+                        let event_hash = match row.event_hash {
+                            Some(event_hash) => event_hash,
+                            None => Self::vault_entry_audit_hash(&row, &retention_tag)
+                                .map_err(|err| {
+                                    DomainError::Validation(format!(
+                                        "missing vault entry event_hash for entry '{}' and recompute failed: {err}",
+                                        row.vault_entry_id
+                                    ))
+                                })?,
+                        };
                         let created_at_ms = Self::parse_datetime_ms(&row.created_at)?;
                         let updated_at_ms = Self::parse_datetime_ms(&row.updated_at)?;
                         let sealed_at_ms = match row.sealed_at {
@@ -2796,10 +2800,17 @@ impl SurrealVaultRepository {
                         let retention_tag = row.retention_tag.clone().unwrap_or_else(|| {
                             vault_timeline_retention_tag(&vault_entry_id, &event_type)
                         });
-                        let event_hash = row.event_hash.clone().unwrap_or_else(|| {
-                            Self::vault_timeline_audit_hash(&row, &retention_tag)
-                                .unwrap_or_default()
-                        });
+                        let event_hash = match row.event_hash {
+                            Some(event_hash) => event_hash,
+                            None => Self::vault_timeline_audit_hash(&row, &retention_tag).map_err(
+                                |err| {
+                                    DomainError::Validation(format!(
+                                        "missing vault timeline event_hash for event '{}' and recompute failed: {err}",
+                                        row.event_id
+                                    ))
+                                },
+                            )?,
+                        };
                         Ok(VaultTimelineEvent {
                             event_id: row.event_id,
                             vault_entry_id,
@@ -3112,7 +3123,22 @@ fn vault_timeline_retention_tag(
     vault_entry_id: &str,
     event_type: &VaultTimelineEventType,
 ) -> String {
-    format!("vault_timeline:{vault_entry_id}:{event_type:?}")
+    format!(
+        "vault_timeline:{vault_entry_id}:{}",
+        vault_timeline_event_type_to_string(event_type)
+    )
+}
+
+fn vault_timeline_event_type_to_string(value: &VaultTimelineEventType) -> &'static str {
+    match value {
+        VaultTimelineEventType::WitnessDrafted => "witness_drafted",
+        VaultTimelineEventType::WitnessSealed => "witness_sealed",
+        VaultTimelineEventType::WitnessTrusteeAdded => "witness_trustee_added",
+        VaultTimelineEventType::WitnessTrusteeRemoved => "witness_trustee_removed",
+        VaultTimelineEventType::WitnessPublished => "witness_published",
+        VaultTimelineEventType::WitnessRevoked => "witness_revoked",
+        VaultTimelineEventType::WitnessExpired => "witness_expired",
+    }
 }
 
 impl SurrealVaultRepository {
@@ -3796,9 +3822,15 @@ impl SurrealSiagaRepository {
             .retention_tag
             .clone()
             .unwrap_or_else(|| siaga_broadcast_retention_tag(&siaga_id));
-        let event_hash = row.event_hash.clone().unwrap_or_else(|| {
-            Self::siaga_broadcast_audit_hash(&row, &retention_tag).unwrap_or_default()
-        });
+        let event_hash = match row.event_hash {
+            Some(event_hash) => event_hash,
+            None => Self::siaga_broadcast_audit_hash(&row, &retention_tag).map_err(|err| {
+                DomainError::Validation(format!(
+                    "missing siaga broadcast event_hash for '{}' and recompute failed: {err}",
+                    row.siaga_id
+                ))
+            })?,
+        };
         Ok(SiagaBroadcast {
             siaga_id,
             scope_id: row.scope_id,
@@ -3841,9 +3873,16 @@ impl SurrealSiagaRepository {
             .retention_tag
             .clone()
             .unwrap_or_else(|| siaga_timeline_retention_tag(&siaga_id, &event_type));
-        let event_hash = row.event_hash.clone().unwrap_or_else(|| {
-            Self::siaga_timeline_audit_hash(&row, &event_type, &retention_tag).unwrap_or_default()
-        });
+        let event_hash = match row.event_hash {
+            Some(event_hash) => event_hash,
+            None => Self::siaga_timeline_audit_hash(&row, &event_type, &retention_tag)
+                .map_err(|err| {
+                    DomainError::Validation(format!(
+                        "missing siaga timeline event_hash for event '{}' and recompute failed: {err}",
+                        row.event_id
+                    ))
+                })?,
+        };
         Ok(SiagaTimelineEvent {
             event_id: row.event_id,
             siaga_id,
@@ -4738,9 +4777,15 @@ impl SurrealModerationRepository {
             .as_ref()
             .cloned()
             .unwrap_or_else(|| moderation_content_retention_tag(&row.content_id));
-        let event_hash = row.event_hash.as_ref().cloned().unwrap_or_else(|| {
-            Self::moderation_content_audit_hash(&row, &retention_tag).unwrap_or_default()
-        });
+        let event_hash = match row.event_hash {
+            Some(event_hash) => event_hash,
+            None => Self::moderation_content_audit_hash(&row, &retention_tag).map_err(|err| {
+                DomainError::Validation(format!(
+                    "missing moderation content event_hash for '{}' and recompute failed: {err}",
+                    row.content_id
+                ))
+            })?,
+        };
         Ok(ContentModeration {
             content_id: row.content_id,
             content_type: row.content_type,
@@ -4779,9 +4824,15 @@ impl SurrealModerationRepository {
             row.retention_tag.as_ref().cloned().unwrap_or_else(|| {
                 moderation_decision_retention_tag(&row.content_id, &row.request_id)
             });
-        let event_hash = row.event_hash.as_ref().cloned().unwrap_or_else(|| {
-            Self::moderation_decision_audit_hash(&row, &retention_tag).unwrap_or_default()
-        });
+        let event_hash = match row.event_hash {
+            Some(event_hash) => event_hash,
+            None => Self::moderation_decision_audit_hash(&row, &retention_tag).map_err(|err| {
+                DomainError::Validation(format!(
+                    "missing moderation decision event_hash for decision '{}' and recompute failed: {err}",
+                    row.decision_id
+                ))
+            })?,
+        };
         Ok(ModerationDecision {
             decision_id: row.decision_id,
             content_id: row.content_id,
