@@ -6,14 +6,21 @@ set -euo pipefail
 : "${SURREAL_DB:=chat}"
 : "${SURREAL_USER:=root}"
 : "${SURREAL_PASS:=root}"
-: "${SURREAL_IMAGE:=surrealdb/surrealdb:v3.0.0-beta-4}"
+: "${SURREAL_IMAGE:=surrealdb/surrealdb:v3.0.0-beta.4}"
 
 SUR_CMD=(surreal)
 WORKDIR="$(pwd)"
 
-if ! command -v "${SUR_CMD[0]}" >/dev/null 2>&1; then
+if command -v "${SUR_CMD[0]}" >/dev/null 2>&1; then
+  surreal_version="$(${SUR_CMD[0]} version 2>/dev/null | awk 'NR==1 {print $1}')"
+  surreal_major="${surreal_version%%.*}"
+  if [[ "$surreal_major" != "3" ]]; then
+    SUR_CMD=(docker run --rm --network host -v "${WORKDIR}:/workspace" "$SURREAL_IMAGE")
+    WORKDIR="/workspace"
+  fi
+else
   # Note: Docker Desktop on macOS/Windows doesn't support --network host.
-  # Prefer the local SurrealDB CLI binary for dev on those platforms.
+  # Fall back to container-based CLI for reliable protocol compatibility.
   SUR_CMD=(docker run --rm --network host -v "${WORKDIR}:/workspace" "$SURREAL_IMAGE")
   WORKDIR="/workspace"
 fi

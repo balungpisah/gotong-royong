@@ -29,7 +29,7 @@ jobs:
         run: |
           docker run -d --name surrealdb \
             -p 8000:8000 \
-            surrealdb/surrealdb:v3.0.0-beta-4 \
+            surrealdb/surrealdb:v3.0.0-beta.4 \
             start --user root --pass root --bind 0.0.0.0:8000 memory
           sleep 2
 

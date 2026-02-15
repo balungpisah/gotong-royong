@@ -90,7 +90,7 @@ services:
       - minio
 
   surrealdb:
-    image: surrealdb/surrealdb:v3.0.0-beta-4
+    image: surrealdb/surrealdb:v3.0.0-beta.4
     command: start --user root --pass ${SURREAL_PASS} file:/data/surreal.db
     ports:
       - "8000:8000"
