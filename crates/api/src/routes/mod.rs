@@ -1,6 +1,6 @@
 use axum::{
     Json, Router,
-    extract::{Extension, State},
+    extract::State,
     http::StatusCode,
     middleware,
     response::{IntoResponse, Response},
@@ -8,7 +8,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tower_http::request_id::RequestId;
 use validator::Validate;
 
 use gotong_domain::idempotency::BeginOutcome;
@@ -17,17 +16,31 @@ use gotong_domain::ports::idempotency::{IdempotencyKey, IdempotencyResponse};
 use crate::{error::ApiError, middleware as app_middleware, state::AppState, validation};
 
 pub fn router(state: AppState) -> Router {
-    Router::new()
+    let protected = Router::new()
+        .route("/v1/idempotent-echo", post(idempotent_echo))
+        .route_layer(middleware::from_fn(app_middleware::require_auth_middleware));
+
+    let mut app = Router::new()
         .route("/health", get(health))
         .route("/v1/echo", post(echo))
-        .route("/v1/idempotent-echo", post(idempotent_echo))
-        .layer(app_middleware::rate_limit_layer())
+        .merge(protected)
         .layer(app_middleware::timeout_layer())
         .layer(app_middleware::trace_layer())
         .layer(app_middleware::set_request_id_layer())
+        .layer(middleware::from_fn(
+            app_middleware::correlation_id_middleware,
+        ))
         .layer(app_middleware::propagate_request_id_layer())
-        .layer(middleware::from_fn(app_middleware::auth_stub_middleware))
-        .with_state(state)
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            app_middleware::auth_middleware,
+        ));
+
+    if !state.config.app_env.eq_ignore_ascii_case("test") {
+        app = app.layer(app_middleware::rate_limit_layer());
+    }
+
+    app.with_state(state)
 }
 
 #[derive(Serialize)]
@@ -73,14 +86,14 @@ struct IdempotentEchoRequest {
 
 async fn idempotent_echo(
     State(state): State<AppState>,
-    Extension(request_id): Extension<RequestId>,
+    headers: axum::http::HeaderMap,
     Json(payload): Json<IdempotentEchoRequest>,
 ) -> Result<Response, ApiError> {
     validation::validate(&payload)?;
-    let request_id = request_id
-        .header_value()
-        .to_str()
-        .map_err(|_| ApiError::Validation("invalid request id".into()))?
+    let request_id = headers
+        .get("x-request-id")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| ApiError::Validation("missing request id".into()))?
         .to_string();
     let key = IdempotencyKey::new("echo", payload.entity_id.clone(), request_id);
 

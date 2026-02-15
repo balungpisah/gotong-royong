@@ -140,7 +140,7 @@ impl IdempotencyStore for RedisIdempotencyStore {
                 .arg("XX")
                 .arg("PX")
                 .arg(ttl_ms)
-                    .query_async(&mut conn)
+                .query_async(&mut conn)
                 .await
                 .map_err(|err| IdempotencyError::Store(err.to_string()))?;
 

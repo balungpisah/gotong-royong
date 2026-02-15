@@ -28,6 +28,7 @@ database/
   checks/
     0001_initial_schema_check.surql
     0002_chat_indexes_check.surql
+    0003_permissions_private_channels_check.surql
   MIGRATION-STATE.md
 ```
 

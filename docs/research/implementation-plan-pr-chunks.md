@@ -129,6 +129,9 @@ Exit criteria:
 
 ## PR-04 — Auth + Permissions Baseline
 
+Status:
+- DONE (2026-02-15)
+
 Goal:
 - Establish authentication, RBAC, and Surreal permission scaffolding.
 

@@ -33,3 +33,11 @@ cat "$WORKDIR/database/checks/0002_chat_indexes_check.surql" | "${SUR_CMD[@]}" s
   --namespace "$SURREAL_NS" \
   --database "$SURREAL_DB" \
   --json
+
+cat "$WORKDIR/database/checks/0003_permissions_private_channels_check.surql" | "${SUR_CMD[@]}" sql \
+  --endpoint "$SURREAL_ENDPOINT" \
+  --user "$SURREAL_USER" \
+  --pass "$SURREAL_PASS" \
+  --namespace "$SURREAL_NS" \
+  --database "$SURREAL_DB" \
+  --json

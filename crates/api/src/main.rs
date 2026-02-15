@@ -39,3 +39,6 @@ async fn shutdown_signal() {
     let _ = tokio::signal::ctrl_c().await;
     tracing::info!("shutdown signal received");
 }
+
+#[cfg(test)]
+mod tests;

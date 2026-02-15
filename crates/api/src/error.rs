@@ -9,6 +9,8 @@ pub enum ApiError {
     Validation(String),
     #[error("unauthorized")]
     Unauthorized,
+    #[error("forbidden")]
+    Forbidden,
     #[error("not found")]
     NotFound,
     #[error("conflict")]
@@ -22,6 +24,7 @@ impl ApiError {
         match self {
             ApiError::Validation(_) => StatusCode::BAD_REQUEST,
             ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
+            ApiError::Forbidden => StatusCode::FORBIDDEN,
             ApiError::NotFound => StatusCode::NOT_FOUND,
             ApiError::Conflict => StatusCode::CONFLICT,
             ApiError::Internal => StatusCode::INTERNAL_SERVER_ERROR,
@@ -32,6 +35,7 @@ impl ApiError {
         match self {
             ApiError::Validation(_) => "validation_error",
             ApiError::Unauthorized => "unauthorized",
+            ApiError::Forbidden => "forbidden",
             ApiError::NotFound => "not_found",
             ApiError::Conflict => "conflict",
             ApiError::Internal => "internal_error",

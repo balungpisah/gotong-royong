@@ -8,9 +8,11 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+jsonwebtoken.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+time.workspace = true
 tokio.workspace = true
 tower.workspace = true
 tower_governor.workspace = true
@@ -22,3 +24,6 @@ validator.workspace = true
 
 gotong-domain = { path = "../domain" }
 gotong-infra = { path = "../infra" }
+
+[dev-dependencies]
+tower-util = { package = "tower", version = "0.5", features = ["util"] }
