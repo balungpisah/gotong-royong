@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod adaptive_path;
 pub mod chat;
 pub mod contributions;
 pub mod discovery;

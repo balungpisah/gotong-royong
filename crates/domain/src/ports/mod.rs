@@ -9,6 +9,7 @@ pub mod db;
 pub mod discovery;
 pub mod evidence;
 pub mod idempotency;
+pub mod adaptive_path;
 pub mod jobs;
 pub mod moderation;
 pub mod siaga;

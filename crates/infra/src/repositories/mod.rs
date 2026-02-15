@@ -3,6 +3,9 @@ use std::sync::Arc;
 
 use crate::db::DbConfig;
 use gotong_domain::DomainResult;
+use gotong_domain::adaptive_path::{
+    AdaptivePathEvent, AdaptivePathPlan, AdaptivePathSuggestion, SuggestionDecisionStatus,
+};
 use gotong_domain::chat::{
     ChatDeliveryEvent, ChatMember, ChatMemberRole, ChatMessage, ChatReadCursor, ChatThread,
     ChatThreadQuery, ChatThreadWithMembers, MessageCatchup,
@@ -17,6 +20,7 @@ use gotong_domain::moderation::{
     ModerationStatus, ModerationViolation,
 };
 use gotong_domain::ports::chat::ChatRepository as ChatRepositoryPort;
+use gotong_domain::ports::adaptive_path::AdaptivePathRepository;
 use gotong_domain::ports::contributions::ContributionRepository;
 use gotong_domain::ports::discovery::{
     FeedRepository, FeedRepositoryQuery, FeedRepositorySearchQuery, NotificationRepository,
@@ -2016,6 +2020,666 @@ impl TrackTransitionRepository for SurrealTrackTransitionRepository {
                 .take(0)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             Self::decode_transition_rows(rows)
+        })
+    }
+}
+
+#[derive(Default)]
+pub struct InMemoryAdaptivePathRepository {
+    plans: Arc<RwLock<HashMap<String, AdaptivePathPlan>>>,
+    plan_by_entity: Arc<RwLock<HashMap<String, String>>>,
+    plan_by_entity_request: Arc<RwLock<HashMap<(String, String), String>>>,
+    events_by_plan: Arc<RwLock<HashMap<String, Vec<AdaptivePathEvent>>>>,
+    event_by_request: Arc<RwLock<HashMap<String, (String, String)>>>,
+    suggestions: Arc<RwLock<HashMap<String, AdaptivePathSuggestion>>>,
+    suggestion_by_plan_request: Arc<RwLock<HashMap<(String, String), String>>>,
+}
+
+impl InMemoryAdaptivePathRepository {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn plan_request_key(entity_id: &str, request_id: &str) -> (String, String) {
+        (entity_id.to_string(), request_id.to_string())
+    }
+
+    fn suggestion_request_key(plan_id: &str, request_id: &str) -> (String, String) {
+        (plan_id.to_string(), request_id.to_string())
+    }
+}
+
+impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
+    fn create_plan(&self, plan: &AdaptivePathPlan) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
+        let plan = plan.clone();
+        let plans = self.plans.clone();
+        let plan_by_entity = self.plan_by_entity.clone();
+        let plan_by_entity_request = self.plan_by_entity_request.clone();
+        Box::pin(async move {
+            let request_key = Self::plan_request_key(&plan.entity_id, &plan.request_id);
+            if plan_by_entity_request
+                .read()
+                .await
+                .contains_key(&request_key)
+            {
+                return Err(DomainError::Conflict);
+            }
+
+            let mut plan_map = plans.write().await;
+            if plan_map.contains_key(&plan.plan_id) {
+                return Err(DomainError::Conflict);
+            }
+
+            let mut by_entity = plan_by_entity.write().await;
+            if by_entity.contains_key(&plan.entity_id) {
+                return Err(DomainError::Conflict);
+            }
+            by_entity.insert(plan.entity_id.clone(), plan.plan_id.clone());
+            plan_by_entity_request
+                .write()
+                .await
+                .insert(request_key, plan.plan_id.clone());
+            plan_map.insert(plan.plan_id.clone(), plan.clone());
+            Ok(plan)
+        })
+    }
+
+    fn get_plan(&self, plan_id: &str) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
+        let plan_id = plan_id.to_string();
+        let plans = self.plans.clone();
+        Box::pin(async move {
+            let plans = plans.read().await;
+            Ok(plans.get(&plan_id).cloned())
+        })
+    }
+
+    fn get_plan_by_entity(
+        &self,
+        entity_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
+        let entity_id = entity_id.to_string();
+        let plans = self.plans.clone();
+        let plan_by_entity = self.plan_by_entity.clone();
+        Box::pin(async move {
+            let by_entity = plan_by_entity.read().await;
+            let Some(plan_id) = by_entity.get(&entity_id) else {
+                return Ok(None);
+            };
+            let plans = plans.read().await;
+            Ok(plans.get(plan_id).cloned())
+        })
+    }
+
+    fn get_plan_by_request_id(
+        &self,
+        entity_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
+        let key = Self::plan_request_key(entity_id, request_id);
+        let plans = self.plans.clone();
+        let plan_by_entity_request = self.plan_by_entity_request.clone();
+        Box::pin(async move {
+            let by_request = plan_by_entity_request.read().await;
+            let Some(plan_id) = by_request.get(&key) else {
+                return Ok(None);
+            };
+            let plans = plans.read().await;
+            Ok(plans.get(plan_id).cloned())
+        })
+    }
+
+    fn update_plan(&self, plan: &AdaptivePathPlan) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
+        let plan = plan.clone();
+        let plans = self.plans.clone();
+        let plan_by_entity_request = self.plan_by_entity_request.clone();
+        Box::pin(async move {
+            let request_key = Self::plan_request_key(&plan.entity_id, &plan.request_id);
+            if let Some(existing_plan_id) = plan_by_entity_request.read().await.get(&request_key) {
+                let plans = plans.read().await;
+                if let Some(existing) = plans.get(existing_plan_id) {
+                    return Ok(existing.clone());
+                }
+                return Err(DomainError::Conflict);
+            }
+
+            let mut plans = plans.write().await;
+            let Some(current) = plans.get(&plan.plan_id) else {
+                return Err(DomainError::NotFound);
+            };
+            if plan.version <= current.version {
+                return Err(DomainError::Conflict);
+            }
+            plans.insert(plan.plan_id.clone(), plan.clone());
+            plan_by_entity_request
+                .write()
+                .await
+                .insert(request_key, plan.plan_id.clone());
+            Ok(plan)
+        })
+    }
+
+    fn create_event(&self, event: &AdaptivePathEvent) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathEvent>> {
+        let event = event.clone();
+        let events_by_plan = self.events_by_plan.clone();
+        let event_by_request = self.event_by_request.clone();
+        Box::pin(async move {
+            if event_by_request
+                .read()
+                .await
+                .contains_key(&event.request_id)
+            {
+                return Err(DomainError::Conflict);
+            }
+
+            let mut event_rows = events_by_plan.write().await;
+            let rows = event_rows.entry(event.plan_id.clone()).or_default();
+            if rows.iter().any(|row| row.event_id == event.event_id) {
+                return Err(DomainError::Conflict);
+            }
+            rows.push(event.clone());
+            event_by_request.write().await.insert(
+                event.request_id.clone(),
+                (event.plan_id.clone(), event.event_id.clone()),
+            );
+            Ok(event)
+        })
+    }
+
+    fn list_events(&self, plan_id: &str) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathEvent>>> {
+        let plan_id = plan_id.to_string();
+        let events_by_plan = self.events_by_plan.clone();
+        Box::pin(async move {
+            let mut rows = events_by_plan
+                .read()
+                .await
+                .get(&plan_id)
+                .cloned()
+                .unwrap_or_default();
+            rows.sort_by(|left, right| {
+                left.occurred_at_ms
+                    .cmp(&right.occurred_at_ms)
+                    .then_with(|| left.event_id.cmp(&right.event_id))
+            });
+            Ok(rows)
+        })
+    }
+
+    fn get_event_by_request_id(
+        &self,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathEvent>>> {
+        let request_id = request_id.to_string();
+        let events_by_plan = self.events_by_plan.clone();
+        let event_by_request = self.event_by_request.clone();
+        Box::pin(async move {
+            let by_request = event_by_request.read().await;
+            let Some((plan_id, event_id)) = by_request.get(&request_id) else {
+                return Ok(None);
+            };
+            let rows = events_by_plan.read().await;
+            let Some(events) = rows.get(plan_id) else {
+                return Ok(None);
+            };
+            Ok(events.iter().find(|event| event.event_id == *event_id).cloned())
+        })
+    }
+
+    fn create_suggestion(
+        &self,
+        suggestion: &AdaptivePathSuggestion,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathSuggestion>> {
+        let suggestion = suggestion.clone();
+        let suggestions = self.suggestions.clone();
+        let suggestion_by_plan_request = self.suggestion_by_plan_request.clone();
+        Box::pin(async move {
+            let request_key = Self::suggestion_request_key(&suggestion.plan_id, &suggestion.request_id);
+            if suggestion_by_plan_request
+                .read()
+                .await
+                .contains_key(&request_key)
+            {
+                return Err(DomainError::Conflict);
+            }
+            let mut suggestions = suggestions.write().await;
+            if suggestions.contains_key(&suggestion.suggestion_id) {
+                return Err(DomainError::Conflict);
+            }
+            suggestions.insert(suggestion.suggestion_id.clone(), suggestion.clone());
+            suggestion_by_plan_request
+                .write()
+                .await
+                .insert(request_key, suggestion.suggestion_id.clone());
+            Ok(suggestion)
+        })
+    }
+
+    fn list_suggestions(
+        &self,
+        plan_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathSuggestion>>> {
+        let plan_id = plan_id.to_string();
+        let suggestions = self.suggestions.clone();
+        Box::pin(async move {
+            let mut rows: Vec<_> = suggestions
+                .read()
+                .await
+                .values()
+                .filter(|suggestion| suggestion.plan_id == plan_id)
+                .cloned()
+                .collect();
+            rows.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.suggestion_id.cmp(&left.suggestion_id))
+            });
+            Ok(rows)
+        })
+    }
+
+    fn get_suggestion(
+        &self,
+        suggestion_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathSuggestion>>> {
+        let suggestion_id = suggestion_id.to_string();
+        let suggestions = self.suggestions.clone();
+        Box::pin(async move {
+            let suggestions = suggestions.read().await;
+            Ok(suggestions.get(&suggestion_id).cloned())
+        })
+    }
+
+    fn get_suggestion_by_request_id(
+        &self,
+        plan_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathSuggestion>>> {
+        let key = Self::suggestion_request_key(plan_id, request_id);
+        let suggestions = self.suggestions.clone();
+        let suggestion_by_plan_request = self.suggestion_by_plan_request.clone();
+        Box::pin(async move {
+            let by_request = suggestion_by_plan_request.read().await;
+            let Some(suggestion_id) = by_request.get(&key) else {
+                return Ok(None);
+            };
+            let suggestions = suggestions.read().await;
+            Ok(suggestions.get(suggestion_id).cloned())
+        })
+    }
+
+    fn update_suggestion_status(
+        &self,
+        suggestion_id: &str,
+        status: SuggestionDecisionStatus,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathSuggestion>> {
+        let suggestion_id = suggestion_id.to_string();
+        let suggestions = self.suggestions.clone();
+        Box::pin(async move {
+            let mut suggestions = suggestions.write().await;
+            let suggestion = suggestions
+                .get_mut(&suggestion_id)
+                .ok_or(DomainError::NotFound)?;
+            suggestion.status = status;
+            suggestion.updated_at_ms = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as i64;
+            Ok(suggestion.clone())
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealAdaptivePathRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealAdaptivePathRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let message = err.to_string().to_lowercase();
+        if message.contains("already exists")
+            || message.contains("duplicate")
+            || message.contains("unique")
+            || message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {message}"))
+    }
+
+    fn decode_one<T>(rows: Vec<Value>, context: &str) -> DomainResult<Option<T>>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let decoded = serde_json::from_value::<T>(row)
+            .map_err(|err| DomainError::Validation(format!("invalid {context} row: {err}")))?;
+        Ok(Some(decoded))
+    }
+
+    fn decode_many<T>(rows: Vec<Value>, context: &str) -> DomainResult<Vec<T>>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<T>(row).map_err(|err| {
+                    DomainError::Validation(format!("invalid {context} row: {err}"))
+                })
+            })
+            .collect()
+    }
+}
+
+impl AdaptivePathRepository for SurrealAdaptivePathRepository {
+    fn create_plan(&self, plan: &AdaptivePathPlan) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
+        let client = self.client.clone();
+        let plan = plan.clone();
+        Box::pin(async move {
+            let payload = to_value(&plan)
+                .map_err(|err| DomainError::Validation(format!("invalid plan payload: {err}")))?;
+            let mut response = client
+                .query("CREATE path_plan CONTENT $payload")
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "path_plan")?
+                .ok_or_else(|| DomainError::Validation("create returned no plan row".to_string()))
+        })
+    }
+
+    fn get_plan(&self, plan_id: &str) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
+        let client = self.client.clone();
+        let plan_id = plan_id.to_string();
+        Box::pin(async move {
+            let mut response = client
+                .query("SELECT * FROM path_plan WHERE plan_id = $plan_id LIMIT 1")
+                .bind(("plan_id", plan_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "path_plan")
+        })
+    }
+
+    fn get_plan_by_entity(
+        &self,
+        entity_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
+        let client = self.client.clone();
+        let entity_id = entity_id.to_string();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM path_plan \
+                     WHERE entity_id = $entity_id \
+                     ORDER BY version DESC, updated_at_ms DESC, plan_id DESC \
+                     LIMIT 1",
+                )
+                .bind(("entity_id", entity_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "path_plan")
+        })
+    }
+
+    fn get_plan_by_request_id(
+        &self,
+        entity_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
+        let client = self.client.clone();
+        let entity_id = entity_id.to_string();
+        let request_id = request_id.to_string();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM path_plan \
+                     WHERE entity_id = $entity_id AND request_id = $request_id \
+                     LIMIT 1",
+                )
+                .bind(("entity_id", entity_id))
+                .bind(("request_id", request_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "path_plan")
+        })
+    }
+
+    fn update_plan(&self, plan: &AdaptivePathPlan) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
+        let client = self.client.clone();
+        let plan = plan.clone();
+        Box::pin(async move {
+            let expected_version = plan.version.saturating_sub(1);
+            let payload = to_value(&plan)
+                .map_err(|err| DomainError::Validation(format!("invalid plan payload: {err}")))?;
+            let mut response = client
+                .query(
+                    "UPDATE path_plan MERGE $payload \
+                     WHERE plan_id = $plan_id AND version = $expected_version \
+                     RETURN AFTER",
+                )
+                .bind(("payload", payload))
+                .bind(("plan_id", plan.plan_id.clone()))
+                .bind(("expected_version", expected_version))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "path_plan")?.ok_or(DomainError::Conflict)
+        })
+    }
+
+    fn create_event(&self, event: &AdaptivePathEvent) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathEvent>> {
+        let client = self.client.clone();
+        let event = event.clone();
+        Box::pin(async move {
+            let payload = to_value(&event)
+                .map_err(|err| DomainError::Validation(format!("invalid event payload: {err}")))?;
+            let mut response = client
+                .query("CREATE path_plan_event CONTENT $payload")
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "path_plan_event")?
+                .ok_or_else(|| DomainError::Validation("create returned no event row".to_string()))
+        })
+    }
+
+    fn list_events(&self, plan_id: &str) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathEvent>>> {
+        let client = self.client.clone();
+        let plan_id = plan_id.to_string();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM path_plan_event \
+                     WHERE plan_id = $plan_id \
+                     ORDER BY occurred_at_ms ASC, event_id ASC",
+                )
+                .bind(("plan_id", plan_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_many(rows, "path_plan_event")
+        })
+    }
+
+    fn get_event_by_request_id(
+        &self,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathEvent>>> {
+        let client = self.client.clone();
+        let request_id = request_id.to_string();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM path_plan_event \
+                     WHERE request_id = $request_id LIMIT 1",
+                )
+                .bind(("request_id", request_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "path_plan_event")
+        })
+    }
+
+    fn create_suggestion(
+        &self,
+        suggestion: &AdaptivePathSuggestion,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathSuggestion>> {
+        let client = self.client.clone();
+        let suggestion = suggestion.clone();
+        Box::pin(async move {
+            let payload = to_value(&suggestion).map_err(|err| {
+                DomainError::Validation(format!("invalid suggestion payload: {err}"))
+            })?;
+            let mut response = client
+                .query("CREATE plan_suggestion CONTENT $payload")
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "plan_suggestion")?.ok_or_else(|| {
+                DomainError::Validation("create returned no suggestion row".to_string())
+            })
+        })
+    }
+
+    fn list_suggestions(
+        &self,
+        plan_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathSuggestion>>> {
+        let client = self.client.clone();
+        let plan_id = plan_id.to_string();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM plan_suggestion \
+                     WHERE plan_id = $plan_id \
+                     ORDER BY created_at_ms DESC, suggestion_id DESC",
+                )
+                .bind(("plan_id", plan_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_many(rows, "plan_suggestion")
+        })
+    }
+
+    fn get_suggestion(
+        &self,
+        suggestion_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathSuggestion>>> {
+        let client = self.client.clone();
+        let suggestion_id = suggestion_id.to_string();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM plan_suggestion \
+                     WHERE suggestion_id = $suggestion_id LIMIT 1",
+                )
+                .bind(("suggestion_id", suggestion_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "plan_suggestion")
+        })
+    }
+
+    fn get_suggestion_by_request_id(
+        &self,
+        plan_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathSuggestion>>> {
+        let client = self.client.clone();
+        let plan_id = plan_id.to_string();
+        let request_id = request_id.to_string();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM plan_suggestion \
+                     WHERE plan_id = $plan_id AND request_id = $request_id \
+                     LIMIT 1",
+                )
+                .bind(("plan_id", plan_id))
+                .bind(("request_id", request_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "plan_suggestion")
+        })
+    }
+
+    fn update_suggestion_status(
+        &self,
+        suggestion_id: &str,
+        status: SuggestionDecisionStatus,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathSuggestion>> {
+        let client = self.client.clone();
+        let suggestion_id = suggestion_id.to_string();
+        Box::pin(async move {
+            let status = to_value(&status)
+                .map_err(|err| DomainError::Validation(format!("invalid status value: {err}")))?;
+            let updated_at_ms = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as i64;
+            let mut response = client
+                .query(
+                    "UPDATE plan_suggestion \
+                     SET status = $status, updated_at_ms = $updated_at_ms \
+                     WHERE suggestion_id = $suggestion_id \
+                     RETURN AFTER",
+                )
+                .bind(("status", status))
+                .bind(("updated_at_ms", updated_at_ms))
+                .bind(("suggestion_id", suggestion_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::decode_one(rows, "plan_suggestion")?.ok_or(DomainError::NotFound)
         })
     }
 }

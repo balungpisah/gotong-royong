@@ -15,6 +15,12 @@ use axum::{
 };
 use futures_util::{SinkExt, StreamExt};
 use gotong_domain::{
+    adaptive_path::{
+        AdaptivePathBranchDraftInput, AdaptivePathCheckpointDraftInput, AdaptivePathEditorRole,
+        AdaptivePathEvent, AdaptivePathPhaseDraftInput, AdaptivePathPlan, AdaptivePathService,
+        AdaptivePathSuggestion, AdaptivePathPlanPayloadDraft, CreateAdaptivePathInput,
+        SuggestAdaptivePathInput, SuggestionReviewInput, UpdateAdaptivePathInput,
+    },
     auth::TrackRole,
     chat::{
         ChatMember, ChatMessage, ChatReadCursor, ChatService, ChatThread, ChatThreadCreate,
@@ -91,6 +97,32 @@ pub fn router(state: AppState) -> Router {
             get(get_active_transition_stage),
         )
         .route("/v1/transitions/:transition_id", get(get_transition_by_id))
+        .route("/v1/adaptive-path/plans", post(create_adaptive_path_plan))
+        .route("/v1/adaptive-path/plans/:plan_id", get(get_adaptive_path_plan))
+        .route(
+            "/v1/adaptive-path/entities/:entity_id/plan",
+            get(get_adaptive_path_plan_by_entity),
+        )
+        .route(
+            "/v1/adaptive-path/plans/:plan_id/update",
+            post(update_adaptive_path_plan),
+        )
+        .route(
+            "/v1/adaptive-path/plans/:plan_id/events",
+            get(list_adaptive_path_events),
+        )
+        .route(
+            "/v1/adaptive-path/plans/:plan_id/suggestions",
+            post(propose_adaptive_path_suggestion).get(list_adaptive_path_suggestions),
+        )
+        .route(
+            "/v1/adaptive-path/suggestions/:suggestion_id/accept",
+            post(accept_adaptive_path_suggestion),
+        )
+        .route(
+            "/v1/adaptive-path/suggestions/:suggestion_id/reject",
+            post(reject_adaptive_path_suggestion),
+        )
         .route("/v1/vaults", post(create_vault_draft).get(list_vaults))
         .route(
             "/v1/vaults/:vault_entry_id",
@@ -840,6 +872,85 @@ struct CreateTransitionRequest {
     pub closes_at_ms: Option<i64>,
 }
 
+#[derive(Debug, Deserialize)]
+struct AdaptivePathCheckpointDraftRequest {
+    pub checkpoint_id: Option<String>,
+    pub title: String,
+    pub status: gotong_domain::adaptive_path::AdaptivePathStatus,
+    pub order: i64,
+    pub source: gotong_domain::adaptive_path::AdaptivePathSource,
+}
+
+#[derive(Debug, Deserialize)]
+struct AdaptivePathPhaseDraftRequest {
+    pub phase_id: Option<String>,
+    pub title: String,
+    pub objective: String,
+    pub status: gotong_domain::adaptive_path::AdaptivePathStatus,
+    pub order: i64,
+    pub source: gotong_domain::adaptive_path::AdaptivePathSource,
+    pub checkpoints: Vec<AdaptivePathCheckpointDraftRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AdaptivePathBranchDraftRequest {
+    pub branch_id: Option<String>,
+    pub label: String,
+    pub parent_checkpoint_id: Option<String>,
+    pub order: i64,
+    pub phases: Vec<AdaptivePathPhaseDraftRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AdaptivePathPayloadDraftRequest {
+    pub title: String,
+    pub summary: Option<String>,
+    pub track_hint: Option<String>,
+    pub seed_hint: Option<String>,
+    pub branches: Vec<AdaptivePathBranchDraftRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateAdaptivePathPlanRequest {
+    pub entity_id: String,
+    pub payload: AdaptivePathPayloadDraftRequest,
+    #[serde(default)]
+    pub editor_roles: Vec<AdaptivePathEditorRole>,
+    #[serde(default)]
+    pub request_ts_ms: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateAdaptivePathPlanRequest {
+    pub expected_version: u64,
+    pub payload: AdaptivePathPayloadDraftRequest,
+    #[serde(default)]
+    pub editor_roles: Vec<AdaptivePathEditorRole>,
+    #[serde(default)]
+    pub request_ts_ms: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SuggestAdaptivePathPlanRequest {
+    pub base_version: u64,
+    pub payload: AdaptivePathPayloadDraftRequest,
+    pub rationale: Option<String>,
+    pub model_id: Option<String>,
+    pub prompt_version: Option<String>,
+    #[serde(default)]
+    pub editor_roles: Vec<AdaptivePathEditorRole>,
+    #[serde(default)]
+    pub request_ts_ms: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReviewAdaptivePathSuggestionRequest {
+    #[serde(default)]
+    pub editor_roles: Vec<AdaptivePathEditorRole>,
+    #[serde(default)]
+    pub request_ts_ms: Option<i64>,
+}
+
 #[derive(Debug, Deserialize, Validate)]
 struct ApplyModerationRequest {
     #[validate(length(min = 1, max = 128))]
@@ -1442,6 +1553,340 @@ async fn get_transition_by_id(
         .map_err(map_domain_error)?;
     let transition = transition.ok_or(ApiError::NotFound)?;
     Ok(Json(transition))
+}
+
+async fn create_adaptive_path_plan(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateAdaptivePathPlanRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let token_role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let entity_id = payload.entity_id.trim().to_string();
+    if entity_id.is_empty() {
+        return Err(ApiError::Validation("entity_id is required".to_string()));
+    }
+
+    let key = IdempotencyKey::new(
+        "adaptive_path_create",
+        format!("{}:{entity_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let input = CreateAdaptivePathInput {
+                entity_id,
+                payload: into_adaptive_path_payload_draft(payload.payload),
+                editor_roles: payload.editor_roles,
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let plan = service
+                .create_plan(&actor, &token_role, input)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(&plan).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn get_adaptive_path_plan(
+    State(state): State<AppState>,
+    Path(plan_id): Path<String>,
+) -> Result<Json<AdaptivePathPlan>, ApiError> {
+    let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+    let plan = service.get_plan(&plan_id).await.map_err(map_domain_error)?;
+    let plan = plan.ok_or(ApiError::NotFound)?;
+    Ok(Json(plan))
+}
+
+async fn get_adaptive_path_plan_by_entity(
+    State(state): State<AppState>,
+    Path(entity_id): Path<String>,
+) -> Result<Json<AdaptivePathPlan>, ApiError> {
+    let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+    let plan = service
+        .get_plan_by_entity(&entity_id)
+        .await
+        .map_err(map_domain_error)?;
+    let plan = plan.ok_or(ApiError::NotFound)?;
+    Ok(Json(plan))
+}
+
+async fn update_adaptive_path_plan(
+    State(state): State<AppState>,
+    Path(plan_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<UpdateAdaptivePathPlanRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let token_role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "adaptive_path_update",
+        format!("{}:{plan_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let input = UpdateAdaptivePathInput {
+                plan_id,
+                expected_version: payload.expected_version,
+                payload: into_adaptive_path_payload_draft(payload.payload),
+                editor_roles: payload.editor_roles,
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let plan = service
+                .update_plan(&actor, &token_role, input)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&plan).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn propose_adaptive_path_suggestion(
+    State(state): State<AppState>,
+    Path(plan_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<SuggestAdaptivePathPlanRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let token_role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "adaptive_path_suggest",
+        format!("{}:{plan_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let input = SuggestAdaptivePathInput {
+                plan_id,
+                base_version: payload.base_version,
+                payload: into_adaptive_path_payload_draft(payload.payload),
+                rationale: payload.rationale,
+                model_id: payload.model_id,
+                prompt_version: payload.prompt_version,
+                editor_roles: payload.editor_roles,
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let suggestion = service
+                .suggest_plan(&actor, &token_role, input)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(&suggestion).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn accept_adaptive_path_suggestion(
+    State(state): State<AppState>,
+    Path(suggestion_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<ReviewAdaptivePathSuggestionRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let token_role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "adaptive_path_accept",
+        format!("{}:{suggestion_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let input = SuggestionReviewInput {
+                suggestion_id,
+                editor_roles: payload.editor_roles,
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let plan = service
+                .accept_suggestion(&actor, &token_role, input)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&plan).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn reject_adaptive_path_suggestion(
+    State(state): State<AppState>,
+    Path(suggestion_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<ReviewAdaptivePathSuggestionRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let token_role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "adaptive_path_reject",
+        format!("{}:{suggestion_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let input = SuggestionReviewInput {
+                suggestion_id,
+                editor_roles: payload.editor_roles,
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let suggestion = service
+                .reject_suggestion(&actor, &token_role, input)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&suggestion).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn list_adaptive_path_events(
+    State(state): State<AppState>,
+    Path(plan_id): Path<String>,
+) -> Result<Json<Vec<AdaptivePathEvent>>, ApiError> {
+    let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+    let events = service
+        .list_events(&plan_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(events))
+}
+
+async fn list_adaptive_path_suggestions(
+    State(state): State<AppState>,
+    Path(plan_id): Path<String>,
+) -> Result<Json<Vec<AdaptivePathSuggestion>>, ApiError> {
+    let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+    let suggestions = service
+        .list_suggestions(&plan_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(suggestions))
 }
 
 async fn create_vault_draft(
@@ -2855,6 +3300,50 @@ async fn get_chat_read_cursor(
         .await
         .map_err(map_domain_error)?;
     Ok(Json(cursor))
+}
+
+fn into_adaptive_path_payload_draft(
+    payload: AdaptivePathPayloadDraftRequest,
+) -> AdaptivePathPlanPayloadDraft {
+    AdaptivePathPlanPayloadDraft {
+        title: payload.title,
+        summary: payload.summary,
+        track_hint: payload.track_hint,
+        seed_hint: payload.seed_hint,
+        branches: payload
+            .branches
+            .into_iter()
+            .map(|branch| AdaptivePathBranchDraftInput {
+                branch_id: branch.branch_id,
+                label: branch.label,
+                parent_checkpoint_id: branch.parent_checkpoint_id,
+                order: branch.order,
+                phases: branch
+                    .phases
+                    .into_iter()
+                    .map(|phase| AdaptivePathPhaseDraftInput {
+                        phase_id: phase.phase_id,
+                        title: phase.title,
+                        objective: phase.objective,
+                        status: phase.status,
+                        order: phase.order,
+                        source: phase.source,
+                        checkpoints: phase
+                            .checkpoints
+                            .into_iter()
+                            .map(|checkpoint| AdaptivePathCheckpointDraftInput {
+                                checkpoint_id: checkpoint.checkpoint_id,
+                                title: checkpoint.title,
+                                status: checkpoint.status,
+                                order: checkpoint.order,
+                                source: checkpoint.source,
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
 }
 
 fn actor_identity(auth: &AuthContext) -> Result<ActorIdentity, ApiError> {

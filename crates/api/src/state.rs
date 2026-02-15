@@ -7,6 +7,7 @@ use gotong_domain::chat::ChatMessage;
 use gotong_domain::idempotency::{IdempotencyConfig, IdempotencyService};
 use gotong_domain::ports::idempotency::IdempotencyStore;
 use gotong_domain::ports::{
+    adaptive_path::AdaptivePathRepository,
     chat::ChatRepository,
     contributions::ContributionRepository,
     discovery::{FeedRepository, NotificationRepository},
@@ -24,11 +25,12 @@ use gotong_infra::db::DbConfig;
 use gotong_infra::idempotency::RedisIdempotencyStore;
 use gotong_infra::jobs::RedisJobQueue;
 use gotong_infra::repositories::{
-    InMemoryChatRepository, InMemoryContributionRepository, InMemoryDiscoveryFeedRepository,
-    InMemoryDiscoveryNotificationRepository, InMemoryEvidenceRepository,
-    InMemoryModerationRepository, InMemorySiagaRepository, InMemoryTrackTransitionRepository,
-    InMemoryVaultRepository, InMemoryVouchRepository, InMemoryWebhookOutboxRepository,
-    SurrealChatRepository, SurrealContributionRepository, SurrealDiscoveryFeedRepository,
+    InMemoryAdaptivePathRepository, InMemoryChatRepository, InMemoryContributionRepository,
+    InMemoryDiscoveryFeedRepository, InMemoryDiscoveryNotificationRepository,
+    InMemoryEvidenceRepository, InMemoryModerationRepository, InMemorySiagaRepository,
+    InMemoryTrackTransitionRepository, InMemoryVaultRepository, InMemoryVouchRepository,
+    InMemoryWebhookOutboxRepository, SurrealAdaptivePathRepository, SurrealChatRepository,
+    SurrealContributionRepository, SurrealDiscoveryFeedRepository,
     SurrealDiscoveryNotificationRepository, SurrealEvidenceRepository, SurrealModerationRepository,
     SurrealSiagaRepository, SurrealTrackTransitionRepository, SurrealVaultRepository,
     SurrealVouchRepository, SurrealWebhookOutboxRepository,
@@ -39,6 +41,7 @@ use tokio::sync::{RwLock, broadcast};
 use tracing::warn;
 
 type RepositoryBundle = (
+    Arc<dyn AdaptivePathRepository>,
     Arc<dyn ContributionRepository>,
     Arc<dyn EvidenceRepository>,
     Arc<dyn VouchRepository>,
@@ -57,6 +60,7 @@ type TransitionJobQueue = Option<Arc<dyn JobQueue>>;
 pub struct AppState {
     pub config: AppConfig,
     pub idempotency: IdempotencyService,
+    pub adaptive_path_repo: Arc<dyn AdaptivePathRepository>,
     pub contribution_repo: Arc<dyn ContributionRepository>,
     pub evidence_repo: Arc<dyn EvidenceRepository>,
     pub vouch_repo: Arc<dyn VouchRepository>,
@@ -393,6 +397,7 @@ impl AppState {
     pub async fn new(config: AppConfig) -> anyhow::Result<Self> {
         let store = RedisIdempotencyStore::connect(&config.redis_url).await?;
         let (
+            adaptive_path_repo,
             contribution_repo,
             evidence_repo,
             vouch_repo,
@@ -411,6 +416,7 @@ impl AppState {
         Ok(Self {
             config,
             idempotency,
+            adaptive_path_repo,
             contribution_repo,
             evidence_repo,
             vouch_repo,
@@ -430,6 +436,7 @@ impl AppState {
     #[allow(dead_code)]
     pub fn with_idempotency_store(config: AppConfig, store: Arc<dyn IdempotencyStore>) -> Self {
         let (
+            adaptive_path_repo,
             contribution_repo,
             evidence_repo,
             vouch_repo,
@@ -446,6 +453,7 @@ impl AppState {
         Self {
             config,
             idempotency: IdempotencyService::new(store, IdempotencyConfig::default()),
+            adaptive_path_repo,
             contribution_repo,
             evidence_repo,
             vouch_repo,
@@ -467,6 +475,7 @@ impl AppState {
     pub fn with_repositories(
         config: AppConfig,
         store: Arc<dyn IdempotencyStore>,
+        adaptive_path_repo: Arc<dyn AdaptivePathRepository>,
         contribution_repo: Arc<dyn ContributionRepository>,
         evidence_repo: Arc<dyn EvidenceRepository>,
         vouch_repo: Arc<dyn VouchRepository>,
@@ -484,6 +493,7 @@ impl AppState {
         Self {
             config,
             idempotency,
+            adaptive_path_repo,
             contribution_repo,
             evidence_repo,
             vouch_repo,
@@ -514,6 +524,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
         }
         "surreal" | "surrealdb" | "tikv" => {
             let db_config = DbConfig::from_app_config(config);
+            let adaptive_path_repo = SurrealAdaptivePathRepository::new(&db_config).await?;
             let transition_repo = SurrealTrackTransitionRepository::new(&db_config).await?;
             let vault_repo = SurrealVaultRepository::new(&db_config).await?;
             let chat_repo = SurrealChatRepository::new(&db_config).await?;
@@ -526,6 +537,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
             let notification_repo = SurrealDiscoveryNotificationRepository::new(&db_config).await?;
             let webhook_outbox_repo = SurrealWebhookOutboxRepository::new(&db_config).await?;
             Ok((
+                Arc::new(adaptive_path_repo),
                 Arc::new(contribution_repo),
                 Arc::new(evidence_repo),
                 Arc::new(vouch_repo),
@@ -545,6 +557,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
 
 fn memory_repositories() -> RepositoryBundle {
     (
+        Arc::new(InMemoryAdaptivePathRepository::new()),
         Arc::new(InMemoryContributionRepository::new()),
         Arc::new(InMemoryEvidenceRepository::new()),
         Arc::new(InMemoryVouchRepository::new()),

@@ -47,6 +47,7 @@ for migration_file in \
   "0008_discovery_schema.surql" \
   "0009_audit_retention_fields.surql" \
   "0010_contributions_evidence_vouch_schema.surql" \
-  "0011_webhook_outbox_schema.surql"; do
+  "0011_webhook_outbox_schema.surql" \
+  "0012_adaptive_path_schema.surql"; do
   run_migration "$migration_file"
 done

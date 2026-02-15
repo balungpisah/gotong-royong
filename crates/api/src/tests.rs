@@ -479,6 +479,248 @@ async fn track_transition_validates_gate_and_role_matrix() {
 }
 
 #[tokio::test]
+async fn adaptive_path_plan_flow_works() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let create_payload = json!({
+        "entity_id": "case-adaptive-1",
+        "editor_roles": ["project_manager"],
+        "payload": {
+            "title": "Rencana awal",
+            "summary": "Ringkas",
+            "track_hint": "resolve",
+            "seed_hint": "issue",
+            "branches": [
+                {
+                    "branch_id": "main",
+                    "label": "Utama",
+                    "parent_checkpoint_id": null,
+                    "order": 0,
+                    "phases": [
+                        {
+                            "phase_id": "phase-1",
+                            "title": "Analisis",
+                            "objective": "Kumpulkan konteks",
+                            "status": "active",
+                            "order": 0,
+                            "source": "ai",
+                            "checkpoints": [
+                                {
+                                    "checkpoint_id": "checkpoint-1",
+                                    "title": "Validasi data",
+                                    "status": "open",
+                                    "order": 0,
+                                    "source": "ai"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/adaptive-path/plans")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "adaptive-create-1")
+        .header("x-correlation-id", "adaptive-corr-1")
+        .body(Body::from(create_payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let created_plan: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let plan_id = created_plan
+        .get("plan_id")
+        .and_then(|value| value.as_str())
+        .expect("plan_id")
+        .to_string();
+
+    let get_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/adaptive-path/plans/{plan_id}"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(get_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let update_payload = json!({
+        "expected_version": 1,
+        "editor_roles": ["project_manager"],
+        "payload": {
+            "title": "Rencana awal",
+            "summary": "Ringkas",
+            "track_hint": "resolve",
+            "seed_hint": "issue",
+            "branches": [
+                {
+                    "branch_id": "main",
+                    "label": "Utama",
+                    "parent_checkpoint_id": null,
+                    "order": 0,
+                    "phases": [
+                        {
+                            "phase_id": "phase-1",
+                            "title": "Analisis",
+                            "objective": "Kumpulkan konteks terbaru",
+                            "status": "active",
+                            "order": 0,
+                            "source": "human",
+                            "checkpoints": [
+                                {
+                                    "checkpoint_id": "checkpoint-1",
+                                    "title": "Validasi data",
+                                    "status": "open",
+                                    "order": 0,
+                                    "source": "ai"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/adaptive-path/plans/{plan_id}/update"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "adaptive-update-1")
+        .header("x-correlation-id", "adaptive-corr-2")
+        .body(Body::from(update_payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let updated_plan: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(updated_plan.get("version"), Some(&json!(2)));
+
+    let suggest_payload = json!({
+        "base_version": 2,
+        "editor_roles": ["highest_profile_user"],
+        "rationale": "update phase title",
+        "model_id": "model-x",
+        "prompt_version": "1.0",
+        "payload": {
+            "title": "Rencana awal",
+            "summary": "Ringkas",
+            "track_hint": "resolve",
+            "seed_hint": "issue",
+            "branches": [
+                {
+                    "branch_id": "main",
+                    "label": "Utama",
+                    "parent_checkpoint_id": null,
+                    "order": 0,
+                    "phases": [
+                        {
+                            "phase_id": "phase-1",
+                            "title": "Analisis lanjutan",
+                            "objective": "Kumpulkan konteks",
+                            "status": "active",
+                            "order": 0,
+                            "source": "ai",
+                            "checkpoints": [
+                                {
+                                    "checkpoint_id": "checkpoint-1",
+                                    "title": "Validasi data",
+                                    "status": "open",
+                                    "order": 0,
+                                    "source": "ai"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/adaptive-path/plans/{plan_id}/suggestions"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "adaptive-suggest-1")
+        .header("x-correlation-id", "adaptive-corr-3")
+        .body(Body::from(suggest_payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let suggestion: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let suggestion_id = suggestion
+        .get("suggestion_id")
+        .and_then(|value| value.as_str())
+        .expect("suggestion_id")
+        .to_string();
+
+    let accept_payload = json!({
+        "editor_roles": ["project_manager"]
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri(format!(
+            "/v1/adaptive-path/suggestions/{suggestion_id}/accept"
+        ))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "adaptive-accept-1")
+        .header("x-correlation-id", "adaptive-corr-4")
+        .body(Body::from(accept_payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let accepted_plan: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(accepted_plan.get("version"), Some(&json!(3)));
+
+    let events_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/adaptive-path/plans/{plan_id}/events"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(events_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let events: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
+    assert!(
+        events.len() >= 4,
+        "expected at least create/update/suggest/accept events"
+    );
+
+    let suggestions_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/adaptive-path/plans/{plan_id}/suggestions"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(suggestions_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let suggestions: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
+    assert_eq!(suggestions.len(), 1);
+    assert_eq!(suggestions[0].get("status"), Some(&json!("accepted")));
+}
+
+#[tokio::test]
 async fn contribution_create_is_idempotent() {
     let app = test_app();
     let token = test_token("test-secret");

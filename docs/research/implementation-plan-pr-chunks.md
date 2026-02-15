@@ -58,6 +58,7 @@ Out of scope:
 | PR-13 | Markov Webhook Integration + Outbox | - | PR-06, PR-05 |
 | PR-14 | Edge-Pod Integrations | `EP-03`, `EP-05`, `EP-08`, `EP-09`, `EP-11` | PR-03, PR-07, PR-09, PR-12 |
 | PR-15 | Audit + Observability + Release Gates | `BE-012`, `BE-013` | PR-14 |
+| PR-16 | Adaptive Path Guidance Core | `PRD-16` | PR-03, PR-04, PR-08 |
 
 ## PR Lock State
 
@@ -66,6 +67,7 @@ Out of scope:
 - `PR-13`: DONE
 - `PR-14`: DONE
 - `PR-15`: DONE (2026-02-15)
+- `PR-16`: DONE (2026-02-15)
 
 ## Detailed PR Plan
 
@@ -452,3 +454,44 @@ Exit criteria:
 - Keep PRs mergeable and independently verifiable.
 - Prefer feature flags for incomplete user-facing paths.
 - Treat any Surreal beta behavior drift as release-blocking until triaged.
+
+## PR-16 — Adaptive Path Guidance Core
+
+Status:
+- DONE (2026-02-15)
+
+Implementation progress note:
+- `adaptive_path` domain service, ports, and invariants are implemented in `crates/domain/src/adaptive_path.rs` and `crates/domain/src/ports/adaptive_path.rs`.
+- App wiring is available through `AppState` with in-memory + Surreal adapters in `crates/api/src/state.rs` and `crates/infra/src/repositories/mod.rs`.
+- API surface is implemented in `crates/api/src/routes/mod.rs`:
+  - `POST /v1/adaptive-path/plans`
+  - `GET /v1/adaptive-path/plans/:plan_id`
+  - `GET /v1/adaptive-path/entities/:entity_id/plan`
+  - `POST /v1/adaptive-path/plans/:plan_id/update`
+  - `POST /v1/adaptive-path/plans/:plan_id/suggestions`
+  - `GET /v1/adaptive-path/plans/:plan_id/suggestions`
+  - `POST /v1/adaptive-path/suggestions/:suggestion_id/accept`
+  - `POST /v1/adaptive-path/suggestions/:suggestion_id/reject`
+  - `GET /v1/adaptive-path/plans/:plan_id/events`
+- Schema/check automation is in `database/migrations/0012_adaptive_path_schema.surql`, `database/checks/0012_adaptive_path_check.surql`, and `scripts/db/{migrate.sh,check.sh}`.
+
+Goal:
+- Make adaptive path plans the canonical progress model with correctness-first governance.
+
+Deliverables:
+- Plan schema and repository adapters for `path_plan` (with embedded `path_branch`, `path_phase`, and `path_checkpoint` payloads) plus normalized projection tables.
+- Append-only plan event log with versioned snapshots.
+- Idempotent command handlers for create, edit, and suggestion workflows.
+- Permission enforcement for privileged plan editing roles.
+- Suggestion pipeline that respects `locked_fields` and version conflicts.
+- Minimal API surface for plan create, fetch, propose, apply, and audit.
+
+Validation:
+- Locked fields are never overwritten by LLM proposals.
+- Plan version conflicts are detected and rejected deterministically.
+- Idempotency works on repeated plan edits and suggestions.
+- Audit log covers all plan edits and proposal actions.
+
+Exit criteria:
+- Adaptive plan is the canonical progress representation for new cases.
+- `docs/research/prd-adaptive-path-guidance.md` requirements are met.
