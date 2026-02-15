@@ -6,6 +6,7 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 pub mod chat;
 pub mod contributions;
 pub mod db;
+pub mod discovery;
 pub mod evidence;
 pub mod idempotency;
 pub mod jobs;

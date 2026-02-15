@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod chat;
 pub mod contributions;
+pub mod discovery;
 pub mod error;
 pub mod evidence;
 pub mod idempotency;
