@@ -77,7 +77,7 @@ Goal:
 
 Deliverables:
 - Rust workspace layout (`api`, `domain`, `infra`, optional `worker`).
-- `rust-toolchain.toml` pinned to `1.85.0`.
+- `rust-toolchain.toml` pinned to `1.88.0`.
 - Base config loader, startup wiring, and structured error envelope.
 - Baseline middleware stack: tracing, request IDs, timeout, auth stub.
 - Request validation layer and rate limiting baseline.

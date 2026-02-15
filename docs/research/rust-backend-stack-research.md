@@ -44,7 +44,7 @@ The backend stack is locked to Rust 2024 with `tokio` + `axum` + `tower`/`tower-
 This research is complete enough to start implementation planning and ticket sequencing.
 
 **Sources**
-- Rust 1.85 announcement (Rust 2024 edition): https://blog.rust-lang.org/2025/02/20/Rust-1.85.0/
+- Rust edition tooling and stack lock references as defined by project ADR and CI config (`rustc 1.88.0`, exact tags).
 - Tokio docs: https://docs.rs/tokio
 - Axum docs: https://docs.rs/axum/latest
 - Tower docs: https://docs.rs/tower

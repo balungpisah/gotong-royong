@@ -6,7 +6,7 @@ Date: 2026-02-15
 General research for building a modern Rust backend using the Rust 2024 edition. This focuses on mature, widely used crates, common architectural patterns, and the knowledge to prepare before implementation.
 
 ## Final Stack Lock (Plan Basis)
-- **Language/Edition**: Rust `2024` (MSRV `1.85.0`).
+- **Language/Edition**: Rust `2024` (MSRV `1.88.0`).
 - **Runtime + HTTP**: Tokio + Axum + Tower + tower-http.
 - **Primary database**: SurrealDB server `v3.0.0-beta-4` with Rust SDK 3 beta channel.
 - **Realtime delivery**: WebSocket primary, SSE fallback, polling fallback for degraded clients.
@@ -18,12 +18,11 @@ General research for building a modern Rust backend using the Rust 2024 edition.
 This lock is the canonical basis for implementation planning. SQLx/Diesel/SeaORM remain reference alternatives only and are deferred.
 
 ## Rust 2024 Status
-- Rust 1.85.0 stabilized the Rust 2024 edition. Editions are opt-in language changes for compatibility-safe evolution.
+- Rust 1.88.0 stabilized the Rust 2024 edition baseline for this codebase (toolchain pinned).
 - New Cargo projects default to `edition = "2024"` in `Cargo.toml`.
-- Cargo 1.85 adds support for the 2024 edition.
+- Cargo 1.88+ supports this pinned stack.
 
 Sources:
-- https://blog.rust-lang.org/2025/02/20/Rust-1.85.0/
 - https://doc.rust-lang.org/edition-guide/editions/creating-a-new-project.html
 - https://doc.rust-lang.org/cargo/CHANGELOG.html
 
@@ -142,7 +141,7 @@ Sources:
 ### Locked Version Matrix (V0)
 | Layer | Locked choice | Policy |
 |---|---|---|
-| Rust toolchain | `1.85.0` | Pin in `rust-toolchain.toml`; no floating toolchain in CI |
+| Rust toolchain | `1.88.0` | Pin in `rust-toolchain.toml`; no floating toolchain in CI |
 | Edition | `2024` | Mandatory for all new crates |
 | Runtime | `tokio` | Pin exact crate version in `Cargo.lock` |
 | API framework | `axum` | Pin exact crate version in `Cargo.lock` |

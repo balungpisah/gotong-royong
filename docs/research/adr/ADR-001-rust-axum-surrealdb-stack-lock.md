@@ -9,7 +9,7 @@ Research identified multiple viable backend stacks, but implementation planning 
 
 ## Decision
 We lock the backend stack to:
-- Rust 2024 (MSRV 1.85.0)
+- Rust 2024 (MSRV 1.88.0)
 - Tokio runtime
 - Axum framework
 - Tower + tower-http middleware

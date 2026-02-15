@@ -23,7 +23,7 @@ Engine profile:
 
 | Software | Version | Purpose |
 |---|---|---|
-| Rust toolchain | 1.85.0+ | Build and run backend |
+| Rust toolchain | 1.88.0+ | Build and run backend |
 | Cargo | bundled with Rust | Build tooling |
 | SurrealDB CLI/server | 3.0.0-beta.4 | Local database runtime |
 | Docker | 20.10+ | Run Redis + MinIO locally |

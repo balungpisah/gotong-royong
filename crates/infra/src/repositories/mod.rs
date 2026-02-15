@@ -821,7 +821,8 @@ impl VaultRepository for InMemoryVaultRepository {
         let entries = self.entries.clone();
         Box::pin(async move {
             let key = Self::actor_request_key(&actor_id, &request_id);
-            let Some(vault_entry_id) = by_actor_request.read().await.get(&key) else {
+            let by_actor_request = by_actor_request.read().await;
+            let Some(vault_entry_id) = by_actor_request.get(&key) else {
                 return Ok(None);
             };
             Ok(entries.read().await.get(vault_entry_id).cloned())
@@ -839,7 +840,8 @@ impl VaultRepository for InMemoryVaultRepository {
         let entries = self.entries.clone();
         Box::pin(async move {
             let key = Self::entry_request_key(&vault_entry_id, &request_id);
-            let Some(vault_entry_id) = by_entry_request.read().await.get(&key) else {
+            let by_entry_request = by_entry_request.read().await;
+            let Some(vault_entry_id) = by_entry_request.get(&key) else {
                 return Ok(None);
             };
             Ok(entries.read().await.get(vault_entry_id).cloned())
@@ -1004,15 +1006,18 @@ impl SurrealVaultRepository {
         let updated_at =
             OffsetDateTime::from_unix_timestamp_nanos((entry.updated_at_ms as i128) * 1_000_000)
                 .map_err(|err| DomainError::Validation(format!("invalid updated_at_ms: {err}")))?;
-        let sealed_at = entry.sealed_at_ms.map(|sealed_at_ms| {
-            OffsetDateTime::from_unix_timestamp_nanos((sealed_at_ms as i128) * 1_000_000)
-                .map_err(|err| DomainError::Validation(format!("invalid sealed_at_ms: {err}")))
-                .map(|datetime| {
-                    datetime
-                        .format(&Rfc3339)
-                        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
-                })
-        });
+        let sealed_at = entry
+            .sealed_at_ms
+            .map(|sealed_at_ms| {
+                OffsetDateTime::from_unix_timestamp_nanos((sealed_at_ms as i128) * 1_000_000)
+                    .map_err(|err| DomainError::Validation(format!("invalid sealed_at_ms: {err}")))
+                    .map(|datetime| {
+                        datetime
+                            .format(&Rfc3339)
+                            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
+                    })
+            })
+            .transpose()?;
         Ok(SurrealVaultEntryCreateRow {
             vault_entry_id: entry.vault_entry_id.clone(),
             author_id: entry.author_id.clone(),
@@ -1236,11 +1241,13 @@ impl VaultRepository for SurrealVaultRepository {
         entry: &VaultEntry,
         event: &VaultTimelineEvent,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<VaultEntry>> {
-        let payload = match Self::to_entry_payload(entry) {
+        let entry = entry.clone();
+        let event = event.clone();
+        let payload = match Self::to_entry_payload(&entry) {
             Ok(payload) => payload,
             Err(err) => return Box::pin(async move { Err(err) }),
         };
-        let event_payload = match Self::to_timeline_payload(event) {
+        let event_payload = match Self::to_timeline_payload(&event) {
             Ok(event_payload) => event_payload,
             Err(err) => return Box::pin(async move { Err(err) }),
         };
@@ -1248,6 +1255,7 @@ impl VaultRepository for SurrealVaultRepository {
         let client = self.client.clone();
         let author_id = entry.author_id.clone();
         let request_id = event.request_id.clone();
+        let event_id = event.event_id.clone();
         Box::pin(async move {
             if let Some(existing_entry_id) =
                 Self::resolve_entry_id_from_actor_request(&client, &author_id, &request_id).await?
@@ -1288,20 +1296,26 @@ impl VaultRepository for SurrealVaultRepository {
                 DomainError::Validation("create returned malformed row".to_string())
             })?;
 
-            let timeline_result = client
+            let mut timeline_response = match client
                 .query(
                     "CREATE type::thing('vault_timeline_event', $event_id) CONTENT $event_payload",
                 )
-                .bind(("event_id", event.event_id.clone()))
+                .bind(("event_id", event_id.clone()))
                 .bind(("event_payload", event_payload))
-                .await;
-            if let Err(err) = timeline_result {
-                let _ = client
-                    .query("DELETE vault_entry WHERE vault_entry_id = $vault_entry_id")
-                    .bind(("vault_entry_id", vault_entry_id.clone()))
-                    .await;
-                return Err(Self::map_surreal_error(err));
-            }
+                .await
+            {
+                Ok(response) => response,
+                Err(err) => {
+                    let _ = client
+                        .query("DELETE vault_entry WHERE vault_entry_id = $vault_entry_id")
+                        .bind(("vault_entry_id", vault_entry_id.clone()))
+                        .await;
+                    return Err(Self::map_surreal_error(err));
+                }
+            };
+            let _rows: Vec<Value> = timeline_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             Ok(created)
         })
     }
@@ -1311,17 +1325,20 @@ impl VaultRepository for SurrealVaultRepository {
         entry: &VaultEntry,
         event: &VaultTimelineEvent,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<VaultEntry>> {
-        let payload = match Self::to_entry_payload(entry) {
+        let entry = entry.clone();
+        let event = event.clone();
+        let payload = match Self::to_entry_payload(&entry) {
             Ok(payload) => payload,
             Err(err) => return Box::pin(async move { Err(err) }),
         };
-        let event_payload = match Self::to_timeline_payload(event) {
+        let event_payload = match Self::to_timeline_payload(&event) {
             Ok(event_payload) => event_payload,
             Err(err) => return Box::pin(async move { Err(err) }),
         };
         let client = self.client.clone();
         let vault_entry_id = entry.vault_entry_id.clone();
         let request_id = event.request_id.clone();
+        let event_id = event.event_id.clone();
         Box::pin(async move {
             let payload = to_value(payload)
                 .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
@@ -1381,11 +1398,11 @@ impl VaultRepository for SurrealVaultRepository {
                 .query(
                     "CREATE type::thing('vault_timeline_event', $event_id) CONTENT $event_payload",
                 )
-                .bind(("event_id", event.event_id.clone()))
+                .bind(("event_id", event_id.clone()))
                 .bind(("event_payload", event_payload))
                 .await
                 .map_err(Self::map_surreal_error)?;
-            timeline_response
+            let _rows: Vec<Value> = timeline_response
                 .take(0)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             Ok(updated)

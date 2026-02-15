@@ -11,7 +11,7 @@ use axum::{
     middleware,
     response::sse::{Event, KeepAlive, Sse},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use futures_util::{SinkExt, StreamExt};
 use gotong_domain::{
@@ -36,8 +36,8 @@ use gotong_domain::{
         TransitionMechanism,
     },
     vault::{
-        AddTrustee, CreateVaultDraft, ExpireVault, PublishVault, RemoveTrustee, SealVault,
-        UpdateVaultDraft, VaultEntry, VaultService, VaultTimelineEvent,
+        AddTrustee, CreateVaultDraft, ExpireVault, PublishVault, RemoveTrustee, RevokeVault,
+        SealVault, UpdateVaultDraft, VaultEntry, VaultService, VaultTimelineEvent,
     },
     vouches::{Vouch, VouchCreate, VouchService, VouchWeightHint},
 };
