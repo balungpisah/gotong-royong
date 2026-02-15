@@ -1,0 +1,746 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — A+2 · Catatan Saksi Vault UI</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --fs-h2:20px; --fs-h3:16px; --fs-body:14px; --fs-small:12px;
+    --fs-caption:11px; --fs-micro:9px;
+    --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-6:24px; --sp-8:32px;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+    --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+    --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+    --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+    /* Tanah core */
+    --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63;
+    --c-pasir:#A1887F; --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+    --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+    --c-berhasil:#2E7D32; --c-berhasil-l:#E8F5E9;
+    --c-peringatan:#E65100; --c-peringatan-l:#FFF3E0;
+    --c-bahaya:#C62828; --c-bahaya-l:#FFEBEE;
+    /* Vault palette */
+    --v-deep:#263238; --v-surface:#37474F; --v-mid:#546E7A;
+    --v-soft:#78909C; --v-light:#B0BEC5; --v-wash:#ECEFF1;
+  }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: #e8e0d8; color: var(--c-tanah-gelap);
+    min-height: 100vh;
+  }
+
+  .doc-bar {
+    background: var(--v-deep); color: #fff;
+    padding: 16px 24px; text-align: center;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .doc-bar h1 { font-size: 15px; font-weight: 700; }
+  .doc-bar p { font-size: 11px; opacity: 0.5; margin-top: 2px; }
+
+  .scenario-nav {
+    background: var(--v-deep);
+    display: flex; justify-content: center; flex-wrap: wrap;
+    position: sticky; top: 52px; z-index: 99;
+  }
+  .scenario-btn {
+    padding: 8px 12px; font-size: 10px; font-weight: 700;
+    cursor: pointer; border: none; background: transparent;
+    color: #667; border-bottom: 2px solid transparent;
+    transition: all 0.2s; font-family: 'Nunito', sans-serif;
+  }
+  .scenario-btn:hover { color: #aab; }
+  .scenario-btn.active { color: #fff; border-bottom-color: var(--v-soft); }
+  .scenario-label {
+    width: 100%; text-align: center; padding: 6px;
+    font-size: 10px; color: #556; background: #1c2529;
+  }
+
+  /* ═══════════════════════════
+     PHONE FRAME
+     ═══════════════════════════ */
+  .phone-frame {
+    width: 375px; margin: 24px auto;
+    background: var(--v-wash);
+    border-radius: 28px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.08);
+    height: 760px;
+    display: flex; flex-direction: column;
+  }
+
+  /* ── Vault App Bar (darker than community) ── */
+  .vault-bar {
+    background: var(--v-surface);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--v-mid);
+    flex-shrink: 0;
+  }
+  .vault-bar .back-btn {
+    width: 32px; height: 32px; border-radius: var(--r-full);
+    background: var(--v-deep); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: var(--v-light);
+  }
+  .vault-bar .title {
+    font-size: var(--fs-h3); font-weight: var(--fw-bold);
+    color: var(--v-wash); flex: 1;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .vault-bar .title .lock-icon {
+    font-size: 13px; opacity: 0.6;
+  }
+
+  /* ── Content Area ── */
+  .vault-content {
+    flex: 1; overflow-y: auto;
+    padding: var(--sp-4) var(--sp-3);
+    display: flex; flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  /* ── Seal Bar (bottom strip — vault equivalent of context bar) ── */
+  .seal-bar {
+    flex-shrink: 0;
+    border-top: 1px solid var(--v-mid);
+    background: var(--v-surface);
+    padding: var(--sp-3);
+    transition: all 0.3s ease;
+  }
+  .seal-bar.unsealed { background: var(--v-surface); border-top-color: var(--v-mid); }
+  .seal-bar.sealed { background: var(--v-deep); border-top: 2px solid var(--v-soft); }
+
+  .seal-status {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: var(--sp-2);
+  }
+  .seal-status .seal-icon {
+    width: 20px; height: 20px; border-radius: var(--r-full);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; flex-shrink: 0;
+  }
+  .seal-status .seal-icon.open { background: var(--v-mid); color: var(--v-wash); }
+  .seal-status .seal-icon.locked { background: var(--c-berhasil); color: #fff; }
+  .seal-status .seal-label {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--v-light);
+  }
+  .seal-status .seal-hash {
+    font-size: 9px; font-family: 'Courier New', monospace;
+    color: var(--v-soft); margin-left: auto;
+  }
+
+  .seal-actions {
+    display: flex; gap: 6px;
+  }
+  .seal-actions .btn {
+    font-family: 'Nunito', sans-serif; border: none; cursor: pointer;
+    font-weight: var(--fw-bold); border-radius: var(--r-md);
+    font-size: var(--fs-caption); padding: 10px 14px;
+    transition: all 0.15s;
+  }
+  .btn-seal { background: var(--v-light); color: var(--v-deep); flex: 1; }
+  .btn-seal:hover { background: #cfd8dc; }
+  .btn-surface { background: transparent; color: var(--v-light); border: 1.5px solid var(--v-mid) !important; }
+  .btn-surface:hover { border-color: var(--v-light) !important; color: #fff; }
+  .btn-wali { background: transparent; color: var(--v-light); border: 1.5px solid var(--v-mid) !important; }
+  .btn-wali:hover { border-color: var(--v-light) !important; }
+  .btn-publish { background: var(--c-api); color: #fff; flex: 1; }
+  .btn-publish:hover { background: var(--c-api-terang); }
+  .btn-cancel { background: var(--v-surface); color: var(--v-light); border: 1px solid var(--v-mid) !important; }
+
+  /* ── Compose area (vault-tinted) ── */
+  .vault-compose {
+    background: var(--v-surface);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+  .vault-compose-header {
+    padding: var(--sp-3) var(--sp-4);
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--v-mid);
+    font-size: var(--fs-caption); color: var(--v-soft);
+    font-weight: var(--fw-semi);
+  }
+  .vault-textarea {
+    width: 100%; min-height: 120px; border: none; outline: none;
+    padding: var(--sp-3) var(--sp-4);
+    font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-body); color: var(--v-wash);
+    background: transparent; resize: none; line-height: 1.6;
+  }
+  .vault-textarea::placeholder { color: var(--v-mid); }
+  .vault-compose-tools {
+    display: flex; align-items: center; gap: 12px;
+    padding: var(--sp-2) var(--sp-3);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    font-size: 16px; color: var(--v-soft);
+  }
+  .vault-compose-tools span { cursor: pointer; }
+  .vault-compose-tools span:hover { color: var(--v-light); }
+
+  /* ── Sealed entry card ── */
+  .sealed-entry {
+    background: var(--v-surface);
+    border-radius: var(--r-lg);
+    overflow: hidden; box-shadow: var(--shadow-md);
+    border: 1px solid var(--v-mid);
+    position: relative;
+  }
+  .sealed-entry::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: linear-gradient(90deg, var(--v-mid), var(--v-soft), var(--v-mid));
+  }
+  .sealed-entry .se-header {
+    padding: var(--sp-3) var(--sp-4);
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--v-mid);
+  }
+  .sealed-entry .se-header .se-lock {
+    width: 24px; height: 24px; border-radius: var(--r-sm);
+    background: var(--v-deep); display: flex; align-items: center;
+    justify-content: center; font-size: 12px; color: var(--v-soft);
+  }
+  .sealed-entry .se-header .se-meta {
+    flex: 1;
+  }
+  .sealed-entry .se-header .se-date {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--v-wash);
+  }
+  .sealed-entry .se-header .se-hash-full {
+    font-size: 9px; font-family: 'Courier New', monospace;
+    color: var(--v-soft); margin-top: 1px;
+  }
+  .sealed-entry .se-body {
+    padding: var(--sp-4);
+    font-size: var(--fs-body); color: var(--v-light);
+    line-height: 1.6;
+  }
+  .sealed-entry .se-attachments {
+    padding: 0 var(--sp-4) var(--sp-3);
+    display: flex; gap: 6px;
+  }
+  .sealed-entry .se-attach-thumb {
+    width: 48px; height: 48px; border-radius: var(--r-sm);
+    background: var(--v-deep); display: flex; align-items: center;
+    justify-content: center; font-size: 18px; color: var(--v-soft);
+    border: 1px solid var(--v-mid);
+  }
+  .sealed-entry .se-footer {
+    padding: var(--sp-2) var(--sp-4);
+    border-top: 1px solid var(--v-mid);
+    display: flex; align-items: center; gap: 8px;
+    font-size: var(--fs-micro); color: var(--v-soft);
+  }
+  .se-footer .enc-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: var(--v-deep); padding: 2px 8px;
+    border-radius: var(--r-full); font-weight: var(--fw-bold);
+  }
+  .se-footer .tandang-note {
+    margin-left: auto; font-style: italic;
+  }
+
+  /* ── Wali section ── */
+  .wali-section {
+    background: var(--v-surface);
+    border-radius: var(--r-lg);
+    overflow: hidden; box-shadow: var(--shadow-md);
+    border: 1px solid var(--v-mid);
+  }
+  .wali-header {
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid var(--v-mid);
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+    color: var(--v-wash);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .wali-body { padding: var(--sp-4); }
+  .wali-explain {
+    font-size: var(--fs-caption); color: var(--v-light);
+    line-height: 1.5; margin-bottom: var(--sp-3);
+  }
+  .wali-search {
+    width: 100%; border: 1.5px solid var(--v-mid); border-radius: var(--r-md);
+    padding: 10px 14px; font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-body); background: var(--v-deep);
+    color: var(--v-wash); outline: none;
+  }
+  .wali-search::placeholder { color: var(--v-mid); }
+  .wali-search:focus { border-color: var(--v-soft); }
+  .wali-perms {
+    margin-top: var(--sp-3);
+    display: flex; flex-direction: column; gap: var(--sp-2);
+  }
+  .wali-perm-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: var(--fs-caption); color: var(--v-light);
+    line-height: 1.4;
+  }
+  .wali-perm-item .perm-icon {
+    width: 18px; height: 18px; border-radius: var(--r-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; flex-shrink: 0; margin-top: 1px;
+  }
+  .perm-yes { background: rgba(46,125,50,0.2); color: var(--c-berhasil); }
+  .perm-no { background: rgba(198,40,40,0.15); color: var(--c-bahaya); }
+
+  .wali-selected {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--v-deep); border-radius: var(--r-md);
+    padding: var(--sp-3); margin-top: var(--sp-3);
+    border: 1.5px solid var(--v-mid);
+  }
+  .wali-selected .ws-avatar {
+    width: 36px; height: 36px; border-radius: var(--r-full);
+    background: var(--v-mid); display: flex; align-items: center;
+    justify-content: center; font-size: 13px; font-weight: 700;
+    color: var(--v-wash); flex-shrink: 0;
+  }
+  .wali-selected .ws-info { flex: 1; }
+  .wali-selected .ws-name {
+    font-size: var(--fs-small); font-weight: var(--fw-bold); color: var(--v-wash);
+  }
+  .wali-selected .ws-tier {
+    font-size: var(--fs-micro); color: var(--v-soft); margin-top: 1px;
+  }
+  .wali-selected .ws-check {
+    width: 24px; height: 24px; border-radius: var(--r-full);
+    background: var(--c-berhasil); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800;
+  }
+
+  /* ── Publish warning ── */
+  .publish-warning {
+    background: var(--c-peringatan-l);
+    border-radius: var(--r-lg);
+    overflow: hidden; box-shadow: var(--shadow-md);
+    border: 2px solid var(--c-peringatan);
+  }
+  .publish-warning .pw-header {
+    padding: var(--sp-3) var(--sp-4);
+    background: rgba(230,81,0,0.1);
+    border-bottom: 1px solid rgba(230,81,0,0.2);
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+    color: var(--c-peringatan);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .publish-warning .pw-body { padding: var(--sp-4); }
+  .pw-change-list {
+    display: flex; flex-direction: column; gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+  }
+  .pw-change {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: var(--fs-caption); line-height: 1.4;
+  }
+  .pw-change .change-icon {
+    font-size: 12px; flex-shrink: 0; margin-top: 1px;
+  }
+  .pw-change .change-label { font-weight: var(--fw-bold); color: var(--c-tanah-gelap); }
+  .pw-change .change-desc { color: var(--c-kayu); }
+
+  .pw-track-pick {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-bottom: var(--sp-3);
+  }
+  .pw-track-chip {
+    font-family: 'Nunito', sans-serif;
+    padding: 6px 12px; border-radius: var(--r-full);
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    cursor: pointer; border: 1.5px solid var(--c-batu);
+    background: var(--c-susu); color: var(--c-tanah);
+    transition: all 0.15s;
+  }
+  .pw-track-chip:hover { border-color: var(--c-api); }
+  .pw-track-chip.selected { background: var(--c-bara); border-color: var(--c-api); color: var(--c-api); }
+
+  .pw-rahasia-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: var(--fs-caption); color: var(--c-kayu);
+    padding: var(--sp-2) 0;
+  }
+  .pw-rahasia-toggle {
+    width: 36px; height: 20px; border-radius: 10px;
+    background: var(--c-berhasil); position: relative;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .pw-rahasia-toggle::after {
+    content: ''; position: absolute; top: 2px; left: 18px;
+    width: 16px; height: 16px; border-radius: var(--r-full);
+    background: #fff; transition: left 0.15s;
+  }
+
+  /* ── Pattern alert ── */
+  .pattern-alert {
+    background: var(--v-surface);
+    border-radius: var(--r-lg);
+    border: 1px solid var(--v-mid);
+    overflow: hidden;
+  }
+  .pattern-alert .pa-header {
+    padding: var(--sp-3) var(--sp-4);
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--v-mid);
+  }
+  .pattern-alert .pa-icon {
+    width: 28px; height: 28px; border-radius: var(--r-full);
+    background: rgba(230,81,0,0.15); color: var(--c-peringatan);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .pattern-alert .pa-title {
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+    color: var(--v-wash);
+  }
+  .pattern-alert .pa-body {
+    padding: var(--sp-3) var(--sp-4);
+    font-size: var(--fs-caption); color: var(--v-light);
+    line-height: 1.5;
+  }
+  .pattern-alert .pa-resources {
+    padding: 0 var(--sp-4) var(--sp-3);
+    display: flex; flex-direction: column; gap: var(--sp-2);
+  }
+  .pa-resource-link {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--v-deep); border-radius: var(--r-md);
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-caption); color: var(--v-light);
+    font-weight: var(--fw-semi);
+    cursor: pointer; transition: all 0.15s;
+    border: 1px solid var(--v-mid);
+    text-decoration: none;
+  }
+  .pa-resource-link:hover { border-color: var(--v-soft); background: var(--v-surface); }
+  .pa-resource-link .res-icon { font-size: 16px; flex-shrink: 0; }
+  .pa-dismiss {
+    padding: var(--sp-2) var(--sp-4) var(--sp-3);
+    font-size: var(--fs-micro); color: var(--v-soft);
+    cursor: pointer;
+  }
+  .pa-dismiss:hover { color: var(--v-light); }
+
+  /* ── Scenarios ── */
+  .scenario { display: none; flex-direction: column; height: 100%; }
+  .scenario.active { display: flex; }
+
+  @media (max-width: 420px) {
+    .phone-frame { width: 100%; border-radius: 0; margin: 0; height: 100vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-bar">
+  <h1>A+2 · Catatan Saksi — Vault UI</h1>
+  <p>Private witness record lifecycle. Encrypted, timestamped, author-controlled.</p>
+</div>
+
+<nav class="scenario-nav">
+  <button class="scenario-btn active" onclick="showScenario('simpan')">1. Menyimpan</button>
+  <button class="scenario-btn" onclick="showScenario('segel')">2. Tersegel</button>
+  <button class="scenario-btn" onclick="showScenario('wali')">3. Wali</button>
+  <button class="scenario-btn" onclick="showScenario('terbit')">4. Terbitkan</button>
+  <button class="scenario-btn" onclick="showScenario('pola')">5. Pola</button>
+  <div class="scenario-label">← Vault entry lifecycle. Each state shows the same entry evolving.</div>
+</nav>
+
+<div class="phone-frame">
+
+  <div class="vault-bar">
+    <button class="back-btn">‹</button>
+    <div class="title"><span class="lock-icon">🔒</span> Catatan Saksi</div>
+  </div>
+
+  <!-- ════════ 1. MENYIMPAN — compose/review before sealing ════════ -->
+  <div id="s-simpan" class="scenario active">
+    <div class="vault-content">
+      <div style="font-size:var(--fs-caption); color:var(--v-soft); font-weight:var(--fw-semi); margin-bottom:var(--sp-1);">
+        Dari percakapan AI-00 · 13 Feb 2026
+      </div>
+
+      <div class="vault-compose">
+        <div class="vault-compose-header">
+          🔒 Catatan ini hanya bisa dilihat oleh Anda
+        </div>
+        <textarea class="vault-textarea">Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya. Ada pembelian material yang tidak sesuai RAB.
+
+Saya dengar dari Bu Sari bahwa harga semen yang dibeli jauh di atas harga pasar.</textarea>
+        <div class="vault-compose-tools">
+          <span title="Foto">📷</span>
+          <span title="Dokumen">📎</span>
+          <span title="Lokasi">📍</span>
+          <span title="Audio">🎙️</span>
+        </div>
+      </div>
+
+      <div style="font-size:var(--fs-micro); color:var(--v-soft); line-height:1.5; margin-top:var(--sp-2);">
+        Setelah disegel, catatan ini akan dienkripsi dan ditandai waktu secara kriptografis. Anda bisa menambah Wali atau menerbitkan ke komunitas kapan saja.
+      </div>
+    </div>
+
+    <!-- SEAL BAR: Unsealed -->
+    <div class="seal-bar unsealed">
+      <div class="seal-status">
+        <div class="seal-icon open">✎</div>
+        <div class="seal-label">Belum tersegel — masih bisa diedit</div>
+      </div>
+      <div class="seal-actions">
+        <button class="btn btn-seal">🔒 Simpan & Segel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 2. TERSEGEL — locked entry view ════════ -->
+  <div id="s-segel" class="scenario">
+    <div class="vault-content">
+      <div class="sealed-entry">
+        <div class="se-header">
+          <div class="se-lock">🔒</div>
+          <div class="se-meta">
+            <div class="se-date">13 Februari 2026 · 14:32 WIB</div>
+            <div class="se-hash-full">SHA-256 · #a7f2c1...3b1c9d</div>
+          </div>
+        </div>
+        <div class="se-body">
+          Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya. Ada pembelian material yang tidak sesuai RAB.<br><br>
+          Saya dengar dari Bu Sari bahwa harga semen yang dibeli jauh di atas harga pasar.
+        </div>
+        <div class="se-attachments">
+          <div class="se-attach-thumb">📷</div>
+          <div class="se-attach-thumb">📎</div>
+        </div>
+        <div class="se-footer">
+          <span class="enc-badge">🔒 Terenkripsi</span>
+          <span>· Tersegel</span>
+          <span class="tandang-note">Tandang tidak terpengaruh</span>
+        </div>
+      </div>
+
+      <div style="font-size:var(--fs-micro); color:var(--v-soft); margin-top:var(--sp-3); text-align:center; line-height:1.5;">
+        Catatan ini tersegel. Tidak bisa diedit. Hanya Anda (dan Wali jika ditunjuk) yang bisa mengakses.
+      </div>
+    </div>
+
+    <!-- SEAL BAR: Sealed -->
+    <div class="seal-bar sealed">
+      <div class="seal-status">
+        <div class="seal-icon locked">✓</div>
+        <div class="seal-label">Tersegel · 13 Feb 2026 14:32</div>
+        <div class="seal-hash">#a7f2...3b1c</div>
+      </div>
+      <div class="seal-actions">
+        <button class="btn btn-wali">👤 Tambah Wali</button>
+        <button class="btn btn-surface">Terbitkan ›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 3. WALI — trustee designation ════════ -->
+  <div id="s-wali" class="scenario">
+    <div class="vault-content">
+      <div class="wali-section">
+        <div class="wali-header">
+          <span>👤</span> Tunjuk Wali
+        </div>
+        <div class="wali-body">
+          <div class="wali-explain">
+            Wali adalah orang yang Anda percaya untuk menjaga catatan ini. Wali bisa mengakses catatan jika Anda tidak bisa, dan bisa membantu menerbitkan ke komunitas atas persetujuan Anda.
+          </div>
+
+          <input class="wali-search" type="text" placeholder="Cari nama anggota komunitas..." />
+
+          <div class="wali-perms">
+            <div class="wali-perm-item">
+              <div class="perm-icon perm-yes">✓</div>
+              <div><span class="change-label">Bisa:</span> Membaca catatan ini</div>
+            </div>
+            <div class="wali-perm-item">
+              <div class="perm-icon perm-yes">✓</div>
+              <div><span class="change-label">Bisa:</span> Menerbitkan ke komunitas (dengan persetujuan Anda)</div>
+            </div>
+            <div class="wali-perm-item">
+              <div class="perm-icon perm-no">✕</div>
+              <div><span class="change-label">Tidak bisa:</span> Mengedit atau menghapus catatan</div>
+            </div>
+            <div class="wali-perm-item">
+              <div class="perm-icon perm-no">✕</div>
+              <div><span class="change-label">Tidak bisa:</span> Membagikan ke pihak lain tanpa izin</div>
+            </div>
+          </div>
+
+          <div class="wali-selected">
+            <div class="ws-avatar">AS</div>
+            <div class="ws-info">
+              <div class="ws-name">Andi Supriyanto</div>
+              <div class="ws-tier">Pilar · RT 03</div>
+            </div>
+            <div class="ws-check">✓</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEAL BAR: Sealed + Wali -->
+    <div class="seal-bar sealed">
+      <div class="seal-status">
+        <div class="seal-icon locked">✓</div>
+        <div class="seal-label">Tersegel · Wali: Andi S.</div>
+        <div class="seal-hash">#a7f2...3b1c</div>
+      </div>
+      <div class="seal-actions">
+        <button class="btn btn-seal">Konfirmasi Wali</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 4. TERBITKAN — surface to community ════════ -->
+  <div id="s-terbit" class="scenario">
+    <div class="vault-content">
+      <div class="publish-warning">
+        <div class="pw-header">
+          <span>⚠</span> Terbitkan ke Komunitas
+        </div>
+        <div class="pw-body">
+          <div style="font-size:var(--fs-caption); color:var(--c-kayu); margin-bottom:var(--sp-3); line-height:1.5;">
+            Catatan ini akan menjadi kartu komunitas. Perhatikan perubahan berikut:
+          </div>
+
+          <div class="pw-change-list">
+            <div class="pw-change">
+              <span class="change-icon">👁️</span>
+              <div>
+                <div class="change-label">Visibilitas berubah</div>
+                <div class="change-desc">Dari pribadi menjadi bisa dilihat komunitas</div>
+              </div>
+            </div>
+            <div class="pw-change">
+              <span class="change-icon">📊</span>
+              <div>
+                <div class="change-label">Tandang terpengaruh</div>
+                <div class="change-desc">Reputasi Anda akan ikut terhitung dari respons komunitas</div>
+              </div>
+            </div>
+            <div class="pw-change">
+              <span class="change-icon">🔒</span>
+              <div>
+                <div class="change-label">Tidak bisa ditarik kembali</div>
+                <div class="change-desc">Setelah diterbitkan, tidak bisa dikembalikan ke vault</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--c-tanah-gelap); margin-bottom:var(--sp-2);">
+            Pilih jalur:
+          </div>
+          <div class="pw-track-pick">
+            <span class="pw-track-chip selected">🔧 Tuntaskan</span>
+            <span class="pw-track-chip">🤝 Musyawarah</span>
+            <span class="pw-track-chip">🔍 Telusuri</span>
+          </div>
+
+          <div class="pw-rahasia-row">
+            <div class="pw-rahasia-toggle"></div>
+            <div>
+              <strong>Rahasia L2</strong> — nama Anda disamarkan, hanya anggota terverifikasi yang bisa lihat
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEAL BAR: Publish confirmation -->
+    <div class="seal-bar" style="background:var(--c-susu); border-top:2px solid var(--c-peringatan);">
+      <div class="seal-actions">
+        <button class="btn btn-publish">Terbitkan — Tuntaskan (Rahasia L2)</button>
+        <button class="btn btn-cancel">Batal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 5. POLA — pattern detection alert ════════ -->
+  <div id="s-pola" class="scenario">
+    <div class="vault-content">
+      <!-- The sealed entry is still there -->
+      <div class="sealed-entry">
+        <div class="se-header">
+          <div class="se-lock">🔒</div>
+          <div class="se-meta">
+            <div class="se-date">13 Februari 2026 · 14:32 WIB</div>
+            <div class="se-hash-full">SHA-256 · #a7f2c1...3b1c9d</div>
+          </div>
+        </div>
+        <div class="se-body" style="max-height:60px; overflow:hidden; mask-image:linear-gradient(black 60%, transparent);">
+          Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya.
+        </div>
+        <div class="se-footer">
+          <span class="enc-badge">🔒 Terenkripsi</span>
+          <span>· Wali: Andi S.</span>
+        </div>
+      </div>
+
+      <!-- Pattern alert appears gently below -->
+      <div class="pattern-alert">
+        <div class="pa-header">
+          <div class="pa-icon">💛</div>
+          <div class="pa-title">Kami perhatikan sesuatu</div>
+        </div>
+        <div class="pa-body">
+          Anda menyimpan 3 catatan tentang keamanan pribadi dalam 2 minggu terakhir. Tidak apa-apa — catatan Anda aman. Tapi jika Anda membutuhkan bantuan, berikut beberapa sumber daya yang mungkin berguna.
+        </div>
+        <div class="pa-resources">
+          <a class="pa-resource-link" href="#">
+            <span class="res-icon">📞</span>
+            <span>Telepon Sahabat — 119 ext. 8</span>
+          </a>
+          <a class="pa-resource-link" href="#">
+            <span class="res-icon">💬</span>
+            <span>Komnas Perempuan — 021-3903963</span>
+          </a>
+          <a class="pa-resource-link" href="#">
+            <span class="res-icon">🏥</span>
+            <span>LPSK (Perlindungan Saksi & Korban)</span>
+          </a>
+        </div>
+        <div class="pa-dismiss">Saya mengerti, terima kasih</div>
+      </div>
+    </div>
+
+    <!-- SEAL BAR: Normal sealed state -->
+    <div class="seal-bar sealed">
+      <div class="seal-status">
+        <div class="seal-icon locked">✓</div>
+        <div class="seal-label">Tersegel · Wali: Andi S.</div>
+        <div class="seal-hash">#a7f2...3b1c</div>
+      </div>
+      <div class="seal-actions">
+        <button class="btn btn-wali">👤 Ganti Wali</button>
+        <button class="btn btn-surface">Terbitkan ›</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showScenario(id) {
+  document.querySelectorAll('.scenario').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

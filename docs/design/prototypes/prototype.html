@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gotong Royong — Witness First</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{background:linear-gradient(135deg,#0f172a,#1e293b,#0f172a);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',system-ui,sans-serif;padding:20px}
+    .ext{color:#64748b;font-size:10px;margin-top:14px;text-align:center;max-width:360px;line-height:1.7}
+    .ext b{color:#94a3b8}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    @keyframes ping{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.1;transform:scale(1.3)}}
+    @keyframes gentlePulse{0%,100%{opacity:.7}50%{opacity:1}}
+    textarea:focus,input:focus{border-color:#2563eb!important;box-shadow:0 0 0 3px rgba(37,99,235,.08);outline:none}
+    button{transition:all .15s ease}button:active{transform:scale(.97)}
+    ::-webkit-scrollbar{width:0}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div class="ext"><b>Tap cards</b> to see more, tap again for full details &middot; <b>Witness prompt</b> at top of feed &middot; <b>Map</b> tab for spatial view</div>
+
+  <script type="text/babel">
+    const {useState,useCallback} = React;
+
+    // ─── Data ───
+    const W = [
+      {id:1,track:"resolve",stage:"execute",summary:"Flooding risk in Kelurahan Manggarai",detail:"Drainage blocked by construction debris. 40+ households at risk during rainy season. RT/RW has been notified but no action yet.",complexity:.72,co:8,domain:"Civil Engineering",esco:["Emergency Response","Civil Engineering","Social Cohesion"],days:12,conf:false,tasks:3,done:1,dist:"0.3 km",forYou:true,yourDomain:true,lat:-6.2088,lng:106.8456,people:["Pak Budi","Ibu Sari","Adi"]},
+      {id:6,track:"resolve",stage:"seed",summary:"Suspicious chemical waste dumping near Kali Ciliwung",detail:"Observed at night near the riverbank. Strong chemical smell. No visible company markings on containers.",complexity:.85,co:1,domain:"Environmental",esco:["Environmental Protection","Legal"],days:0,conf:true,tasks:0,done:0,dist:"0.8 km",forYou:false,yourDomain:false,isNew:true,lat:-6.212,lng:106.835,people:["Anonymous"]},
+      {id:2,track:"celebrate",stage:"recognize",summary:"Posyandu Melati: free health checks for 120 elderly residents",detail:"Monthly program by local health volunteers. Blood pressure, blood sugar, basic consultations. Community requesting formal recognition.",complexity:.35,co:14,domain:"Health Services",esco:["Health Services","Social Cohesion"],days:5,conf:false,tasks:0,done:0,dist:"1.2 km",forYou:false,yourDomain:true,lat:-6.215,lng:106.852,people:["Ibu Wati","Dr. Nia","Pak Heru","Dina"]},
+      {id:8,track:"resolve",stage:"path",summary:"School roof in SDN 04 leaking during rain",detail:"Students study in hallways when it rains. Principal submitted repair request 3 months ago. Community raising funds.",complexity:.55,co:6,domain:"Infrastructure",esco:["Civil Engineering","Education"],days:7,conf:false,tasks:0,done:0,dist:"0.5 km",forYou:false,yourDomain:false,lat:-6.207,lng:106.842,people:["Pak Guru","Ibu RT"]},
+      {id:4,track:"explore",stage:"hypotheses",summary:"Is the new fogging schedule reducing dengue in RT 05?",detail:"Dengue cases dropped 40% since new bi-weekly schedule. Correlation isn't causation. Need health data analysis.",complexity:.58,co:5,domain:"Health",esco:["Health","Data Analysis"],days:8,conf:false,tasks:0,done:0,dist:"2.1 km",forYou:false,yourDomain:false,lat:-6.22,lng:106.84,people:["Dr. Andi","Siti"]},
+      {id:5,track:"resolve",stage:"impact",summary:"Community well in Gang Mawar repaired",detail:"40 families now have clean water access. Repair took 3 weeks with volunteer labor and donated materials.",complexity:.45,co:11,domain:"Infrastructure",esco:["Infrastructure","Health"],days:45,conf:false,tasks:5,done:5,dist:"1.5 km",forYou:false,yourDomain:false,lat:-6.205,lng:106.85,people:["Pak RT","Ibu Eni","Joko","Yanti","Bambang"]},
+      {id:3,track:"resolve",stage:"define",summary:"Street vendors displaced from Jl. Sudirman",detail:"15 vendors affected, most are primary earners. Community mediation requested between vendors and city planning.",complexity:.65,co:3,domain:"Social Services",esco:["Social Services","Legal","Community Mediation"],days:2,conf:true,tasks:0,done:0,dist:"3.0 km",forYou:false,yourDomain:true,lat:-6.202,lng:106.838,people:["Pak Agus","Ibu Ria"]},
+      {id:7,track:"celebrate",stage:"impact",summary:"Kampung Warna painted by youth volunteers",detail:"Tourism increased 30%. Youth-led initiative with 45 volunteers over 2 weekends. Mural themes chosen by residents.",complexity:.3,co:22,domain:"Culture",esco:["Indonesian Craft & Heritage","Social Cohesion"],days:60,conf:false,tasks:0,done:0,dist:"1.8 km",forYou:false,yourDomain:false,lat:-6.218,lng:106.848,people:["Raka","Putri","Dimas","Ayu"]},
+    ];
+
+    const NOTIFS = [
+      {id:1,type:"stage",msg:"Your flooding witness just moved to Execute \u2014 someone picked up the debris clearing task!",time:"2h",wid:1},
+      {id:2,type:"co",msg:"3 more neighbors co-witnessed the Posyandu health checks",time:"4h",wid:2},
+      {id:3,type:"impact",msg:"It's official: community well repair helped 40 families get clean water",time:"1d",wid:5},
+      {id:4,type:"urgent",msg:"Last hour to challenge the vendor relocation plan",time:"now",wid:3},
+    ];
+
+    const USER = {name:"Rina",fullName:"Rina Widiastuti",tier:"Pillar",pillar:"field_social",i:.87,j:.82,domains:["Social Cohesion","Health Services","Emergency Response","Community Mediation"],wCount:23,impact:8,budgetUsed:.35};
+    const WEATHER = {status:"berawan",gdf:6.2,label:"Berawan",icon:"\uD83C\uDF24\uFE0F",msg:"Calm neighborhood. A few things need attention."};
+
+    // ─── Constants ───
+    const TC = {resolve:"#2563eb",celebrate:"#f59e0b",explore:"#8b5cf6"};
+    const TBG = {resolve:"#eff6ff",celebrate:"#fffbeb",explore:"#f5f3ff"};
+    const TL = {resolve:"Resolve",celebrate:"Celebrate",explore:"Explore"};
+    const PC = {tech_build:"#0ea5e9",field_social:"#f97316",logic_audit:"#94a3b8",culture_context:"#dc2626"};
+    const SL = {resolve:["Seed","Define","Path","Execute","Accept","Impact","Archive"],celebrate:["Seed","Corroborate","Recognize","Impact","Archive"],explore:["Seed","Hypotheses","Experiments","Conclusion","Archive"]};
+    const TS = {resolve:"\u25CF",celebrate:"\u2605",explore:"\u25C6"};
+
+    function si(track,stage){
+      const s={resolve:["seed","define","path","execute","accept","impact","archive"],celebrate:["seed","corroborate","recognize","impact","archive"],explore:["seed","hypotheses","experiments","conclusion","archive"]};
+      return s[track]?.indexOf(stage)??0;
+    }
+
+    // Human-readable stage status
+    function stageHuman(w){
+      const m={
+        seed:"Just witnessed \u2014 needs confirmation",
+        define:"Community is defining what to do",
+        path:"Voting on the plan",
+        execute:w.done+"/"+w.tasks+" tasks done"+(w.tasks-w.done>0?" \u2014 help needed":""),
+        accept:"Checking the results",
+        impact:"Impact being confirmed",
+        archive:"Completed",
+        corroborate:"Being verified by neighbors",
+        recognize:"Community is voting to recognize this",
+        hypotheses:"Exploring what might explain this",
+        experiments:"Testing theories",
+        conclusion:"Drawing conclusions"
+      };
+      return m[w.stage]||"";
+    }
+    function ctaFor(w){
+      const m={seed:{l:"I see this too",i:"\uD83D\uDC41\uFE0F"},define:{l:"Help define",i:"\uD83D\uDCDD"},path:{l:"Vote",i:"\uD83D\uDDF3\uFE0F"},execute:{l:"Pick up a task",i:"\u26A1"},recognize:{l:"Cast vote",i:"\uD83D\uDDF3\uFE0F"},hypotheses:{l:"Suggest why",i:"\uD83D\uDCA1"},impact:{l:"Confirm impact",i:"\u2705"},accept:{l:"Verify",i:"\u2705"},corroborate:{l:"Confirm",i:"\uD83D\uDC41\uFE0F"},conclusion:{l:"Review",i:"\uD83D\uDCDD"}};
+      return m[w.stage]||{l:"View",i:"\u2192"};
+    }
+
+    // ─── Components ───
+
+    function TrustRing({tier,pillar,size=40}){
+      const c=PC[pillar]||"#94a3b8";
+      const b={Novice:"none",Contributor:"2px solid "+c+"40",Pillar:"3px solid "+c,Keystone:"3px double "+c};
+      return <div style={{width:size,height:size,borderRadius:"50%",border:b[tier]||b.Novice,background:"linear-gradient(135deg,"+c+"20,"+c+"08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.45,flexShrink:0}}>{"\uD83D\uDC64"}</div>;
+    }
+
+    // ─── Greeting Bar (replaces cold weather bar) ───
+    function GreetingBar({user,weather,onWeatherTap}){
+      const bg={cerah:"linear-gradient(135deg,#fef3c7,#fde68a)",berawan:"linear-gradient(135deg,#eef2ff,#dbeafe)",hujan:"linear-gradient(135deg,#dbeafe,#bfdbfe)",badai:"linear-gradient(135deg,#1e293b,#334155)"};
+      const dark=weather.status==="badai";
+      return (
+        <div style={{background:bg[weather.status],padding:"12px 16px 10px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{fontSize:16,fontWeight:700,color:dark?"#fff":"#1e293b"}}>Hai, {user.name} {weather.icon}</div>
+              <div style={{fontSize:12,color:dark?"#cbd5e1":"#64748b",marginTop:2}}>{weather.msg}</div>
+            </div>
+            <div onClick={onWeatherTap} style={{cursor:"pointer",textAlign:"center",padding:"4px 10px",borderRadius:10,background:dark?"rgba(255,255,255,.1)":"rgba(0,0,0,.04)"}}>
+              <div style={{fontSize:10,color:dark?"#94a3b8":"#94a3b8"}}>Community</div>
+              <div style={{fontSize:14,fontWeight:700,color:dark?"#fff":"#1e293b"}}>{W.length} active</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Witness Prompt (hero at top of feed) ───
+    function WitnessPrompt({onStartCreate}){
+      return (
+        <div style={{margin:"12px 14px 6px",background:"#fff",borderRadius:16,padding:"16px",boxShadow:"0 1px 4px rgba(0,0,0,.04)",border:"1px solid #f1f5f9"}}>
+          <div style={{fontSize:15,fontWeight:600,color:"#1e293b",marginBottom:10}}>What's happening around you?</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>onStartCreate("photo")} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"14px 8px",borderRadius:12,border:"1.5px solid #e2e8f0",background:"#fafbfc",cursor:"pointer"}}>
+              <span style={{fontSize:22}}>{"\uD83D\uDCF7"}</span>
+              <span style={{fontSize:11,color:"#64748b",fontWeight:500}}>Photo</span>
+            </button>
+            <button onClick={()=>onStartCreate("text")} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"14px 8px",borderRadius:12,border:"1.5px solid #e2e8f0",background:"#fafbfc",cursor:"pointer"}}>
+              <span style={{fontSize:22}}>{"\u270D\uFE0F"}</span>
+              <span style={{fontSize:11,color:"#64748b",fontWeight:500}}>Write</span>
+            </button>
+            <button onClick={()=>onStartCreate("anon")} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"14px 8px",borderRadius:12,border:"1.5px solid #e2e8f0",background:"#fafbfc",cursor:"pointer"}}>
+              <span style={{fontSize:22}}>{"\uD83D\uDD12"}</span>
+              <span style={{fontSize:11,color:"#64748b",fontWeight:500}}>Anonymous</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Feed Card with 3-level progressive disclosure ───
+    function FeedCard({w,level,onTap}){
+      const c=TC[w.track];
+      const bg=TBG[w.track];
+      const idx=si(w.track,w.stage);
+      const labels=SL[w.track];
+      const cta=ctaFor(w);
+      const status=stageHuman(w);
+
+      // People string
+      const ppl=w.people||[];
+      const pplStr=ppl.length<=2?ppl.join(" & "):(ppl.slice(0,2).join(", ")+" + "+(ppl.length-2)+" others");
+
+      // ─── Level 0: Minimal — just the story ───
+      if(level===0){
+        return (
+          <div onClick={()=>onTap(w.id,1)} style={{background:"#fff",borderRadius:14,marginBottom:6,padding:"12px 14px",cursor:"pointer",borderLeft:"3px solid "+c,animation:"fadeIn .2s ease",position:"relative"}}>
+            {w.isNew&&<div style={{position:"absolute",top:8,right:10,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:700,padding:"1px 6px",borderRadius:6}}>NEW</div>}
+            <div style={{fontSize:14,fontWeight:600,color:"#1e293b",lineHeight:1.45,marginBottom:6,paddingRight:w.isNew?32:0}}>{w.summary}</div>
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#94a3b8"}}>
+              <span>{pplStr}</span>
+              <span style={{opacity:.4}}>&middot;</span>
+              <span>{w.dist}</span>
+              {w.days<=1&&<span style={{marginLeft:"auto",color:"#64748b",fontWeight:500}}>{w.days===0?"Just now":"Yesterday"}</span>}
+              {w.days>1&&<span style={{marginLeft:"auto"}}>{w.days}d ago</span>}
+            </div>
+          </div>
+        );
+      }
+
+      // ─── Level 1: Story + stage + action ───
+      if(level===1){
+        return (
+          <div style={{background:"#fff",borderRadius:16,marginBottom:8,overflow:"hidden",borderLeft:"3px solid "+c,animation:"fadeIn .2s ease"}}>
+            <div style={{padding:"14px 14px 0"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                <span style={{background:bg,color:c,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6}}>{TL[w.track]}</span>
+                {w.conf&&<span style={{fontSize:10,color:"#64748b"}}>{"\uD83D\uDD12"} Confidential</span>}
+                <button onClick={(e)=>{e.stopPropagation();onTap(w.id,0);}} style={{marginLeft:"auto",background:"none",border:"none",fontSize:14,color:"#cbd5e1",cursor:"pointer",padding:0}}>{"\u2715"}</button>
+              </div>
+              <div style={{fontSize:15,fontWeight:700,color:"#1e293b",lineHeight:1.4,marginBottom:4}}>{w.summary}</div>
+              <div style={{fontSize:13,color:"#475569",lineHeight:1.6,marginBottom:12}}>{w.detail}</div>
+            </div>
+
+            {/* Stage bar */}
+            <div style={{padding:"0 14px",marginBottom:6}}>
+              <div style={{display:"flex",gap:2}}>
+                {labels.map((l,i)=>{
+                  const a=i<=idx,cur=i===idx;
+                  return <div key={i} style={{flex:1}}>
+                    <div style={{height:4,borderRadius:2,background:a?c:"#e2e8f0",position:"relative"}}>
+                      {cur&&<div style={{position:"absolute",right:0,top:-3,width:10,height:10,borderRadius:"50%",background:c,border:"2px solid #fff",boxShadow:"0 0 6px "+c+"50"}}/>}
+                    </div>
+                  </div>;
+                })}
+              </div>
+              <div style={{fontSize:11,color:"#64748b",marginTop:6}}>{status}</div>
+            </div>
+
+            {/* People */}
+            <div style={{padding:"6px 14px",fontSize:11,color:"#94a3b8"}}>
+              {"\uD83D\uDC65"} {pplStr} &middot; {w.dist}
+            </div>
+
+            {/* Action row */}
+            <div style={{padding:"8px 14px 12px",display:"flex",gap:8}}>
+              <button style={{flex:2,padding:"10px 0",borderRadius:10,border:"none",background:c,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>{cta.i} {cta.l}</button>
+              <button onClick={(e)=>{e.stopPropagation();onTap(w.id,2);}} style={{flex:1,padding:"10px 0",borderRadius:10,border:"1.5px solid #e2e8f0",background:"#fff",color:"#94a3b8",fontSize:11,fontWeight:500,cursor:"pointer"}}>More</button>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── Level 2: Full details ───
+      return (
+        <div style={{background:"#fff",borderRadius:16,marginBottom:10,overflow:"hidden",borderLeft:"3px solid "+c,border:"1px solid "+c+"25",animation:"fadeIn .2s ease"}}>
+          <div style={{padding:"14px 14px 0"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+              <span style={{background:bg,color:c,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6}}>{TL[w.track]}</span>
+              <span style={{fontSize:10,color:"#94a3b8"}}>{labels[idx]}</span>
+              {w.conf&&<span style={{fontSize:10,color:"#64748b"}}>{"\uD83D\uDD12"}</span>}
+              <button onClick={(e)=>{e.stopPropagation();onTap(w.id,0);}} style={{marginLeft:"auto",background:"none",border:"none",fontSize:14,color:"#cbd5e1",cursor:"pointer",padding:0}}>{"\u2715"}</button>
+            </div>
+            <div style={{fontSize:15,fontWeight:700,color:"#1e293b",lineHeight:1.4,marginBottom:4}}>{w.summary}</div>
+            <div style={{fontSize:13,color:"#475569",lineHeight:1.6,marginBottom:12}}>{w.detail}</div>
+          </div>
+
+          {/* Full stage progress with labels */}
+          <div style={{padding:"0 14px",marginBottom:12}}>
+            <div style={{display:"flex",gap:2}}>
+              {labels.map((l,i)=>{
+                const a=i<=idx,cur=i===idx;
+                return <div key={i} style={{flex:1,textAlign:"center"}}>
+                  <div style={{height:4,borderRadius:2,background:a?c:"#e2e8f0",position:"relative",marginBottom:4}}>
+                    {cur&&<div style={{position:"absolute",right:0,top:-3,width:10,height:10,borderRadius:"50%",background:c,border:"2px solid #fff",boxShadow:"0 0 6px "+c+"50"}}/>}
+                  </div>
+                  <div style={{fontSize:8,color:a?c:"#cbd5e1",fontWeight:cur?700:400}}>{l}</div>
+                </div>;
+              })}
+            </div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:6}}>{status}</div>
+          </div>
+
+          {/* Context triad */}
+          <div style={{padding:"0 14px",display:"flex",gap:12,marginBottom:10}}>
+            <div style={{fontSize:11,color:!w.conf?"#059669":"#cbd5e1"}}>{!w.conf?"\uD83D\uDCF7":"\u25FB\uFE0F"} Visual</div>
+            <div style={{fontSize:11,color:"#059669"}}>{"\uD83D\uDCCD"} {w.dist}</div>
+            <div style={{fontSize:11,color:w.co>0?"#059669":"#cbd5e1"}}>{"\uD83D\uDC65"} {w.co} co-witness{w.co!==1?"es":""}</div>
+          </div>
+
+          {/* ESCO tags */}
+          <div style={{padding:"0 14px",display:"flex",flexWrap:"wrap",gap:4,marginBottom:10}}>
+            {w.esco.map((t,i)=><span key={i} style={{background:"#f1f5f9",color:"#64748b",fontSize:10,padding:"2px 8px",borderRadius:10}}>{t}</span>)}
+          </div>
+
+          {/* Complexity */}
+          <div style={{padding:"0 14px",display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <span style={{fontSize:10,color:"#94a3b8"}}>Complexity</span>
+            <div style={{flex:1,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden"}}>
+              <div style={{width:w.complexity*100+"%",height:"100%",borderRadius:2,background:w.complexity>.7?"#ef4444":w.complexity>.4?"#f59e0b":"#22c55e"}}/>
+            </div>
+            <span style={{fontSize:10,color:"#64748b",fontWeight:600}}>{Math.round(w.complexity*100)}%</span>
+          </div>
+
+          {/* What's needed */}
+          <div style={{margin:"0 14px 10px",background:c+"08",border:"1px solid "+c+"18",borderRadius:10,padding:12}}>
+            <div style={{fontSize:11,fontWeight:600,color:c,marginBottom:3}}>What's needed</div>
+            <div style={{fontSize:12,color:"#475569",lineHeight:1.5}}>{status}</div>
+          </div>
+
+          {/* People involved */}
+          <div style={{padding:"0 14px",marginBottom:12}}>
+            <div style={{fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>People involved</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {ppl.map((p,i)=><span key={i} style={{background:"#f8fafc",color:"#475569",fontSize:11,padding:"3px 10px",borderRadius:10}}>{p}</span>)}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{padding:"0 14px 14px",display:"flex",gap:8}}>
+            <button style={{flex:2,padding:"10px 0",borderRadius:10,border:"none",background:c,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>{cta.i} {cta.l}</button>
+            <button style={{flex:1,padding:"10px 0",borderRadius:10,border:"1.5px solid #e2e8f0",background:"#fff",color:"#64748b",fontSize:11,fontWeight:500,cursor:"pointer"}}>Share</button>
+            <button style={{flex:1,padding:"10px 0",borderRadius:10,border:"1.5px solid #fee2e2",background:"#fff",color:"#ef4444",fontSize:11,fontWeight:500,cursor:"pointer"}}>Dispute</button>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Feed Screen ───
+    function FeedScreen({levels,onTapCard,onStartCreate}){
+      const forYou=W.filter(w=>w.forYou||w.yourDomain||w.isNew);
+      const nearby=W.filter(w=>parseFloat(w.dist)<=1&&!w.forYou&&!w.isNew);
+      const rest=W.filter(w=>!w.forYou&&!w.yourDomain&&!w.isNew&&parseFloat(w.dist)>1);
+
+      const Section=({label,items})=>{
+        if(!items.length)return null;
+        return <div style={{marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:600,color:"#94a3b8",marginBottom:6,padding:"0 14px"}}>{label}</div>
+          <div style={{padding:"0 14px"}}>
+            {items.map(w=><FeedCard key={w.id} w={w} level={levels[w.id]||0} onTap={onTapCard}/>)}
+          </div>
+        </div>;
+      };
+
+      return (
+        <div style={{flex:1,overflow:"auto",background:"#f8f9fb"}}>
+          <WitnessPrompt onStartCreate={onStartCreate}/>
+          <div style={{paddingBottom:60}}>
+            <Section label="Needs your help" items={forYou}/>
+            <Section label="Near you" items={nearby}/>
+            <Section label="Happening in your community" items={rest}/>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Map Screen ───
+    function MapScreen({onPinTap,selectedId}){
+      const cx=106.84,cy=-6.21,sc=2800;
+      const pos=(lat,lng)=>({x:(lng-cx)*sc+195,y:(lat-cy)*-sc+220});
+      const opM={seed:.45,define:.55,corroborate:.55,hypotheses:.55,path:.65,experiments:.65,execute:.8,recognize:.8,conclusion:.8,accept:.9,impact:1,archive:.3};
+      return (
+        <div style={{flex:1,position:"relative",background:"linear-gradient(180deg,#e8f0e8,#d4dfd4,#c8d8c4,#bcd0b8)",overflow:"hidden"}}>
+          <svg width="100%" height="100%" style={{position:"absolute",top:0,left:0}}>
+            <line x1="0" y1="180" x2="390" y2="180" stroke="#b8c8b0" strokeWidth="3"/>
+            <line x1="0" y1="260" x2="390" y2="260" stroke="#b8c8b0" strokeWidth="3"/>
+            <line x1="140" y1="0" x2="140" y2="460" stroke="#b8c8b0" strokeWidth="3"/>
+            <line x1="260" y1="0" x2="260" y2="460" stroke="#b8c8b0" strokeWidth="3"/>
+            <path d="M 20,0 Q 80,120 50,250 Q 30,350 60,460" stroke="#93c5fd" strokeWidth="8" fill="none" opacity=".5"/>
+            <path d="M 20,0 Q 80,120 50,250 Q 30,350 60,460" stroke="#60a5fa" strokeWidth="3" fill="none" opacity=".4"/>
+            <text x="80" y="140" fill="#6b7b60" fontSize="10" opacity=".5">Manggarai</text>
+            <text x="220" y="100" fill="#6b7b60" fontSize="10" opacity=".5">Menteng</text>
+            <text x="270" y="320" fill="#6b7b60" fontSize="10" opacity=".5">Tebet</text>
+          </svg>
+          {W.map(w=>{
+            const p=pos(w.lat,w.lng),c=TC[w.track],op=opM[w.stage]||.5,sel=selectedId===w.id,sz=sel?34:26;
+            const hex=Math.round(op*255).toString(16).padStart(2,'0');
+            return <div key={w.id} onClick={(e)=>{e.stopPropagation();onPinTap(w);}} style={{position:"absolute",left:p.x-sz/2,top:p.y-sz/2,cursor:"pointer",zIndex:sel?20:10,transition:"all .2s"}}>
+              {(w.stage==="execute"||w.stage==="impact")&&<div style={{position:"absolute",inset:-5,borderRadius:"50%",border:"2px solid "+c,opacity:.3,animation:"ping 2s infinite"}}/>}
+              <div style={{width:sz,height:sz,borderRadius:w.track==="explore"?"5px":w.track==="celebrate"?"4px":"50%",background:c+hex,border:"2px solid "+(sel?"#fff":c),boxShadow:sel?"0 0 14px "+c+"80":"0 2px 4px rgba(0,0,0,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,transform:w.track==="explore"?"rotate(45deg)":"none"}}>
+                <span style={{transform:w.track==="explore"?"rotate(-45deg)":"none"}}>{w.co}</span>
+              </div>
+              {w.conf&&<div style={{position:"absolute",top:-3,right:-3,width:12,height:12,borderRadius:"50%",background:"#64748b",border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7}}>{"\uD83D\uDD12"}</div>}
+            </div>;
+          })}
+          <div style={{position:"absolute",bottom:10,left:10,background:"rgba(255,255,255,.92)",borderRadius:8,padding:"6px 10px",fontSize:10,display:"flex",gap:10}}>
+            {Object.entries(TC).map(([t,c])=><div key={t} style={{display:"flex",alignItems:"center",gap:3}}><span style={{color:c,fontSize:12}}>{TS[t]}</span><span style={{color:"#475569",textTransform:"capitalize"}}>{t}</span></div>)}
+          </div>
+        </div>
+      );
+    }
+
+    function MapSheet({w,onClose}){
+      if(!w)return null;
+      const c=TC[w.track],idx=si(w.track,w.stage),labels=SL[w.track];
+      return <div style={{position:"absolute",bottom:0,left:0,right:0,background:"#fff",borderRadius:"16px 16px 0 0",boxShadow:"0 -4px 20px rgba(0,0,0,.12)",zIndex:50,padding:"10px 16px 14px",animation:"slideUp .3s ease"}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:8}}><div style={{width:32,height:3,borderRadius:2,background:"#d1d5db"}}/></div>
+        <div style={{fontSize:14,fontWeight:600,color:"#1e293b",lineHeight:1.4,marginBottom:6}}>{w.summary}</div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:8}}>{stageHuman(w)}</div>
+        <div style={{display:"flex",gap:2,marginBottom:10}}>{labels.map((l,i)=><div key={i} style={{flex:1,height:3,borderRadius:2,background:i<=idx?c:"#e2e8f0"}}/>)}</div>
+        <div style={{display:"flex",gap:8}}>
+          <button style={{flex:2,padding:"10px 0",borderRadius:10,border:"none",background:c,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>{ctaFor(w).i} {ctaFor(w).l}</button>
+          <button onClick={onClose} style={{flex:1,padding:"10px 0",borderRadius:10,border:"1.5px solid #e2e8f0",background:"#fff",color:"#94a3b8",fontSize:12,cursor:"pointer"}}>Close</button>
+        </div>
+      </div>;
+    }
+
+    // ─── Updates Screen ───
+    function UpdatesScreen({onTap}){
+      return <div style={{flex:1,overflow:"auto",background:"#f8f9fb"}}>
+        <div style={{padding:"14px 14px 60px"}}>
+          <div style={{fontSize:16,fontWeight:700,color:"#1e293b",marginBottom:4}}>Story Updates</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginBottom:14}}>What happened since you were away</div>
+          {NOTIFS.map(n=><div key={n.id} onClick={()=>onTap(n.wid)} style={{background:"#fff",borderRadius:12,padding:"12px 14px",marginBottom:8,cursor:"pointer",borderLeft:n.type==="urgent"?"3px solid #ef4444":n.type==="impact"?"3px solid #22c55e":"3px solid #e2e8f0"}}>
+            <div style={{fontSize:13,color:"#1e293b",lineHeight:1.55}}>{n.msg}</div>
+            <div style={{fontSize:10,color:n.type==="urgent"?"#ef4444":"#94a3b8",marginTop:4,fontWeight:n.type==="urgent"?600:400}}>{n.time==="now"?"Right now":n.time+" ago"}</div>
+          </div>)}
+        </div>
+      </div>;
+    }
+
+    // ─── Journey Screen ───
+    function JourneyScreen(){
+      const u=USER;
+      return <div style={{flex:1,overflow:"auto",background:"#f8f9fb"}}>
+        <div style={{padding:"16px 14px 60px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20}}>
+            <TrustRing tier={u.tier} pillar={u.pillar} size={56}/>
+            <div>
+              <div style={{fontSize:16,fontWeight:700,color:"#1e293b"}}>{u.fullName}</div>
+              <div style={{fontSize:12,color:PC[u.pillar],fontWeight:600}}>{u.tier} &middot; Field & Social</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10,marginBottom:18}}>
+            {[{l:"Witnessed",v:u.wCount},{l:"Impact",v:u.impact,a:true},{l:"Domains",v:u.domains.length}].map((s,i)=><div key={i} style={{flex:1,background:"#fff",borderRadius:12,padding:"12px 8px",textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+              <div style={{fontSize:20,fontWeight:700,color:s.a?"#f59e0b":"#1e293b"}}>{s.v}</div>
+              <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{s.l}</div>
+            </div>)}
+          </div>
+          <div style={{background:"#fff",borderRadius:14,padding:16,marginBottom:14,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#64748b",marginBottom:10}}>Influence Budget</div>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <svg width="56" height="56" viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" fill="none" stroke="#f1f5f9" strokeWidth="5"/><circle cx="28" cy="28" r="24" fill="none" stroke="#2563eb" strokeWidth="5" strokeDasharray={u.budgetUsed*150.8+" 150.8"} strokeLinecap="round" transform="rotate(-90 28 28)"/></svg>
+              <div><div style={{fontSize:11,color:"#94a3b8"}}>{Math.round(u.budgetUsed*100)}% used</div><div style={{fontSize:10,color:"#cbd5e1",marginTop:2}}>Vouch + Governance</div></div>
+            </div>
+          </div>
+          <div style={{background:"#fff",borderRadius:14,padding:16,marginBottom:14,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#64748b",marginBottom:10}}>Your Domains</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {u.domains.map((d,i)=><span key={i} style={{background:i===0?PC.field_social+"15":"#f8fafc",color:i===0?PC.field_social:"#64748b",fontSize:11,padding:"4px 10px",borderRadius:10,fontWeight:i===0?600:400}}>{d}</span>)}
+            </div>
+          </div>
+          <button style={{width:"100%",padding:12,background:"#1e293b",color:"#fff",borderRadius:10,border:"none",fontSize:13,fontWeight:600,cursor:"pointer"}}>{"\uD83D\uDCC4"} View CV Hidup</button>
+        </div>
+      </div>;
+    }
+
+    // ─── Create Flow ───
+    function CreateFlow({onClose,mode}){
+      const [step,setStep]=useState(mode==="photo"?0:1);
+      const [claim,setClaim]=useState(null);
+      const claims=[{t:"bad",l:"Problem",i:"\u26A0\uFE0F",c:"#ef4444"},{t:"good",l:"Achievement",i:"\uD83C\uDF89",c:"#f59e0b"},{t:"unknown",l:"Question",i:"\uD83D\uDD2C",c:"#8b5cf6"}];
+      const totalSteps=3;
+
+      return <div style={{position:"absolute",inset:0,background:"#fff",zIndex:200,display:"flex",flexDirection:"column",animation:"slideUp .25s ease"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:"1px solid #f1f5f9"}}>
+          <span style={{fontSize:12,color:"#94a3b8"}}>Step {Math.min(step+1,totalSteps)} of {totalSteps}</span>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:15,color:"#94a3b8",cursor:"pointer"}}>{"\u2715"}</button>
+        </div>
+        <div style={{display:"flex",gap:3,padding:"0 16px",marginTop:6}}>
+          {[0,1,2].map(i=><div key={i} style={{flex:1,height:3,borderRadius:2,background:i<=step?"#2563eb":"#e2e8f0"}}/>)}
+        </div>
+
+        {step===0&&<div style={{padding:16,flex:1,display:"flex",flexDirection:"column"}}>
+          <div style={{fontSize:18,fontWeight:700,color:"#1e293b",marginBottom:6}}>Capture what you see</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>A photo helps the community understand faster</div>
+          <div style={{flex:1,background:"#f1f5f9",borderRadius:14,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,marginBottom:16}}>
+            <div style={{width:56,height:56,borderRadius:"50%",background:"#e2e8f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>{"\uD83D\uDCF7"}</div>
+            <div style={{fontSize:13,color:"#64748b"}}>Tap to take photo or video</div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:10,background:"#f0fdf4",borderRadius:10,marginBottom:12,fontSize:11,color:"#059669"}}>{"\uD83D\uDCCD"} Manggarai, Jakarta Selatan</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setStep(1)} style={{flex:1,padding:12,background:"#f1f5f9",color:"#64748b",borderRadius:10,border:"none",fontSize:13,cursor:"pointer"}}>Skip to text</button>
+            <button onClick={()=>setStep(1)} style={{flex:2,padding:12,background:"#2563eb",color:"#fff",borderRadius:10,border:"none",fontSize:13,fontWeight:600,cursor:"pointer"}}>Next</button>
+          </div>
+        </div>}
+
+        {step===1&&<div style={{padding:16,flex:1,display:"flex",flexDirection:"column"}}>
+          <div style={{fontSize:18,fontWeight:700,color:"#1e293b",marginBottom:6}}>What happened?</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginBottom:14}}>Describe what you witnessed. Be specific.</div>
+          {mode==="anon"&&<div style={{display:"flex",alignItems:"center",gap:6,padding:8,background:"#f8fafc",borderRadius:8,marginBottom:12,fontSize:11,color:"#64748b"}}>{"\uD83D\uDD12"} Your identity will be hidden from the public</div>}
+          <textarea placeholder="I saw..." style={{flex:1,minHeight:100,padding:12,borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:13,fontFamily:"inherit",resize:"none",marginBottom:14}}/>
+          <div style={{fontSize:12,fontWeight:600,color:"#64748b",marginBottom:8}}>What kind?</div>
+          <div style={{display:"flex",gap:6,marginBottom:16}}>
+            {claims.map(c=><button key={c.t} onClick={()=>setClaim(c.t)} style={{flex:1,padding:12,borderRadius:10,border:claim===c.t?"2px solid "+c.c:"1.5px solid #e2e8f0",background:claim===c.t?c.c+"08":"#fff",cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:18,marginBottom:2}}>{c.i}</div>
+              <div style={{fontSize:11,color:claim===c.t?c.c:"#64748b",fontWeight:600}}>{c.l}</div>
+            </button>)}
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>setStep(0)} style={{flex:1,padding:12,background:"#f1f5f9",color:"#64748b",borderRadius:10,border:"none",fontSize:13,cursor:"pointer"}}>Back</button>
+            <button onClick={()=>setStep(2)} style={{flex:2,padding:12,background:claim?"#2563eb":"#94a3b8",color:"#fff",borderRadius:10,border:"none",fontSize:13,fontWeight:600,cursor:"pointer"}}>Next</button>
+          </div>
+        </div>}
+
+        {step===2&&<div style={{padding:16,flex:1,display:"flex",flexDirection:"column"}}>
+          <div style={{fontSize:18,fontWeight:700,color:"#1e293b",marginBottom:6}}>Review & submit</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginBottom:16}}>AI will process your witness and create a story for the community.</div>
+          <div style={{background:"#f8fafc",borderRadius:12,padding:14,marginBottom:12,border:"1px solid #e2e8f0"}}>
+            <div style={{fontSize:10,fontWeight:600,color:"#94a3b8",marginBottom:6}}>AI-generated preview</div>
+            <div style={{fontSize:13,color:"#1e293b",lineHeight:1.5,marginBottom:8}}>"Reports of blocked drainage causing flooding risk. Construction debris identified as cause."</div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              <span style={{background:"#dbeafe",color:"#2563eb",fontSize:9,padding:"2px 6px",borderRadius:6}}>Civil Engineering</span>
+              <span style={{background:"#dbeafe",color:"#2563eb",fontSize:9,padding:"2px 6px",borderRadius:6}}>Emergency Response</span>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            {[{m:"Open",d:"Everyone can see"},mode==="anon"?{m:"Anonymous",d:"Identity hidden"}:{m:"Confidential",d:"Community only"}].map((o,i)=><button key={o.m} style={{flex:1,padding:"10px 8px",borderRadius:10,border:i===0?"2px solid #2563eb":"1.5px solid #e2e8f0",background:i===0?"#eff6ff":"#fff",cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:11,color:i===0?"#2563eb":"#64748b",fontWeight:600}}>{o.m}</div>
+              <div style={{fontSize:9,color:"#94a3b8",marginTop:1}}>{o.d}</div>
+            </button>)}
+          </div>
+          <div style={{display:"flex",gap:6,marginTop:"auto"}}>
+            <button onClick={()=>setStep(1)} style={{flex:1,padding:12,background:"#f1f5f9",color:"#64748b",borderRadius:10,border:"none",fontSize:13,cursor:"pointer"}}>Back</button>
+            <button onClick={onClose} style={{flex:2,padding:12,background:"#059669",color:"#fff",borderRadius:10,border:"none",fontSize:13,fontWeight:600,cursor:"pointer"}}>{"\u2705"} Submit</button>
+          </div>
+        </div>}
+      </div>;
+    }
+
+    // ─── Weather Station ───
+    function WeatherStation({onClose}){
+      const w=WEATHER;
+      const days=[{d:"Mon",g:2.1},{d:"Tue",g:2.8},{d:"Wed",g:3.5},{d:"Thu",g:5.1},{d:"Fri",g:5.8},{d:"Sat",g:6.0},{d:"Today",g:6.2}];
+      return <div style={{position:"absolute",inset:0,zIndex:200,background:"linear-gradient(180deg,#eef2ff,#f8fafc)",overflow:"auto",animation:"fadeIn .2s ease"}}>
+        <button onClick={onClose} style={{position:"absolute",top:8,right:14,background:"rgba(255,255,255,.9)",border:"none",borderRadius:"50%",width:30,height:30,fontSize:14,cursor:"pointer",boxShadow:"0 1px 6px rgba(0,0,0,.1)",zIndex:10}}>{"\u2715"}</button>
+        <div style={{padding:20}}>
+          <div style={{textAlign:"center",marginBottom:20}}>
+            <div style={{fontSize:40,marginBottom:4}}>{w.icon}</div>
+            <div style={{fontSize:20,fontWeight:700,color:"#1e293b"}}>{w.label}</div>
+            <div style={{fontSize:12,color:"#64748b",marginTop:2}}>{w.msg}</div>
+            <div style={{fontSize:28,fontWeight:700,color:"#2563eb",marginTop:8}}>{w.gdf}%</div>
+            <div style={{fontSize:11,color:"#94a3b8"}}>Global Difficulty Floor</div>
+          </div>
+          <div style={{background:"#fff",borderRadius:14,padding:16,marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#64748b",marginBottom:12}}>7-Day Trend</div>
+            <div style={{display:"flex",alignItems:"flex-end",gap:6,height:70}}>
+              {days.map((d,i)=><div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                <div style={{fontSize:8,color:"#94a3b8"}}>{d.g}%</div>
+                <div style={{width:"100%",height:(d.g/20)*55+"px",background:d.g>10?"#fbbf24":d.g>5?"#93c5fd":"#86efac",borderRadius:3}}/>
+                <div style={{fontSize:9,color:i===6?"#2563eb":"#94a3b8",fontWeight:i===6?700:400}}>{d.d}</div>
+              </div>)}
+            </div>
+          </div>
+          <div style={{background:"#fff",borderRadius:14,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#64748b",marginBottom:10}}>What affected the community</div>
+            <div style={{fontSize:11,color:"#475569",lineHeight:2.2}}>
+              <div>{"\u26A1"} Verification failure in Civil Engineering</div>
+              <div>{"\u2705"} Fraud report confirmed in Health Services</div>
+              <div>{"\uD83C\uDF3F"} Natural trust recovery underway</div>
+            </div>
+          </div>
+        </div>
+      </div>;
+    }
+
+    // ─── Main ───
+    function App(){
+      const [tab,setTab]=useState("feed");
+      const [levels,setLevels]=useState({});
+      const [createMode,setCreateMode]=useState(null);
+      const [showWeather,setShowWeather]=useState(false);
+      const [mapSel,setMapSel]=useState(null);
+
+      const tapCard=useCallback((id,lvl)=>{
+        setLevels(prev=>{
+          const cur=prev[id]||0;
+          // If tapping to collapse (lvl=0), remove it
+          if(lvl===0)return {...prev,[id]:0};
+          // Otherwise set to requested level
+          return {...prev,[id]:lvl};
+        });
+      },[]);
+
+      return (
+        <div style={{width:390,height:720,borderRadius:32,overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.3),0 0 0 1px rgba(255,255,255,.06)",background:"#fff",position:"relative",fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif"}}>
+          {/* Status bar */}
+          <div style={{height:42,background:"#fff",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 22px",fontSize:13,fontWeight:600,color:"#1e293b"}}>
+            <span>9:41</span>
+            <span style={{fontSize:11,fontWeight:700,letterSpacing:.5}}>Gotong Royong</span>
+            <span style={{fontSize:11}}>{"\uD83D\uDCF6"} {"\uD83D\uDD0B"}</span>
+          </div>
+
+          {/* Greeting bar */}
+          <GreetingBar user={USER} weather={WEATHER} onWeatherTap={()=>setShowWeather(true)}/>
+
+          {/* Content */}
+          <div style={{height:720-42-52-52,display:"flex",flexDirection:"column",position:"relative"}}>
+            {tab==="feed"&&<FeedScreen levels={levels} onTapCard={tapCard} onStartCreate={(m)=>setCreateMode(m)}/>}
+            {tab==="map"&&<><MapScreen onPinTap={w=>setMapSel(w)} selectedId={mapSel?.id}/><MapSheet w={mapSel} onClose={()=>setMapSel(null)}/></>}
+            {tab==="updates"&&<UpdatesScreen onTap={wid=>{setTab("feed");tapCard(wid,1);}}/>}
+            {tab==="journey"&&<JourneyScreen/>}
+            {createMode&&<CreateFlow mode={createMode} onClose={()=>setCreateMode(null)}/>}
+            {showWeather&&<WeatherStation onClose={()=>setShowWeather(false)}/>}
+          </div>
+
+          {/* Tab bar */}
+          <div style={{height:52,background:"#fff",borderTop:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-around"}}>
+            <TabBtn icon={"\uD83C\uDFE0"} label="Home" active={tab==="feed"} onClick={()=>{setTab("feed");setShowWeather(false);}}/>
+            <TabBtn icon={"\uD83D\uDDFA\uFE0F"} label="Map" active={tab==="map"} onClick={()=>{setTab("map");setShowWeather(false);}}/>
+            <TabBtn icon={"\uD83D\uDCE8"} label="Updates" active={tab==="updates"} badge={2} onClick={()=>{setTab("updates");setShowWeather(false);}}/>
+            <TabBtn icon={"\uD83D\uDC64"} label="Me" active={tab==="journey"} onClick={()=>{setTab("journey");setShowWeather(false);}}/>
+          </div>
+        </div>
+      );
+    }
+
+    function TabBtn({icon,label,active,onClick,badge}){
+      return <button onClick={onClick} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"2px 14px",position:"relative"}}>
+        <span style={{fontSize:18,filter:active?"none":"grayscale(1)",opacity:active?1:.4}}>{icon}</span>
+        <span style={{fontSize:9,color:active?"#2563eb":"#94a3b8",fontWeight:active?700:400}}>{label}</span>
+        {badge&&<div style={{position:"absolute",top:-1,right:6,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{badge}</div>}
+      </button>;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

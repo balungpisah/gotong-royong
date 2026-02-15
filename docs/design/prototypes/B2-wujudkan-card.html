@@ -1,0 +1,1500 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — B2 · Wujudkan Card (v1)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --fs-h2:20px; --fs-h3:16px; --fs-body:14px; --fs-small:12px;
+    --fs-caption:11px; --fs-micro:9px;
+    --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-6:24px; --sp-8:32px;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+    --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+    --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+    --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+    --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63;
+    --c-pasir:#A1887F; --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+    --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+    --c-berhasil:#2E7D32; --c-berhasil-l:#E8F5E9;
+    --c-peringatan:#E65100; --c-peringatan-l:#FFF3E0;
+    --c-bahaya:#C62828; --c-bahaya-l:#FFEBEE;
+    --c-keterangan:#4E342E; --c-keterangan-l:#EFEBE9;
+    /* Track tokens — Wujudkan */
+    --t-wujudkan:#2E7D32; --t-wujudkan-soft:#E8F5E9; --t-wujudkan-muted:#C8E6C9;
+    --t-musyawarah:#4E342E; --t-musyawarah-soft:#EFEBE9;
+  }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: #e8e0d8; color: var(--c-tanah-gelap);
+    min-height: 100vh;
+  }
+
+  .doc-bar {
+    background: var(--t-wujudkan); color: #fff;
+    padding: 16px 24px; text-align: center;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .doc-bar h1 { font-size: 15px; font-weight: 700; }
+  .doc-bar p { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+
+  .scenario-nav {
+    background: var(--c-tanah-gelap);
+    display: flex; justify-content: center; flex-wrap: wrap;
+    position: sticky; top: 52px; z-index: 99;
+  }
+  .scenario-btn {
+    padding: 8px 7px; font-size: 8.5px; font-weight: 700;
+    cursor: pointer; border: none; background: transparent;
+    color: rgba(255,255,255,0.35); border-bottom: 2px solid transparent;
+    transition: all 0.2s; font-family: 'Nunito', sans-serif;
+  }
+  .scenario-btn:hover { color: rgba(255,255,255,0.7); }
+  .scenario-btn.active { color: #fff; border-bottom-color: var(--t-wujudkan); }
+  .scenario-label {
+    width: 100%; text-align: center; padding: 6px;
+    font-size: 10px; color: rgba(255,255,255,0.25); background: #2c1e1a;
+  }
+
+  .phone-frame {
+    width: 375px; margin: 24px auto;
+    background: var(--c-kapas);
+    border-radius: 28px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.08);
+    min-height: 760px;
+    display: flex; flex-direction: column;
+  }
+
+  .app-bar {
+    background: var(--c-susu);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--c-batu);
+    flex-shrink: 0;
+  }
+  .app-bar .back-btn {
+    width: 32px; height: 32px; border-radius: var(--r-full);
+    background: var(--c-kapas); border: none; cursor: pointer;
+    font-size: 16px; color: var(--c-tanah);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .app-bar .title {
+    font-size: var(--fs-h3); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+  }
+
+  /* ═══════════════════════════
+     TAB BAR — cross-cutting (from B1)
+     ═══════════════════════════ */
+  .tab-bar {
+    display: flex; background: var(--c-susu);
+    border-bottom: 1px solid var(--c-batu);
+    flex-shrink: 0; position: relative;
+  }
+  .tab-btn {
+    flex: 1; padding: 10px 8px;
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-pasir); background: transparent;
+    border: none; cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all 0.2s; position: relative;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .tab-btn.active { color: var(--t-wujudkan); }
+  .tab-btn.active::after {
+    content: ''; position: absolute; bottom: -1px; left: 16px; right: 16px;
+    height: 2.5px; background: var(--t-wujudkan); border-radius: 2px 2px 0 0;
+  }
+  .tab-btn .tab-icon { font-size: 12px; }
+  .tab-btn .tab-notif {
+    width: 6px; height: 6px; border-radius: var(--r-full);
+    background: var(--c-bahaya); flex-shrink: 0;
+  }
+  .swipe-hint {
+    text-align: center; padding: 4px;
+    font-size: 8px; color: var(--c-batu); background: var(--c-susu);
+    letter-spacing: 2px;
+  }
+  .tab-panel { display: none; flex: 1; flex-direction: column; overflow-y: auto; }
+  .tab-panel.active { display: flex; }
+
+  .feed-content {
+    flex: 1; overflow-y: auto;
+    padding: var(--sp-3);
+    display: flex; flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .section-label {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    color: var(--c-pasir); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: var(--sp-1);
+  }
+
+  /* ═══════════════════════════
+     SEED CARD — B0 universal base (Wujudkan green)
+     ═══════════════════════════ */
+  .seed-card {
+    background: var(--c-susu);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--c-batu);
+    position: relative;
+  }
+  .seed-card .track-strip {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    width: 4px; background: var(--t-wujudkan);
+  }
+
+  .card-header {
+    padding: var(--sp-3) var(--sp-3) var(--sp-2);
+    padding-left: calc(var(--sp-3) + 8px);
+  }
+  .card-header-top {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: var(--sp-2); flex-wrap: wrap;
+  }
+  .seed-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    background: var(--t-wujudkan-soft); color: var(--t-wujudkan);
+  }
+
+  .card-title {
+    font-size: var(--fs-body); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); line-height: 1.4;
+    margin-bottom: var(--sp-2);
+  }
+  .card-author { display: flex; align-items: center; gap: 6px; }
+  .author-avatar {
+    width: 22px; height: 22px; border-radius: var(--r-full);
+    background: var(--c-kayu); display: flex; align-items: center;
+    justify-content: center; font-size: 9px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .author-name { font-size: var(--fs-caption); font-weight: var(--fw-semi); color: var(--c-tanah); }
+  .author-tier { font-size: var(--fs-micro); color: var(--c-pasir); font-weight: var(--fw-semi); }
+  .card-time { margin-left: auto; font-size: var(--fs-micro); color: var(--c-pasir); }
+
+  .card-body {
+    padding: 0 var(--sp-3) var(--sp-3);
+    padding-left: calc(var(--sp-3) + 8px);
+  }
+  .card-text {
+    font-size: var(--fs-small); color: var(--c-tanah); line-height: 1.6;
+  }
+  .card-more {
+    font-size: var(--fs-caption); color: var(--c-api);
+    font-weight: var(--fw-semi); cursor: pointer; margin-top: var(--sp-1);
+  }
+  .card-media { display: flex; gap: 6px; margin-top: var(--sp-2); }
+  .media-thumb {
+    width: 52px; height: 52px; border-radius: var(--r-sm);
+    background: var(--c-kapas); border: 1px solid var(--c-batu);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--c-pasir);
+  }
+
+  /* Stepper */
+  .card-stepper {
+    padding: var(--sp-2) var(--sp-3);
+    padding-left: calc(var(--sp-2) + 8px);
+    border-top: 1px solid var(--c-batu);
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto;
+  }
+  .step { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .step .step-dot { width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0; }
+  .step .step-label { font-size: 8px; font-weight: var(--fw-bold); }
+  .step-connector { width: 12px; height: 1px; flex-shrink: 0; margin: 0 2px; }
+  .step.done .step-dot { background: var(--c-pasir); }
+  .step.done .step-label { color: var(--c-pasir); }
+  .step-connector.done { background: var(--c-pasir); }
+  .step.current .step-dot { background: var(--t-wujudkan); box-shadow: 0 0 0 2px var(--c-susu), 0 0 0 3.5px var(--t-wujudkan); }
+  .step.current .step-label { color: var(--t-wujudkan); font-weight: var(--fw-extra); }
+  .step.future .step-dot { background: transparent; border: 1.5px solid var(--c-batu); }
+  .step.future .step-label { color: var(--c-batu); }
+  .step-connector.future { background: var(--c-batu); }
+  .step.complete .step-dot { background: var(--c-berhasil); }
+  .step.complete .step-label { color: var(--c-berhasil); font-weight: var(--fw-extra); }
+
+  /* Footer */
+  .card-footer {
+    padding: var(--sp-2) var(--sp-3);
+    padding-left: calc(var(--sp-2) + 8px);
+    border-top: 1px solid var(--c-batu);
+    display: flex; align-items: center; gap: var(--sp-3);
+  }
+  .footer-action {
+    display: flex; align-items: center; gap: 4px;
+    font-size: var(--fs-caption); color: var(--c-kayu); font-weight: var(--fw-semi);
+  }
+  .fa-icon { font-size: 13px; }
+  .ai-badge {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+  }
+  .ai-badge.classified { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .ai-badge.summary { background: var(--c-keterangan-l); color: var(--c-keterangan); }
+
+  /* ═══════════════════════════
+     CHAT — WhatsApp-style (from B1, re-themed green)
+     ═══════════════════════════ */
+  .chat-area {
+    flex: 1; overflow-y: auto;
+    padding: var(--sp-3); padding-bottom: 60px;
+    display: flex; flex-direction: column; gap: var(--sp-2);
+    background: var(--c-kapas);
+  }
+  .chat-bubble {
+    max-width: 80%; padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-md); font-size: var(--fs-caption);
+    line-height: 1.5; position: relative;
+  }
+  .chat-bubble.other {
+    background: var(--c-susu); align-self: flex-start;
+    border: 1px solid var(--c-batu); border-top-left-radius: 3px;
+  }
+  .chat-bubble.self {
+    background: var(--t-wujudkan-soft); align-self: flex-end;
+    border: 1px solid var(--t-wujudkan-muted); border-top-right-radius: 3px;
+  }
+  .chat-name { font-size: var(--fs-micro); font-weight: var(--fw-extra); margin-bottom: 2px; }
+  .chat-bubble.other .chat-name { color: var(--c-kayu); }
+  .chat-bubble.self .chat-name { color: var(--t-wujudkan); }
+  .chat-text { color: var(--c-tanah-gelap); }
+  .chat-time { font-size: 8px; color: var(--c-pasir); text-align: right; margin-top: 2px; }
+  .ai-chat-card {
+    align-self: center; max-width: 90%;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--c-keterangan-l); border-radius: var(--r-md);
+    border: 1px dashed var(--c-kayu); margin: var(--sp-1) 0;
+  }
+  .ai-chat-header {
+    display: flex; align-items: center; gap: 4px;
+    font-size: var(--fs-micro); font-weight: var(--fw-extra); color: var(--c-kayu);
+    margin-bottom: var(--sp-1);
+  }
+  .ai-chat-text {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.5; font-style: italic;
+  }
+  .chat-input-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--c-susu); border-top: 1px solid var(--c-batu);
+    padding: var(--sp-2) var(--sp-3);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chat-input {
+    flex: 1; padding: 8px 12px; border-radius: var(--r-full);
+    border: 1px solid var(--c-batu); background: var(--c-kapas);
+    font-size: var(--fs-caption); font-family: 'Nunito', sans-serif;
+    color: var(--c-tanah-gelap);
+  }
+  .chat-input::placeholder { color: var(--c-pasir); }
+  .chat-send {
+    width: 32px; height: 32px; border-radius: var(--r-full);
+    background: var(--t-wujudkan); border: none; color: #fff;
+    font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chat-date {
+    align-self: center; padding: 2px 10px; border-radius: var(--r-full);
+    background: rgba(0,0,0,0.06);
+    font-size: 8px; font-weight: var(--fw-bold); color: var(--c-pasir);
+    margin: var(--sp-1) 0;
+  }
+  .chat-reactions { display: flex; gap: 4px; margin-top: 3px; }
+  .chat-react {
+    padding: 1px 5px; border-radius: var(--r-full);
+    background: var(--c-kapas); border: 1px solid var(--c-batu);
+    font-size: 9px; display: flex; align-items: center; gap: 2px;
+  }
+  .chat-react .react-count { font-size: 8px; color: var(--c-pasir); font-weight: var(--fw-bold); }
+
+  /* ═══════════════════════════
+     WUJUDKAN-SPECIFIC COMPONENTS
+     ═══════════════════════════ */
+
+  /* AI-07 summary */
+  .ai-summary {
+    margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3);
+    background: var(--c-keterangan-l); border-radius: var(--r-md);
+    border-left: 3px solid var(--c-kayu);
+  }
+  .ai-summary-header {
+    display: flex; align-items: center; gap: 4px;
+    font-size: var(--fs-micro); font-weight: var(--fw-extra); color: var(--c-kayu);
+    margin-bottom: var(--sp-1);
+  }
+  .ai-summary-text {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.5; font-style: italic;
+  }
+
+  /* Feasibility pill */
+  .feasibility-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    margin-top: var(--sp-2);
+  }
+  .feasibility-pill.high { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .feasibility-pill.medium { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+
+  /* Gate button */
+  .gate-btn {
+    margin-top: var(--sp-3);
+    width: 100%; padding: var(--sp-3);
+    border-radius: var(--r-md); border: none;
+    font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .gate-btn.ready { background: var(--t-wujudkan); color: #fff; }
+  .gate-btn.ready:hover { opacity: 0.9; }
+
+  /* ═══ PAPAN GOTONG ROYONG (Rancang — Wujudkan green) ═══ */
+  .papan-gr {
+    background: var(--c-susu); border-radius: var(--r-lg);
+    border: 2px solid var(--t-wujudkan-muted);
+    overflow: hidden;
+  }
+  .papan-header {
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--t-wujudkan-soft);
+    border-bottom: 1px solid var(--t-wujudkan-muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .papan-header .ph-icon { font-size: 18px; }
+  .papan-header .ph-title {
+    font-size: var(--fs-small); font-weight: var(--fw-extra);
+    color: var(--t-wujudkan);
+  }
+  .papan-header .ph-status {
+    margin-left: auto; font-size: var(--fs-micro);
+    font-weight: var(--fw-extra); padding: 2px 8px;
+    border-radius: var(--r-full);
+  }
+  .ph-status.filling { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+  .ph-status.ready { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .papan-body { padding: var(--sp-3); }
+
+  /* PIC section */
+  .pic-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--t-wujudkan-soft);
+    border-radius: var(--r-md); border: 1px solid var(--t-wujudkan-muted);
+    margin-bottom: var(--sp-3);
+  }
+  .pic-avatar {
+    width: 28px; height: 28px; border-radius: var(--r-full);
+    background: var(--t-wujudkan); display: flex; align-items: center;
+    justify-content: center; font-size: 10px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .pic-info { flex: 1; }
+  .pic-label { font-size: var(--fs-micro); color: var(--c-kayu); font-weight: var(--fw-semi); }
+  .pic-name { font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--c-tanah-gelap); }
+  .pic-status {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    padding: 2px 6px; border-radius: var(--r-full);
+    background: var(--c-berhasil-l); color: var(--c-berhasil);
+  }
+
+  /* ═══ MILESTONE TRACKER (E4 — hierarchical) ═══ */
+  .milestone-section { margin-bottom: var(--sp-3); }
+  .milestone-title {
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap); margin-bottom: var(--sp-2);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .milestone-title .ai-draft {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    color: var(--c-kayu); background: var(--c-keterangan-l);
+    padding: 1px 6px; border-radius: var(--r-full);
+  }
+  .milestone-card {
+    border: 1.5px solid var(--c-batu); border-radius: var(--r-md);
+    margin-bottom: var(--sp-2); overflow: hidden;
+  }
+  .milestone-card.active { border-color: var(--t-wujudkan-muted); }
+  .milestone-card.done { border-color: rgba(46,125,50,0.3); }
+  .ms-header {
+    padding: var(--sp-2) var(--sp-3);
+    display: flex; align-items: center; gap: 8px;
+    background: var(--c-kapas);
+  }
+  .ms-icon { font-size: 14px; flex-shrink: 0; }
+  .ms-name {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+  }
+  .ms-card-done .ms-name { color: var(--c-pasir); text-decoration: line-through; }
+  .ms-progress {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    padding: 2px 8px; border-radius: var(--r-full);
+  }
+  .ms-progress.complete { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .ms-progress.partial { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+  .ms-progress.pending { background: var(--c-kapas); color: var(--c-pasir); }
+
+  /* Sub-tasks within milestone */
+  .ms-subtasks { padding: var(--sp-2) var(--sp-3); }
+  .subtask-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: var(--sp-1) 0; font-size: var(--fs-caption);
+    color: var(--c-tanah); line-height: 1.4;
+  }
+  .check {
+    width: 16px; height: 16px; border-radius: var(--r-sm);
+    flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 9px; margin-top: 1px;
+  }
+  .check.pending { background: transparent; border: 1.5px solid var(--c-batu); }
+  .check.done { background: var(--c-berhasil); color: #fff; }
+  .check.active { background: var(--t-wujudkan-soft); border: 1.5px solid var(--t-wujudkan); color: var(--t-wujudkan); }
+  .subtask-item.is-done { color: var(--c-pasir); text-decoration: line-through; }
+  .subtask-assignee {
+    font-size: var(--fs-micro); color: var(--c-kayu);
+    margin-left: auto; flex-shrink: 0;
+  }
+
+  /* ═══ GALANG SUB-LIFECYCLE (E6 — protected financial) ═══ */
+  .galang-panel {
+    background: var(--c-susu); border-radius: var(--r-lg);
+    border: 2px solid var(--t-wujudkan-muted);
+    overflow: hidden;
+  }
+  .galang-panel-header {
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--c-bara);
+    border-bottom: 1px solid var(--t-wujudkan-muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .galang-panel-header .gp-icon { font-size: 18px; }
+  .galang-panel-header .gp-title {
+    font-size: var(--fs-small); font-weight: var(--fw-extra);
+    color: var(--c-api);
+  }
+  .galang-panel-header .gp-stage {
+    margin-left: auto; font-size: var(--fs-micro);
+    font-weight: var(--fw-extra); padding: 2px 8px;
+    border-radius: var(--r-full);
+    background: var(--c-peringatan-l); color: var(--c-peringatan);
+  }
+  .galang-body { padding: var(--sp-3); }
+
+  /* Sasaran (target) form — E6 protected fields */
+  .galang-target {
+    padding: var(--sp-3);
+    background: var(--c-kapas); border-radius: var(--r-md);
+    margin-bottom: var(--sp-3);
+  }
+  .galang-target-label {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap); margin-bottom: var(--sp-2);
+  }
+  .galang-amount-row {
+    display: flex; align-items: baseline; gap: 4px;
+    margin-bottom: var(--sp-2);
+  }
+  .galang-currency { font-size: var(--fs-caption); color: var(--c-kayu); font-weight: var(--fw-bold); }
+  .galang-amount {
+    font-size: var(--fs-h2); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap);
+  }
+  .protected-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 6px; border-radius: var(--r-full);
+    font-size: 7px; font-weight: var(--fw-extra);
+    background: var(--c-bahaya-l); color: var(--c-bahaya);
+    margin-left: 8px; vertical-align: super;
+  }
+
+  /* Kumpul (collection) progress */
+  .galang-progress {
+    padding: var(--sp-3);
+    background: #fff; border-radius: var(--r-md);
+    border: 1px solid var(--c-batu);
+    margin-bottom: var(--sp-3);
+  }
+  .galang-bar-wrap {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: var(--sp-2);
+  }
+  .galang-bar { flex: 1; height: 8px; border-radius: 4px; background: var(--c-batu); overflow: hidden; }
+  .galang-bar .gfill { height: 100%; border-radius: 4px; background: var(--t-wujudkan); transition: width 0.3s; }
+  .galang-percent { font-size: var(--fs-caption); font-weight: var(--fw-extra); color: var(--t-wujudkan); }
+  .galang-stats {
+    display: flex; gap: var(--sp-3);
+    font-size: var(--fs-micro); color: var(--c-kayu);
+  }
+  .galang-stats span { display: flex; align-items: center; gap: 3px; }
+
+  /* Contributor list (protected amounts) */
+  .galang-contributors { margin-bottom: var(--sp-2); }
+  .gc-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: var(--sp-1) 0;
+  }
+  .gc-avatar {
+    width: 20px; height: 20px; border-radius: var(--r-full);
+    background: var(--c-kayu); display: flex; align-items: center;
+    justify-content: center; font-size: 8px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .gc-avatar.anon { background: var(--c-batu); color: var(--c-pasir); }
+  .gc-name { font-size: var(--fs-caption); color: var(--c-tanah); flex: 1; }
+  .gc-name.anon { font-style: italic; color: var(--c-pasir); }
+  .gc-amount { font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--c-tanah-gelap); }
+
+  /* ═══ KONTRIBUSI ═══ */
+  .kontribusi-section { margin-bottom: var(--sp-3); }
+  .kontribusi-title {
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap); margin-bottom: var(--sp-2);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .kontribusi-slot {
+    border: 1.5px solid var(--c-batu); border-radius: var(--r-md);
+    margin-bottom: var(--sp-2); overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .kontribusi-slot.filled { border-color: rgba(46,125,50,0.3); }
+  .kontribusi-slot.partial { border-color: var(--t-wujudkan-muted); }
+  .ks-header {
+    padding: var(--sp-2) var(--sp-3);
+    display: flex; align-items: center; gap: 6px;
+    background: var(--c-kapas);
+  }
+  .ks-type-icon { font-size: 14px; flex-shrink: 0; }
+  .ks-type-label {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+  }
+  .ks-count {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    padding: 2px 8px; border-radius: var(--r-full);
+  }
+  .ks-count.full { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .ks-count.partial { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+  .ks-body { padding: var(--sp-2) var(--sp-3); }
+  .ks-person {
+    display: flex; align-items: center; gap: 6px; padding: var(--sp-1) 0;
+  }
+  .ks-person-avatar {
+    width: 20px; height: 20px; border-radius: var(--r-full);
+    background: var(--c-kayu); display: flex; align-items: center;
+    justify-content: center; font-size: 8px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .ks-person-name { font-size: var(--fs-caption); color: var(--c-tanah); flex: 1; }
+  .ks-empty-slot {
+    display: flex; align-items: center; gap: 6px;
+    padding: var(--sp-2);
+    border: 1.5px dashed var(--c-batu); border-radius: var(--r-md);
+    cursor: pointer; transition: all 0.15s;
+    margin-top: var(--sp-1);
+  }
+  .ks-empty-slot:hover { border-color: var(--t-wujudkan); background: var(--t-wujudkan-soft); }
+  .ks-empty-slot .ks-plus {
+    width: 20px; height: 20px; border-radius: var(--r-full);
+    background: var(--c-kapas); display: flex; align-items: center;
+    justify-content: center; font-size: 12px; color: var(--c-pasir); font-weight: 800;
+  }
+  .ks-empty-slot .ks-cta {
+    font-size: var(--fs-caption); color: var(--c-pasir); font-weight: var(--fw-semi);
+  }
+
+  /* Readiness */
+  .readiness {
+    padding: var(--sp-3);
+    background: var(--c-kapas); border-radius: var(--r-md);
+    border: 1px solid var(--c-batu);
+  }
+  .readiness-title {
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap); margin-bottom: var(--sp-2);
+  }
+  .readiness-items { display: flex; flex-direction: column; gap: var(--sp-1); }
+  .readiness-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--fs-caption); color: var(--c-tanah);
+  }
+  .ri-check {
+    width: 14px; height: 14px; border-radius: var(--r-full);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; flex-shrink: 0;
+  }
+  .ri-check.yes { background: var(--c-berhasil); color: #fff; }
+  .ri-check.warn { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+
+  /* ═══ RAYAKAN (celebration — replaces Periksa) ═══ */
+  .rayakan-card {
+    padding: var(--sp-4);
+    background: linear-gradient(135deg, var(--t-wujudkan-soft) 0%, #fff 100%);
+    border-radius: var(--r-lg);
+    border: 2px solid var(--t-wujudkan-muted);
+    text-align: center;
+  }
+  .rayakan-emoji { font-size: 40px; margin-bottom: var(--sp-2); }
+  .rayakan-title {
+    font-size: var(--fs-h3); font-weight: var(--fw-extra);
+    color: var(--t-wujudkan); margin-bottom: var(--sp-1);
+  }
+  .rayakan-subtitle {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.5; margin-bottom: var(--sp-3);
+  }
+  .rayakan-contributors {
+    display: flex; justify-content: center; gap: -4px;
+    margin-bottom: var(--sp-3);
+  }
+  .rayakan-avatar {
+    width: 28px; height: 28px; border-radius: var(--r-full);
+    background: var(--t-wujudkan); display: flex; align-items: center;
+    justify-content: center; font-size: 9px; font-weight: 700;
+    color: #fff; border: 2px solid #fff;
+    margin-left: -6px;
+  }
+  .rayakan-avatar:first-child { margin-left: 0; }
+  .rayakan-stats {
+    display: flex; justify-content: center; gap: var(--sp-4);
+    padding: var(--sp-2) 0;
+  }
+  .rayakan-stat { text-align: center; }
+  .rayakan-stat-num {
+    font-size: var(--fs-h3); font-weight: var(--fw-extra);
+    color: var(--t-wujudkan);
+  }
+  .rayakan-stat-label {
+    font-size: var(--fs-micro); color: var(--c-kayu);
+    font-weight: var(--fw-semi);
+  }
+  .rayakan-reactions {
+    display: flex; justify-content: center; gap: var(--sp-2);
+    margin-top: var(--sp-3);
+  }
+  .rayakan-react-btn {
+    padding: var(--sp-2) var(--sp-3); border-radius: var(--r-full);
+    border: 1.5px solid var(--c-batu); background: var(--c-susu);
+    font-size: var(--fs-caption); cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all 0.15s;
+  }
+  .rayakan-react-btn:hover { border-color: var(--t-wujudkan); background: var(--t-wujudkan-soft); }
+
+  /* Dampak row */
+  .dampak-row {
+    margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3);
+    background: var(--c-berhasil-l); border-radius: var(--r-md);
+    border: 1px solid rgba(46,125,50,0.15);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dampak-icon { font-size: 14px; }
+  .dampak-text { font-size: var(--fs-caption); color: var(--c-berhasil); font-weight: var(--fw-semi); line-height: 1.3; }
+
+  .scenario { display: none; flex-direction: column; height: 100%; }
+  .scenario.active { display: flex; }
+
+  @media (max-width: 420px) {
+    .phone-frame { width: 100%; border-radius: 0; margin: 0; min-height: 100vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-bar">
+  <h1>B2 · Wujudkan Card (v1)</h1>
+  <p>Proactive creation track · Milestones (E4 hierarchy) · Galang (E6 protected fields) · Rayakan</p>
+</div>
+
+<nav class="scenario-nav">
+  <button class="scenario-btn active" onclick="showScenario('gagasan')">1. Gagasan</button>
+  <button class="scenario-btn" onclick="showScenario('bahas')">2. Bahas</button>
+  <button class="scenario-btn" onclick="showScenario('rancang')">3. Rancang</button>
+  <button class="scenario-btn" onclick="showScenario('galang')">4. Galang</button>
+  <button class="scenario-btn" onclick="showScenario('garap')">5. Garap</button>
+  <button class="scenario-btn" onclick="showScenario('rayakan')">6. Rayakan</button>
+  <button class="scenario-btn" onclick="showScenario('tuntas')">7. Tuntas</button>
+  <div class="scenario-label">NEW: milestone hierarchy (E4) · Galang with protected fields (E6) · Rayakan celebration</div>
+</nav>
+
+<div class="phone-frame">
+
+  <!-- ════════ 1. GAGASAN — seed (no tabs) ════════ -->
+  <div id="s-gagasan" class="scenario active">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Wujudkan</div></div>
+    <div class="feed-content">
+      <div class="section-label">Benih — gagasan baru</div>
+      <div class="seed-card">
+        <div class="track-strip"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge">🌱 Gagasan</span>
+          </div>
+          <div class="card-title">Taman baca komunitas untuk anak-anak RT 05</div>
+          <div class="card-author">
+            <div class="author-avatar" style="background:var(--t-wujudkan)">SM</div>
+            <span class="author-name">Siti Maryam</span>
+            <span class="author-tier">· Terverifikasi</span>
+            <span class="card-time">1j lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">Bagaimana kalau kita buat taman baca sederhana di halaman balai RT? Banyak anak-anak yang sepulang sekolah hanya bermain tanpa kegiatan. Kita bisa kumpulkan buku bekas dan buat rak dari kayu palet.</div>
+          <div class="card-more">...selengkapnya</div>
+          <div class="card-media">
+            <div class="media-thumb">📷</div>
+          </div>
+          <div class="card-location">📍 Balai RT 05, Kel. Harapan</div>
+        </div>
+        <div class="card-stepper">
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Gagasan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Rancang</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Rayakan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action"><span class="fa-icon">💬</span><span>0</span></div>
+          <div class="footer-action"><span class="fa-icon">👥</span><span>3</span></div>
+          <span class="ai-badge classified">🤖 Wujudkan · 96%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 2. BAHAS — tabs: Diskusi | Rangkuman ════════ -->
+  <div id="s-bahas" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Taman Baca RT 05</div></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab(this, 'bahas-diskusi')">
+        <span class="tab-icon">💬</span> Diskusi
+        <span class="tab-notif"></span>
+      </button>
+      <button class="tab-btn" onclick="showTab(this, 'bahas-rangkuman')">
+        <span class="tab-icon">📋</span> Rangkuman
+      </button>
+    </div>
+    <div class="swipe-hint">‹ geser ›</div>
+
+    <!-- Tab 1: Diskusi -->
+    <div id="bahas-diskusi" class="tab-panel active" style="position:relative;">
+      <div class="chat-area">
+        <div class="chat-date">Hari ini</div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Siti Maryam</div>
+          <div class="chat-text">Ide ini udah lama saya pikirkan. Anak-anak sepulang sekolah cuma nongkrong di warung. Kalau ada taman baca, bisa sambil belajar.</div>
+          <div class="chat-time">09:14</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Budi Hartono</div>
+          <div class="chat-text">Setuju Bu Siti! Saya punya sekitar 50 buku anak yang sudah tidak terpakai. Bisa disumbangkan.</div>
+          <div class="chat-time">09:20</div>
+          <div class="chat-reactions"><span class="chat-react">❤️ <span class="react-count">4</span></span></div>
+        </div>
+
+        <div class="chat-bubble self">
+          <div class="chat-name">Anda</div>
+          <div class="chat-text">Kalau tempat, halaman balai RT lumayan luas. Tapi perlu rak dan atap sederhana supaya buku tidak kehujanan.</div>
+          <div class="chat-time">09:25</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Wahyu</div>
+          <div class="chat-text">Saya tukang kayu, bisa bikin rak dari palet bekas. Cuma perlu dana untuk beli cat dan paku. Mungkin 500rb cukup.</div>
+          <div class="chat-time">09:32</div>
+          <div class="chat-reactions"><span class="chat-react">💪 <span class="react-count">6</span></span></div>
+        </div>
+
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-07 · Rangkuman awal</div>
+          <div class="ai-chat-text">Gagasan: taman baca anak di balai RT. Sumber daya teridentifikasi: 50 buku (Budi), tukang kayu (Pak Wahyu). Kebutuhan: rak kayu, atap, dana ±Rp500rb. Lihat tab 📋 Rangkuman untuk detail.</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Ibu Dewi</div>
+          <div class="chat-text">Saya guru SD, bisa bantu jadi relawan baca setiap Sabtu sore. Anak-anak pasti senang kalau ada yang bacakan cerita.</div>
+          <div class="chat-time">10:15</div>
+          <div class="chat-reactions"><span class="chat-react">🎉 <span class="react-count">8</span></span></div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" placeholder="Tulis pesan...">
+        <button class="chat-send">↑</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: Rangkuman -->
+    <div id="bahas-rangkuman" class="tab-panel">
+      <div class="feed-content">
+        <div class="ai-summary">
+          <div class="ai-summary-header">🤖 AI-07 · Rangkuman Diskusi</div>
+          <div class="ai-summary-text">Komunitas antusias dengan gagasan taman baca anak di balai RT 05. Sudah teridentifikasi: lokasi (halaman balai RT), sumber buku (50 buku dari Budi), tenaga ahli kayu (Pak Wahyu), dan relawan baca (Ibu Dewi, guru SD). Kebutuhan utama: dana material ±Rp500rb, rak kayu, atap sederhana.</div>
+        </div>
+
+        <div style="margin-top:var(--sp-3);">
+          <div class="section-label">Sumber daya teridentifikasi</div>
+          <div style="display:flex;flex-direction:column;gap:var(--sp-1);margin-top:var(--sp-1);">
+            <div style="display:flex;align-items:center;gap:6px;font-size:var(--fs-caption);color:var(--c-tanah);">
+              <span style="font-size:12px;">📚</span> 50 buku anak — Budi Hartono
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:var(--fs-caption);color:var(--c-tanah);">
+              <span style="font-size:12px;">🔨</span> Tenaga tukang kayu — Pak Wahyu
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:var(--fs-caption);color:var(--c-tanah);">
+              <span style="font-size:12px;">👩‍🏫</span> Relawan baca Sabtu — Ibu Dewi
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:var(--fs-caption);color:var(--c-tanah);">
+              <span style="font-size:12px;">📍</span> Lokasi: halaman balai RT 05
+            </div>
+          </div>
+        </div>
+
+        <div class="feasibility-pill high" style="margin-top:var(--sp-3);">✓ Kelayakan tinggi — sumber daya tersedia</div>
+
+        <button class="gate-btn ready" style="margin-top:var(--sp-3);">Lanjut ke Rancang →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 3. RANCANG — tabs: Papan GR | Koordinasi ════════ -->
+  <div id="s-rancang" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Taman Baca RT 05</div></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab(this, 'rancang-papan')">
+        <span class="tab-icon">📋</span> Papan GR
+      </button>
+      <button class="tab-btn" onclick="showTab(this, 'rancang-koordinasi')">
+        <span class="tab-icon">💬</span> Koordinasi
+        <span class="tab-notif"></span>
+      </button>
+    </div>
+    <div class="swipe-hint">‹ geser ›</div>
+
+    <!-- Tab 1: Papan GR with milestones -->
+    <div id="rancang-papan" class="tab-panel active">
+      <div class="feed-content">
+        <div class="papan-gr">
+          <div class="papan-header">
+            <span class="ph-icon">📋</span>
+            <span class="ph-title">Papan Gotong Royong</span>
+            <span class="ph-status filling">Menyusun</span>
+          </div>
+          <div class="papan-body">
+
+            <!-- PIC -->
+            <div class="pic-row">
+              <div class="pic-avatar">SM</div>
+              <div class="pic-info">
+                <div class="pic-label">Penanggung Jawab (PIC)</div>
+                <div class="pic-name">Siti Maryam</div>
+              </div>
+              <span class="pic-status">✓ Aktif</span>
+            </div>
+
+            <!-- ═══ MILESTONE TRACKER (E4 hierarchical) ═══ -->
+            <div class="milestone-section">
+              <div class="milestone-title">🎯 Tonggak Pencapaian <span class="ai-draft">🤖 draf AI</span></div>
+
+              <!-- Milestone 1 — with sub-tasks -->
+              <div class="milestone-card active">
+                <div class="ms-header">
+                  <span class="ms-icon">🏗️</span>
+                  <span class="ms-name">Fase 1 · Persiapan Fisik</span>
+                  <span class="ms-progress partial">1/3</span>
+                </div>
+                <div class="ms-subtasks">
+                  <div class="subtask-item is-done">
+                    <div class="check done">✓</div>
+                    <span>Survei lokasi dan ukur area</span>
+                    <span class="subtask-assignee">Siti</span>
+                  </div>
+                  <div class="subtask-item">
+                    <div class="check active">●</div>
+                    <span>Buat rak dari kayu palet (3 unit)</span>
+                    <span class="subtask-assignee">Pak Wahyu</span>
+                  </div>
+                  <div class="subtask-item">
+                    <div class="check pending"></div>
+                    <span>Pasang atap sederhana</span>
+                    <span class="subtask-assignee">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Milestone 2 -->
+              <div class="milestone-card">
+                <div class="ms-header">
+                  <span class="ms-icon">📚</span>
+                  <span class="ms-name">Fase 2 · Kumpulkan Buku</span>
+                  <span class="ms-progress pending">0/2</span>
+                </div>
+                <div class="ms-subtasks">
+                  <div class="subtask-item">
+                    <div class="check pending"></div>
+                    <span>Kumpulkan donasi buku dari warga</span>
+                    <span class="subtask-assignee">Budi</span>
+                  </div>
+                  <div class="subtask-item">
+                    <div class="check pending"></div>
+                    <span>Sortir dan label buku per kategori umur</span>
+                    <span class="subtask-assignee">Ibu Dewi</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Milestone 3 -->
+              <div class="milestone-card">
+                <div class="ms-header">
+                  <span class="ms-icon">🎉</span>
+                  <span class="ms-name">Fase 3 · Peluncuran</span>
+                  <span class="ms-progress pending">0/2</span>
+                </div>
+                <div class="ms-subtasks">
+                  <div class="subtask-item">
+                    <div class="check pending"></div>
+                    <span>Atur jadwal relawan baca mingguan</span>
+                    <span class="subtask-assignee">Ibu Dewi</span>
+                  </div>
+                  <div class="subtask-item">
+                    <div class="check pending"></div>
+                    <span>Acara pembukaan taman baca</span>
+                    <span class="subtask-assignee">Siti</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Kontribusi -->
+            <div class="kontribusi-section">
+              <div class="kontribusi-title">🤝 Daftar Kontribusi</div>
+
+              <div class="kontribusi-slot filled">
+                <div class="ks-header">
+                  <span class="ks-type-icon">📚</span>
+                  <span class="ks-type-label">Donasi Buku</span>
+                  <span class="ks-count full">1/1</span>
+                </div>
+                <div class="ks-body">
+                  <div class="ks-person">
+                    <div class="ks-person-avatar">BH</div>
+                    <span class="ks-person-name">Budi Hartono — 50 buku anak</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="kontribusi-slot partial">
+                <div class="ks-header">
+                  <span class="ks-type-icon">🔨</span>
+                  <span class="ks-type-label">Tenaga Ahli Kayu</span>
+                  <span class="ks-count full">1/1</span>
+                </div>
+                <div class="ks-body">
+                  <div class="ks-person">
+                    <div class="ks-person-avatar">WH</div>
+                    <span class="ks-person-name">Pak Wahyu — tukang kayu</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="kontribusi-slot">
+                <div class="ks-header">
+                  <span class="ks-type-icon">🎨</span>
+                  <span class="ks-type-label">Cat & Dekorasi</span>
+                  <span class="ks-count partial">0/1</span>
+                </div>
+                <div class="ks-body">
+                  <div class="ks-empty-slot">
+                    <div class="ks-plus">+</div>
+                    <span class="ks-cta">Bantu sediakan cat & dekorasi</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Readiness -->
+            <div class="readiness">
+              <div class="readiness-title">🚦 Kesiapan Mulai</div>
+              <div class="readiness-items">
+                <div class="readiness-item"><div class="ri-check yes">✓</div> PIC terkonfirmasi</div>
+                <div class="readiness-item"><div class="ri-check yes">✓</div> Tonggak pencapaian tersusun</div>
+                <div class="readiness-item"><div class="ri-check warn">!</div> Kontribusi belum lengkap (2/3)</div>
+                <div class="readiness-item"><div class="ri-check warn">!</div> Galang belum diaktifkan</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Koordinasi chat -->
+    <div id="rancang-koordinasi" class="tab-panel" style="position:relative;">
+      <div class="chat-area">
+        <div class="chat-date">Hari ini</div>
+        <div class="chat-bubble self">
+          <div class="chat-name">Siti Maryam</div>
+          <div class="chat-text">Saya sudah bagi jadi 3 fase di Papan. Pak Wahyu, fase 1 mulai dari buat rak ya. Bisa mulai kapan?</div>
+          <div class="chat-time">14:20</div>
+        </div>
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Wahyu</div>
+          <div class="chat-text">Bisa mulai Sabtu ini Bu. Palet sudah ada 5 lembar. Tinggal beli paku dan cat.</div>
+          <div class="chat-time">14:28</div>
+        </div>
+        <div class="chat-bubble other">
+          <div class="chat-name">Budi Hartono</div>
+          <div class="chat-text">Perlu buka galang dana ga untuk beli material? Saya bisa mulai kumpulkan dari tetangga sekitar.</div>
+          <div class="chat-time">14:35</div>
+        </div>
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-07 · Saran</div>
+          <div class="ai-chat-text">Terdeteksi kebutuhan dana untuk material. Disarankan aktifkan fitur Galang untuk mengumpulkan dana secara transparan. Lihat tab 📋 Papan GR → aktifkan Galang.</div>
+        </div>
+        <div class="chat-bubble self">
+          <div class="chat-name">Siti Maryam</div>
+          <div class="chat-text">Oke, saya aktifkan Galang ya. Target Rp750rb untuk material + cat.</div>
+          <div class="chat-time">14:45</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" placeholder="Koordinasi...">
+        <button class="chat-send">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 4. GALANG — sub-lifecycle with protected fields ════════ -->
+  <div id="s-galang" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Taman Baca RT 05</div></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab(this, 'galang-panel-tab')">
+        <span class="tab-icon">💰</span> Galang
+      </button>
+      <button class="tab-btn" onclick="showTab(this, 'galang-chat')">
+        <span class="tab-icon">💬</span> Koordinasi
+        <span class="tab-notif"></span>
+      </button>
+    </div>
+    <div class="swipe-hint">‹ geser ›</div>
+
+    <!-- Tab 1: Galang panel -->
+    <div id="galang-panel-tab" class="tab-panel active">
+      <div class="feed-content">
+        <div class="galang-panel">
+          <div class="galang-panel-header">
+            <span class="gp-icon">💰</span>
+            <span class="gp-title">Galang Dana</span>
+            <span class="gp-stage">Kumpul</span>
+          </div>
+          <div class="galang-body">
+
+            <!-- Sasaran — protected form -->
+            <div class="galang-target">
+              <div class="galang-target-label">🎯 Sasaran</div>
+              <div class="galang-amount-row">
+                <span class="galang-currency">Rp</span>
+                <span class="galang-amount">750.000</span>
+                <span class="protected-badge">🔒 DILINDUNGI</span>
+              </div>
+              <div style="font-size:var(--fs-micro);color:var(--c-kayu);margin-top:2px;">Batas waktu: 20 Feb 2026 · Ditetapkan oleh PIC</div>
+            </div>
+
+            <!-- Kumpul progress -->
+            <div class="galang-progress">
+              <div class="galang-bar-wrap">
+                <div class="galang-bar"><div class="gfill" style="width:62%;"></div></div>
+                <span class="galang-percent">62%</span>
+              </div>
+              <div class="galang-stats">
+                <span>💰 Rp465.000 terkumpul</span>
+                <span>👥 8 donatur</span>
+              </div>
+            </div>
+
+            <!-- Contributors with protected amounts -->
+            <div class="galang-contributors">
+              <div class="section-label">Donatur terbaru</div>
+              <div class="gc-item">
+                <div class="gc-avatar" style="background:var(--t-wujudkan)">BH</div>
+                <span class="gc-name">Budi Hartono</span>
+                <span class="gc-amount">Rp150.000</span>
+              </div>
+              <div class="gc-item">
+                <div class="gc-avatar">DW</div>
+                <span class="gc-name">Ibu Dewi</span>
+                <span class="gc-amount">Rp100.000</span>
+              </div>
+              <div class="gc-item">
+                <div class="gc-avatar anon">?</div>
+                <span class="gc-name anon">Anonim</span>
+                <span class="gc-amount">Rp50.000</span>
+              </div>
+              <div class="gc-item">
+                <div class="gc-avatar">RN</div>
+                <span class="gc-name">Rina Nurhasanah</span>
+                <span class="gc-amount">Rp75.000</span>
+              </div>
+              <div style="font-size:var(--fs-micro);color:var(--c-kayu);margin-top:var(--sp-1);text-align:center;">+ 4 donatur lainnya</div>
+            </div>
+
+            <!-- Protected fields notice -->
+            <div style="padding:var(--sp-2) var(--sp-3);background:var(--c-bahaya-l);border-radius:var(--r-md);margin-top:var(--sp-2);">
+              <div style="font-size:var(--fs-micro);font-weight:var(--fw-bold);color:var(--c-bahaya);display:flex;align-items:center;gap:4px;">
+                🔒 Data Keuangan Dilindungi
+              </div>
+              <div style="font-size:var(--fs-micro);color:var(--c-tanah);line-height:1.4;margin-top:2px;">
+                Jumlah donasi dan target ditetapkan oleh manusia. AI tidak dapat melihat, mengubah, atau menyarankan perubahan pada data keuangan.
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Galang chat -->
+    <div id="galang-chat" class="tab-panel" style="position:relative;">
+      <div class="chat-area">
+        <div class="chat-date">Kemarin</div>
+        <div class="chat-bubble self">
+          <div class="chat-name">Siti Maryam</div>
+          <div class="chat-text">Galang sudah aktif! Target Rp750rb untuk beli material rak dan cat. Semua transparan di sini ya.</div>
+          <div class="chat-time">15:00</div>
+        </div>
+        <div class="chat-bubble other">
+          <div class="chat-name">Budi Hartono</div>
+          <div class="chat-text">Saya mulai duluan ya, Rp150rb. Semoga yang lain ikut juga 💪</div>
+          <div class="chat-time">15:12</div>
+          <div class="chat-reactions"><span class="chat-react">👏 <span class="react-count">5</span></span></div>
+        </div>
+        <div class="chat-date">Hari ini</div>
+        <div class="chat-bubble other">
+          <div class="chat-name">Rina Nurhasanah</div>
+          <div class="chat-text">Sudah transfer 75rb. Semoga cepat tercapai targetnya!</div>
+          <div class="chat-time">08:30</div>
+        </div>
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-07 · Update</div>
+          <div class="ai-chat-text">Galang sudah 62% dari target. 8 donatur berpartisipasi. Lihat tab 💰 Galang untuk detail progres.</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" placeholder="Tulis pesan...">
+        <button class="chat-send">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 5. GARAP — tabs: Progres | Koordinasi ════════ -->
+  <div id="s-garap" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Taman Baca RT 05</div></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab(this, 'garap-progres')">
+        <span class="tab-icon">✅</span> Progres
+      </button>
+      <button class="tab-btn" onclick="showTab(this, 'garap-koordinasi')">
+        <span class="tab-icon">💬</span> Koordinasi
+        <span class="tab-notif"></span>
+      </button>
+    </div>
+    <div class="swipe-hint">‹ geser ›</div>
+
+    <!-- Tab 1: Milestone progress -->
+    <div id="garap-progres" class="tab-panel active">
+      <div class="feed-content">
+        <div class="section-label">Tonggak pencapaian · sedang berjalan</div>
+
+        <!-- Milestone 1 — DONE -->
+        <div class="milestone-card done">
+          <div class="ms-header">
+            <span class="ms-icon">🏗️</span>
+            <span class="ms-name" style="text-decoration:line-through;color:var(--c-pasir);">Fase 1 · Persiapan Fisik</span>
+            <span class="ms-progress complete">3/3 ✓</span>
+          </div>
+          <div class="ms-subtasks">
+            <div class="subtask-item is-done"><div class="check done">✓</div><span>Survei lokasi dan ukur area</span><span class="subtask-assignee">Siti</span></div>
+            <div class="subtask-item is-done"><div class="check done">✓</div><span>Buat rak dari kayu palet (3 unit)</span><span class="subtask-assignee">Pak Wahyu</span></div>
+            <div class="subtask-item is-done"><div class="check done">✓</div><span>Pasang atap sederhana</span><span class="subtask-assignee">Pak Wahyu</span></div>
+          </div>
+        </div>
+
+        <!-- Milestone 2 — ACTIVE -->
+        <div class="milestone-card active">
+          <div class="ms-header">
+            <span class="ms-icon">📚</span>
+            <span class="ms-name">Fase 2 · Kumpulkan Buku</span>
+            <span class="ms-progress partial">1/2</span>
+          </div>
+          <div class="ms-subtasks">
+            <div class="subtask-item is-done"><div class="check done">✓</div><span>Kumpulkan donasi buku dari warga</span><span class="subtask-assignee">Budi</span></div>
+            <div class="subtask-item"><div class="check active">●</div><span>Sortir dan label buku per kategori umur</span><span class="subtask-assignee">Ibu Dewi</span></div>
+          </div>
+        </div>
+
+        <!-- Milestone 3 — PENDING -->
+        <div class="milestone-card">
+          <div class="ms-header">
+            <span class="ms-icon">🎉</span>
+            <span class="ms-name">Fase 3 · Peluncuran</span>
+            <span class="ms-progress pending">0/2</span>
+          </div>
+        </div>
+
+        <!-- Galang mini-widget -->
+        <div style="padding:var(--sp-2) var(--sp-3);background:var(--c-bara);border-radius:var(--r-md);border:1px solid var(--t-wujudkan-muted);margin-top:var(--sp-1);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:var(--sp-1);">
+            <span style="font-size:12px;">💰</span>
+            <span style="font-size:var(--fs-micro);font-weight:var(--fw-extra);color:var(--c-api);">Galang</span>
+            <span style="margin-left:auto;font-size:var(--fs-caption);font-weight:var(--fw-extra);color:var(--c-tanah-gelap);">Rp750.000 / Rp750.000</span>
+          </div>
+          <div class="galang-bar"><div class="gfill" style="width:100%;background:var(--c-berhasil);"></div></div>
+          <div style="font-size:var(--fs-micro);color:var(--c-berhasil);font-weight:var(--fw-bold);margin-top:var(--sp-1);">✓ Target tercapai · 12 donatur</div>
+        </div>
+
+        <!-- Overall progress computed -->
+        <div style="padding:var(--sp-3);background:var(--c-kapas);border-radius:var(--r-md);border:1px solid var(--c-batu);margin-top:var(--sp-2);">
+          <div style="font-size:var(--fs-caption);font-weight:var(--fw-extra);color:var(--c-tanah-gelap);margin-bottom:var(--sp-2);">📊 Progres Keseluruhan</div>
+          <div class="galang-bar-wrap">
+            <div class="galang-bar"><div class="gfill" style="width:57%;"></div></div>
+            <span class="galang-percent">57%</span>
+          </div>
+          <div style="font-size:var(--fs-micro);color:var(--c-kayu);margin-top:var(--sp-1);">4 dari 7 tugas selesai · Fase 2 sedang berjalan</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Koordinasi -->
+    <div id="garap-koordinasi" class="tab-panel" style="position:relative;">
+      <div class="chat-area">
+        <div class="chat-date">Sabtu, 15 Feb</div>
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Wahyu</div>
+          <div class="chat-text">Rak sudah jadi 3 unit! Tinggal cat aja. Foto terlampir 📷</div>
+          <div class="chat-time">16:30</div>
+          <div class="chat-reactions"><span class="chat-react">🔥 <span class="react-count">9</span></span></div>
+        </div>
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-07 · Auto-update</div>
+          <div class="ai-chat-text">Berdasarkan laporan Pak Wahyu, tugas "Buat rak dari kayu palet" ditandai selesai ✓. Fase 1 tinggal 1 tugas: pasang atap. Lihat tab ✅ Progres.</div>
+        </div>
+        <div class="chat-bubble self">
+          <div class="chat-name">Siti Maryam</div>
+          <div class="chat-text">Bagus sekali Pak! Atapnya bisa dipasang Minggu besok?</div>
+          <div class="chat-time">16:45</div>
+        </div>
+        <div class="chat-date">Hari ini</div>
+        <div class="chat-bubble other">
+          <div class="chat-name">Budi Hartono</div>
+          <div class="chat-text">Buku sudah terkumpul 87 total dari 6 keluarga! Ibu Dewi, bisa mulai sortir?</div>
+          <div class="chat-time">10:20</div>
+        </div>
+        <div class="chat-bubble other">
+          <div class="chat-name">Ibu Dewi</div>
+          <div class="chat-text">Siap, besok Sabtu saya sortir. Saya bawa label warna-warni dari sekolah.</div>
+          <div class="chat-time">10:35</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" placeholder="Koordinasi...">
+        <button class="chat-send">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 6. RAYAKAN — celebration (replaces Periksa) ════════ -->
+  <div id="s-rayakan" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Taman Baca RT 05</div></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab(this, 'rayakan-display')">
+        <span class="tab-icon">🎉</span> Rayakan
+      </button>
+      <button class="tab-btn" onclick="showTab(this, 'rayakan-chat')">
+        <span class="tab-icon">💬</span> Ucapan
+        <span class="tab-notif"></span>
+      </button>
+    </div>
+    <div class="swipe-hint">‹ geser ›</div>
+
+    <!-- Tab 1: Celebration display -->
+    <div id="rayakan-display" class="tab-panel active">
+      <div class="feed-content">
+        <div class="rayakan-card">
+          <div class="rayakan-emoji">🎉📚</div>
+          <div class="rayakan-title">Taman Baca RT 05 Resmi Dibuka!</div>
+          <div class="rayakan-subtitle">Gagasan Siti Maryam berhasil diwujudkan bersama komunitas RT 05 dalam 3 minggu.</div>
+
+          <div class="rayakan-contributors">
+            <div class="rayakan-avatar" style="background:var(--t-wujudkan)">SM</div>
+            <div class="rayakan-avatar">BH</div>
+            <div class="rayakan-avatar">WH</div>
+            <div class="rayakan-avatar" style="background:var(--c-api)">DW</div>
+            <div class="rayakan-avatar" style="background:var(--c-pasir)">+8</div>
+          </div>
+
+          <div class="rayakan-stats">
+            <div class="rayakan-stat">
+              <div class="rayakan-stat-num">12</div>
+              <div class="rayakan-stat-label">kontributor</div>
+            </div>
+            <div class="rayakan-stat">
+              <div class="rayakan-stat-num">87</div>
+              <div class="rayakan-stat-label">buku</div>
+            </div>
+            <div class="rayakan-stat">
+              <div class="rayakan-stat-num">Rp750k</div>
+              <div class="rayakan-stat-label">dana</div>
+            </div>
+          </div>
+
+          <div class="rayakan-reactions">
+            <button class="rayakan-react-btn">👏 Apresiasi</button>
+            <button class="rayakan-react-btn">🎉 Selamat!</button>
+            <button class="rayakan-react-btn">💚 Bangga</button>
+          </div>
+        </div>
+
+        <!-- Gallery placeholder -->
+        <div style="margin-top:var(--sp-3);">
+          <div class="section-label">Dokumentasi</div>
+          <div class="card-media" style="margin-top:var(--sp-1);">
+            <div class="media-thumb" style="width:72px;height:72px;font-size:24px;">📷</div>
+            <div class="media-thumb" style="width:72px;height:72px;font-size:24px;">📷</div>
+            <div class="media-thumb" style="width:72px;height:72px;font-size:24px;">📷</div>
+            <div class="media-thumb" style="width:72px;height:72px;font-size:14px;color:var(--c-kayu);">+5</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Community congratulations -->
+    <div id="rayakan-chat" class="tab-panel" style="position:relative;">
+      <div class="chat-area">
+        <div class="chat-date">Hari ini</div>
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak RT</div>
+          <div class="chat-text">Luar biasa! Taman baca ini sudah anak-anak nantikan. Terima kasih Bu Siti dan semua yang terlibat. Ini contoh gotong royong yang nyata. 🙏</div>
+          <div class="chat-time">10:00</div>
+          <div class="chat-reactions"><span class="chat-react">❤️ <span class="react-count">14</span></span><span class="chat-react">👏 <span class="react-count">11</span></span></div>
+        </div>
+        <div class="chat-bubble other">
+          <div class="chat-name">Ibu Ani</div>
+          <div class="chat-text">Anak saya senang sekali! Langsung pilih buku cerita rakyat. Terima kasih banyak 💚</div>
+          <div class="chat-time">10:15</div>
+        </div>
+        <div class="chat-bubble self">
+          <div class="chat-name">Siti Maryam</div>
+          <div class="chat-text">Alhamdulillah, ini semua berkat kerja sama warga. Tanpa Pak Wahyu, Budi, Ibu Dewi, dan semua donatur, tidak mungkin terwujud. Mari jaga bersama!</div>
+          <div class="chat-time">10:20</div>
+          <div class="chat-reactions"><span class="chat-react">🫶 <span class="react-count">18</span></span></div>
+        </div>
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-07 · Pencapaian</div>
+          <div class="ai-chat-text">Gagasan diwujudkan dalam 21 hari. 12 kontributor, 87 buku terkumpul, dana 100% tercapai. Dampak akan diukur dalam 30 hari.</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" placeholder="Ucapkan selamat...">
+        <button class="chat-send">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 7. TUNTAS — archive (no tabs) ════════ -->
+  <div id="s-tuntas" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Wujudkan</div></div>
+    <div class="feed-content">
+      <div class="section-label">Arsip — gagasan terwujud</div>
+      <div class="seed-card">
+        <div class="track-strip"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge">🌱 Gagasan</span>
+          </div>
+          <div class="card-title">Taman baca komunitas untuk anak-anak RT 05</div>
+          <div class="card-author">
+            <div class="author-avatar" style="background:var(--t-wujudkan)">SM</div>
+            <span class="author-name">Siti Maryam</span>
+            <span class="author-tier">· Terverifikasi</span>
+            <span class="card-time">21 hari</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">Taman baca anak di halaman balai RT 05 dengan 87 buku donasi, rak kayu palet buatan Pak Wahyu, dan program relawan baca setiap Sabtu oleh Ibu Dewi.</div>
+          <div class="dampak-row">
+            <span class="dampak-icon">🌱</span>
+            <span class="dampak-text">Dampak: 23 anak aktif membaca mingguan, 4 relawan tetap, koleksi bertambah menjadi 120 buku</span>
+          </div>
+        </div>
+        <div class="card-stepper">
+          <div class="step complete"><div class="step-dot"></div><div class="step-label">Gagasan</div></div>
+          <div class="step-connector done"></div>
+          <div class="step complete"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector done"></div>
+          <div class="step complete"><div class="step-dot"></div><div class="step-label">Rancang</div></div>
+          <div class="step-connector done"></div>
+          <div class="step complete"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+          <div class="step-connector done"></div>
+          <div class="step complete"><div class="step-dot"></div><div class="step-label">Rayakan</div></div>
+          <div class="step-connector done"></div>
+          <div class="step complete"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action"><span class="fa-icon">💬</span><span>47</span></div>
+          <div class="footer-action"><span class="fa-icon">👥</span><span>12</span></div>
+          <div class="footer-action"><span class="fa-icon">⏱</span><span>21h</span></div>
+          <span class="ai-badge" style="background:var(--c-berhasil-l);color:var(--c-berhasil);">🌱 Dampak 30h</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showScenario(id) {
+  document.querySelectorAll('.scenario').forEach(s => s.classList.remove('active'));
+  document.getElementById('s-' + id).classList.add('active');
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+function showTab(btn, panelId) {
+  const scenario = btn.closest('.scenario');
+  scenario.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  scenario.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(panelId).classList.add('active');
+}
+</script>
+
+</body>
+</html>

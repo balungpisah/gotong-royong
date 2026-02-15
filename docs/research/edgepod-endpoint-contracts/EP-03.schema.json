@@ -1,0 +1,323 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gotong-royong.internal/schema/edgepod-EP-03.schema.json",
+  "title": "Edge-Pod contract for EP-03",
+  "endpoint_id": "EP-03",
+  "path": "/api/v1/edge-pod/ai/03/duplicate-detection",
+  "method": "POST",
+  "prompt_id": "DUPLICATE-001",
+  "prompt_source": "14-prompt-versioning.md",
+  "prompt_version": "v0.2.0",
+  "definitions": {
+    "Actor": {
+      "type": "object",
+      "required": [
+        "user_id",
+        "platform_user_id",
+        "role"
+      ],
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform_user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "member",
+            "admin",
+            "moderator",
+            "humas",
+            "bendahara",
+            "pic",
+            "system"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "GeoPoint": {
+      "type": "object",
+      "required": [
+        "lat",
+        "lng"
+      ],
+      "properties": {
+        "lat": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lng": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        }
+      },
+      "additionalProperties": true
+    },
+    "BaseRequest": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "correlation_id",
+        "actor",
+        "trigger",
+        "payload_version"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "pattern": "^req_[A-Za-z0-9_-]{8,}$"
+        },
+        "correlation_id": {
+          "type": "string",
+          "minLength": 4
+        },
+        "actor": {
+          "$ref": "#/definitions/Actor"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string",
+          "enum": [
+            "user_action",
+            "timer",
+            "webhook",
+            "async_batch"
+          ]
+        },
+        "payload_version": {
+          "type": "string"
+        },
+        "privacy_level": {
+          "type": "string",
+          "enum": [
+            "open",
+            "l1",
+            "l2",
+            "vault"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "SuccessEnvelope": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "result_version",
+        "output"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result_version": {
+          "type": "string",
+          "pattern": "^v\\d+\\.\\d+\\.\\d+$"
+        },
+        "output": {
+          "type": "object"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reason_code": {
+          "type": "string"
+        },
+        "actor_context": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "ErrorEnvelope": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "result_version",
+        "error"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result_version": {
+          "type": "string",
+          "pattern": "^v\\d+\\.\\d+\\.\\d+$"
+        },
+        "error": {
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "retryable"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "MODEL_UNAVAILABLE",
+                "INVALID_INPUT",
+                "TIMEOUT",
+                "SCHEMA_VIOLATION",
+                "RETRYABLE_TRANSIENT",
+                "POLICY_BLOCK"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "request_schema": {
+    "allOf": [
+      {
+        "$ref": "#/definitions/BaseRequest"
+      },
+      {
+        "type": "object",
+        "required": [
+          "seed_text"
+        ],
+        "properties": {
+          "seed_text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "media_hashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "embedding": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "location": {
+            "$ref": "#/definitions/GeoPoint"
+          },
+          "radius_km": {
+            "type": "number",
+            "minimum": 0
+          },
+          "scope": {
+            "type": "string"
+          },
+          "exclude_seed_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "query_options": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    ]
+  },
+  "success_response_schema": {
+    "allOf": [
+      {
+        "$ref": "#/definitions/SuccessEnvelope"
+      },
+      {
+        "required": [
+          "output"
+        ],
+        "properties": {
+          "output": {
+            "type": "object",
+            "required": [
+              "matches",
+              "top_match",
+              "confidence",
+              "auto_block"
+            ],
+            "properties": {
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "seed_id",
+                    "similarity",
+                    "distance_km",
+                    "recommendation"
+                  ],
+                  "properties": {
+                    "seed_id": {
+                      "type": "string"
+                    },
+                    "similarity": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "distance_km": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "recommendation": {
+                      "type": "string",
+                      "enum": [
+                        "allow",
+                        "warn",
+                        "block"
+                      ]
+                    }
+                  }
+                }
+              },
+              "top_match": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "auto_block": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "error_response_schema": {
+    "$ref": "#/definitions/ErrorEnvelope"
+  }
+}

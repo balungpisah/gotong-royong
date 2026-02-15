@@ -1,0 +1,569 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — A3 · Typography & Spacing (Tanah)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* ── Type Scale (1.250 Major Third) ── */
+    --fs-display:  32px;   /* 2.000rem */
+    --fs-h1:       26px;   /* 1.625rem */
+    --fs-h2:       20px;   /* 1.250rem */
+    --fs-h3:       16px;   /* 1.000rem */
+    --fs-body:     14px;   /* 0.875rem */
+    --fs-small:    12px;   /* 0.750rem */
+    --fs-caption:  11px;   /* 0.688rem */
+    --fs-micro:     9px;   /* 0.563rem */
+
+    /* ── Line Heights ── */
+    --lh-tight:    1.2;
+    --lh-normal:   1.5;
+    --lh-relaxed:  1.7;
+
+    /* ── Font Weights ── */
+    --fw-regular:  400;
+    --fw-semi:     600;
+    --fw-bold:     700;
+    --fw-extra:    800;
+
+    /* ── Spacing Scale (4px base) ── */
+    --sp-1:   4px;
+    --sp-2:   8px;
+    --sp-3:  12px;
+    --sp-4:  16px;
+    --sp-5:  20px;
+    --sp-6:  24px;
+    --sp-8:  32px;
+    --sp-10: 40px;
+    --sp-12: 48px;
+    --sp-16: 64px;
+
+    /* ── Corner Radii ── */
+    --r-sm:    6px;
+    --r-md:   10px;
+    --r-lg:   14px;
+    --r-xl:   20px;
+    --r-full: 9999px;
+
+    /* ── Elevation ── */
+    --shadow-sm:  0 1px  4px rgba(62,39,35,0.06);
+    --shadow-md:  0 2px 12px rgba(62,39,35,0.08);
+    --shadow-lg:  0 4px 24px rgba(62,39,35,0.12);
+    --shadow-xl:  0 8px 40px rgba(62,39,35,0.16);
+
+    /* ── Colors (from A2) ── */
+    --c-tanah-gelap: #3E2723;
+    --c-tanah:       #5D4037;
+    --c-kayu:        #8D6E63;
+    --c-pasir:       #A1887F;
+    --c-batu:        #D7CCC8;
+    --c-kapas:       #F5EDE3;
+    --c-susu:        #FFFBF5;
+    --c-api:         #C05621;
+    --c-bara:        #FFF3E0;
+  }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: var(--c-kapas);
+    color: var(--c-tanah-gelap);
+    min-height: 100vh;
+    padding: 0 0 60px 0;
+  }
+
+  .top-bar {
+    background: var(--c-tanah-gelap);
+    color: #fff;
+    padding: 24px 32px;
+    text-align: center;
+  }
+  .top-bar h1 { font-size: 18px; font-weight: 700; }
+  .top-bar p { font-size: 13px; opacity: 0.6; margin-top: 4px; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+  .section { margin-top: 40px; }
+  .section:first-child { margin-top: 0; }
+  .section-title {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--c-kayu); margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--c-batu);
+  }
+  .section-note {
+    font-size: 12px; color: var(--c-pasir); margin-bottom: 16px; line-height: 1.5;
+  }
+
+  /* ── Type Scale Display ── */
+  .type-scale {
+    background: var(--c-susu);
+    border-radius: var(--r-lg);
+    padding: var(--sp-6);
+    box-shadow: var(--shadow-md);
+  }
+  .type-row {
+    display: grid;
+    grid-template-columns: 90px 60px 50px 1fr;
+    align-items: baseline;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--c-kapas);
+    gap: 12px;
+  }
+  .type-row:last-child { border-bottom: none; }
+  .type-row .t-name {
+    font-size: 10px; font-weight: 700; color: var(--c-api);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .type-row .t-size {
+    font-size: 10px; color: var(--c-pasir); font-weight: 600;
+  }
+  .type-row .t-weight {
+    font-size: 10px; color: var(--c-pasir); font-weight: 600;
+  }
+
+  /* ── Spacing Visual ── */
+  .spacing-grid {
+    display: flex; flex-wrap: wrap; gap: 12px;
+  }
+  .sp-item {
+    background: var(--c-susu);
+    border-radius: var(--r-md);
+    padding: 12px;
+    box-shadow: var(--shadow-sm);
+    display: flex; align-items: flex-end; gap: 10px;
+    min-width: 100px;
+  }
+  .sp-item .sp-block {
+    background: var(--c-api);
+    border-radius: 4px;
+    opacity: 0.7;
+  }
+  .sp-item .sp-label {
+    font-size: 10px; font-weight: 700; color: var(--c-tanah);
+  }
+  .sp-item .sp-value {
+    font-size: 9px; color: var(--c-pasir);
+  }
+
+  /* ── Radius Visual ── */
+  .radius-row {
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .radius-item {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .radius-box {
+    width: 64px; height: 64px;
+    background: var(--c-api);
+    opacity: 0.75;
+  }
+  .radius-label {
+    font-size: 10px; font-weight: 700; color: var(--c-tanah);
+    text-align: center;
+  }
+  .radius-value {
+    font-size: 9px; color: var(--c-pasir);
+  }
+
+  /* ── Shadow Visual ── */
+  .shadow-row {
+    display: flex; gap: 20px; flex-wrap: wrap;
+  }
+  .shadow-item {
+    width: 140px; height: 80px;
+    background: var(--c-susu);
+    border-radius: var(--r-lg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px;
+  }
+  .shadow-item .s-label {
+    font-size: 11px; font-weight: 700; color: var(--c-tanah);
+  }
+  .shadow-item .s-use {
+    font-size: 9px; color: var(--c-pasir);
+  }
+
+  /* ── Live Sample ── */
+  .live-sample {
+    background: var(--c-susu);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+  .live-sample .ls-header {
+    background: linear-gradient(135deg, #D2691E, #C05621);
+    color: #fff;
+    padding: var(--sp-3) var(--sp-4);
+    font-size: var(--fs-caption);
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .live-sample .ls-header .badge {
+    background: rgba(255,255,255,0.25);
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
+    font-size: var(--fs-micro);
+  }
+  .live-sample .ls-stepper {
+    display: flex; align-items: center;
+    padding: var(--sp-2) var(--sp-3);
+    gap: 0; font-size: var(--fs-micro); font-weight: 600;
+    background: var(--c-bara); color: var(--c-api);
+    border-bottom: 1px solid var(--c-batu);
+  }
+  .live-sample .ls-stepper .step {
+    padding: 2px 6px; border-radius: 4px; opacity: 0.35;
+    white-space: nowrap;
+  }
+  .live-sample .ls-stepper .step.active {
+    background: var(--c-api); color: #fff; opacity: 1; font-weight: 800;
+    border-radius: var(--r-sm);
+  }
+  .live-sample .ls-stepper .sep {
+    margin: 0 2px; opacity: 0.3; font-size: 8px;
+  }
+  .live-sample .ls-body {
+    padding: var(--sp-4);
+  }
+  .live-sample .ls-body h3 {
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--c-tanah-gelap);
+    margin-bottom: var(--sp-1);
+  }
+  .live-sample .ls-body p {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-regular);
+    line-height: var(--lh-normal);
+    color: var(--c-tanah);
+  }
+  .live-sample .ls-meta {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: var(--sp-3) var(--sp-4);
+    border-top: 1px solid var(--c-batu);
+    font-size: var(--fs-caption);
+    font-weight: var(--fw-semi);
+    color: var(--c-kayu);
+  }
+  .live-sample .ls-meta .avatar {
+    width: 22px; height: 22px; border-radius: var(--r-full);
+    background: #D2691E; display: inline-flex;
+    align-items: center; justify-content: center;
+    color: #fff; font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    margin-right: var(--sp-1); vertical-align: middle;
+  }
+  .live-sample .ls-footer {
+    display: flex; border-top: 1px solid var(--c-batu);
+  }
+  .live-sample .ls-footer button {
+    flex: 1; padding: var(--sp-3);
+    border: none; background: transparent;
+    font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-small);
+    font-weight: var(--fw-semi);
+    color: var(--c-kayu);
+    cursor: pointer;
+  }
+  .live-sample .ls-footer button:hover { background: var(--c-bara); }
+  .live-sample .ls-footer button + button { border-left: 1px solid var(--c-batu); }
+
+  /* ── Token Table ── */
+  .token-table {
+    background: var(--c-susu);
+    border-radius: var(--r-lg);
+    padding: var(--sp-4);
+    box-shadow: var(--shadow-sm);
+    font-size: 11px;
+    line-height: 1.8;
+    color: var(--c-tanah);
+  }
+  .token-table code {
+    background: var(--c-kapas);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 10px;
+    color: var(--c-api);
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>A3 · Typography & Spacing — Tanah</h1>
+  <p>Type scale, spacing grid, corner radii, elevation tokens — all using CSS variables</p>
+</div>
+
+<div class="container">
+
+  <!-- ═══════════════ TYPE SCALE ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Type Scale — Nunito (Major Third 1.250)</div>
+    <div class="section-note">8 steps from Display (32px) to Micro (9px). All weights available: 400 regular, 600 semi, 700 bold, 800 extra-bold.</div>
+    <div class="type-scale">
+      <div class="type-row">
+        <span class="t-name">Display</span>
+        <span class="t-size">32px</span>
+        <span class="t-weight">800</span>
+        <span style="font-size:var(--fs-display); font-weight:var(--fw-extra); line-height:var(--lh-tight);">Gotong Royong</span>
+      </div>
+      <div class="type-row">
+        <span class="t-name">Heading 1</span>
+        <span class="t-size">26px</span>
+        <span class="t-weight">800</span>
+        <span style="font-size:var(--fs-h1); font-weight:var(--fw-extra); line-height:var(--lh-tight);">Tuntaskan Bersama</span>
+      </div>
+      <div class="type-row">
+        <span class="t-name">Heading 2</span>
+        <span class="t-size">20px</span>
+        <span class="t-weight">700</span>
+        <span style="font-size:var(--fs-h2); font-weight:var(--fw-bold); line-height:var(--lh-tight);">Keresahan Warga RT 05</span>
+      </div>
+      <div class="type-row">
+        <span class="t-name">Heading 3</span>
+        <span class="t-size">16px</span>
+        <span class="t-weight">700</span>
+        <span style="font-size:var(--fs-h3); font-weight:var(--fw-bold); line-height:var(--lh-tight);">Jalan depan rumah pak RT rusak parah</span>
+      </div>
+      <div class="type-row">
+        <span class="t-name">Body</span>
+        <span class="t-size">14px</span>
+        <span class="t-weight">400</span>
+        <span style="font-size:var(--fs-body); font-weight:var(--fw-regular); line-height:var(--lh-normal);">Sudah tiga minggu jalan berlubang besar. Motor dan becak sering jatuh, apalagi kalau hujan malam.</span>
+      </div>
+      <div class="type-row">
+        <span class="t-name">Small</span>
+        <span class="t-size">12px</span>
+        <span class="t-weight">600</span>
+        <span style="font-size:var(--fs-small); font-weight:var(--fw-semi); line-height:var(--lh-normal);">Dukung · Komentar · Bagikan</span>
+      </div>
+      <div class="type-row">
+        <span class="t-name">Caption</span>
+        <span class="t-size">11px</span>
+        <span class="t-weight">600</span>
+        <span style="font-size:var(--fs-caption); font-weight:var(--fw-semi); line-height:var(--lh-normal); color:var(--c-kayu);">2 jam lalu · RT 05 / RW 12 · Sari Rahayu</span>
+      </div>
+      <div class="type-row">
+        <span class="t-name">Micro</span>
+        <span class="t-size">9px</span>
+        <span class="t-weight">700</span>
+        <span style="font-size:var(--fs-micro); font-weight:var(--fw-bold); line-height:var(--lh-normal); color:var(--c-kayu); letter-spacing:0.5px;">KERESAHAN · TUNTASKAN · RAHASIA L2</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SPACING ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Spacing Scale — 4px Base Grid</div>
+    <div class="section-note">All spacing is a multiple of 4px. Use sp-2 (8px) for tight groups, sp-4 (16px) for standard padding, sp-6 (24px) for sections, sp-8+ for page-level gaps.</div>
+    <div class="spacing-grid">
+      <div class="sp-item">
+        <div class="sp-block" style="width:4px; height:32px;"></div>
+        <div><div class="sp-label">sp-1</div><div class="sp-value">4px</div></div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-block" style="width:8px; height:32px;"></div>
+        <div><div class="sp-label">sp-2</div><div class="sp-value">8px</div></div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-block" style="width:12px; height:32px;"></div>
+        <div><div class="sp-label">sp-3</div><div class="sp-value">12px</div></div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-block" style="width:16px; height:32px;"></div>
+        <div><div class="sp-label">sp-4</div><div class="sp-value">16px</div></div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-block" style="width:20px; height:32px;"></div>
+        <div><div class="sp-label">sp-5</div><div class="sp-value">20px</div></div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-block" style="width:24px; height:32px;"></div>
+        <div><div class="sp-label">sp-6</div><div class="sp-value">24px</div></div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-block" style="width:32px; height:32px;"></div>
+        <div><div class="sp-label">sp-8</div><div class="sp-value">32px</div></div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-block" style="width:40px; height:32px;"></div>
+        <div><div class="sp-label">sp-10</div><div class="sp-value">40px</div></div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-block" style="width:48px; height:32px;"></div>
+        <div><div class="sp-label">sp-12</div><div class="sp-value">48px</div></div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-block" style="width:64px; height:32px;"></div>
+        <div><div class="sp-label">sp-16</div><div class="sp-value">64px</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ CORNER RADII ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Corner Radii</div>
+    <div class="section-note">Rounded shapes = warm & approachable. r-sm for inputs/badges, r-md for inner cards, r-lg for outer cards, r-xl for modals, r-full for avatars/pills.</div>
+    <div class="radius-row">
+      <div class="radius-item">
+        <div class="radius-box" style="border-radius:var(--r-sm);"></div>
+        <div class="radius-label">r-sm</div>
+        <div class="radius-value">6px</div>
+      </div>
+      <div class="radius-item">
+        <div class="radius-box" style="border-radius:var(--r-md);"></div>
+        <div class="radius-label">r-md</div>
+        <div class="radius-value">10px</div>
+      </div>
+      <div class="radius-item">
+        <div class="radius-box" style="border-radius:var(--r-lg);"></div>
+        <div class="radius-label">r-lg</div>
+        <div class="radius-value">14px</div>
+      </div>
+      <div class="radius-item">
+        <div class="radius-box" style="border-radius:var(--r-xl);"></div>
+        <div class="radius-label">r-xl</div>
+        <div class="radius-value">20px</div>
+      </div>
+      <div class="radius-item">
+        <div class="radius-box" style="border-radius:var(--r-full);"></div>
+        <div class="radius-label">r-full</div>
+        <div class="radius-value">9999px</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ELEVATION ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Elevation / Shadows</div>
+    <div class="section-note">Warm brown-tinted shadows (rgba 62,39,35) instead of cold gray. 4 levels matching surface hierarchy.</div>
+    <div class="shadow-row">
+      <div class="shadow-item" style="box-shadow:var(--shadow-sm);">
+        <span class="s-label">shadow-sm</span>
+        <span class="s-use">Badges, pills</span>
+      </div>
+      <div class="shadow-item" style="box-shadow:var(--shadow-md);">
+        <span class="s-label">shadow-md</span>
+        <span class="s-use">Cards, inputs</span>
+      </div>
+      <div class="shadow-item" style="box-shadow:var(--shadow-lg);">
+        <span class="s-label">shadow-lg</span>
+        <span class="s-use">Dropdowns, popovers</span>
+      </div>
+      <div class="shadow-item" style="box-shadow:var(--shadow-xl);">
+        <span class="s-label">shadow-xl</span>
+        <span class="s-use">Modals, overlays</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ LIVE CARD SAMPLE ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Live Card — All Tokens Applied</div>
+    <div class="section-note">Every token from A2 (color) + A3 (type, spacing, radii, shadow) used together. This is what a real Tuntaskan card looks like with the full design system.</div>
+    <div style="display:flex; justify-content:center; padding:var(--sp-6) 0;">
+      <div class="live-sample" style="width:340px; border-radius:var(--r-lg); box-shadow:var(--shadow-md);">
+        <div class="ls-header">
+          <span>Tuntaskan</span>
+          <span class="badge">Keresahan</span>
+        </div>
+        <div class="ls-stepper">
+          <span class="step active">Keresahan</span><span class="sep">›</span>
+          <span class="step">Bahas</span><span class="sep">›</span>
+          <span class="step">Garap</span><span class="sep">›</span>
+          <span class="step">Periksa</span><span class="sep">›</span>
+          <span class="step">Tuntas</span>
+        </div>
+        <div class="ls-body">
+          <h3>Jalan depan rumah pak RT rusak parah</h3>
+          <p>Sudah tiga minggu jalan berlubang besar. Motor dan becak sering jatuh, apalagi kalau hujan malam. Warga sudah lapor tapi belum ada tindakan.</p>
+        </div>
+        <div class="ls-meta">
+          <span><span class="avatar">SR</span> Sari Rahayu</span>
+          <span>2 jam lalu</span>
+        </div>
+        <div class="ls-footer">
+          <button>Dukung</button>
+          <button>Komentar</button>
+          <button>Bagikan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TOKEN REFERENCE ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Token Reference</div>
+    <div class="section-note">CSS variable names for implementation. All tokens defined in :root.</div>
+    <div class="token-table">
+      <strong>Type Scale:</strong>
+      <code>--fs-display</code> 32px ·
+      <code>--fs-h1</code> 26px ·
+      <code>--fs-h2</code> 20px ·
+      <code>--fs-h3</code> 16px ·
+      <code>--fs-body</code> 14px ·
+      <code>--fs-small</code> 12px ·
+      <code>--fs-caption</code> 11px ·
+      <code>--fs-micro</code> 9px
+      <br><br>
+      <strong>Line Height:</strong>
+      <code>--lh-tight</code> 1.2 (headings) ·
+      <code>--lh-normal</code> 1.5 (body) ·
+      <code>--lh-relaxed</code> 1.7 (long text)
+      <br><br>
+      <strong>Font Weight:</strong>
+      <code>--fw-regular</code> 400 ·
+      <code>--fw-semi</code> 600 ·
+      <code>--fw-bold</code> 700 ·
+      <code>--fw-extra</code> 800
+      <br><br>
+      <strong>Spacing:</strong>
+      <code>--sp-1</code> 4px ·
+      <code>--sp-2</code> 8px ·
+      <code>--sp-3</code> 12px ·
+      <code>--sp-4</code> 16px ·
+      <code>--sp-5</code> 20px ·
+      <code>--sp-6</code> 24px ·
+      <code>--sp-8</code> 32px ·
+      <code>--sp-10</code> 40px ·
+      <code>--sp-12</code> 48px ·
+      <code>--sp-16</code> 64px
+      <br><br>
+      <strong>Radii:</strong>
+      <code>--r-sm</code> 6px ·
+      <code>--r-md</code> 10px ·
+      <code>--r-lg</code> 14px ·
+      <code>--r-xl</code> 20px ·
+      <code>--r-full</code> 9999px
+      <br><br>
+      <strong>Shadows:</strong>
+      <code>--shadow-sm</code> badges/pills ·
+      <code>--shadow-md</code> cards ·
+      <code>--shadow-lg</code> popovers ·
+      <code>--shadow-xl</code> modals
+      <br><br>
+      <strong>Usage Guide:</strong><br>
+      Card padding: <code>--sp-4</code> (16px) inner body, <code>--sp-3</code> (12px) meta/footer<br>
+      Card gap in feed: <code>--sp-3</code> (12px) between cards<br>
+      Section gap: <code>--sp-8</code> (32px) between sections<br>
+      Card title: <code>--fs-h3</code> + <code>--fw-bold</code> + <code>--lh-tight</code><br>
+      Card body: <code>--fs-body</code> + <code>--fw-regular</code> + <code>--lh-normal</code><br>
+      Stepper text: <code>--fs-micro</code> + <code>--fw-semi</code><br>
+      Button text: <code>--fs-small</code> + <code>--fw-semi</code><br>
+      Track header: <code>--fs-caption</code> + <code>--fw-extra</code> + uppercase + 1.2px letter-spacing
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — Style Guide (D2)</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════════════════════
+   ROOT TOKENS — Complete Design DNA
+   ════════════════════════════════════════════════════════ */
+:root {
+  /* Tanah Core */
+  --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63; --c-pasir:#A1887F;
+  --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+  /* Action (Api) */
+  --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+  /* Semantic */
+  --c-berhasil:#2E7D32; --c-berhasil-lembut:#E8F5E9;
+  --c-peringatan:#E65100; --c-peringatan-lembut:#FFF3E0;
+  --c-bahaya:#C62828; --c-bahaya-lembut:#FFEBEE;
+  --c-keterangan:#4E342E; --c-keterangan-lembut:#EFEBE9;
+  /* Track Accents */
+  --t-tuntaskan:#C05621; --t-tuntaskan-soft:#FFF3E0; --t-tuntaskan-muted:#FFECD2;
+  --t-wujudkan:#2E7D32; --t-wujudkan-soft:#E8F5E9; --t-wujudkan-muted:#C8E6C9;
+  --t-telusuri:#6A1B9A; --t-telusuri-soft:#F3E5F5; --t-telusuri-muted:#E1BEE7;
+  --t-rayakan:#F57F17; --t-rayakan-soft:#FFF8E1; --t-rayakan-muted:#FFECB3;
+  --t-musyawarah:#4E342E; --t-musyawarah-soft:#EFEBE9; --t-musyawarah-muted:#D7CCC8;
+  /* Vault */
+  --v-deep:#263238; --v-surface:#37474F; --v-mid:#546E7A;
+  --v-soft:#78909C; --v-light:#B0BEC5; --v-wash:#ECEFF1;
+  /* Siaga */
+  --s-deep:#B71C1C; --s-pulse:#D32F2F; --s-accent:#FF5252;
+  --s-soft:#FFEBEE; --s-border:#FFCDD2;
+  /* Rahasia */
+  --c-rahasia-l1:#8D6E63; --c-rahasia-l2:#5D4037; --c-rahasia-l3:#3E2723;
+  /* Tandang */
+  --c-tandang:#00695C; --c-tandang-i:#F57F17; --c-tandang-c:#00695C; --c-tandang-j:#7B1FA2;
+  /* Typography */
+  --font:'Nunito', -apple-system, sans-serif;
+  --fs-display:32px; --fs-h1:26px; --fs-h2:20px; --fs-h3:16px;
+  --fs-body:14px; --fs-small:12px; --fs-caption:11px; --fs-micro:9px;
+  --lh-tight:1.2; --lh-normal:1.5; --lh-relaxed:1.7;
+  --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+  /* Spacing */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px;
+  --sp-6:24px; --sp-8:32px; --sp-10:40px; --sp-12:48px; --sp-16:64px;
+  /* Radii */
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+  /* Shadows */
+  --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+  --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+  --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+  --shadow-xl:0 8px 40px rgba(62,39,35,0.16);
+}
+
+/* ════════════════════════════════════════════════════════
+   BASE STYLES
+   ════════════════════════════════════════════════════════ */
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:var(--font); color:var(--c-tanah-gelap); background:#FAF7F4; line-height:var(--lh-normal); }
+
+.guide { max-width:1080px; margin:0 auto; padding:var(--sp-8) var(--sp-6); }
+.guide-header { text-align:center; margin-bottom:var(--sp-12); padding-bottom:var(--sp-8); border-bottom:2px solid var(--c-batu); }
+.guide-header h1 { font-size:var(--fs-display); font-weight:var(--fw-extra); color:var(--c-tanah-gelap); }
+.guide-header p { font-size:var(--fs-body); color:var(--c-kayu); margin-top:var(--sp-2); }
+
+/* Nav */
+.guide-nav { display:flex; flex-wrap:wrap; gap:var(--sp-2); justify-content:center; margin-bottom:var(--sp-12); position:sticky; top:0; background:#FAF7F4; padding:var(--sp-3) 0; z-index:100; border-bottom:1px solid var(--c-batu); }
+.guide-nav a { font-size:var(--fs-caption); font-weight:var(--fw-semi); color:var(--c-kayu); text-decoration:none; padding:var(--sp-1) var(--sp-3); border-radius:var(--r-full); transition:all 0.2s; }
+.guide-nav a:hover { background:var(--c-bara); color:var(--c-api); }
+
+/* Sections */
+.section { margin-bottom:var(--sp-16); }
+.section-title { font-size:var(--fs-h1); font-weight:var(--fw-extra); color:var(--c-tanah-gelap); margin-bottom:var(--sp-6); padding-bottom:var(--sp-2); border-bottom:3px solid var(--c-api); display:inline-block; }
+.subsection-title { font-size:var(--fs-h2); font-weight:var(--fw-bold); color:var(--c-tanah); margin:var(--sp-8) 0 var(--sp-4); }
+.sub3-title { font-size:var(--fs-h3); font-weight:var(--fw-bold); color:var(--c-kayu); margin:var(--sp-5) 0 var(--sp-3); }
+.desc { font-size:var(--fs-body); color:var(--c-kayu); margin-bottom:var(--sp-4); line-height:var(--lh-relaxed); }
+.token-label { font-size:var(--fs-micro); font-weight:var(--fw-bold); color:var(--c-pasir); text-transform:uppercase; letter-spacing:0.5px; }
+
+/* ════════════════════════════════════════════════════════
+   COLOR SWATCHES
+   ════════════════════════════════════════════════════════ */
+.color-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:var(--sp-3); margin-bottom:var(--sp-6); }
+.color-swatch { border-radius:var(--r-md); overflow:hidden; box-shadow:var(--shadow-sm); }
+.color-swatch .swatch-block { height:64px; }
+.color-swatch .swatch-info { padding:var(--sp-2) var(--sp-3); background:white; }
+.color-swatch .swatch-name { font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--c-tanah-gelap); }
+.color-swatch .swatch-hex { font-size:var(--fs-micro); color:var(--c-pasir); font-family:monospace; }
+
+/* ════════════════════════════════════════════════════════
+   TYPOGRAPHY SAMPLES
+   ════════════════════════════════════════════════════════ */
+.type-sample { display:flex; align-items:baseline; gap:var(--sp-6); padding:var(--sp-3) 0; border-bottom:1px solid var(--c-kapas); }
+.type-sample .type-meta { min-width:120px; flex-shrink:0; }
+.type-sample .type-meta span { display:block; }
+
+/* ════════════════════════════════════════════════════════
+   SPACING VISUALIZATION
+   ════════════════════════════════════════════════════════ */
+.spacing-row { display:flex; align-items:center; gap:var(--sp-4); margin-bottom:var(--sp-2); }
+.spacing-bar { height:24px; background:var(--c-api); border-radius:var(--r-sm); opacity:0.7; }
+.spacing-label { font-size:var(--fs-caption); font-weight:var(--fw-semi); color:var(--c-tanah); min-width:80px; }
+.spacing-val { font-size:var(--fs-caption); color:var(--c-pasir); font-family:monospace; }
+
+/* ════════════════════════════════════════════════════════
+   RADIUS & SHADOW DEMOS
+   ════════════════════════════════════════════════════════ */
+.radius-row { display:flex; gap:var(--sp-4); flex-wrap:wrap; margin-bottom:var(--sp-6); }
+.radius-demo { width:80px; height:80px; background:var(--c-kapas); border:2px solid var(--c-batu); display:flex; align-items:center; justify-content:center; flex-direction:column; }
+.radius-demo .token-label { margin-top:var(--sp-1); }
+
+.shadow-row { display:flex; gap:var(--sp-6); flex-wrap:wrap; margin-bottom:var(--sp-6); }
+.shadow-demo { width:120px; height:80px; background:white; border-radius:var(--r-md); display:flex; align-items:center; justify-content:center; }
+.shadow-demo .token-label { font-size:10px; }
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT STYLES (Live Rendered)
+   ════════════════════════════════════════════════════════ */
+.comp-row { display:flex; flex-wrap:wrap; gap:var(--sp-3); align-items:center; margin-bottom:var(--sp-4); }
+
+/* Buttons */
+.btn { font-family:var(--font); font-weight:var(--fw-bold); border:none; border-radius:var(--r-full); cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; justify-content:center; }
+.btn-lg { font-size:var(--fs-h3); padding:var(--sp-3) var(--sp-6); }
+.btn-md { font-size:var(--fs-body); padding:var(--sp-2) var(--sp-5); }
+.btn-sm { font-size:var(--fs-caption); padding:var(--sp-1) var(--sp-4); }
+.btn-primary { background:var(--c-api); color:white; }
+.btn-primary:hover { background:var(--c-api-terang); }
+.btn-secondary { background:var(--c-kapas); color:var(--c-tanah); }
+.btn-secondary:hover { background:var(--c-batu); }
+.btn-outline { background:transparent; color:var(--c-api); border:1.5px solid var(--c-api); }
+.btn-outline:hover { background:var(--c-bara); }
+.btn-ghost { background:transparent; color:var(--c-kayu); }
+.btn-ghost:hover { background:var(--c-kapas); }
+.btn-text { background:transparent; color:var(--c-api); padding:0; border:none; text-decoration:underline; }
+.btn-text:hover { color:var(--c-api-terang); }
+.btn-danger { background:var(--c-bahaya); color:white; }
+.btn-danger:hover { background:#B71C1C; }
+.btn-disabled { background:var(--c-batu); color:var(--c-pasir); cursor:not-allowed; }
+
+/* Track Buttons */
+.btn-track-tuntaskan { background:var(--t-tuntaskan); color:white; }
+.btn-track-wujudkan { background:var(--t-wujudkan); color:white; }
+.btn-track-telusuri { background:var(--t-telusuri); color:white; }
+.btn-track-rayakan { background:var(--t-rayakan); color:white; }
+.btn-track-musyawarah { background:var(--t-musyawarah); color:white; }
+.btn-vault { background:var(--v-deep); color:var(--v-light); }
+.btn-siaga { background:var(--s-deep); color:white; }
+
+/* Badges */
+.badge { font-size:var(--fs-micro); font-weight:var(--fw-extra); text-transform:uppercase; letter-spacing:0.5px; padding:2px 8px; border-radius:var(--r-sm); display:inline-flex; align-items:center; }
+.badge-tuntaskan { background:var(--t-tuntaskan-soft); color:var(--t-tuntaskan); }
+.badge-wujudkan { background:var(--t-wujudkan-soft); color:var(--t-wujudkan); }
+.badge-telusuri { background:var(--t-telusuri-soft); color:var(--t-telusuri); }
+.badge-rayakan { background:var(--t-rayakan-soft); color:var(--t-rayakan); }
+.badge-musyawarah { background:var(--t-musyawarah-soft); color:var(--t-musyawarah); }
+.badge-berhasil { background:var(--c-berhasil-lembut); color:var(--c-berhasil); }
+.badge-peringatan { background:var(--c-peringatan-lembut); color:var(--c-peringatan); }
+.badge-bahaya { background:var(--c-bahaya-lembut); color:var(--c-bahaya); }
+.badge-keterangan { background:var(--c-keterangan-lembut); color:var(--c-keterangan); }
+.badge-rahasia { background:var(--c-tanah-gelap); color:var(--c-pasir); }
+.badge-vault { background:var(--v-deep); color:var(--v-light); }
+.badge-siaga { background:var(--s-deep); color:white; animation:siaga-pulse 1.5s infinite; }
+@keyframes siaga-pulse { 0%,100%{opacity:1;} 50%{opacity:0.7;} }
+.badge-step { background:var(--c-api); color:white; border-radius:var(--r-full); width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; }
+.badge-step-done { background:var(--c-berhasil-lembut); color:var(--c-berhasil); border-radius:var(--r-full); width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; }
+.badge-step-future { background:var(--c-kapas); color:var(--c-pasir); border-radius:var(--r-full); width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; }
+.badge-seed { background:var(--c-bara); color:var(--c-api); font-size:var(--fs-micro); padding:2px 8px; border-radius:var(--r-sm); }
+.badge-confidence { background:var(--c-kapas); color:var(--c-kayu); font-size:var(--fs-micro); padding:2px 8px; border-radius:var(--r-sm); }
+.badge-ai { background:var(--c-kapas); color:var(--c-kayu); font-size:var(--fs-micro); padding:2px 8px; border-radius:var(--r-sm); }
+.badge-tier { font-size:var(--fs-caption); font-weight:var(--fw-bold); letter-spacing:1px; }
+/* Compact tier: small pip for tight spaces (avatars, inline, bylines) */
+.tier-pip { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:var(--r-full); font-size:9px; font-weight:var(--fw-extra); line-height:1; border:1.5px solid white; }
+.tier-pip-kunci { background:#FFD700; color:#5D4037; }
+.tier-pip-pilar { background:#1E88E5; color:white; }
+.tier-pip-kontributor { background:var(--c-tandang); color:white; }
+.tier-pip-pemula { background:#795548; color:white; }
+.tier-pip-bayangan { background:var(--c-batu); color:var(--c-pasir); }
+
+/* Inputs */
+.input-group { display:flex; flex-direction:column; gap:var(--sp-1); width:260px; }
+.input-label { font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--c-tanah); }
+.input-field { font-family:var(--font); font-size:var(--fs-body); padding:var(--sp-2) var(--sp-3); border-radius:var(--r-sm); border:1.5px solid var(--c-batu); background:var(--c-kapas); color:var(--c-tanah-gelap); outline:none; transition:all 0.2s; }
+.input-field:focus { border-color:var(--c-api); background:var(--c-susu); box-shadow:0 0 0 3px rgba(192,86,33,0.15); }
+.input-field.input-error { border-color:var(--c-bahaya); background:var(--c-bahaya-lembut); }
+.input-field:disabled { background:var(--c-batu); color:var(--c-pasir); cursor:not-allowed; }
+.input-hint { font-size:var(--fs-caption); color:var(--c-pasir); }
+.input-error-msg { font-size:var(--fs-caption); color:var(--c-bahaya); font-weight:var(--fw-semi); }
+textarea.input-field { min-height:80px; resize:vertical; }
+
+/* Avatars */
+.avatar { border-radius:var(--r-full); background:var(--c-api-terang); color:white; display:inline-flex; align-items:center; justify-content:center; font-weight:var(--fw-bold); flex-shrink:0; }
+.avatar-xs { width:20px; height:20px; font-size:8px; }
+.avatar-sm { width:28px; height:28px; font-size:10px; }
+.avatar-md { width:36px; height:36px; font-size:13px; }
+.avatar-lg { width:48px; height:48px; font-size:17px; }
+.avatar-xl { width:64px; height:64px; font-size:22px; }
+.avatar-group { display:flex; }
+.avatar-group .avatar { margin-left:-8px; border:2px solid var(--c-susu); }
+.avatar-group .avatar:first-child { margin-left:0; }
+.avatar-tier-wrap { position:relative; display:inline-block; }
+.avatar-tier-badge { position:absolute; bottom:-2px; right:-2px; font-size:8px; background:var(--c-tandang); color:white; border-radius:var(--r-full); width:16px; height:16px; display:flex; align-items:center; justify-content:center; border:1.5px solid white; }
+
+/* Pills */
+.pill { font-size:var(--fs-caption); font-weight:var(--fw-bold); padding:var(--sp-1) var(--sp-3); border-radius:var(--r-full); display:inline-flex; align-items:center; gap:var(--sp-1); cursor:pointer; transition:all 0.2s; }
+.pill-active { background:var(--c-bara); color:var(--c-api); }
+.pill-default { background:var(--c-kapas); color:var(--c-tanah); }
+.pill-success { background:var(--c-berhasil-lembut); color:var(--c-berhasil); }
+.pill-removable { background:var(--c-kapas); color:var(--c-tanah); }
+.pill-removable .pill-x { font-size:10px; margin-left:2px; opacity:0.5; }
+.pill-track-tuntaskan { background:var(--t-tuntaskan); color:white; }
+.pill-track-wujudkan { background:var(--t-wujudkan); color:white; }
+.pill-track-telusuri { background:var(--t-telusuri); color:white; }
+.pill-track-rayakan { background:var(--t-rayakan); color:white; }
+.pill-track-musyawarah { background:var(--t-musyawarah); color:white; }
+.pill-esco-validated { background:var(--c-kapas); color:var(--c-tanah); border:1.5px solid var(--c-batu); }
+.pill-esco-validated::before { content:"●"; margin-right:4px; color:var(--c-berhasil); }
+.pill-esco-declared { background:var(--c-kapas); color:var(--c-tanah); border:1.5px solid var(--c-batu); }
+.pill-esco-declared::before { content:"○"; margin-right:4px; color:var(--c-pasir); }
+
+/* Status Indicators */
+.status { display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-caption); font-weight:var(--fw-bold); }
+.status-dot { width:8px; height:8px; border-radius:var(--r-full); }
+.status-active .status-dot { background:var(--c-berhasil); }
+.status-stalled .status-dot { background:var(--c-peringatan); }
+.status-tuntas .status-dot { background:var(--c-batu); }
+.status-review .status-dot { background:var(--c-api); animation:blink 1.5s infinite; }
+.status-moderation .status-dot { background:var(--c-bahaya); animation:blink 1.5s infinite; }
+.status-sealed .status-dot { background:var(--v-mid); }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+/* Progress Bars */
+.progress-bar { height:6px; background:var(--c-kapas); border-radius:var(--r-full); overflow:hidden; width:200px; }
+.progress-fill { height:100%; border-radius:var(--r-full); transition:width 0.3s; }
+.progress-fill-api { background:var(--c-api); }
+.progress-fill-berhasil { background:var(--c-berhasil); }
+.confidence-bar { height:4px; background:var(--c-batu); border-radius:var(--r-full); overflow:hidden; width:160px; }
+.confidence-fill { height:100%; border-radius:var(--r-full); }
+.confidence-high { background:var(--c-berhasil); }
+.confidence-mid { background:var(--c-peringatan); }
+.confidence-low { background:var(--c-pasir); }
+
+/* Toggle */
+.toggle { width:40px; height:22px; border-radius:var(--r-full); background:var(--c-batu); position:relative; cursor:pointer; transition:background 0.2s; }
+.toggle.on { background:var(--c-api); }
+.toggle-knob { width:16px; height:16px; border-radius:var(--r-full); background:white; position:absolute; top:3px; left:3px; transition:left 0.2s; box-shadow:var(--shadow-sm); }
+.toggle.on .toggle-knob { left:21px; }
+
+/* Tooltip */
+.tooltip-demo { position:relative; display:inline-block; }
+.tooltip-box { position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); background:var(--c-tanah-gelap); color:white; font-size:var(--fs-caption); font-weight:var(--fw-semi); padding:5px 10px; border-radius:var(--r-sm); white-space:nowrap; box-shadow:var(--shadow-md); }
+.tooltip-box::after { content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:4px solid transparent; border-top-color:var(--c-tanah-gelap); }
+
+/* Divider */
+.divider { height:1px; background:var(--c-batu); margin:var(--sp-3) 0; }
+
+/* ════════════════════════════════════════════════════════
+   SEED CARD (Complete Anatomy)
+   ════════════════════════════════════════════════════════ */
+.seed-card { background:var(--c-susu); border-radius:var(--r-lg); box-shadow:var(--shadow-md); overflow:hidden; max-width:375px; display:flex; }
+.seed-strip { width:4px; flex-shrink:0; }
+.seed-content { padding:var(--sp-4); flex:1; min-width:0; }
+.seed-header { margin-bottom:var(--sp-3); }
+.seed-header-top { display:flex; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-2); }
+.seed-title { font-size:var(--fs-h3); font-weight:var(--fw-bold); color:var(--c-tanah-gelap); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.seed-author { display:flex; align-items:center; gap:var(--sp-2); font-size:var(--fs-small); color:var(--c-kayu); }
+.seed-body { font-size:var(--fs-body); color:var(--c-tanah); line-height:var(--lh-relaxed); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:var(--sp-3); }
+.seed-tags { display:flex; flex-wrap:wrap; gap:var(--sp-1); margin-bottom:var(--sp-3); }
+.seed-stepper { display:flex; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-3); font-size:var(--fs-micro); }
+.step-dot { width:8px; height:8px; border-radius:var(--r-full); }
+.step-dot.done { background:var(--c-berhasil-lembut); border:1.5px solid var(--c-berhasil); }
+.step-dot.current { border:none; }
+.step-dot.future { background:var(--c-kapas); border:1.5px solid var(--c-batu); }
+.step-label { font-weight:var(--fw-bold); }
+.step-line { width:12px; height:1px; background:var(--c-batu); }
+.seed-footer { display:flex; align-items:center; gap:var(--sp-4); font-size:var(--fs-small); color:var(--c-pasir); }
+.seed-footer .ai-badge { margin-left:auto; font-size:var(--fs-micro); font-weight:var(--fw-bold); padding:2px 6px; border-radius:var(--r-sm); }
+
+/* ════════════════════════════════════════════════════════
+   TRACK CARDS ROW
+   ════════════════════════════════════════════════════════ */
+.track-cards { display:flex; gap:var(--sp-4); overflow-x:auto; padding-bottom:var(--sp-3); }
+.track-mini { width:200px; flex-shrink:0; border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-md); }
+.track-mini-header { padding:var(--sp-3) var(--sp-4); color:white; font-size:var(--fs-caption); font-weight:var(--fw-bold); text-transform:uppercase; letter-spacing:0.5px; }
+.track-mini-body { padding:var(--sp-3) var(--sp-4); background:white; }
+.track-mini-body .stages { font-size:var(--fs-micro); color:var(--c-kayu); line-height:var(--lh-relaxed); }
+
+/* ════════════════════════════════════════════════════════
+   CONTEXT BAR DEMO
+   ════════════════════════════════════════════════════════ */
+.context-bar-demo { background:var(--c-susu); border-radius:var(--r-lg); box-shadow:var(--shadow-md); max-width:375px; overflow:hidden; }
+  .context-bar { padding:var(--sp-3) var(--sp-4); display:flex; align-items:center; gap:var(--sp-3); }
+  .context-bar.listening { background:var(--c-kapas); }
+  .context-bar.leaning { background:var(--c-bara); }
+  .context-bar.ready { background:var(--t-tuntaskan-soft); border-left:4px solid var(--t-tuntaskan); }
+  .context-bar.vault-ready { background:var(--v-wash); border-left:4px solid var(--v-deep); }
+  .context-bar.siaga-ready { background:var(--s-soft); border-left:4px solid var(--s-deep); }
+  .context-bar.split-ready { background:#FFF3E0; border-left:4px solid var(--c-peringatan); }
+  .context-bar.manual { background:var(--c-kapas); border-left:4px solid var(--c-kayu); }
+.cb-label { font-size:var(--fs-caption); font-weight:var(--fw-semi); }
+.cb-confidence { font-size:var(--fs-micro); font-weight:var(--fw-bold); padding:2px 6px; border-radius:var(--r-sm); }
+
+/* ════════════════════════════════════════════════════════
+   SEAL BAR DEMO
+   ════════════════════════════════════════════════════════ */
+.seal-bar-demo { max-width:375px; padding:var(--sp-3) var(--sp-4); border-radius:var(--r-lg); display:flex; align-items:center; justify-content:space-between; }
+.seal-bar-demo.unsealed { background:var(--v-surface); }
+.seal-bar-demo.sealed { background:var(--v-deep); }
+.seal-status { font-size:var(--fs-caption); font-weight:var(--fw-bold); display:flex; align-items:center; gap:var(--sp-2); }
+.seal-actions { display:flex; gap:var(--sp-2); }
+.seal-btn { font-family:var(--font); font-size:var(--fs-caption); font-weight:var(--fw-bold); border:none; border-radius:var(--r-full); padding:var(--sp-1) var(--sp-3); cursor:pointer; }
+
+/* ════════════════════════════════════════════════════════
+   ANNOTATION
+   ════════════════════════════════════════════════════════ */
+.anno { font-size:var(--fs-caption); color:var(--c-pasir); font-style:italic; margin-top:var(--sp-1); padding-left:var(--sp-3); border-left:2px solid var(--c-batu); }
+</style>
+</head>
+<body>
+<div class="guide">
+
+<!-- ═══════════ HEADER ═══════════ -->
+<div class="guide-header">
+  <h1>Gotong Royong</h1>
+  <p>Design System Style Guide · D2 · Interactive Reference · v0.1</p>
+</div>
+
+<!-- ═══════════ NAV ═══════════ -->
+<nav class="guide-nav">
+  <a href="#colors">Warna</a>
+  <a href="#typography">Tipografi</a>
+  <a href="#spacing">Spasi</a>
+  <a href="#radii">Radii</a>
+  <a href="#shadows">Shadow</a>
+  <a href="#buttons">Tombol</a>
+  <a href="#badges">Badge</a>
+  <a href="#inputs">Input</a>
+  <a href="#avatars">Avatar</a>
+  <a href="#pills">Pill</a>
+  <a href="#status">Status</a>
+  <a href="#progress">Progress</a>
+  <a href="#toggles">Toggle</a>
+  <a href="#seed-card">Seed Card</a>
+  <a href="#tracks">Track</a>
+  <a href="#context-bar">Context Bar</a>
+  <a href="#seal-bar">Seal Bar</a>
+</nav>
+
+<!-- ═══════════ SECTION 1: COLORS ═══════════ -->
+<div class="section" id="colors">
+  <h2 class="section-title">Sistem Warna</h2>
+
+  <h3 class="subsection-title">Tanah Inti (7)</h3>
+  <div class="color-grid">
+    <div class="color-swatch"><div class="swatch-block" style="background:#3E2723"></div><div class="swatch-info"><div class="swatch-name">Tanah Gelap</div><div class="swatch-hex">#3E2723</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#5D4037"></div><div class="swatch-info"><div class="swatch-name">Tanah</div><div class="swatch-hex">#5D4037</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#8D6E63"></div><div class="swatch-info"><div class="swatch-name">Kayu</div><div class="swatch-hex">#8D6E63</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#A1887F"></div><div class="swatch-info"><div class="swatch-name">Pasir</div><div class="swatch-hex">#A1887F</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#D7CCC8"></div><div class="swatch-info"><div class="swatch-name">Batu</div><div class="swatch-hex">#D7CCC8</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#F5EDE3"></div><div class="swatch-info"><div class="swatch-name">Kapas</div><div class="swatch-hex">#F5EDE3</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFFBF5"></div><div class="swatch-info"><div class="swatch-name">Susu</div><div class="swatch-hex">#FFFBF5</div></div></div>
+  </div>
+
+  <h3 class="subsection-title">Aksi / Api (4)</h3>
+  <div class="color-grid">
+    <div class="color-swatch"><div class="swatch-block" style="background:#C05621"></div><div class="swatch-info"><div class="swatch-name">Api</div><div class="swatch-hex">#C05621</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#D2691E"></div><div class="swatch-info"><div class="swatch-name">Api Terang</div><div class="swatch-hex">#D2691E</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#A0461A"></div><div class="swatch-info"><div class="swatch-name">Api Dalam</div><div class="swatch-hex">#A0461A</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFF3E0"></div><div class="swatch-info"><div class="swatch-name">Bara</div><div class="swatch-hex">#FFF3E0</div></div></div>
+  </div>
+
+  <h3 class="subsection-title">Semantik (8)</h3>
+  <div class="color-grid">
+    <div class="color-swatch"><div class="swatch-block" style="background:#2E7D32"></div><div class="swatch-info"><div class="swatch-name">Berhasil</div><div class="swatch-hex">#2E7D32</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#E8F5E9"></div><div class="swatch-info"><div class="swatch-name">Berhasil Lembut</div><div class="swatch-hex">#E8F5E9</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#E65100"></div><div class="swatch-info"><div class="swatch-name">Peringatan</div><div class="swatch-hex">#E65100</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFF3E0"></div><div class="swatch-info"><div class="swatch-name">Peringatan Lembut</div><div class="swatch-hex">#FFF3E0</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#C62828"></div><div class="swatch-info"><div class="swatch-name">Bahaya</div><div class="swatch-hex">#C62828</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFEBEE"></div><div class="swatch-info"><div class="swatch-name">Bahaya Lembut</div><div class="swatch-hex">#FFEBEE</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#4E342E"></div><div class="swatch-info"><div class="swatch-name">Keterangan</div><div class="swatch-hex">#4E342E</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#EFEBE9"></div><div class="swatch-info"><div class="swatch-name">Keterangan Lembut</div><div class="swatch-hex">#EFEBE9</div></div></div>
+  </div>
+
+  <h3 class="subsection-title">Track Accents (5 × 3)</h3>
+  <div class="color-grid">
+    <div class="color-swatch"><div class="swatch-block" style="background:#C05621"></div><div class="swatch-info"><div class="swatch-name">Tuntaskan</div><div class="swatch-hex">#C05621</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFF3E0"></div><div class="swatch-info"><div class="swatch-name">Tuntaskan Soft</div><div class="swatch-hex">#FFF3E0</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFECD2"></div><div class="swatch-info"><div class="swatch-name">Tuntaskan Muted</div><div class="swatch-hex">#FFECD2</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#2E7D32"></div><div class="swatch-info"><div class="swatch-name">Wujudkan</div><div class="swatch-hex">#2E7D32</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#E8F5E9"></div><div class="swatch-info"><div class="swatch-name">Wujudkan Soft</div><div class="swatch-hex">#E8F5E9</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#C8E6C9"></div><div class="swatch-info"><div class="swatch-name">Wujudkan Muted</div><div class="swatch-hex">#C8E6C9</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#6A1B9A"></div><div class="swatch-info"><div class="swatch-name">Telusuri</div><div class="swatch-hex">#6A1B9A</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#F3E5F5"></div><div class="swatch-info"><div class="swatch-name">Telusuri Soft</div><div class="swatch-hex">#F3E5F5</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#E1BEE7"></div><div class="swatch-info"><div class="swatch-name">Telusuri Muted</div><div class="swatch-hex">#E1BEE7</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#F57F17"></div><div class="swatch-info"><div class="swatch-name">Rayakan</div><div class="swatch-hex">#F57F17</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFF8E1"></div><div class="swatch-info"><div class="swatch-name">Rayakan Soft</div><div class="swatch-hex">#FFF8E1</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFECB3"></div><div class="swatch-info"><div class="swatch-name">Rayakan Muted</div><div class="swatch-hex">#FFECB3</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#4E342E"></div><div class="swatch-info"><div class="swatch-name">Musyawarah</div><div class="swatch-hex">#4E342E</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#EFEBE9"></div><div class="swatch-info"><div class="swatch-name">Musyawarah Soft</div><div class="swatch-hex">#EFEBE9</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#D7CCC8"></div><div class="swatch-info"><div class="swatch-name">Musyawarah Muted</div><div class="swatch-hex">#D7CCC8</div></div></div>
+  </div>
+
+  <h3 class="subsection-title">Vault (6)</h3>
+  <div class="color-grid">
+    <div class="color-swatch"><div class="swatch-block" style="background:#263238"></div><div class="swatch-info"><div class="swatch-name">V-Deep</div><div class="swatch-hex">#263238</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#37474F"></div><div class="swatch-info"><div class="swatch-name">V-Surface</div><div class="swatch-hex">#37474F</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#546E7A"></div><div class="swatch-info"><div class="swatch-name">V-Mid</div><div class="swatch-hex">#546E7A</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#78909C"></div><div class="swatch-info"><div class="swatch-name">V-Soft</div><div class="swatch-hex">#78909C</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#B0BEC5"></div><div class="swatch-info"><div class="swatch-name">V-Light</div><div class="swatch-hex">#B0BEC5</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#ECEFF1"></div><div class="swatch-info"><div class="swatch-name">V-Wash</div><div class="swatch-hex">#ECEFF1</div></div></div>
+  </div>
+
+  <h3 class="subsection-title">Siaga (5)</h3>
+  <div class="color-grid">
+    <div class="color-swatch"><div class="swatch-block" style="background:#B71C1C"></div><div class="swatch-info"><div class="swatch-name">S-Deep</div><div class="swatch-hex">#B71C1C</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#D32F2F"></div><div class="swatch-info"><div class="swatch-name">S-Pulse</div><div class="swatch-hex">#D32F2F</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FF5252"></div><div class="swatch-info"><div class="swatch-name">S-Accent</div><div class="swatch-hex">#FF5252</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFEBEE"></div><div class="swatch-info"><div class="swatch-name">S-Soft</div><div class="swatch-hex">#FFEBEE</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#FFCDD2"></div><div class="swatch-info"><div class="swatch-name">S-Border</div><div class="swatch-hex">#FFCDD2</div></div></div>
+  </div>
+
+  <h3 class="subsection-title">Rahasia (3 Level)</h3>
+  <div class="color-grid">
+    <div class="color-swatch"><div class="swatch-block" style="background:#8D6E63"></div><div class="swatch-info"><div class="swatch-name">L1 · Terbatas</div><div class="swatch-hex">#8D6E63</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#5D4037"></div><div class="swatch-info"><div class="swatch-name">L2 · Rahasia</div><div class="swatch-hex">#5D4037</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#3E2723"></div><div class="swatch-info"><div class="swatch-name">L3 · Sangat Rahasia</div><div class="swatch-hex">#3E2723</div></div></div>
+  </div>
+
+  <h3 class="subsection-title">Tandang (4)</h3>
+  <div class="color-grid">
+    <div class="color-swatch"><div class="swatch-block" style="background:#00695C"></div><div class="swatch-info"><div class="swatch-name">Tandang</div><div class="swatch-hex">#00695C</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#F57F17"></div><div class="swatch-info"><div class="swatch-name">I (Inisiatif)</div><div class="swatch-hex">#F57F17</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#00695C"></div><div class="swatch-info"><div class="swatch-name">C (Kompetensi)</div><div class="swatch-hex">#00695C</div></div></div>
+    <div class="color-swatch"><div class="swatch-block" style="background:#7B1FA2"></div><div class="swatch-info"><div class="swatch-name">J (Penilaian)</div><div class="swatch-hex">#7B1FA2</div></div></div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 2: TYPOGRAPHY ═══════════ -->
+<div class="section" id="typography">
+  <h2 class="section-title">Tipografi</h2>
+  <p class="desc">Nunito, Major Third scale (1.250). 8 langkah dari Micro (9px) sampai Display (32px).</p>
+
+  <div class="type-sample"><div class="type-meta"><span class="token-label">--fs-display</span><span style="font-size:var(--fs-caption);color:var(--c-pasir)">32px · 800</span></div><div style="font-size:var(--fs-display);font-weight:var(--fw-extra)">Gotong Royong</div></div>
+  <div class="type-sample"><div class="type-meta"><span class="token-label">--fs-h1</span><span style="font-size:var(--fs-caption);color:var(--c-pasir)">26px · 800</span></div><div style="font-size:var(--fs-h1);font-weight:var(--fw-extra)">Judul Halaman</div></div>
+  <div class="type-sample"><div class="type-meta"><span class="token-label">--fs-h2</span><span style="font-size:var(--fs-caption);color:var(--c-pasir)">20px · 700</span></div><div style="font-size:var(--fs-h2);font-weight:var(--fw-bold)">Judul Seksi</div></div>
+  <div class="type-sample"><div class="type-meta"><span class="token-label">--fs-h3</span><span style="font-size:var(--fs-caption);color:var(--c-pasir)">16px · 700</span></div><div style="font-size:var(--fs-h3);font-weight:var(--fw-bold)">Judul Kartu</div></div>
+  <div class="type-sample"><div class="type-meta"><span class="token-label">--fs-body</span><span style="font-size:var(--fs-caption);color:var(--c-pasir)">14px · 400</span></div><div style="font-size:var(--fs-body);font-weight:var(--fw-regular)">Teks isi utama untuk paragraf dan konten baca.</div></div>
+  <div class="type-sample"><div class="type-meta"><span class="token-label">--fs-small</span><span style="font-size:var(--fs-caption);color:var(--c-pasir)">12px · 600</span></div><div style="font-size:var(--fs-small);font-weight:var(--fw-semi)">Teks kecil, meta, timestamp</div></div>
+  <div class="type-sample"><div class="type-meta"><span class="token-label">--fs-caption</span><span style="font-size:var(--fs-caption);color:var(--c-pasir)">11px · 600</span></div><div style="font-size:var(--fs-caption);font-weight:var(--fw-semi)">Caption, label input, hint</div></div>
+  <div class="type-sample"><div class="type-meta"><span class="token-label">--fs-micro</span><span style="font-size:var(--fs-caption);color:var(--c-pasir)">9px · 700</span></div><div style="font-size:var(--fs-micro);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:0.5px">Badge · Uppercase Label</div></div>
+</div>
+
+<!-- ═══════════ SECTION 3: SPACING ═══════════ -->
+<div class="section" id="spacing">
+  <h2 class="section-title">Grid Spasi</h2>
+  <p class="desc">Basis 4px. 10 token untuk margin, padding, gap.</p>
+  <div class="spacing-row"><span class="spacing-label">--sp-1</span><div class="spacing-bar" style="width:4px"></div><span class="spacing-val">4px</span></div>
+  <div class="spacing-row"><span class="spacing-label">--sp-2</span><div class="spacing-bar" style="width:8px"></div><span class="spacing-val">8px</span></div>
+  <div class="spacing-row"><span class="spacing-label">--sp-3</span><div class="spacing-bar" style="width:12px"></div><span class="spacing-val">12px</span></div>
+  <div class="spacing-row"><span class="spacing-label">--sp-4</span><div class="spacing-bar" style="width:16px"></div><span class="spacing-val">16px</span></div>
+  <div class="spacing-row"><span class="spacing-label">--sp-5</span><div class="spacing-bar" style="width:20px"></div><span class="spacing-val">20px</span></div>
+  <div class="spacing-row"><span class="spacing-label">--sp-6</span><div class="spacing-bar" style="width:24px"></div><span class="spacing-val">24px</span></div>
+  <div class="spacing-row"><span class="spacing-label">--sp-8</span><div class="spacing-bar" style="width:32px"></div><span class="spacing-val">32px</span></div>
+  <div class="spacing-row"><span class="spacing-label">--sp-10</span><div class="spacing-bar" style="width:40px"></div><span class="spacing-val">40px</span></div>
+  <div class="spacing-row"><span class="spacing-label">--sp-12</span><div class="spacing-bar" style="width:48px"></div><span class="spacing-val">48px</span></div>
+  <div class="spacing-row"><span class="spacing-label">--sp-16</span><div class="spacing-bar" style="width:64px"></div><span class="spacing-val">64px</span></div>
+</div>
+
+<!-- ═══════════ SECTION 4: RADII ═══════════ -->
+<div class="section" id="radii">
+  <h2 class="section-title">Border Radius</h2>
+  <div class="radius-row">
+    <div class="radius-demo" style="border-radius:var(--r-sm)"><span class="token-label">r-sm</span><span style="font-size:10px;color:var(--c-pasir)">6px</span></div>
+    <div class="radius-demo" style="border-radius:var(--r-md)"><span class="token-label">r-md</span><span style="font-size:10px;color:var(--c-pasir)">10px</span></div>
+    <div class="radius-demo" style="border-radius:var(--r-lg)"><span class="token-label">r-lg</span><span style="font-size:10px;color:var(--c-pasir)">14px</span></div>
+    <div class="radius-demo" style="border-radius:var(--r-xl)"><span class="token-label">r-xl</span><span style="font-size:10px;color:var(--c-pasir)">20px</span></div>
+    <div class="radius-demo" style="border-radius:var(--r-full)"><span class="token-label">r-full</span><span style="font-size:10px;color:var(--c-pasir)">9999</span></div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 5: SHADOWS ═══════════ -->
+<div class="section" id="shadows">
+  <h2 class="section-title">Elevasi / Shadow</h2>
+  <p class="desc">Brown-tinted menggunakan rgba(62,39,35) untuk konsistensi warm tone.</p>
+  <div class="shadow-row">
+    <div class="shadow-demo" style="box-shadow:var(--shadow-sm)"><span class="token-label">sm</span></div>
+    <div class="shadow-demo" style="box-shadow:var(--shadow-md)"><span class="token-label">md</span></div>
+    <div class="shadow-demo" style="box-shadow:var(--shadow-lg)"><span class="token-label">lg</span></div>
+    <div class="shadow-demo" style="box-shadow:var(--shadow-xl)"><span class="token-label">xl</span></div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 6: BUTTONS ═══════════ -->
+<div class="section" id="buttons">
+  <h2 class="section-title">Tombol (Button)</h2>
+
+  <h3 class="sub3-title">6 Varian × 3 Ukuran</h3>
+  <div class="comp-row">
+    <button class="btn btn-primary btn-lg">Primary LG</button>
+    <button class="btn btn-primary btn-md">Primary MD</button>
+    <button class="btn btn-primary btn-sm">Primary SM</button>
+  </div>
+  <div class="comp-row">
+    <button class="btn btn-secondary btn-lg">Secondary LG</button>
+    <button class="btn btn-secondary btn-md">Secondary MD</button>
+    <button class="btn btn-secondary btn-sm">Secondary SM</button>
+  </div>
+  <div class="comp-row">
+    <button class="btn btn-outline btn-lg">Outline LG</button>
+    <button class="btn btn-outline btn-md">Outline MD</button>
+    <button class="btn btn-outline btn-sm">Outline SM</button>
+  </div>
+  <div class="comp-row">
+    <button class="btn btn-ghost btn-lg">Ghost LG</button>
+    <button class="btn btn-ghost btn-md">Ghost MD</button>
+    <button class="btn btn-ghost btn-sm">Ghost SM</button>
+  </div>
+  <div class="comp-row">
+    <button class="btn btn-text btn-md">Text Link</button>
+    <button class="btn btn-text btn-sm">Text SM</button>
+  </div>
+  <div class="comp-row">
+    <button class="btn btn-danger btn-lg">Danger LG</button>
+    <button class="btn btn-danger btn-md">Danger MD</button>
+    <button class="btn btn-danger btn-sm">Danger SM</button>
+    <button class="btn btn-disabled btn-md" disabled>Disabled</button>
+  </div>
+
+  <h3 class="sub3-title">Track Buttons</h3>
+  <div class="comp-row">
+    <button class="btn btn-track-tuntaskan btn-md">Tuntaskan</button>
+    <button class="btn btn-track-wujudkan btn-md">Wujudkan</button>
+    <button class="btn btn-track-telusuri btn-md">Telusuri</button>
+    <button class="btn btn-track-rayakan btn-md">Rayakan</button>
+    <button class="btn btn-track-musyawarah btn-md">Musyawarah</button>
+  </div>
+
+  <h3 class="sub3-title">Mode Khusus</h3>
+  <div class="comp-row">
+    <button class="btn btn-vault btn-md">🔒 Vault</button>
+    <button class="btn btn-siaga btn-md">🚨 Siaga</button>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 7: BADGES ═══════════ -->
+<div class="section" id="badges">
+  <h2 class="section-title">Badge</h2>
+
+  <h3 class="sub3-title">Track</h3>
+  <div class="comp-row">
+    <span class="badge badge-tuntaskan">Tuntaskan</span>
+    <span class="badge badge-wujudkan">Wujudkan</span>
+    <span class="badge badge-telusuri">Telusuri</span>
+    <span class="badge badge-rayakan">Rayakan</span>
+    <span class="badge badge-musyawarah">Musyawarah</span>
+  </div>
+
+  <h3 class="sub3-title">Semantik</h3>
+  <div class="comp-row">
+    <span class="badge badge-berhasil">Berhasil</span>
+    <span class="badge badge-peringatan">Peringatan</span>
+    <span class="badge badge-bahaya">Bahaya</span>
+    <span class="badge badge-keterangan">Keterangan</span>
+  </div>
+
+  <h3 class="sub3-title">Seed</h3>
+  <div class="comp-row">
+    <span class="badge badge-seed">🌱 Benih Baru</span>
+  </div>
+
+  <h3 class="sub3-title">Khusus</h3>
+  <div class="comp-row">
+    <span class="badge badge-rahasia">◀◀ Rahasia</span>
+    <span class="badge badge-vault">🔒 Vault</span>
+    <span class="badge badge-siaga">🚨 Siaga</span>
+  </div>
+
+  <h3 class="sub3-title">AI Badge Catalog (8)</h3>
+  <div class="comp-row">
+    <span class="badge badge-ai">🤖 Classified</span>
+    <span class="badge badge-ai">🤖 Suggested</span>
+    <span class="badge badge-ai">🤖 Summary</span>
+    <span class="badge badge-ai">🤖 Sentiment</span>
+  </div>
+  <div class="comp-row">
+    <span class="badge badge-ai" style="background:var(--c-peringatan-lembut);color:var(--c-peringatan)">⚠ Stalled</span>
+    <span class="badge badge-ai" style="background:var(--c-peringatan-lembut);color:var(--c-peringatan)">⚠ Duplicate</span>
+    <span class="badge badge-ai" style="background:var(--c-peringatan-lembut);color:var(--c-peringatan)">⚠ Resolve</span>
+    <span class="badge badge-ai" style="background:var(--c-berhasil-lembut);color:var(--c-berhasil)">🌱 Dampak</span>
+  </div>
+  <div class="comp-row">
+    <span class="badge badge-confidence">🤖 92%</span>
+    <span class="anno">Confidence badge (inline with cards)</span>
+  </div>
+
+  <h3 class="sub3-title">Stepper</h3>
+  <div class="comp-row">
+    <span class="badge-step">✓</span>
+    <span class="badge-step-done">✓</span>
+    <span class="badge-step-future">3</span>
+  </div>
+
+  <h3 class="sub3-title">Tier — Full (◆◇ System)</h3>
+  <p class="desc">Untuk profile headers, leaderboard, kartu detail — area dengan ruang luas.</p>
+  <div class="comp-row">
+    <span class="badge-tier" style="color:#FFD700">◆◆◆◆ Kunci</span>
+    <span class="badge-tier" style="color:#1E88E5">◆◆◆◇ Pilar</span>
+    <span class="badge-tier" style="color:var(--c-tandang)">◆◆◇◇ Kontributor</span>
+    <span class="badge-tier" style="color:#795548">◆◇◇◇ Pemula</span>
+    <span class="badge-tier" style="color:var(--c-bahaya)">◇◇◇◇ Bayangan</span>
+  </div>
+
+  <h3 class="sub3-title">Tier — Compact (Pip)</h3>
+  <p class="desc">Untuk avatar overlay, inline byline, comment header, seed card author — area sempit.</p>
+  <div class="comp-row" style="gap:var(--sp-4)">
+    <div style="display:flex;align-items:center;gap:6px"><span class="tier-pip tier-pip-kunci">4</span><span style="font-size:var(--fs-caption);color:var(--c-kayu)">Kunci</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><span class="tier-pip tier-pip-pilar">3</span><span style="font-size:var(--fs-caption);color:var(--c-kayu)">Pilar</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><span class="tier-pip tier-pip-kontributor">2</span><span style="font-size:var(--fs-caption);color:var(--c-kayu)">Kontributor</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><span class="tier-pip tier-pip-pemula">1</span><span style="font-size:var(--fs-caption);color:var(--c-kayu)">Pemula</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><span class="tier-pip tier-pip-bayangan">0</span><span style="font-size:var(--fs-caption);color:var(--c-kayu)">Bayangan</span></div>
+  </div>
+  <p class="anno" style="margin-top:var(--sp-2)">Pip = 18px circle, tier color fill, number = diamond count. Used in avatar-tier-badge overlay and inline bylines.</p>
+
+  <h3 class="sub3-title">Tier — In Context</h3>
+  <p class="desc">Compact pip di dalam avatar dan byline seed card.</p>
+  <div class="comp-row" style="gap:var(--sp-6)">
+    <div class="avatar-tier-wrap">
+      <div class="avatar avatar-md" style="background:var(--t-rayakan)">S</div>
+      <div class="avatar-tier-badge" style="background:#FFD700;color:#5D4037;font-size:9px">4</div>
+    </div>
+    <div class="avatar-tier-wrap">
+      <div class="avatar avatar-md" style="background:#2E7D32">A</div>
+      <div class="avatar-tier-badge" style="background:#1E88E5;color:white;font-size:9px">3</div>
+    </div>
+    <div class="avatar-tier-wrap">
+      <div class="avatar avatar-sm" style="background:#6A1B9A">R</div>
+      <div class="avatar-tier-badge" style="background:var(--c-tandang);color:white;font-size:8px;width:14px;height:14px">2</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:var(--fs-small);color:var(--c-kayu)">
+      <div class="avatar avatar-xs" style="background:#C05621">B</div>
+      <span>Bu Sari</span>
+      <span class="tier-pip tier-pip-kontributor" style="width:14px;height:14px;font-size:8px">2</span>
+      <span style="color:var(--c-pasir)">· 2j</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 8: INPUTS ═══════════ -->
+<div class="section" id="inputs">
+  <h2 class="section-title">Input</h2>
+  <div class="comp-row" style="align-items:flex-start; gap:var(--sp-6)">
+    <div class="input-group">
+      <label class="input-label">Default</label>
+      <input class="input-field" type="text" placeholder="Placeholder...">
+      <span class="input-hint">Teks petunjuk di sini</span>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Focus (click me)</label>
+      <input class="input-field" type="text" value="Teks aktif">
+    </div>
+    <div class="input-group">
+      <label class="input-label">Error</label>
+      <input class="input-field input-error" type="text" value="Input salah">
+      <span class="input-error-msg">Harap isi dengan benar</span>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Disabled</label>
+      <input class="input-field" type="text" value="Tidak aktif" disabled>
+    </div>
+  </div>
+  <div style="margin-top:var(--sp-4)">
+    <div class="input-group" style="width:360px">
+      <label class="input-label">Textarea (Compose)</label>
+      <textarea class="input-field" placeholder="Ceritakan apa yang terjadi..."></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 9: AVATARS ═══════════ -->
+<div class="section" id="avatars">
+  <h2 class="section-title">Avatar</h2>
+
+  <h3 class="sub3-title">5 Ukuran</h3>
+  <div class="comp-row">
+    <div><div class="avatar avatar-xs">A</div><div class="anno">xs · 20px</div></div>
+    <div><div class="avatar avatar-sm">B</div><div class="anno">sm · 28px</div></div>
+    <div><div class="avatar avatar-md">C</div><div class="anno">md · 36px</div></div>
+    <div><div class="avatar avatar-lg">D</div><div class="anno">lg · 48px</div></div>
+    <div><div class="avatar avatar-xl">E</div><div class="anno">xl · 64px</div></div>
+  </div>
+
+  <h3 class="sub3-title">Avatar Group & Tier</h3>
+  <div class="comp-row">
+    <div class="avatar-group">
+      <div class="avatar avatar-sm" style="background:var(--t-rayakan)">A</div>
+      <div class="avatar avatar-sm" style="background:#2E7D32">B</div>
+      <div class="avatar avatar-sm" style="background:#6A1B9A">C</div>
+      <div class="avatar avatar-sm" style="background:#C05621">+2</div>
+    </div>
+    <div class="avatar-tier-wrap">
+      <div class="avatar avatar-lg">M</div>
+      <div class="avatar-tier-badge">◆</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 10: PILLS ═══════════ -->
+<div class="section" id="pills">
+  <h2 class="section-title">Pill / Tag</h2>
+
+  <h3 class="sub3-title">State</h3>
+  <div class="comp-row">
+    <span class="pill pill-active">Aktif</span>
+    <span class="pill pill-default">Default</span>
+    <span class="pill pill-success">Berhasil</span>
+    <span class="pill pill-removable">Removable <span class="pill-x">×</span></span>
+  </div>
+
+  <h3 class="sub3-title">Track</h3>
+  <div class="comp-row">
+    <span class="pill pill-track-tuntaskan">Tuntaskan</span>
+    <span class="pill pill-track-wujudkan">Wujudkan</span>
+    <span class="pill pill-track-telusuri">Telusuri</span>
+    <span class="pill pill-track-rayakan">Rayakan</span>
+    <span class="pill pill-track-musyawarah">Musyawarah</span>
+  </div>
+
+  <h3 class="sub3-title">ESCO Skill (Validated ● vs Declared ○)</h3>
+  <div class="comp-row">
+    <span class="pill pill-esco-validated">Perbaikan Pipa</span>
+    <span class="pill pill-esco-validated">Pengajaran</span>
+    <span class="pill pill-esco-declared">Desain Grafis</span>
+    <span class="pill pill-esco-declared">Manajemen Proyek</span>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 11: STATUS ═══════════ -->
+<div class="section" id="status">
+  <h2 class="section-title">Status Indicators</h2>
+  <div class="comp-row" style="gap:var(--sp-6)">
+    <span class="status status-active"><span class="status-dot"></span>Aktif</span>
+    <span class="status status-stalled"><span class="status-dot"></span>Macet</span>
+    <span class="status status-tuntas"><span class="status-dot"></span>Tuntas</span>
+    <span class="status status-review"><span class="status-dot"></span>Peninjauan</span>
+    <span class="status status-moderation"><span class="status-dot"></span>Moderasi</span>
+    <span class="status status-sealed"><span class="status-dot"></span>Tersegel</span>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 12: PROGRESS ═══════════ -->
+<div class="section" id="progress">
+  <h2 class="section-title">Progress & Confidence</h2>
+  <h3 class="sub3-title">Progress Bar</h3>
+  <div style="display:flex;gap:var(--sp-6);align-items:center;flex-wrap:wrap;margin-bottom:var(--sp-4)">
+    <div><div class="progress-bar"><div class="progress-fill progress-fill-api" style="width:65%"></div></div><div class="anno">Api 65%</div></div>
+    <div><div class="progress-bar"><div class="progress-fill progress-fill-berhasil" style="width:85%"></div></div><div class="anno">Berhasil 85%</div></div>
+    <div><div class="progress-bar"><div class="progress-fill progress-fill-api" style="width:30%"></div></div><div class="anno">Api 30%</div></div>
+  </div>
+  <h3 class="sub3-title">Confidence Bar</h3>
+  <div style="display:flex;gap:var(--sp-6);align-items:center;flex-wrap:wrap">
+    <div><div class="confidence-bar"><div class="confidence-fill confidence-high" style="width:92%"></div></div><div class="anno">Tinggi 92%</div></div>
+    <div><div class="confidence-bar"><div class="confidence-fill confidence-mid" style="width:67%"></div></div><div class="anno">Sedang 67%</div></div>
+    <div><div class="confidence-bar"><div class="confidence-fill confidence-low" style="width:35%"></div></div><div class="anno">Rendah 35%</div></div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 13: TOGGLES ═══════════ -->
+<div class="section" id="toggles">
+  <h2 class="section-title">Toggle, Tooltip, Divider</h2>
+
+  <h3 class="sub3-title">Toggle</h3>
+  <div class="comp-row">
+    <div class="toggle" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+    <span style="font-size:var(--fs-caption);color:var(--c-kayu)">Off (click to toggle)</span>
+    <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+    <span style="font-size:var(--fs-caption);color:var(--c-kayu)">On</span>
+  </div>
+
+  <h3 class="sub3-title">Tooltip</h3>
+  <div class="comp-row">
+    <div class="tooltip-demo">
+      <div class="tooltip-box">Ini adalah tooltip</div>
+      <button class="btn btn-secondary btn-sm">Hover target</button>
+    </div>
+  </div>
+
+  <h3 class="sub3-title">Divider</h3>
+  <div style="max-width:400px">
+    <p style="font-size:var(--fs-body);color:var(--c-tanah)">Konten di atas divider</p>
+    <div class="divider"></div>
+    <p style="font-size:var(--fs-body);color:var(--c-tanah)">Konten di bawah divider</p>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 14: SEED CARD ═══════════ -->
+<div class="section" id="seed-card">
+  <h2 class="section-title">Seed Card (Anatomi Lengkap)</h2>
+  <p class="desc">Struktur universal 6-bagian: track strip, header, body, skill tags, stepper, footer.</p>
+
+  <div class="seed-card">
+    <div class="seed-strip" style="background:var(--t-tuntaskan)"></div>
+    <div class="seed-content">
+      <div class="seed-header">
+        <div class="seed-header-top">
+          <span class="badge badge-tuntaskan">Keresahan</span>
+        </div>
+        <div class="seed-title">Jalan utama RT 05 rusak parah setelah hujan deras kemarin malam</div>
+        <div class="seed-author">
+          <div class="avatar avatar-sm" style="background:#C05621">B</div>
+          <span>Bu Sari</span>
+          <span class="badge-tier" style="color:var(--c-tandang);font-size:10px">◆◆◇◇</span>
+          <span style="color:var(--c-pasir)">· 2 jam</span>
+        </div>
+      </div>
+      <div class="seed-body">Air menggenang di depan gang masuk. Sudah 3 hari tidak surut. Motor dan pejalan kaki kesulitan lewat, terutama anak-anak sekolah pagi hari...</div>
+      <div class="seed-tags">
+        <span class="pill pill-esco-validated" style="font-size:10px;padding:2px 8px">Perbaikan Jalan</span>
+        <span class="pill pill-esco-declared" style="font-size:10px;padding:2px 8px">Drainase</span>
+      </div>
+      <div class="seed-stepper">
+        <span class="step-dot current" style="width:8px;height:8px;border-radius:99px;background:var(--t-tuntaskan)"></span>
+        <span class="step-label" style="color:var(--t-tuntaskan)">Keresahan</span>
+        <span class="step-line"></span>
+        <span class="step-dot future"></span>
+        <span style="color:var(--c-pasir)">Bahas</span>
+        <span class="step-line"></span>
+        <span class="step-dot future"></span>
+        <span style="color:var(--c-pasir)">Rancang</span>
+        <span class="step-line"></span>
+        <span class="step-dot future"></span>
+        <span style="color:var(--c-pasir)">···</span>
+      </div>
+      <div class="seed-footer">
+        <span>💬 3</span>
+        <span>👥 8</span>
+        <span>⏱ 2j</span>
+        <span class="ai-badge" style="background:var(--c-berhasil-lembut);color:var(--c-berhasil)">🤖 Tuntaskan · 92%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 15: TRACK CARDS ═══════════ -->
+<div class="section" id="tracks">
+  <h2 class="section-title">5 Track</h2>
+  <p class="desc">Setiap track memiliki warna, lifecycle, dan komponen unik.</p>
+
+  <div class="track-cards">
+    <div class="track-mini"><div class="track-mini-header" style="background:var(--t-tuntaskan)">Tuntaskan</div><div class="track-mini-body"><div class="stages">Keresahan → Bahas → Rancang → Garap → Periksa → Tuntas</div><div class="anno" style="margin-top:8px">Papan GR, Kontribusi, PIC readiness</div></div></div>
+    <div class="track-mini"><div class="track-mini-header" style="background:var(--t-wujudkan)">Wujudkan</div><div class="track-mini-body"><div class="stages">Gagasan → Bahas → Rancang → Galang → Garap → Rayakan → Tuntas</div><div class="anno" style="margin-top:8px">Milestone tracker, Galang, Rayakan</div></div></div>
+    <div class="track-mini"><div class="track-mini-header" style="background:var(--t-telusuri);color:white">Telusuri</div><div class="track-mini-body"><div class="stages">Pertanyaan → Dugaan → Uji → Temuan → Tuntas</div><div class="anno" style="margin-top:8px">Hypothesis, evidence board, Temuan</div></div></div>
+    <div class="track-mini"><div class="track-mini-header" style="background:var(--t-rayakan)">Rayakan</div><div class="track-mini-body"><div class="stages">Kabar Baik → Sahkan → Apresiasi → Tuntas (+ Dampak opsional)</div><div class="anno" style="margin-top:8px">Validation, recognition, appreciation</div></div></div>
+    <div class="track-mini"><div class="track-mini-header" style="background:var(--t-musyawarah);color:white">Musyawarah</div><div class="track-mini-body"><div class="stages">Usul → Bahas → Putuskan → Jalankan → Tinjau → Tuntas</div><div class="anno" style="margin-top:8px">Position board, vote, Ketetapan</div></div></div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 16: CONTEXT BAR ═══════════ -->
+<div class="section" id="context-bar">
+  <h2 class="section-title">Context Bar (AI-00 Triage)</h2>
+  <p class="desc">Morphing bar di atas keyboard. Berubah bentuk sesuai state percakapan.</p>
+
+  <div style="display:flex;flex-direction:column;gap:var(--sp-3);max-width:375px">
+    <div class="context-bar listening">
+      <span style="font-size:18px">〰️</span>
+      <span class="cb-label" style="color:var(--c-pasir)">Mendengarkan...</span>
+    </div>
+    <div class="context-bar listening" style="border-left:3px solid var(--c-api)">
+      <div style="display:flex;gap:3px;align-items:center"><span style="width:4px;height:12px;background:var(--c-api);border-radius:2px;opacity:0.6"></span><span style="width:4px;height:18px;background:var(--c-api);border-radius:2px;opacity:0.8"></span><span style="width:4px;height:10px;background:var(--c-api);border-radius:2px;opacity:0.5"></span></div>
+      <span class="cb-label" style="color:var(--c-kayu)">Menggali lebih dalam...</span>
+      <span class="anno" style="border:0;padding:0;margin:0;font-size:9px">probing</span>
+    </div>
+    <div class="context-bar leaning">
+      <span class="pill pill-track-tuntaskan" style="font-size:10px;padding:2px 8px">Tuntaskan?</span>
+      <span class="cb-label" style="color:var(--c-kayu)">Ketuk untuk konfirmasi</span>
+    </div>
+    <div class="context-bar ready">
+      <span class="badge badge-tuntaskan">Keresahan</span>
+      <span class="cb-label" style="color:var(--t-tuntaskan)">Siap dikirim</span>
+      <span class="cb-confidence" style="background:var(--c-berhasil-lembut);color:var(--c-berhasil)">92%</span>
+    </div>
+    <div class="context-bar vault-ready">
+      <span class="badge badge-vault">🔒 Vault</span>
+      <span class="cb-label" style="color:var(--v-mid)">Catatan Saksi</span>
+    </div>
+    <div class="context-bar siaga-ready">
+      <span class="badge badge-siaga">🚨 Siaga</span>
+      <span class="cb-label" style="color:var(--s-deep)">Darurat terdeteksi</span>
+    </div>
+    <div class="context-bar split-ready">
+      <span class="badge" style="background:#FFF3E0;color:#E65100;border:1px solid #FFCC80">⚠️ Split</span>
+      <span class="cb-label" style="color:#E65100">Dua alur terdeteksi</span>
+      <span class="anno" style="border:0;padding:0;margin:0;font-size:9px">split-ready</span>
+    </div>
+    <div class="context-bar manual">
+      <span class="cb-label" style="color:var(--c-kayu)">Manual</span>
+      <span class="cb-label" style="color:var(--c-kayu);font-weight:700">5 tracks + Catatan Saksi</span>
+      <span class="anno" style="border:0;padding:0;margin:0;font-size:9px">manual</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 17: SEAL BAR ═══════════ -->
+<div class="section" id="seal-bar">
+  <h2 class="section-title">Seal Bar (Vault)</h2>
+  <p class="desc">Bar bawah vault yang berubah antara unsealed (editable) dan sealed (locked + actions).</p>
+
+  <div style="display:flex;flex-direction:column;gap:var(--sp-3)">
+    <div class="seal-bar-demo unsealed">
+      <span class="seal-status" style="color:var(--v-light)">📝 <span style="color:var(--v-wash)">Belum disegel</span></span>
+      <div class="seal-actions">
+        <button class="seal-btn" style="background:var(--v-light);color:var(--v-deep)">Simpan & Segel</button>
+      </div>
+    </div>
+    <div class="seal-bar-demo sealed">
+      <span class="seal-status" style="color:var(--v-light)">🔒 <span style="color:var(--v-wash)">Tersegel</span></span>
+      <div class="seal-actions">
+        <button class="seal-btn" style="background:var(--v-mid);color:white">Ganti Wali</button>
+        <button class="seal-btn" style="background:var(--c-api);color:white">Terbitkan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ FOOTER ═══════════ -->
+<div style="text-align:center;padding:var(--sp-12) 0 var(--sp-8);color:var(--c-pasir);font-size:var(--fs-small)">
+  Gotong Royong Design System · Style Guide D2 · Februari 2026 · Dokumen Internal
+</div>
+
+</div>
+</body>
+</html>

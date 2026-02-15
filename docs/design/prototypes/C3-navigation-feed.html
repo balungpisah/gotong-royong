@@ -1,0 +1,1782 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C3 · Navigation & Feed — Gotong Royong Design System</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   C3 · Navigation & Feed (v2 — Rebuilt)
+   7 Views: Beranda / Terlibat / Bantu / Notifikasi / Profil / Cari / Pilih Jangkauan
+   ============================================================ */
+
+:root {
+  /* Typography */
+  --fs-display:32px; --fs-h1:26px; --fs-h2:20px; --fs-h3:16px;
+  --fs-body:14px; --fs-small:12px; --fs-caption:11px; --fs-micro:9px;
+  --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+  --lh-tight:1.2; --lh-normal:1.5; --lh-relaxed:1.7;
+
+  /* Spacing (4px grid) */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px;
+  --sp-6:24px; --sp-8:32px; --sp-10:40px; --sp-12:48px; --sp-16:64px;
+
+  /* Radii */
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+
+  /* Shadows */
+  --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+  --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+  --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+  --shadow-xl:0 8px 40px rgba(62,39,35,0.16);
+
+  /* Core (Tanah) */
+  --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63;
+  --c-pasir:#A1887F; --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+
+  /* Action (Api) */
+  --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+
+  /* Semantic */
+  --c-berhasil:#2E7D32; --c-berhasil-l:#E8F5E9;
+  --c-peringatan:#E65100; --c-peringatan-l:#FFF3E0;
+  --c-bahaya:#C62828; --c-bahaya-l:#FFEBEE;
+  --c-keterangan:#4E342E; --c-keterangan-l:#EFEBE9;
+
+  /* Track Accents */
+  --t-tuntaskan:#C05621; --t-tuntaskan-soft:#FFF3E0; --t-tuntaskan-muted:#FFECD2;
+  --t-wujudkan:#2E7D32; --t-wujudkan-soft:#E8F5E9; --t-wujudkan-muted:#C8E6C9;
+  --t-telusuri:#6A1B9A; --t-telusuri-soft:#F3E5F5; --t-telusuri-muted:#E1BEE7;
+  --t-rayakan:#F57F17; --t-rayakan-soft:#FFF8E1; --t-rayakan-muted:#FFECB3;
+  --t-musyawarah:#4E342E; --t-musyawarah-soft:#EFEBE9; --t-musyawarah-muted:#D7CCC8;
+
+  /* Tandang */
+  --c-tandang:#00695C; --c-tandang-deep:#004D40;
+  --c-tandang-soft:#E0F2F1; --c-tandang-muted:#B2DFDB;
+
+  /* Score Axes */
+  --score-i:#F57F17; --score-i-soft:#FFF8E1;
+  --score-c:#00695C; --score-c-soft:#E0F2F1;
+  --score-j:#6A1B9A; --score-j-soft:#F3E5F5;
+
+  /* Tier */
+  --tier-keystone:#F57F17; --tier-pillar:#1565C0;
+  --tier-contributor:#00695C; --tier-novice:#8D6E63; --tier-shadow:#C62828;
+
+  /* AI (from C2 — no brand color, "AI is Furniture") */
+  --ai-high:#2E7D32; --ai-high-l:#E8F5E9;
+  --ai-medium:#E65100; --ai-medium-l:#FFF3E0;
+  --ai-low:#78909C; --ai-low-l:#ECEFF1;
+  --ai-neutral:#4E342E; --ai-neutral-l:#EFEBE9;
+}
+
+/* === LAYOUT === */
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:'Nunito',sans-serif; background:#E8E0D8;
+  display:flex; flex-direction:column; align-items:center;
+  padding:24px 16px; min-height:100vh;
+}
+
+/* === DOC BAR === */
+.doc-bar {
+  width:100%; max-width:900px; padding:16px 24px; margin-bottom:24px;
+  background:var(--c-kayu); color:#fff; border-radius:var(--r-lg);
+}
+.doc-bar h1 { font-size:var(--fs-h2); font-weight:var(--fw-extra); margin-bottom:4px; }
+.doc-bar p { font-size:var(--fs-small); opacity:0.85; }
+
+/* === VIEW SWITCHER === */
+.view-switcher {
+  display:flex; flex-wrap:wrap; gap:6px; max-width:900px; width:100%;
+  margin-bottom:20px; justify-content:center;
+}
+.scenario-btn {
+  padding:8px 16px; border-radius:var(--r-full);
+  font-size:var(--fs-small); font-weight:var(--fw-bold);
+  cursor:pointer; border:2px solid var(--c-kayu); color:var(--c-kayu);
+  background:transparent; font-family:'Nunito',sans-serif; transition:all 0.2s;
+}
+.scenario-btn.active, .scenario-btn:hover {
+  background:var(--c-kayu); color:#fff;
+}
+
+/* === PHONE FRAME === */
+.view-section { display:none; width:100%; max-width:900px; }
+.view-section.active { display:flex; justify-content:center; }
+
+.phone-frame {
+  width:375px; min-height:740px; background:var(--c-kapas);
+  border-radius:28px; box-shadow:var(--shadow-xl);
+  overflow:hidden; display:flex; flex-direction:column;
+  border:8px solid #222; position:relative;
+}
+
+/* === APP HEADER (shared) === */
+.app-header {
+  display:flex; align-items:center; padding:10px 16px;
+  background:var(--c-susu); border-bottom:1px solid var(--c-batu);
+  flex-shrink:0; gap:8px; z-index:10;
+}
+.ah-scope {
+  display:flex; align-items:center; gap:4px;
+  padding:4px 10px; border-radius:var(--r-full);
+  background:var(--c-kapas); border:1px solid var(--c-batu);
+  font-size:var(--fs-micro); font-weight:var(--fw-bold); color:var(--c-tanah);
+  cursor:pointer;
+}
+.ah-scope .ah-arrow { font-size:8px; color:var(--c-pasir); }
+.ah-title {
+  flex:1; text-align:center; font-size:var(--fs-body);
+  font-weight:var(--fw-extra); color:var(--c-tanah-gelap);
+}
+.ah-icon {
+  width:32px; height:32px; border-radius:var(--r-full);
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; cursor:pointer; background:transparent;
+  border:none; color:var(--c-tanah);
+}
+.ah-icon:hover { background:var(--c-kapas); }
+.ah-compose {
+  width:32px; height:32px; border-radius:var(--r-full);
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; cursor:pointer; border:none;
+  background:var(--c-api); color:#fff;
+}
+
+/* === COMMUNITY PULSE BAR === */
+.pulse-bar {
+  display:flex; align-items:center; gap:6px;
+  padding:8px 16px; background:var(--c-tandang-soft);
+  border-bottom:1px solid var(--c-tandang-muted); flex-shrink:0;
+  cursor:pointer;
+}
+.pulse-weather { font-size:16px; }
+.pulse-label {
+  font-size:var(--fs-micro); font-weight:var(--fw-semi);
+  color:var(--c-tandang-deep);
+}
+.pulse-label strong { font-weight:var(--fw-extra); }
+.pulse-stats {
+  display:flex; gap:8px; margin-left:auto;
+}
+.pulse-stat {
+  font-size:var(--fs-micro); font-weight:var(--fw-bold);
+  color:var(--c-tandang);
+}
+
+/* === TRACK TABS (horizontal scroll) === */
+.track-tabs {
+  display:flex; gap:6px; padding:8px 16px;
+  overflow-x:auto; flex-shrink:0; scrollbar-width:none;
+  border-bottom:1px solid rgba(215,204,200,0.4);
+}
+.track-tabs::-webkit-scrollbar { display:none; }
+.track-tab {
+  padding:5px 12px; border-radius:var(--r-full);
+  font-size:var(--fs-micro); font-weight:var(--fw-bold);
+  white-space:nowrap; cursor:pointer;
+  border:1.5px solid; transition:all 0.2s;
+  font-family:'Nunito',sans-serif; background:transparent;
+}
+.track-tab.all { border-color:var(--c-kayu); color:var(--c-kayu); }
+.track-tab.all.active { background:var(--c-kayu); color:#fff; }
+.track-tab.tuntaskan { border-color:var(--t-tuntaskan); color:var(--t-tuntaskan); }
+.track-tab.tuntaskan.active { background:var(--t-tuntaskan); color:#fff; }
+.track-tab.wujudkan { border-color:var(--t-wujudkan); color:var(--t-wujudkan); }
+.track-tab.wujudkan.active { background:var(--t-wujudkan); color:#fff; }
+.track-tab.telusuri { border-color:var(--t-telusuri); color:var(--t-telusuri); }
+.track-tab.telusuri.active { background:var(--t-telusuri); color:#fff; }
+.track-tab.rayakan { border-color:var(--t-rayakan); color:var(--t-rayakan); }
+.track-tab.rayakan.active { background:var(--t-rayakan); color:#fff; }
+.track-tab.musyawarah { border-color:var(--t-musyawarah); color:var(--t-musyawarah); }
+.track-tab.musyawarah.active { background:var(--t-musyawarah); color:#fff; }
+
+/* === FEED CARDS (seed card compact) === */
+.feed-area { flex:1; overflow-y:auto; padding:8px 12px; }
+.feed-card {
+  background:#fff; border-radius:var(--r-lg);
+  box-shadow:var(--shadow-sm); margin-bottom:8px;
+  overflow:hidden; display:flex;
+}
+.fc-strip { width:4px; flex-shrink:0; }
+.fc-strip.tuntaskan { background:var(--t-tuntaskan); }
+.fc-strip.wujudkan { background:var(--t-wujudkan); }
+.fc-strip.telusuri { background:var(--t-telusuri); }
+.fc-strip.rayakan { background:var(--t-rayakan); }
+.fc-strip.musyawarah { background:var(--t-musyawarah); }
+
+.fc-body { flex:1; padding:10px 12px; }
+.fc-header { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.fc-seed-badge {
+  padding:1px 6px; border-radius:var(--r-full);
+  font-size:8px; font-weight:var(--fw-extra); color:#fff;
+}
+.fc-seed-badge.tuntaskan { background:var(--t-tuntaskan); }
+.fc-seed-badge.wujudkan { background:var(--t-wujudkan); }
+.fc-seed-badge.telusuri { background:var(--t-telusuri); }
+.fc-seed-badge.rayakan { background:var(--t-rayakan); }
+.fc-seed-badge.musyawarah { background:var(--t-musyawarah); }
+.fc-title { font-size:var(--fs-small); font-weight:var(--fw-bold); color:var(--c-tanah-gelap); flex:1; }
+
+.fc-author { display:flex; align-items:center; gap:4px; margin-bottom:6px; }
+.fc-avatar {
+  width:20px; height:20px; border-radius:var(--r-full);
+  background:var(--c-batu); display:flex; align-items:center; justify-content:center;
+  font-size:10px;
+}
+.fc-name { font-size:var(--fs-micro); color:var(--c-tanah); font-weight:var(--fw-semi); }
+.fc-tier { font-size:8px; letter-spacing:-0.5px; }
+.fc-tier.keystone { color:var(--tier-keystone); }
+.fc-tier.pillar { color:var(--tier-pillar); }
+.fc-tier.contributor { color:var(--tier-contributor); }
+.fc-tier.novice { color:var(--tier-novice); }
+.fc-time { font-size:var(--fs-micro); color:var(--c-pasir); margin-left:auto; }
+
+.fc-text {
+  font-size:var(--fs-caption); color:var(--c-tanah); line-height:1.4;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden; margin-bottom:6px;
+}
+
+/* Skill tags on seed cards */
+.fc-skills { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+.fc-skill-tag {
+  font-size:8px; font-weight:var(--fw-semi); padding:2px 6px;
+  border-radius:var(--r-full); background:var(--c-tandang-soft);
+  color:var(--c-tandang-deep); border:1px solid var(--c-tandang-muted);
+}
+
+/* Stepper dots */
+.fc-stepper { display:flex; gap:3px; align-items:center; margin-bottom:6px; }
+.fc-dot { width:6px; height:6px; border-radius:var(--r-full); }
+.fc-dot.done { background:var(--c-pasir); }
+.fc-dot.current { width:16px; border-radius:var(--r-full); }
+.fc-dot.current.tuntaskan { background:var(--t-tuntaskan); }
+.fc-dot.current.wujudkan { background:var(--t-wujudkan); }
+.fc-dot.current.telusuri { background:var(--t-telusuri); }
+.fc-dot.current.rayakan { background:var(--t-rayakan); }
+.fc-dot.current.musyawarah { background:var(--t-musyawarah); }
+.fc-dot.future { background:var(--c-batu); }
+.fc-stage-label { font-size:8px; font-weight:var(--fw-bold); margin-left:3px; }
+.fc-stage-label.tuntaskan { color:var(--t-tuntaskan); }
+.fc-stage-label.wujudkan { color:var(--t-wujudkan); }
+.fc-stage-label.telusuri { color:var(--t-telusuri); }
+.fc-stage-label.rayakan { color:var(--t-rayakan); }
+.fc-stage-label.musyawarah { color:var(--t-musyawarah); }
+
+/* Footer */
+.fc-footer { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.fc-stat { font-size:var(--fs-micro); color:var(--c-pasir); display:flex; align-items:center; gap:2px; }
+.fc-ai-badge {
+  padding:1px 5px; border-radius:var(--r-full);
+  font-size:8px; font-weight:var(--fw-bold); margin-left:auto;
+}
+.fc-ai-badge.classified { background:var(--c-berhasil-l); color:var(--c-berhasil); }
+.fc-ai-badge.suggested { background:var(--c-peringatan-l); color:var(--c-peringatan); }
+.fc-ai-badge.stall { background:var(--c-bahaya-l); color:var(--c-bahaya); }
+.fc-ai-badge.summary { background:var(--c-keterangan-l); color:var(--c-keterangan); }
+.fc-ai-badge.dampak { background:var(--c-berhasil-l); color:var(--c-berhasil); }
+
+/* === ACTION WEIGHT INDICATOR (Beranda) === */
+.fc-action-flag {
+  display:flex; align-items:center; gap:4px; padding:4px 8px;
+  border-radius:var(--r-sm); font-size:var(--fs-micro); font-weight:var(--fw-bold);
+  margin-bottom:6px;
+}
+.fc-action-flag.your-action { background:var(--c-bara); color:var(--c-api); }
+.fc-action-flag.nearing { background:var(--c-berhasil-l); color:var(--c-berhasil); }
+.fc-action-flag.new-seed { background:var(--c-tandang-soft); color:var(--c-tandang); }
+
+/* === PROGRESS RING (Terlibat) === */
+.fc-progress-ring {
+  width:36px; height:36px; flex-shrink:0; position:relative;
+}
+.fc-progress-ring svg { width:36px; height:36px; transform:rotate(-90deg); }
+.fc-progress-ring .ring-bg { fill:none; stroke:var(--c-batu); stroke-width:3; }
+.fc-progress-ring .ring-fill { fill:none; stroke-width:3; stroke-linecap:round; }
+.fc-progress-ring .ring-pct {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  font-size:8px; font-weight:var(--fw-extra); color:var(--c-tanah);
+}
+
+/* === ROLE BADGE (Terlibat) === */
+.fc-role-badge {
+  padding:2px 6px; border-radius:var(--r-full);
+  font-size:8px; font-weight:var(--fw-extra); color:#fff;
+}
+.fc-role-badge.pic { background:var(--c-api); }
+.fc-role-badge.author { background:var(--c-tanah); }
+.fc-role-badge.kontributor { background:var(--c-tandang); }
+.fc-role-badge.pemilih { background:var(--t-musyawarah); }
+
+/* === STREAK BANNER (Terlibat) === */
+.streak-banner {
+  display:flex; align-items:center; gap:8px;
+  padding:10px 16px; background:var(--c-bara);
+  border-bottom:1px solid var(--t-tuntaskan-muted); flex-shrink:0;
+}
+.streak-fire { font-size:20px; }
+.streak-count {
+  font-size:var(--fs-h3); font-weight:var(--fw-extra); color:var(--c-api);
+}
+.streak-label { font-size:var(--fs-micro); color:var(--c-kayu); }
+.streak-best {
+  margin-left:auto; font-size:var(--fs-micro); color:var(--c-pasir);
+  font-weight:var(--fw-semi);
+}
+
+/* === SKILL MATCH INDICATOR (Bantu) === */
+.fc-skill-match {
+  display:flex; align-items:center; gap:4px;
+  padding:4px 8px; border-radius:var(--r-sm);
+  background:var(--c-tandang-soft); margin-bottom:6px;
+  font-size:var(--fs-micro); font-weight:var(--fw-bold); color:var(--c-tandang-deep);
+}
+.skill-match-icon { font-size:12px; }
+.skill-pill-validated {
+  padding:1px 6px; border-radius:var(--r-full);
+  background:var(--c-tandang); color:#fff;
+  font-size:8px; font-weight:var(--fw-extra);
+}
+.skill-pill-declared {
+  padding:1px 6px; border-radius:var(--r-full);
+  background:transparent; color:var(--c-tandang);
+  border:1.5px solid var(--c-tandang);
+  font-size:8px; font-weight:var(--fw-extra);
+}
+
+/* Empty state (Bantu) */
+.empty-state {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:40px 24px; text-align:center; flex:1;
+}
+.empty-icon { font-size:48px; margin-bottom:16px; opacity:0.5; }
+.empty-title { font-size:var(--fs-h3); font-weight:var(--fw-bold); color:var(--c-tanah); margin-bottom:8px; }
+.empty-text { font-size:var(--fs-small); color:var(--c-kayu); margin-bottom:16px; line-height:1.5; }
+.empty-btn {
+  padding:10px 20px; border-radius:var(--r-full);
+  background:var(--c-tandang); color:#fff;
+  font-size:var(--fs-small); font-weight:var(--fw-bold);
+  border:none; cursor:pointer; font-family:'Nunito',sans-serif;
+}
+
+/* === NOTIFICATIONS === */
+.notif-group-label {
+  padding:8px 16px; font-size:var(--fs-micro); font-weight:var(--fw-extra);
+  color:var(--c-kayu); text-transform:uppercase; letter-spacing:0.5px;
+}
+.notif-item {
+  display:flex; gap:10px; padding:10px 16px;
+  background:#fff; margin:0 12px 4px; border-radius:var(--r-md);
+  box-shadow:var(--shadow-sm); align-items:flex-start;
+}
+.notif-item.unread { border-left:3px solid var(--c-api); }
+.notif-icon {
+  width:32px; height:32px; border-radius:var(--r-full);
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; flex-shrink:0;
+}
+.notif-icon.mention { background:var(--c-bara); }
+.notif-icon.stage { background:var(--c-berhasil-l); }
+.notif-icon.credit { background:var(--score-i-soft); }
+.notif-icon.stall { background:var(--c-bahaya-l); }
+.notif-icon.skill-match { background:var(--c-tandang-soft); }
+.notif-icon.vote { background:var(--t-musyawarah-soft); }
+.notif-icon.digest { background:var(--t-telusuri-soft); }
+
+.notif-body { flex:1; min-width:0; }
+.notif-text { font-size:var(--fs-caption); color:var(--c-tanah); line-height:1.4; }
+.notif-text strong { font-weight:var(--fw-bold); color:var(--c-tanah-gelap); }
+.notif-meta { font-size:var(--fs-micro); color:var(--c-pasir); margin-top:2px; }
+.notif-seed-ref {
+  display:inline-flex; align-items:center; gap:3px;
+  padding:1px 6px; border-radius:var(--r-full);
+  font-size:8px; font-weight:var(--fw-bold);
+  margin-top:4px;
+}
+
+/* === PROFILE (CV HIDUP) === */
+.profile-hero {
+  text-align:center; padding:20px 16px 12px; background:var(--c-susu);
+}
+.profile-avatar {
+  width:64px; height:64px; border-radius:var(--r-full);
+  background:var(--c-tandang); margin:0 auto 8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:24px; color:#fff; font-weight:var(--fw-bold);
+  border:3px solid var(--c-tandang-muted);
+}
+.profile-name { font-size:var(--fs-h3); font-weight:var(--fw-extra); color:var(--c-tanah-gelap); }
+.profile-area { font-size:var(--fs-micro); color:var(--c-kayu); margin-top:2px; }
+.profile-tier {
+  display:inline-flex; align-items:center; gap:2px;
+  margin-top:6px; padding:3px 10px; border-radius:var(--r-full);
+  font-size:var(--fs-micro); font-weight:var(--fw-bold);
+}
+.profile-tier .diamond { font-size:10px; }
+.profile-tier .diamond.filled { color:var(--tier-pillar); }
+.profile-tier .diamond.empty { opacity:0.3; color:var(--tier-pillar); }
+.profile-tier .tier-label { color:var(--tier-pillar); margin-left:4px; }
+
+/* I/C/J Score Cards */
+.icj-scores { display:flex; gap:8px; padding:12px 16px; }
+.icj-card {
+  flex:1; padding:10px; border-radius:var(--r-md); text-align:center;
+}
+.icj-card.sc-i { background:var(--score-i-soft); }
+.icj-card.sc-c { background:var(--score-c-soft); }
+.icj-card.sc-j { background:var(--score-j-soft); }
+.icj-icon { font-size:16px; margin-bottom:2px; }
+.icj-value { font-size:var(--fs-h3); font-weight:var(--fw-extra); }
+.icj-card.sc-i .icj-value { color:var(--score-i); }
+.icj-card.sc-c .icj-value { color:var(--score-c); }
+.icj-card.sc-j .icj-value { color:var(--score-j); }
+.icj-label {
+  font-size:var(--fs-micro); font-weight:var(--fw-semi); color:var(--c-kayu);
+  text-transform:uppercase; letter-spacing:0.3px; margin-top:2px;
+}
+.icj-decay { font-size:8px; color:var(--c-pasir); margin-top:1px; }
+
+/* Skills Section */
+.profile-section {
+  padding:12px 16px; border-top:1px solid var(--c-batu);
+}
+.profile-section-title {
+  font-size:var(--fs-small); font-weight:var(--fw-extra); color:var(--c-tanah-gelap);
+  margin-bottom:8px; display:flex; align-items:center; gap:6px;
+}
+.skill-group-label {
+  font-size:var(--fs-micro); font-weight:var(--fw-bold); color:var(--c-kayu);
+  margin-bottom:6px; text-transform:uppercase; letter-spacing:0.3px;
+}
+.skill-pills { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.skill-validated {
+  padding:4px 10px; border-radius:var(--r-full);
+  background:var(--c-tandang); color:#fff;
+  font-size:var(--fs-caption); font-weight:var(--fw-semi);
+}
+.skill-declared {
+  padding:4px 10px; border-radius:var(--r-full);
+  background:transparent; color:var(--c-tandang);
+  border:1.5px solid var(--c-tandang);
+  font-size:var(--fs-caption); font-weight:var(--fw-semi);
+}
+.skill-add-btn {
+  padding:4px 10px; border-radius:var(--r-full);
+  background:var(--c-kapas); color:var(--c-kayu);
+  border:1.5px dashed var(--c-batu);
+  font-size:var(--fs-caption); font-weight:var(--fw-semi);
+  cursor:pointer; font-family:'Nunito',sans-serif;
+}
+
+/* Kontribusi Timeline */
+.kontribusi-item {
+  display:flex; gap:8px; align-items:flex-start; padding:8px 0;
+  border-bottom:1px solid rgba(215,204,200,0.4);
+}
+.kontribusi-item:last-child { border-bottom:none; }
+.kontribusi-strip { width:3px; min-height:32px; border-radius:var(--r-full); flex-shrink:0; }
+.kontribusi-detail { flex:1; }
+.kontribusi-title { font-size:var(--fs-caption); font-weight:var(--fw-semi); color:var(--c-tanah-gelap); }
+.kontribusi-meta { font-size:var(--fs-micro); color:var(--c-pasir); margin-top:1px; }
+.kontribusi-role {
+  font-size:8px; font-weight:var(--fw-extra); padding:1px 5px;
+  border-radius:var(--r-full); color:#fff; display:inline-block; margin-top:2px;
+}
+
+/* Vouch Section */
+.vouch-row { display:flex; gap:16px; }
+.vouch-group { flex:1; }
+.vouch-label { font-size:var(--fs-micro); font-weight:var(--fw-semi); color:var(--c-kayu); margin-bottom:6px; }
+.vouch-avatars { display:flex; }
+.vouch-av {
+  width:28px; height:28px; border-radius:var(--r-full);
+  display:flex; align-items:center; justify-content:center;
+  font-size:10px; color:#fff; font-weight:var(--fw-bold);
+  border:2px solid var(--c-susu); margin-left:-6px;
+}
+.vouch-av:first-child { margin-left:0; }
+.vouch-count { font-size:var(--fs-micro); color:var(--c-tanah); font-weight:var(--fw-semi); margin-top:4px; }
+
+/* Impact Metrics */
+.impact-row { display:flex; gap:8px; }
+.impact-card {
+  flex:1; padding:10px; border-radius:var(--r-md);
+  background:var(--c-kapas); text-align:center;
+}
+.impact-value { font-size:var(--fs-h3); font-weight:var(--fw-extra); color:var(--c-tanah-gelap); }
+.impact-label { font-size:var(--fs-micro); color:var(--c-kayu); margin-top:2px; }
+
+/* QR Code */
+.qr-section {
+  display:flex; align-items:center; gap:12px;
+  padding:12px; border-radius:var(--r-md); background:var(--c-kapas);
+}
+.qr-placeholder {
+  width:56px; height:56px; background:var(--c-tanah-gelap);
+  border-radius:var(--r-sm); display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:var(--fs-micro); font-weight:var(--fw-bold);
+}
+.qr-text { flex:1; }
+.qr-title { font-size:var(--fs-small); font-weight:var(--fw-bold); color:var(--c-tanah-gelap); }
+.qr-desc { font-size:var(--fs-micro); color:var(--c-kayu); margin-top:2px; }
+
+/* Decay Nudge */
+.decay-nudge {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 12px; border-radius:var(--r-md);
+  background:var(--c-peringatan-l); border:1px solid #FFCC80;
+  font-size:var(--fs-micro); color:var(--c-peringatan);
+}
+.decay-nudge-icon { font-size:14px; }
+
+/* === SEARCH OVERLAY === */
+.search-overlay {
+  position:absolute; top:0; left:0; right:0; bottom:0;
+  background:var(--c-susu); z-index:20; display:flex; flex-direction:column;
+}
+.search-header {
+  display:flex; align-items:center; gap:8px; padding:10px 12px;
+  border-bottom:1px solid var(--c-batu);
+}
+.search-input {
+  flex:1; padding:8px 12px; border-radius:var(--r-full);
+  border:1.5px solid var(--c-batu); font-size:var(--fs-body);
+  font-family:'Nunito',sans-serif; background:var(--c-kapas);
+  outline:none;
+}
+.search-input:focus { border-color:var(--c-api); }
+.search-close {
+  font-size:18px; color:var(--c-pasir); cursor:pointer;
+  background:none; border:none; padding:4px;
+}
+.search-filters { padding:8px 12px; border-bottom:1px solid rgba(215,204,200,0.4); }
+.search-filter-label {
+  font-size:var(--fs-micro); font-weight:var(--fw-bold); color:var(--c-kayu);
+  text-transform:uppercase; letter-spacing:0.3px; margin-bottom:6px;
+}
+.search-filter-pills { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; }
+.search-pill {
+  padding:4px 10px; border-radius:var(--r-full);
+  font-size:var(--fs-micro); font-weight:var(--fw-bold);
+  border:1.5px solid var(--c-batu); color:var(--c-kayu);
+  background:transparent; cursor:pointer; font-family:'Nunito',sans-serif;
+}
+.search-pill.active { background:var(--c-tanah); color:#fff; border-color:var(--c-tanah); }
+.search-results { flex:1; overflow-y:auto; padding:8px 12px; }
+.search-result-label {
+  font-size:var(--fs-micro); color:var(--c-pasir); padding:4px 0;
+  font-weight:var(--fw-semi);
+}
+
+/* === SCOPE PICKER (Bottom Sheet) === */
+.scope-sheet {
+  position:absolute; bottom:0; left:0; right:0;
+  background:var(--c-susu); z-index:20;
+  border-top-left-radius:20px; border-top-right-radius:20px;
+  box-shadow:0 -4px 24px rgba(62,39,35,0.15);
+  display:flex; flex-direction:column; max-height:80%;
+}
+.scope-handle {
+  width:40px; height:4px; border-radius:var(--r-full);
+  background:var(--c-batu); margin:10px auto;
+}
+.scope-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:4px 16px 12px; border-bottom:1px solid var(--c-batu);
+}
+.scope-title { font-size:var(--fs-body); font-weight:var(--fw-extra); color:var(--c-tanah-gelap); }
+.scope-close { font-size:18px; color:var(--c-pasir); cursor:pointer; background:none; border:none; }
+
+.scope-breadcrumb {
+  display:flex; gap:4px; align-items:center; padding:8px 16px;
+  font-size:var(--fs-micro); color:var(--c-pasir); flex-wrap:wrap;
+}
+.scope-breadcrumb .bc-item { color:var(--c-kayu); cursor:pointer; font-weight:var(--fw-semi); }
+.scope-breadcrumb .bc-sep { color:var(--c-batu); }
+.scope-breadcrumb .bc-current { color:var(--c-api); font-weight:var(--fw-extra); }
+
+.scope-list { flex:1; overflow-y:auto; padding:4px 0; }
+.scope-item {
+  display:flex; align-items:center; gap:10px; padding:12px 16px;
+  cursor:pointer; border-bottom:1px solid rgba(215,204,200,0.3);
+}
+.scope-item:hover { background:var(--c-kapas); }
+.scope-item.selected { background:var(--c-bara); }
+.scope-item-icon { font-size:16px; }
+.scope-item-info { flex:1; }
+.scope-item-name { font-size:var(--fs-small); font-weight:var(--fw-bold); color:var(--c-tanah-gelap); }
+.scope-item-meta { font-size:var(--fs-micro); color:var(--c-pasir); }
+.scope-item-check { font-size:16px; color:var(--c-api); }
+.scope-apply-btn {
+  margin:12px 16px; padding:12px; border-radius:var(--r-md);
+  background:var(--c-api); color:#fff; font-size:var(--fs-body);
+  font-weight:var(--fw-bold); border:none; cursor:pointer;
+  font-family:'Nunito',sans-serif; text-align:center;
+}
+
+/* === BOTTOM NAV (5 tabs) === */
+.bottom-nav {
+  display:flex; background:var(--c-susu);
+  border-top:1px solid var(--c-batu); flex-shrink:0;
+  padding:4px 0 8px;
+}
+.bn-item {
+  flex:1; display:flex; flex-direction:column; align-items:center;
+  gap:2px; padding:6px 0; cursor:pointer;
+  background:none; border:none; font-family:'Nunito',sans-serif;
+  transition:color 0.2s;
+}
+.bn-icon { font-size:18px; opacity:0.5; }
+.bn-label { font-size:var(--fs-micro); font-weight:var(--fw-semi); color:var(--c-pasir); }
+.bn-item.active .bn-icon { opacity:1; }
+.bn-item.active .bn-label { color:var(--c-api); font-weight:var(--fw-extra); }
+.bn-badge {
+  position:relative;
+}
+.bn-badge::after {
+  content:''; position:absolute; top:-2px; right:-4px;
+  width:8px; height:8px; border-radius:var(--r-full);
+  background:var(--c-bahaya); border:1.5px solid var(--c-susu);
+}
+
+/* === ANNOTATIONS === */
+.anno {
+  margin:8px 12px; padding:10px 12px;
+  background:rgba(141,110,99,0.08); border-left:3px solid var(--c-kayu);
+  border-radius:0 var(--r-sm) var(--r-sm) 0;
+  font-size:var(--fs-micro); color:var(--c-kayu); line-height:1.5;
+}
+.anno strong { color:var(--c-tanah-gelap); }
+
+/* === VIEW LABEL === */
+.view-label {
+  padding:8px 16px; background:var(--c-keterangan);
+  color:#fff; font-size:var(--fs-micro); font-weight:var(--fw-extra);
+  text-align:center; text-transform:uppercase; letter-spacing:1px;
+  flex-shrink:0;
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- DOC HEADER                                                    -->
+<!-- ============================================================ -->
+<div class="doc-bar">
+  <h1>C3 · Navigation & Feed</h1>
+  <p>5-tab navigation, scope hierarchy, ESCO skill tags, Community Pulse, action-weighted feed, CV Hidup profile, search overlay, scope picker.</p>
+</div>
+
+<!-- VIEW SWITCHER -->
+<div class="view-switcher">
+  <button class="scenario-btn active" onclick="showView('v-beranda')">1 · Beranda</button>
+  <button class="scenario-btn" onclick="showView('v-terlibat')">2 · Terlibat</button>
+  <button class="scenario-btn" onclick="showView('v-bantu')">3 · Bantu</button>
+  <button class="scenario-btn" onclick="showView('v-notifikasi')">4 · Notifikasi</button>
+  <button class="scenario-btn" onclick="showView('v-profil')">5 · Profil</button>
+  <button class="scenario-btn" onclick="showView('v-cari')">6 · Cari</button>
+  <button class="scenario-btn" onclick="showView('v-scope')">7 · Jangkauan</button>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW 1 · BERANDA                                              -->
+<!-- ============================================================ -->
+<div class="view-section active" id="v-beranda">
+<div class="phone-frame">
+  <div class="view-label">Beranda — Action-Weighted Community Feed</div>
+
+  <!-- App Header -->
+  <div class="app-header">
+    <div class="ah-scope">RT 05 <span class="ah-arrow">▼</span></div>
+    <div class="ah-title">Gotong Royong</div>
+    <button class="ah-icon">🔍</button>
+    <button class="ah-compose">+</button>
+  </div>
+
+  <!-- Community Pulse -->
+  <div class="pulse-bar">
+    <span class="pulse-weather">☀️</span>
+    <span class="pulse-label"><strong>Cerah</strong></span>
+    <div class="pulse-stats">
+      <span class="pulse-stat">14 aktif</span>
+      <span class="pulse-stat">3 baru</span>
+      <span class="pulse-stat">1 vote</span>
+    </div>
+  </div>
+
+  <!-- Track Tabs -->
+  <div class="track-tabs">
+    <button class="track-tab all active">Semua</button>
+    <button class="track-tab tuntaskan">🔥 Tuntaskan</button>
+    <button class="track-tab wujudkan">🌱 Wujudkan</button>
+    <button class="track-tab telusuri">🔍 Telusuri</button>
+    <button class="track-tab rayakan">🎉 Rayakan</button>
+    <button class="track-tab musyawarah">🤝 Musyawarah</button>
+  </div>
+
+  <!-- Feed (Action-Weighted) -->
+  <div class="feed-area">
+
+    <div class="anno">
+      <strong>Action-Weighted Feed</strong> — Not chronological. Priority: (1) seeds needing YOUR action, (2) nearing completion, (3) new, (4) active, (5) completed. Cards show ESCO skill tags.
+    </div>
+
+    <!-- Priority 1: YOUR ACTION NEEDED -->
+    <div class="feed-card">
+      <div class="fc-strip tuntaskan"></div>
+      <div class="fc-body">
+        <div class="fc-action-flag your-action">⚡ Butuh tindakan Anda (PIC)</div>
+        <div class="fc-header">
+          <span class="fc-seed-badge tuntaskan">Keresahan</span>
+          <span class="fc-title">Harga bahan bangunan koperasi tidak wajar</span>
+        </div>
+        <div class="fc-author">
+          <span class="fc-avatar">👩</span>
+          <span class="fc-name">Bu Ratna</span>
+          <span class="fc-tier contributor">◆◆◇◇</span>
+          <span class="fc-time">2j lalu</span>
+        </div>
+        <div class="fc-text">Koperasi RT 07 menaikkan harga bahan bangunan secara tidak wajar. Selisih hampir 30% dari toko luar…</div>
+        <div class="fc-skills">
+          <span class="fc-skill-tag">audit keuangan</span>
+          <span class="fc-skill-tag">manajemen koperasi</span>
+        </div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot current tuntaskan"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label tuntaskan">Rancang</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 18</span>
+          <span class="fc-stat">👥 12</span>
+          <span class="fc-stat">⏱ 3h</span>
+          <span class="fc-ai-badge classified">🤖 92%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Priority 2: NEARING COMPLETION -->
+    <div class="feed-card">
+      <div class="fc-strip wujudkan"></div>
+      <div class="fc-body">
+        <div class="fc-action-flag nearing">🏁 Hampir selesai (87%)</div>
+        <div class="fc-header">
+          <span class="fc-seed-badge wujudkan">Gagasan</span>
+          <span class="fc-title">Taman baca komunitas RT 05</span>
+        </div>
+        <div class="fc-author">
+          <span class="fc-avatar">👨</span>
+          <span class="fc-name">Pak Budi</span>
+          <span class="fc-tier pillar">◆◆◆◇</span>
+          <span class="fc-time">5j lalu</span>
+        </div>
+        <div class="fc-text">Membuat taman baca di lahan kosong sebelah pos RT…</div>
+        <div class="fc-skills">
+          <span class="fc-skill-tag">pertukangan</span>
+          <span class="fc-skill-tag">desain ruang</span>
+          <span class="fc-skill-tag">pendidikan anak</span>
+        </div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot current wujudkan"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label wujudkan">Rayakan</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 45</span>
+          <span class="fc-stat">👥 23</span>
+          <span class="fc-stat">⏱ 14h</span>
+          <span class="fc-ai-badge dampak">🌱 Dampak</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Priority 3: NEW SEED -->
+    <div class="feed-card">
+      <div class="fc-strip telusuri"></div>
+      <div class="fc-body">
+        <div class="fc-action-flag new-seed">🆕 Baru · 2 jam lalu</div>
+        <div class="fc-header">
+          <span class="fc-seed-badge telusuri">Pertanyaan</span>
+          <span class="fc-title">Apakah bantuan BPJS untuk lansia sudah tersalurkan?</span>
+        </div>
+        <div class="fc-author">
+          <span class="fc-avatar">👩</span>
+          <span class="fc-name">Bu Sari</span>
+          <span class="fc-tier novice">◆◇◇◇</span>
+          <span class="fc-time">2j lalu</span>
+        </div>
+        <div class="fc-text">Ada kabar bahwa bantuan BPJS untuk warga lansia sudah cair tapi belum ada yang terima…</div>
+        <div class="fc-skills">
+          <span class="fc-skill-tag">administrasi publik</span>
+          <span class="fc-skill-tag">jaminan sosial</span>
+        </div>
+        <div class="fc-stepper">
+          <div class="fc-dot current telusuri"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label telusuri">Pertanyaan</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 3</span>
+          <span class="fc-stat">👥 2</span>
+          <span class="fc-stat">⏱ 2j</span>
+          <span class="fc-ai-badge suggested">🤖 74%?</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Priority 4: ACTIVE -->
+    <div class="feed-card">
+      <div class="fc-strip musyawarah"></div>
+      <div class="fc-body">
+        <div class="fc-header">
+          <span class="fc-seed-badge musyawarah">Usul</span>
+          <span class="fc-title">Jadwal ronda malam perlu diperbarui</span>
+        </div>
+        <div class="fc-author">
+          <span class="fc-avatar">👨</span>
+          <span class="fc-name">Pak RT</span>
+          <span class="fc-tier keystone">◆◆◆◆</span>
+          <span class="fc-time">1h lalu</span>
+        </div>
+        <div class="fc-text">Usulan pembaruan jadwal ronda untuk menyesuaikan dengan anggota baru…</div>
+        <div class="fc-skills">
+          <span class="fc-skill-tag">keamanan lingkungan</span>
+        </div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot current musyawarah"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label musyawarah">Putuskan</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 31</span>
+          <span class="fc-stat">🗳️ 8/15</span>
+          <span class="fc-stat">⏱ 2h</span>
+          <span class="fc-ai-badge summary">📝 AI-07</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Priority 5: COMPLETED -->
+    <div class="feed-card" style="opacity:0.8;">
+      <div class="fc-strip rayakan"></div>
+      <div class="fc-body">
+        <div class="fc-header">
+          <span class="fc-seed-badge rayakan">Kabar Baik</span>
+          <span class="fc-title">Bu Maya berhasil melek huruf di usia 65!</span>
+        </div>
+        <div class="fc-author">
+          <span class="fc-avatar">👧</span>
+          <span class="fc-name">Dina</span>
+          <span class="fc-tier contributor">◆◆◇◇</span>
+          <span class="fc-time">2h lalu</span>
+        </div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done" style="background:var(--t-rayakan);"></div>
+          <span class="fc-stage-label rayakan">✓ Tuntas</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 28</span>
+          <span class="fc-stat">🎉 42</span>
+          <span class="fc-ai-badge dampak">🌱 +34% literasi</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <button class="bn-item active"><span class="bn-icon">🏠</span><span class="bn-label">Beranda</span></button>
+    <button class="bn-item"><span class="bn-icon">📋</span><span class="bn-label">Terlibat</span></button>
+    <button class="bn-item"><span class="bn-icon">🤝</span><span class="bn-label">Bantu</span></button>
+    <button class="bn-item"><span class="bn-icon bn-badge">🔔</span><span class="bn-label">Notifikasi</span></button>
+    <button class="bn-item"><span class="bn-icon">👤</span><span class="bn-label">Profil</span></button>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW 2 · TERLIBAT                                             -->
+<!-- ============================================================ -->
+<div class="view-section" id="v-terlibat">
+<div class="phone-frame">
+  <div class="view-label">Terlibat — Seeds You're Involved In</div>
+
+  <div class="app-header">
+    <div class="ah-scope">RT 05 <span class="ah-arrow">▼</span></div>
+    <div class="ah-title">Gotong Royong</div>
+    <button class="ah-icon">🔍</button>
+    <button class="ah-compose">+</button>
+  </div>
+
+  <!-- Streak Banner -->
+  <div class="streak-banner">
+    <span class="streak-fire">🔥</span>
+    <span class="streak-count">12</span>
+    <span class="streak-label">hari berturut-turut</span>
+    <span class="streak-best">Terbaik: 21 hari</span>
+  </div>
+
+  <div class="anno">
+    <strong>Terlibat Feed</strong> — Seeds where you are author, PIC, contributor, or voter. Sorted by urgency. Progress rings show completion %. Role badges clarify your relationship.
+  </div>
+
+  <div class="feed-area">
+
+    <!-- Card 1: PIC — needs action -->
+    <div class="feed-card">
+      <div class="fc-strip tuntaskan"></div>
+      <div class="fc-body">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <span class="fc-role-badge pic">PIC</span>
+          <span style="font-size:var(--fs-micro); color:var(--c-api); font-weight:var(--fw-bold);">⚡ Menunggu tindakan Anda</span>
+        </div>
+        <div class="fc-header">
+          <span class="fc-seed-badge tuntaskan">Keresahan</span>
+          <span class="fc-title">Harga bahan bangunan koperasi</span>
+        </div>
+        <div class="fc-text">Koperasi RT 07 menaikkan harga bahan bangunan…</div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot current tuntaskan"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label tuntaskan">Rancang</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 18</span>
+          <span class="fc-stat">👥 12</span>
+        </div>
+      </div>
+      <div class="fc-progress-ring" style="margin:auto 12px auto 0;">
+        <svg viewBox="0 0 36 36">
+          <circle class="ring-bg" cx="18" cy="18" r="15.9"/>
+          <circle class="ring-fill" cx="18" cy="18" r="15.9" stroke="var(--t-tuntaskan)"
+            stroke-dasharray="45 55" stroke-dashoffset="0"/>
+        </svg>
+        <span class="ring-pct">45%</span>
+      </div>
+    </div>
+
+    <!-- Card 2: Kontributor — unread -->
+    <div class="feed-card">
+      <div class="fc-strip wujudkan"></div>
+      <div class="fc-body">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <span class="fc-role-badge kontributor">Kontributor</span>
+          <span style="font-size:var(--fs-micro); color:var(--c-berhasil); font-weight:var(--fw-bold);">● 3 pesan baru</span>
+        </div>
+        <div class="fc-header">
+          <span class="fc-seed-badge wujudkan">Gagasan</span>
+          <span class="fc-title">Taman baca komunitas RT 05</span>
+        </div>
+        <div class="fc-text">Membuat taman baca di lahan kosong sebelah pos RT…</div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot current wujudkan"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label wujudkan">Rayakan</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 45</span>
+          <span class="fc-stat">👥 23</span>
+        </div>
+      </div>
+      <div class="fc-progress-ring" style="margin:auto 12px auto 0;">
+        <svg viewBox="0 0 36 36">
+          <circle class="ring-bg" cx="18" cy="18" r="15.9"/>
+          <circle class="ring-fill" cx="18" cy="18" r="15.9" stroke="var(--t-wujudkan)"
+            stroke-dasharray="87 13" stroke-dashoffset="0"/>
+        </svg>
+        <span class="ring-pct">87%</span>
+      </div>
+    </div>
+
+    <!-- Card 3: Author -->
+    <div class="feed-card">
+      <div class="fc-strip telusuri"></div>
+      <div class="fc-body">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <span class="fc-role-badge author">Penulis</span>
+        </div>
+        <div class="fc-header">
+          <span class="fc-seed-badge telusuri">Pertanyaan</span>
+          <span class="fc-title">Bantuan BPJS untuk lansia</span>
+        </div>
+        <div class="fc-text">Ada kabar bantuan BPJS sudah cair tapi belum ada yang terima…</div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot current telusuri"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label telusuri">Dugaan</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 8</span>
+          <span class="fc-stat">👥 5</span>
+        </div>
+      </div>
+      <div class="fc-progress-ring" style="margin:auto 12px auto 0;">
+        <svg viewBox="0 0 36 36">
+          <circle class="ring-bg" cx="18" cy="18" r="15.9"/>
+          <circle class="ring-fill" cx="18" cy="18" r="15.9" stroke="var(--t-telusuri)"
+            stroke-dasharray="30 70" stroke-dashoffset="0"/>
+        </svg>
+        <span class="ring-pct">30%</span>
+      </div>
+    </div>
+
+    <!-- Card 4: Pemilih -->
+    <div class="feed-card">
+      <div class="fc-strip musyawarah"></div>
+      <div class="fc-body">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <span class="fc-role-badge pemilih">Pemilih</span>
+          <span style="font-size:var(--fs-micro); color:var(--c-peringatan); font-weight:var(--fw-bold);">🗳️ Vote masih berjalan</span>
+        </div>
+        <div class="fc-header">
+          <span class="fc-seed-badge musyawarah">Usul</span>
+          <span class="fc-title">Jadwal ronda malam</span>
+        </div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot current musyawarah"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label musyawarah">Putuskan</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">🗳️ 8/15 suara</span>
+          <span class="fc-stat">⏱ sisa 2h</span>
+        </div>
+      </div>
+      <div class="fc-progress-ring" style="margin:auto 12px auto 0;">
+        <svg viewBox="0 0 36 36">
+          <circle class="ring-bg" cx="18" cy="18" r="15.9"/>
+          <circle class="ring-fill" cx="18" cy="18" r="15.9" stroke="var(--t-musyawarah)"
+            stroke-dasharray="53 47" stroke-dashoffset="0"/>
+        </svg>
+        <span class="ring-pct">53%</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="bottom-nav">
+    <button class="bn-item"><span class="bn-icon">🏠</span><span class="bn-label">Beranda</span></button>
+    <button class="bn-item active"><span class="bn-icon">📋</span><span class="bn-label">Terlibat</span></button>
+    <button class="bn-item"><span class="bn-icon">🤝</span><span class="bn-label">Bantu</span></button>
+    <button class="bn-item"><span class="bn-icon">🔔</span><span class="bn-label">Notifikasi</span></button>
+    <button class="bn-item"><span class="bn-icon">👤</span><span class="bn-label">Profil</span></button>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW 3 · BANTU                                                -->
+<!-- ============================================================ -->
+<div class="view-section" id="v-bantu">
+<div class="phone-frame">
+  <div class="view-label">Bantu — Skill-Matched Opportunities</div>
+
+  <div class="app-header">
+    <div class="ah-scope">RT 05 <span class="ah-arrow">▼</span></div>
+    <div class="ah-title">Gotong Royong</div>
+    <button class="ah-icon">🔍</button>
+    <button class="ah-compose">+</button>
+  </div>
+
+  <div class="anno">
+    <strong>Bantu Tab</strong> — Personalized feed matching your declared (○) and validated (●) ESCO skills to seeds that need those skills. Validated matches ranked higher.
+  </div>
+
+  <div class="feed-area">
+
+    <!-- Matched Card 1: Validated Skill Match -->
+    <div class="feed-card">
+      <div class="fc-strip tuntaskan"></div>
+      <div class="fc-body">
+        <div class="fc-skill-match">
+          <span class="skill-match-icon">🤝</span>
+          Cocok: <span class="skill-pill-validated">audit keuangan ●</span>
+        </div>
+        <div class="fc-header">
+          <span class="fc-seed-badge tuntaskan">Keresahan</span>
+          <span class="fc-title">Harga bahan bangunan koperasi tidak wajar</span>
+        </div>
+        <div class="fc-author">
+          <span class="fc-avatar">👩</span>
+          <span class="fc-name">Bu Ratna</span>
+          <span class="fc-tier contributor">◆◆◇◇</span>
+          <span class="fc-time">2j lalu</span>
+        </div>
+        <div class="fc-text">Koperasi RT 07 menaikkan harga bahan bangunan secara tidak wajar…</div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot current tuntaskan"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label tuntaskan">Rancang</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 18</span>
+          <span class="fc-stat">👥 12</span>
+          <span class="fc-stat">🔎 0 relawan</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matched Card 2: Declared Skill Match -->
+    <div class="feed-card">
+      <div class="fc-strip wujudkan"></div>
+      <div class="fc-body">
+        <div class="fc-skill-match">
+          <span class="skill-match-icon">🤝</span>
+          Cocok: <span class="skill-pill-declared">pertukangan ○</span>
+        </div>
+        <div class="fc-header">
+          <span class="fc-seed-badge wujudkan">Gagasan</span>
+          <span class="fc-title">Taman baca komunitas RT 05</span>
+        </div>
+        <div class="fc-author">
+          <span class="fc-avatar">👨</span>
+          <span class="fc-name">Pak Budi</span>
+          <span class="fc-tier pillar">◆◆◆◇</span>
+          <span class="fc-time">5j lalu</span>
+        </div>
+        <div class="fc-text">Membuat taman baca di lahan kosong sebelah pos RT. Butuh relawan tukang kayu…</div>
+        <div class="fc-stepper">
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot done"></div>
+          <div class="fc-dot current wujudkan"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label wujudkan">Garap</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 45</span>
+          <span class="fc-stat">👥 23</span>
+          <span class="fc-stat">🔎 2 relawan</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matched Card 3: Multiple Skills -->
+    <div class="feed-card">
+      <div class="fc-strip telusuri"></div>
+      <div class="fc-body">
+        <div class="fc-skill-match">
+          <span class="skill-match-icon">🤝</span>
+          Cocok: <span class="skill-pill-validated">administrasi publik ●</span>
+          <span class="skill-pill-declared">jaminan sosial ○</span>
+        </div>
+        <div class="fc-header">
+          <span class="fc-seed-badge telusuri">Pertanyaan</span>
+          <span class="fc-title">Bantuan BPJS untuk lansia</span>
+        </div>
+        <div class="fc-author">
+          <span class="fc-avatar">👩</span>
+          <span class="fc-name">Bu Sari</span>
+          <span class="fc-tier novice">◆◇◇◇</span>
+          <span class="fc-time">2j lalu</span>
+        </div>
+        <div class="fc-text">Ada kabar bantuan BPJS untuk warga lansia sudah cair…</div>
+        <div class="fc-stepper">
+          <div class="fc-dot current telusuri"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <div class="fc-dot future"></div>
+          <span class="fc-stage-label telusuri">Pertanyaan</span>
+        </div>
+        <div class="fc-footer">
+          <span class="fc-stat">💬 3</span>
+          <span class="fc-stat">👥 2</span>
+          <span class="fc-stat">🔎 0 relawan</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="anno">
+      <strong>Validated matches (●)</strong> ranked above declared (○). Seeds with fewer volunteers prioritized. All respect current scope selector.
+    </div>
+
+  </div>
+
+  <div class="bottom-nav">
+    <button class="bn-item"><span class="bn-icon">🏠</span><span class="bn-label">Beranda</span></button>
+    <button class="bn-item"><span class="bn-icon">📋</span><span class="bn-label">Terlibat</span></button>
+    <button class="bn-item active"><span class="bn-icon">🤝</span><span class="bn-label">Bantu</span></button>
+    <button class="bn-item"><span class="bn-icon">🔔</span><span class="bn-label">Notifikasi</span></button>
+    <button class="bn-item"><span class="bn-icon">👤</span><span class="bn-label">Profil</span></button>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW 4 · NOTIFIKASI                                           -->
+<!-- ============================================================ -->
+<div class="view-section" id="v-notifikasi">
+<div class="phone-frame">
+  <div class="view-label">Notifikasi — Time-Grouped Notifications</div>
+
+  <div class="app-header">
+    <div class="ah-scope">RT 05 <span class="ah-arrow">▼</span></div>
+    <div class="ah-title">Gotong Royong</div>
+    <button class="ah-icon">🔍</button>
+    <button class="ah-compose">+</button>
+  </div>
+
+  <div class="feed-area">
+
+    <!-- Today -->
+    <div class="notif-group-label">🕐 Hari Ini</div>
+
+    <div class="notif-item unread">
+      <div class="notif-icon skill-match">🤝</div>
+      <div class="notif-body">
+        <div class="notif-text"><strong>Skill match!</strong> Ada seed baru yang cocok dengan keahlian Anda: audit keuangan</div>
+        <div class="notif-meta">30 menit lalu</div>
+        <span class="notif-seed-ref" style="background:var(--t-tuntaskan-soft); color:var(--t-tuntaskan);">🔥 Harga bahan bangunan koperasi</span>
+      </div>
+    </div>
+
+    <div class="notif-item unread">
+      <div class="notif-icon credit">⭐</div>
+      <div class="notif-body">
+        <div class="notif-text"><strong>+15 Kompetensi</strong> diperoleh dari kontribusi di tahap Garap</div>
+        <div class="notif-meta">1 jam lalu</div>
+        <span class="notif-seed-ref" style="background:var(--t-wujudkan-soft); color:var(--t-wujudkan);">🌱 Taman baca komunitas</span>
+      </div>
+    </div>
+
+    <div class="notif-item unread">
+      <div class="notif-icon mention">💬</div>
+      <div class="notif-body">
+        <div class="notif-text"><strong>Pak Budi</strong> menyebut Anda di diskusi: "…bisa minta tolong @Anda untuk cek material…"</div>
+        <div class="notif-meta">2 jam lalu</div>
+        <span class="notif-seed-ref" style="background:var(--t-wujudkan-soft); color:var(--t-wujudkan);">🌱 Taman baca komunitas</span>
+      </div>
+    </div>
+
+    <div class="notif-item">
+      <div class="notif-icon stage">✅</div>
+      <div class="notif-body">
+        <div class="notif-text">Seed <strong>"Jadwal ronda malam"</strong> bergerak ke tahap <strong>Putuskan</strong></div>
+        <div class="notif-meta">3 jam lalu</div>
+        <span class="notif-seed-ref" style="background:var(--t-musyawarah-soft); color:var(--t-musyawarah);">🤝 Jadwal ronda malam</span>
+      </div>
+    </div>
+
+    <div class="notif-item">
+      <div class="notif-icon vote">🗳️</div>
+      <div class="notif-body">
+        <div class="notif-text">Voting dimulai untuk <strong>"Jadwal ronda malam"</strong>. Suara Anda diperlukan!</div>
+        <div class="notif-meta">3 jam lalu</div>
+      </div>
+    </div>
+
+    <!-- Yesterday -->
+    <div class="notif-group-label">📅 Kemarin</div>
+
+    <div class="notif-item">
+      <div class="notif-icon stall">⚠️</div>
+      <div class="notif-body">
+        <div class="notif-text"><strong>Macet 48j</strong> — Seed yang Anda ikuti tidak ada aktivitas selama 2 hari</div>
+        <div class="notif-meta">Kemarin, 14:30</div>
+        <span class="notif-seed-ref" style="background:var(--t-tuntaskan-soft); color:var(--t-tuntaskan);">🔥 Saluran air tersumbat</span>
+      </div>
+    </div>
+
+    <div class="notif-item">
+      <div class="notif-icon credit">⭐</div>
+      <div class="notif-body">
+        <div class="notif-text"><strong>+5 Integritas</strong> karena berpartisipasi dalam voting Musyawarah</div>
+        <div class="notif-meta">Kemarin, 09:15</div>
+      </div>
+    </div>
+
+    <!-- This Week -->
+    <div class="notif-group-label">📆 Minggu Ini</div>
+
+    <div class="notif-item">
+      <div class="notif-icon digest">📊</div>
+      <div class="notif-body">
+        <div class="notif-text"><strong>Ringkasan mingguan:</strong> 3 kontribusi, 2 skill tervalidasi, +32 Kompetensi, 🔥 12 hari streak</div>
+        <div class="notif-meta">Senin, 08:00</div>
+      </div>
+    </div>
+
+    <div class="notif-item">
+      <div class="notif-icon stage">🏁</div>
+      <div class="notif-body">
+        <div class="notif-text">Seed <strong>"Perbaikan jalan gang"</strong> selesai! Anda berkontribusi sebagai tukang.</div>
+        <div class="notif-meta">Selasa, 16:00</div>
+        <span class="notif-seed-ref" style="background:var(--t-tuntaskan-soft); color:var(--t-tuntaskan);">✓ Tuntas</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="bottom-nav">
+    <button class="bn-item"><span class="bn-icon">🏠</span><span class="bn-label">Beranda</span></button>
+    <button class="bn-item"><span class="bn-icon">📋</span><span class="bn-label">Terlibat</span></button>
+    <button class="bn-item"><span class="bn-icon">🤝</span><span class="bn-label">Bantu</span></button>
+    <button class="bn-item active"><span class="bn-icon">🔔</span><span class="bn-label">Notifikasi</span></button>
+    <button class="bn-item"><span class="bn-icon">👤</span><span class="bn-label">Profil</span></button>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW 5 · PROFIL (CV HIDUP)                                    -->
+<!-- ============================================================ -->
+<div class="view-section" id="v-profil">
+<div class="phone-frame">
+  <div class="view-label">Profil — CV Hidup (Living Resume)</div>
+
+  <div class="app-header">
+    <div class="ah-scope">RT 05 <span class="ah-arrow">▼</span></div>
+    <div class="ah-title">Gotong Royong</div>
+    <button class="ah-icon">🔍</button>
+    <button class="ah-icon">✏️</button>
+  </div>
+
+  <div class="feed-area" style="padding:0;">
+
+    <!-- Hero -->
+    <div class="profile-hero">
+      <div class="profile-avatar">D</div>
+      <div class="profile-name">Damar Panuluh</div>
+      <div class="profile-area">RT 05 Harapan Jaya · Kel. Tugu · Depok</div>
+      <div class="profile-tier" style="background:var(--score-c-soft);">
+        <span class="diamond filled">◆</span>
+        <span class="diamond filled">◆</span>
+        <span class="diamond filled">◆</span>
+        <span class="diamond empty">◇</span>
+        <span class="tier-label">Pilar</span>
+      </div>
+      <div style="font-size:var(--fs-micro); color:var(--c-pasir); margin-top:4px;">Bergabung sejak Maret 2025</div>
+    </div>
+
+    <!-- I/C/J Scores -->
+    <div class="icj-scores">
+      <div class="icj-card sc-i">
+        <div class="icj-icon">⭐</div>
+        <div class="icj-value">847</div>
+        <div class="icj-label">Integritas</div>
+        <div class="icj-decay">permanen</div>
+      </div>
+      <div class="icj-card sc-c">
+        <div class="icj-icon">🎯</div>
+        <div class="icj-value">723</div>
+        <div class="icj-label">Kompetensi</div>
+        <div class="icj-decay">90h half-life</div>
+      </div>
+      <div class="icj-card sc-j">
+        <div class="icj-icon">🧠</div>
+        <div class="icj-value">612</div>
+        <div class="icj-label">Pertimbangan</div>
+        <div class="icj-decay">peluruhan lambat</div>
+      </div>
+    </div>
+
+    <!-- Skills: Validated + Declared -->
+    <div class="profile-section">
+      <div class="profile-section-title">🎓 Keahlian</div>
+
+      <div class="skill-group-label">● Tervalidasi (Tandang)</div>
+      <div class="skill-pills">
+        <span class="skill-validated">audit keuangan</span>
+        <span class="skill-validated">manajemen koperasi</span>
+        <span class="skill-validated">pertukangan</span>
+      </div>
+
+      <div class="skill-group-label">○ Dinyatakan (Belum tervalidasi)</div>
+      <div class="skill-pills">
+        <span class="skill-declared">administrasi publik</span>
+        <span class="skill-declared">jaminan sosial</span>
+        <span class="skill-declared">desain grafis</span>
+        <button class="skill-add-btn">+ Tambah Keahlian</button>
+      </div>
+    </div>
+
+    <!-- Decay Nudge -->
+    <div style="padding:0 16px 8px;">
+      <div class="decay-nudge">
+        <span class="decay-nudge-icon">⏳</span>
+        <span>Keahlian <strong>pertukangan</strong> luruh dalam 23 hari — bantu komunitas untuk mempertahankan</span>
+      </div>
+    </div>
+
+    <!-- Kontribusi Timeline -->
+    <div class="profile-section">
+      <div class="profile-section-title">📋 Kontribusi Terbaru</div>
+
+      <div class="kontribusi-item">
+        <div class="kontribusi-strip" style="background:var(--t-wujudkan);"></div>
+        <div class="kontribusi-detail">
+          <div class="kontribusi-title">Taman baca komunitas RT 05</div>
+          <div class="kontribusi-meta">Wujudkan · Garap · 3 hari lalu</div>
+          <span class="kontribusi-role" style="background:var(--c-tandang);">Kontributor</span>
+        </div>
+      </div>
+
+      <div class="kontribusi-item">
+        <div class="kontribusi-strip" style="background:var(--t-tuntaskan);"></div>
+        <div class="kontribusi-detail">
+          <div class="kontribusi-title">Perbaikan jalan gang RT 05</div>
+          <div class="kontribusi-meta">Tuntaskan · ✓ Tuntas · 1 minggu lalu</div>
+          <span class="kontribusi-role" style="background:var(--c-api);">PIC</span>
+        </div>
+      </div>
+
+      <div class="kontribusi-item">
+        <div class="kontribusi-strip" style="background:var(--t-musyawarah);"></div>
+        <div class="kontribusi-detail">
+          <div class="kontribusi-title">Jadwal ronda malam</div>
+          <div class="kontribusi-meta">Musyawarah · Putuskan · aktif</div>
+          <span class="kontribusi-role" style="background:var(--t-musyawarah);">Pemilih</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vouch Section -->
+    <div class="profile-section">
+      <div class="profile-section-title">🤝 Jaminan (Vouch)</div>
+      <div class="vouch-row">
+        <div class="vouch-group">
+          <div class="vouch-label">Dijamin oleh</div>
+          <div class="vouch-avatars">
+            <div class="vouch-av" style="background:var(--tier-keystone);">RT</div>
+            <div class="vouch-av" style="background:var(--tier-pillar);">BS</div>
+            <div class="vouch-av" style="background:var(--tier-contributor);">SM</div>
+          </div>
+          <div class="vouch-count">3 penjamin</div>
+        </div>
+        <div class="vouch-group">
+          <div class="vouch-label">Menjamin</div>
+          <div class="vouch-avatars">
+            <div class="vouch-av" style="background:var(--tier-contributor);">DR</div>
+            <div class="vouch-av" style="background:var(--tier-novice);">NL</div>
+          </div>
+          <div class="vouch-count">2 dijamin</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Impact Metrics -->
+    <div class="profile-section">
+      <div class="profile-section-title">📊 Dampak</div>
+      <div class="impact-row">
+        <div class="impact-card">
+          <div class="impact-value">7</div>
+          <div class="impact-label">Seed selesai</div>
+        </div>
+        <div class="impact-card">
+          <div class="impact-value">4</div>
+          <div class="impact-label">Bantu terjawab</div>
+        </div>
+        <div class="impact-card">
+          <div class="impact-value">#3</div>
+          <div class="impact-label">di RT 05</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Code -->
+    <div class="profile-section">
+      <div class="qr-section">
+        <div class="qr-placeholder">QR</div>
+        <div class="qr-text">
+          <div class="qr-title">CV Hidup</div>
+          <div class="qr-desc">Bagikan profil Anda — bisa dipindai untuk lamaran kerja, perkenalan komunitas, atau verifikasi keahlian.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="bottom-nav">
+    <button class="bn-item"><span class="bn-icon">🏠</span><span class="bn-label">Beranda</span></button>
+    <button class="bn-item"><span class="bn-icon">📋</span><span class="bn-label">Terlibat</span></button>
+    <button class="bn-item"><span class="bn-icon">🤝</span><span class="bn-label">Bantu</span></button>
+    <button class="bn-item"><span class="bn-icon">🔔</span><span class="bn-label">Notifikasi</span></button>
+    <button class="bn-item active"><span class="bn-icon">👤</span><span class="bn-label">Profil</span></button>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW 6 · CARI (Search Overlay)                                -->
+<!-- ============================================================ -->
+<div class="view-section" id="v-cari">
+<div class="phone-frame">
+  <div class="view-label">Cari — Full-Screen Search Overlay</div>
+
+  <!-- Underlying page (dimmed) -->
+  <div class="app-header" style="opacity:0.3;">
+    <div class="ah-scope">RT 05 <span class="ah-arrow">▼</span></div>
+    <div class="ah-title">Gotong Royong</div>
+    <button class="ah-icon">🔍</button>
+    <button class="ah-compose">+</button>
+  </div>
+  <div style="flex:1; background:var(--c-kapas); opacity:0.15;"></div>
+
+  <!-- Search Overlay -->
+  <div class="search-overlay">
+    <div class="search-header">
+      <input class="search-input" type="text" placeholder="Cari seed, orang, keahlian…" value="perbaikan pipa">
+      <button class="search-close">✕</button>
+    </div>
+
+    <!-- Track Filters -->
+    <div class="search-filters">
+      <div class="search-filter-label">Track</div>
+      <div class="search-filter-pills">
+        <span class="search-pill active">Semua</span>
+        <span class="search-pill" style="border-color:var(--t-tuntaskan); color:var(--t-tuntaskan);">Tuntaskan</span>
+        <span class="search-pill" style="border-color:var(--t-wujudkan); color:var(--t-wujudkan);">Wujudkan</span>
+        <span class="search-pill" style="border-color:var(--t-telusuri); color:var(--t-telusuri);">Telusuri</span>
+        <span class="search-pill" style="border-color:var(--t-rayakan); color:var(--t-rayakan);">Rayakan</span>
+        <span class="search-pill" style="border-color:var(--t-musyawarah); color:var(--t-musyawarah);">Musyawarah</span>
+      </div>
+
+      <div class="search-filter-label">Keahlian (ESCO)</div>
+      <div class="search-filter-pills">
+        <span class="search-pill active" style="background:var(--c-tandang); color:#fff; border-color:var(--c-tandang);">perbaikan pipa</span>
+        <span class="search-pill" style="border-color:var(--c-tandang); color:var(--c-tandang);">pertukangan</span>
+        <span class="search-pill" style="border-color:var(--c-tandang); color:var(--c-tandang);">pemeliharaan bangunan</span>
+      </div>
+
+      <div class="search-filter-label">Waktu</div>
+      <div class="search-filter-pills">
+        <span class="search-pill">24 jam</span>
+        <span class="search-pill active">Minggu ini</span>
+        <span class="search-pill">Bulan ini</span>
+        <span class="search-pill">Semua</span>
+      </div>
+    </div>
+
+    <!-- Search Results -->
+    <div class="search-results">
+      <div class="search-result-label">2 hasil ditemukan</div>
+
+      <div class="feed-card">
+        <div class="fc-strip tuntaskan"></div>
+        <div class="fc-body">
+          <div class="fc-header">
+            <span class="fc-seed-badge tuntaskan">Keresahan</span>
+            <span class="fc-title">Pipa air bocor di gang 3</span>
+          </div>
+          <div class="fc-author">
+            <span class="fc-avatar">👨</span>
+            <span class="fc-name">Pak Hadi</span>
+            <span class="fc-tier contributor">◆◆◇◇</span>
+            <span class="fc-time">1h lalu</span>
+          </div>
+          <div class="fc-skills">
+            <span class="fc-skill-tag" style="background:var(--c-tandang); color:#fff;">perbaikan pipa</span>
+            <span class="fc-skill-tag">pemeliharaan bangunan</span>
+          </div>
+          <div class="fc-stepper">
+            <div class="fc-dot done"></div>
+            <div class="fc-dot current tuntaskan"></div>
+            <div class="fc-dot future"></div>
+            <div class="fc-dot future"></div>
+            <div class="fc-dot future"></div>
+            <div class="fc-dot future"></div>
+            <span class="fc-stage-label tuntaskan">Bahas</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feed-card">
+        <div class="fc-strip tuntaskan"></div>
+        <div class="fc-body">
+          <div class="fc-header">
+            <span class="fc-seed-badge tuntaskan">Keresahan</span>
+            <span class="fc-title">Saluran air tersumbat depan masjid</span>
+          </div>
+          <div class="fc-author">
+            <span class="fc-avatar">👩</span>
+            <span class="fc-name">Bu Endah</span>
+            <span class="fc-tier novice">◆◇◇◇</span>
+            <span class="fc-time">3h lalu</span>
+          </div>
+          <div class="fc-skills">
+            <span class="fc-skill-tag" style="background:var(--c-tandang); color:#fff;">perbaikan pipa</span>
+          </div>
+          <div class="fc-stepper">
+            <div class="fc-dot done"></div>
+            <div class="fc-dot done"></div>
+            <div class="fc-dot done"></div>
+            <div class="fc-dot current tuntaskan"></div>
+            <div class="fc-dot future"></div>
+            <div class="fc-dot future"></div>
+            <span class="fc-stage-label tuntaskan">Garap</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="anno">
+        <strong>Search overlay</strong> opens from 🔍 icon on any page. Filters: track, ESCO skill tags, recency. Matched skill tags highlighted. Returns seeds, people, and skills.
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW 7 · PILIH JANGKAUAN (Scope Picker)                      -->
+<!-- ============================================================ -->
+<div class="view-section" id="v-scope">
+<div class="phone-frame">
+  <div class="view-label">Pilih Jangkauan — Scope Hierarchy Picker</div>
+
+  <!-- Underlying page (dimmed) -->
+  <div class="app-header" style="opacity:0.3;">
+    <div class="ah-scope">RT 05 <span class="ah-arrow">▼</span></div>
+    <div class="ah-title">Gotong Royong</div>
+    <button class="ah-icon">🔍</button>
+    <button class="ah-compose">+</button>
+  </div>
+  <div style="flex:1; background:var(--c-kapas); opacity:0.15;"></div>
+
+  <!-- Bottom Sheet -->
+  <div class="scope-sheet">
+    <div class="scope-handle"></div>
+    <div class="scope-header">
+      <span class="scope-title">Pilih Jangkauan</span>
+      <button class="scope-close">✕</button>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div class="scope-breadcrumb">
+      <span class="bc-item">Nasional</span>
+      <span class="bc-sep">›</span>
+      <span class="bc-item">Jawa Barat</span>
+      <span class="bc-sep">›</span>
+      <span class="bc-item">Kota Depok</span>
+      <span class="bc-sep">›</span>
+      <span class="bc-item">Cimanggis</span>
+      <span class="bc-sep">›</span>
+      <span class="bc-item">Tugu</span>
+      <span class="bc-sep">›</span>
+      <span class="bc-item">RW 03</span>
+      <span class="bc-sep">›</span>
+      <span class="bc-current">RT 05</span>
+    </div>
+
+    <div class="anno" style="margin:4px 12px;">
+      <strong>Scope levels</strong> — Tap any breadcrumb to widen. Tap an item below to narrow. Current: RT 05 Harapan Jaya. Opacity shows distance from current scope.
+    </div>
+
+    <!-- Scope Items -->
+    <div class="scope-list">
+      <div class="scope-item" style="opacity:0.5;">
+        <span class="scope-item-icon">🌐</span>
+        <div class="scope-item-info">
+          <div class="scope-item-name">Nasional</div>
+          <div class="scope-item-meta">275M warga · 42K seeds aktif</div>
+        </div>
+      </div>
+      <div class="scope-item" style="opacity:0.55;">
+        <span class="scope-item-icon">🏔️</span>
+        <div class="scope-item-info">
+          <div class="scope-item-name">Jawa Barat</div>
+          <div class="scope-item-meta">49M warga · 8K seeds aktif</div>
+        </div>
+      </div>
+      <div class="scope-item" style="opacity:0.65;">
+        <span class="scope-item-icon">🏙️</span>
+        <div class="scope-item-info">
+          <div class="scope-item-name">Kota Depok</div>
+          <div class="scope-item-meta">2.1M warga · 1.2K seeds aktif</div>
+        </div>
+      </div>
+      <div class="scope-item" style="opacity:0.75;">
+        <span class="scope-item-icon">🏘️</span>
+        <div class="scope-item-info">
+          <div class="scope-item-name">Kec. Cimanggis</div>
+          <div class="scope-item-meta">180K warga · 320 seeds aktif</div>
+        </div>
+      </div>
+      <div class="scope-item" style="opacity:0.85;">
+        <span class="scope-item-icon">🏡</span>
+        <div class="scope-item-info">
+          <div class="scope-item-name">Kel. Tugu</div>
+          <div class="scope-item-meta">14K warga · 87 seeds aktif</div>
+        </div>
+      </div>
+      <div class="scope-item" style="opacity:0.92;">
+        <span class="scope-item-icon">🏠</span>
+        <div class="scope-item-info">
+          <div class="scope-item-name">RW 03</div>
+          <div class="scope-item-meta">980 warga · 24 seeds aktif</div>
+        </div>
+      </div>
+      <div class="scope-item selected">
+        <span class="scope-item-icon">🏠</span>
+        <div class="scope-item-info">
+          <div class="scope-item-name">RT 05 Harapan Jaya</div>
+          <div class="scope-item-meta">148 warga · 14 seeds aktif · ☀️ Cerah</div>
+        </div>
+        <span class="scope-item-check">✓</span>
+      </div>
+    </div>
+
+    <button class="scope-apply-btn">Terapkan: RT 05 Harapan Jaya</button>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW TOGGLE SCRIPT                                            -->
+<!-- ============================================================ -->
+<script>
+function showView(id) {
+  document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+
+</body>
+</html>

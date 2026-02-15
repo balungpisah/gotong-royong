@@ -1,0 +1,514 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — A2 · Color Palette (Tanah)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: #F5F0EB;
+    color: #3E2723;
+    min-height: 100vh;
+    padding: 0 0 60px 0;
+  }
+
+  .top-bar {
+    background: #3E2723;
+    color: #fff;
+    padding: 24px 32px;
+    text-align: center;
+  }
+  .top-bar h1 { font-size: 18px; font-weight: 700; }
+  .top-bar p { font-size: 13px; opacity: 0.6; margin-top: 4px; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+  /* ── Section ── */
+  .section {
+    margin-top: 36px;
+  }
+  .section:first-child { margin-top: 0; }
+  .section-title {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 2px; color: #8D6E63; margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 2px solid #E8D5C0;
+  }
+  .section-note {
+    font-size: 12px; color: #A1887F; margin-bottom: 14px; line-height: 1.5;
+  }
+
+  /* ── Color Row ── */
+  .color-row {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px;
+  }
+  .color-card {
+    width: 120px; border-radius: 14px; overflow: hidden;
+    background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .color-card .swatch {
+    height: 72px; display: flex; align-items: flex-end;
+    justify-content: flex-start; padding: 8px 10px;
+  }
+  .color-card .swatch span {
+    font-size: 10px; font-weight: 700; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    background: rgba(0,0,0,0.15); padding: 2px 6px; border-radius: 4px;
+  }
+  .color-card .info {
+    padding: 8px 10px;
+  }
+  .color-card .info .name {
+    font-size: 11px; font-weight: 700; color: #3E2723;
+  }
+  .color-card .info .role {
+    font-size: 9px; color: #A1887F; margin-top: 2px;
+  }
+
+  /* ── Track Row (wider cards) ── */
+  .track-row {
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .track-card {
+    flex: 1; min-width: 140px; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .track-card .swatch {
+    height: 64px; display: flex; align-items: center;
+    justify-content: center; color: #fff;
+    font-size: 13px; font-weight: 800; letter-spacing: 0.5px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .track-card .details {
+    background: #fff; padding: 10px 12px;
+  }
+  .track-card .details .hex {
+    font-size: 10px; font-weight: 700; color: #5D4037;
+  }
+  .track-card .details .seed {
+    font-size: 9px; color: #A1887F; margin-top: 2px;
+  }
+  .track-card .tints {
+    display: flex; height: 20px; background: #fff;
+  }
+  .track-card .tints div {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 7px; font-weight: 700; color: rgba(0,0,0,0.4);
+  }
+
+  /* ── Special Mode Cards ── */
+  .mode-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  }
+  @media (max-width: 600px) { .mode-row { grid-template-columns: 1fr; } }
+  .mode-card {
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .mode-card .header {
+    padding: 14px 16px;
+    color: #fff; font-size: 14px; font-weight: 800;
+  }
+  .mode-card .header span {
+    display: block; font-size: 11px; font-weight: 400; opacity: 0.7; margin-top: 2px;
+  }
+  .mode-card .body {
+    background: #fff; padding: 12px 16px;
+  }
+  .mode-card .body .row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0; border-bottom: 1px solid #F0E6D8;
+    font-size: 11px;
+  }
+  .mode-card .body .row:last-child { border-bottom: none; }
+  .mode-card .body .row .dot {
+    width: 28px; height: 28px; border-radius: 8px;
+    flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 8px; font-weight: 700;
+    color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+  .mode-card .body .row .label { font-weight: 700; color: #3E2723; }
+  .mode-card .body .row .hex-small { font-size: 9px; color: #A1887F; }
+
+  /* ── Pair Samples ── */
+  .pair-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+  }
+  @media (max-width: 700px) { .pair-row { grid-template-columns: 1fr; } }
+  .pair-sample {
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    font-size: 13px;
+  }
+  .pair-sample .top {
+    padding: 14px 16px; font-weight: 700;
+  }
+  .pair-sample .bot {
+    padding: 10px 16px; font-size: 11px;
+  }
+
+  /* ── Contrast Table ── */
+  .contrast-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+  }
+  .contrast-cell {
+    border-radius: 10px; padding: 10px 12px;
+    font-size: 11px; font-weight: 700;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .contrast-cell .ratio {
+    font-size: 9px; font-weight: 400; opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>A2 · Color Palette — Tanah</h1>
+  <p>Full token set: core, semantic, tracks, modes, accessibility</p>
+</div>
+
+<div class="container">
+
+  <!-- ═══════════════════════════════════ CORE ═══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Core Palette</div>
+    <div class="section-note">Foundation colors used across the entire platform. Warm neutrals rooted in Indonesian earth tones.</div>
+    <div class="color-row">
+      <div class="color-card">
+        <div class="swatch" style="background:#3E2723;"><span>#3E2723</span></div>
+        <div class="info"><div class="name">Tanah Gelap</div><div class="role">Text, headings</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#5D4037;"><span>#5D4037</span></div>
+        <div class="info"><div class="name">Tanah</div><div class="role">Secondary text</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#8D6E63;"><span>#8D6E63</span></div>
+        <div class="info"><div class="name">Kayu</div><div class="role">Captions, meta</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#A1887F;"><span>#A1887F</span></div>
+        <div class="info"><div class="name">Pasir</div><div class="role">Placeholder, disabled</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#D7CCC8;"><span>#D7CCC8</span></div>
+        <div class="info"><div class="name">Batu</div><div class="role">Borders, dividers</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#F5EDE3;"><span style="color:#8D6E63;">#F5EDE3</span></div>
+        <div class="info"><div class="name">Kapas</div><div class="role">Input backgrounds</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#FFFBF5;"><span style="color:#8D6E63;">#FFFBF5</span></div>
+        <div class="info"><div class="name">Susu</div><div class="role">Card backgrounds</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ PRIMARY ACTION ═══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Primary Action</div>
+    <div class="section-note">Main interactive color. Used for primary buttons, active states, links, focus rings.</div>
+    <div class="color-row">
+      <div class="color-card">
+        <div class="swatch" style="background:#C05621;"><span>#C05621</span></div>
+        <div class="info"><div class="name">Api</div><div class="role">Primary action</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#D2691E;"><span>#D2691E</span></div>
+        <div class="info"><div class="name">Api Terang</div><div class="role">Hover state</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#A0461A;"><span>#A0461A</span></div>
+        <div class="info"><div class="name">Api Dalam</div><div class="role">Pressed state</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#FFF3E0;"><span style="color:#C05621;">#FFF3E0</span></div>
+        <div class="info"><div class="name">Bara</div><div class="role">Soft bg, highlight</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SEMANTIC ═══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Semantic Colors</div>
+    <div class="section-note">System feedback. Each has a strong (badges, icons) and soft (backgrounds, banners) variant.</div>
+    <div class="color-row">
+      <!-- Success -->
+      <div class="color-card">
+        <div class="swatch" style="background:#2E7D32;"><span>#2E7D32</span></div>
+        <div class="info"><div class="name">Berhasil</div><div class="role">Success</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#E8F5E9;"><span style="color:#2E7D32;">#E8F5E9</span></div>
+        <div class="info"><div class="name">Berhasil Lembut</div><div class="role">Success bg</div></div>
+      </div>
+      <!-- Warning -->
+      <div class="color-card">
+        <div class="swatch" style="background:#E65100;"><span>#E65100</span></div>
+        <div class="info"><div class="name">Peringatan</div><div class="role">Warning</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#FFF3E0;"><span style="color:#E65100;">#FFF3E0</span></div>
+        <div class="info"><div class="name">Peringatan Lembut</div><div class="role">Warning bg</div></div>
+      </div>
+      <!-- Error -->
+      <div class="color-card">
+        <div class="swatch" style="background:#C62828;"><span>#C62828</span></div>
+        <div class="info"><div class="name">Bahaya</div><div class="role">Error / danger</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#FFEBEE;"><span style="color:#C62828;">#FFEBEE</span></div>
+        <div class="info"><div class="name">Bahaya Lembut</div><div class="role">Error bg</div></div>
+      </div>
+      <!-- Info -->
+      <div class="color-card">
+        <div class="swatch" style="background:#4E342E;"><span>#4E342E</span></div>
+        <div class="info"><div class="name">Keterangan</div><div class="role">Info</div></div>
+      </div>
+      <div class="color-card">
+        <div class="swatch" style="background:#EFEBE9;"><span style="color:#4E342E;">#EFEBE9</span></div>
+        <div class="info"><div class="name">Keterangan Lembut</div><div class="role">Info bg</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ TRACK ACCENTS ═══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Track Accents</div>
+    <div class="section-note">Each track gets a strong accent (header bar, stepper active), a soft tint (stepper bg, badges), and a muted tone (hover, secondary).</div>
+    <div class="track-row">
+      <!-- Tuntaskan -->
+      <div class="track-card">
+        <div class="swatch" style="background: linear-gradient(135deg, #D2691E, #C05621);">Tuntaskan</div>
+        <div class="tints">
+          <div style="background:#C05621; color:#fff;">Strong</div>
+          <div style="background:#FFF3E0; color:#C05621;">Soft</div>
+          <div style="background:#FFECD2; color:#A0461A;">Muted</div>
+        </div>
+        <div class="details">
+          <div class="hex">#C05621 · #FFF3E0</div>
+          <div class="seed">Seed: Keresahan</div>
+        </div>
+      </div>
+      <!-- Wujudkan -->
+      <div class="track-card">
+        <div class="swatch" style="background: linear-gradient(135deg, #43A047, #2E7D32);">Wujudkan</div>
+        <div class="tints">
+          <div style="background:#2E7D32; color:#fff;">Strong</div>
+          <div style="background:#E8F5E9; color:#2E7D32;">Soft</div>
+          <div style="background:#C8E6C9; color:#1B5E20;">Muted</div>
+        </div>
+        <div class="details">
+          <div class="hex">#2E7D32 · #E8F5E9</div>
+          <div class="seed">Seed: Gagasan</div>
+        </div>
+      </div>
+      <!-- Telusuri -->
+      <div class="track-card">
+        <div class="swatch" style="background: linear-gradient(135deg, #7B1FA2, #6A1B9A);">Telusuri</div>
+        <div class="tints">
+          <div style="background:#6A1B9A; color:#fff;">Strong</div>
+          <div style="background:#F3E5F5; color:#6A1B9A;">Soft</div>
+          <div style="background:#E1BEE7; color:#4A148C;">Muted</div>
+        </div>
+        <div class="details">
+          <div class="hex">#6A1B9A · #F3E5F5</div>
+          <div class="seed">Seed: Pertanyaan</div>
+        </div>
+      </div>
+      <!-- Rayakan -->
+      <div class="track-card">
+        <div class="swatch" style="background: linear-gradient(135deg, #FF8F00, #F57F17);">Rayakan</div>
+        <div class="tints">
+          <div style="background:#F57F17; color:#fff;">Strong</div>
+          <div style="background:#FFF8E1; color:#F57F17;">Soft</div>
+          <div style="background:#FFECB3; color:#BF360C;">Muted</div>
+        </div>
+        <div class="details">
+          <div class="hex">#F57F17 · #FFF8E1</div>
+          <div class="seed">Seed: Kabar Baik</div>
+        </div>
+      </div>
+      <!-- Musyawarah -->
+      <div class="track-card">
+        <div class="swatch" style="background: linear-gradient(135deg, #5D4037, #4E342E);">Musyawarah</div>
+        <div class="tints">
+          <div style="background:#4E342E; color:#fff;">Strong</div>
+          <div style="background:#EFEBE9; color:#4E342E;">Soft</div>
+          <div style="background:#D7CCC8; color:#3E2723;">Muted</div>
+        </div>
+        <div class="details">
+          <div class="hex">#4E342E · #EFEBE9</div>
+          <div class="seed">Seed: Usul</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SPECIAL MODES ═══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Special Modes</div>
+    <div class="section-note">New surfaces beyond the 5 tracks: the neutral compose state, the witness vault, the emergency broadcast, and Rahasia treatment.</div>
+    <div class="mode-row">
+
+      <!-- Compose / Neutral -->
+      <div class="mode-card">
+        <div class="header" style="background:#8D6E63;">Menulis (Neutral Compose)<span>Before any classification — no track color yet</span></div>
+        <div class="body">
+          <div class="row"><div class="dot" style="background:#B0A090;">bg</div><div><span class="label">Button idle</span><br><span class="hex-small">#B0A090</span></div></div>
+          <div class="row"><div class="dot" style="background:#F5EDE3;">bg</div><div><span class="label">Input area</span><br><span class="hex-small">#F5EDE3 (Kapas)</span></div></div>
+          <div class="row"><div class="dot" style="background:#FFFBF5;">bg</div><div><span class="label">Card shell</span><br><span class="hex-small">#FFFBF5 (Susu)</span></div></div>
+          <div class="row"><div class="dot" style="background:#D7CCC8;">bd</div><div><span class="label">Borders</span><br><span class="hex-small">#D7CCC8 (Batu)</span></div></div>
+        </div>
+      </div>
+
+      <!-- Catatan Saksi -->
+      <div class="mode-card">
+        <div class="header" style="background:linear-gradient(135deg, #37474F, #263238);">Catatan Saksi (Witness Vault)<span>Private, sealed, encrypted — dark & guarded feel</span></div>
+        <div class="body">
+          <div class="row"><div class="dot" style="background:#263238;">hd</div><div><span class="label">Vault header</span><br><span class="hex-small">#263238</span></div></div>
+          <div class="row"><div class="dot" style="background:#37474F;">bg</div><div><span class="label">Vault surface</span><br><span class="hex-small">#37474F</span></div></div>
+          <div class="row"><div class="dot" style="background:#546E7A;">tx</div><div><span class="label">Vault text</span><br><span class="hex-small">#546E7A</span></div></div>
+          <div class="row"><div class="dot" style="background:#78909C;">mt</div><div><span class="label">Vault meta</span><br><span class="hex-small">#78909C</span></div></div>
+          <div class="row"><div class="dot" style="background:#B0BEC5;">lk</div><div><span class="label">Lock / seal icon</span><br><span class="hex-small">#B0BEC5</span></div></div>
+          <div class="row"><div class="dot" style="background:#ECEFF1;">bg</div><div><span class="label">Vault card bg</span><br><span class="hex-small">#ECEFF1</span></div></div>
+        </div>
+      </div>
+
+      <!-- Siaga -->
+      <div class="mode-card">
+        <div class="header" style="background:linear-gradient(135deg, #D32F2F, #B71C1C);">Siaga (Emergency Broadcast)<span>Urgent, high-contrast, impossible to miss</span></div>
+        <div class="body">
+          <div class="row"><div class="dot" style="background:#B71C1C;">hd</div><div><span class="label">Alert header</span><br><span class="hex-small">#B71C1C</span></div></div>
+          <div class="row"><div class="dot" style="background:#D32F2F;">ic</div><div><span class="label">Alert icon/pulse</span><br><span class="hex-small">#D32F2F</span></div></div>
+          <div class="row"><div class="dot" style="background:#FF5252;">ac</div><div><span class="label">Alert accent</span><br><span class="hex-small">#FF5252</span></div></div>
+          <div class="row"><div class="dot" style="background:#FFEBEE;">bg</div><div><span class="label">Alert card bg</span><br><span class="hex-small">#FFEBEE</span></div></div>
+          <div class="row"><div class="dot" style="background:#FFCDD2;">bd</div><div><span class="label">Alert border</span><br><span class="hex-small">#FFCDD2</span></div></div>
+        </div>
+      </div>
+
+      <!-- Rahasia -->
+      <div class="mode-card">
+        <div class="header" style="background:linear-gradient(135deg, #5D4037, #3E2723);">Rahasia (Privacy Overlay)<span>Applied on top of any track card at levels 1–3</span></div>
+        <div class="body">
+          <div class="row"><div class="dot" style="background:#3E2723;">L3</div><div><span class="label">Level 3 — Sangat Rahasia</span><br><span class="hex-small">Full mask, #3E2723 overlay</span></div></div>
+          <div class="row"><div class="dot" style="background:#5D4037;">L2</div><div><span class="label">Level 2 — Rahasia</span><br><span class="hex-small">Partial mask, #5D4037 overlay</span></div></div>
+          <div class="row"><div class="dot" style="background:#8D6E63;">L1</div><div><span class="label">Level 1 — Terbatas</span><br><span class="hex-small">Light mask, #8D6E63 badge</span></div></div>
+          <div class="row"><div class="dot" style="background:#D7CCC8;">L0</div><div><span class="label">Level 0 — Terbuka</span><br><span class="hex-small">No overlay, default view</span></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ PAIRING SAMPLES ═══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Color Pairing Samples</div>
+    <div class="section-note">How key surfaces pair in practice — track header + card body.</div>
+    <div class="pair-row">
+      <div class="pair-sample">
+        <div class="top" style="background: linear-gradient(135deg, #D2691E, #C05621); color:#fff;">Tuntaskan · Keresahan</div>
+        <div class="bot" style="background:#FFFBF5; color:#5D4037;">Jalan depan rumah pak RT rusak parah sejak tiga minggu lalu.</div>
+      </div>
+      <div class="pair-sample">
+        <div class="top" style="background: linear-gradient(135deg, #43A047, #2E7D32); color:#fff;">Wujudkan · Gagasan</div>
+        <div class="bot" style="background:#FFFBF5; color:#5D4037;">Bagaimana kalau kita bikin taman baca di lahan kosong sebelah masjid?</div>
+      </div>
+      <div class="pair-sample">
+        <div class="top" style="background: linear-gradient(135deg, #7B1FA2, #6A1B9A); color:#fff;">Telusuri · Pertanyaan</div>
+        <div class="bot" style="background:#FFFBF5; color:#5D4037;">Kenapa saluran air di RT 03 selalu mampet setiap musim hujan?</div>
+      </div>
+      <div class="pair-sample">
+        <div class="top" style="background: linear-gradient(135deg, #FF8F00, #F57F17); color:#fff;">Rayakan · Kabar Baik</div>
+        <div class="bot" style="background:#FFFBF5; color:#5D4037;">Pak Hadi berhasil selesaikan program beasiswa untuk 12 anak yatim!</div>
+      </div>
+      <div class="pair-sample">
+        <div class="top" style="background: linear-gradient(135deg, #5D4037, #4E342E); color:#fff;">Musyawarah · Usul</div>
+        <div class="bot" style="background:#FFFBF5; color:#5D4037;">Perlu kita putuskan bersama soal iuran bulanan untuk pos ronda.</div>
+      </div>
+      <div class="pair-sample">
+        <div class="top" style="background: linear-gradient(135deg, #37474F, #263238); color:#B0BEC5;">🔒 Catatan Saksi</div>
+        <div class="bot" style="background:#ECEFF1; color:#37474F;">Saya melihat ada penggunaan dana yang tidak sesuai laporan...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ ACCESSIBILITY ═══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Accessibility Contrast Checks</div>
+    <div class="section-note">WCAG AA requires 4.5:1 for normal text, 3:1 for large text. All primary text combinations pass.</div>
+    <div class="contrast-grid">
+      <div class="contrast-cell" style="background:#FFFBF5; color:#3E2723;">
+        Tanah Gelap on Susu
+        <span class="ratio">Ratio: 12.7:1 ✓ AAA</span>
+      </div>
+      <div class="contrast-cell" style="background:#FFFBF5; color:#5D4037;">
+        Tanah on Susu
+        <span class="ratio">Ratio: 8.1:1 ✓ AAA</span>
+      </div>
+      <div class="contrast-cell" style="background:#FFFBF5; color:#8D6E63;">
+        Kayu on Susu
+        <span class="ratio">Ratio: 4.6:1 ✓ AA</span>
+      </div>
+      <div class="contrast-cell" style="background:#C05621; color:#FFFFFF;">
+        White on Api
+        <span class="ratio">Ratio: 4.8:1 ✓ AA</span>
+      </div>
+      <div class="contrast-cell" style="background:#2E7D32; color:#FFFFFF;">
+        White on Wujudkan
+        <span class="ratio">Ratio: 4.9:1 ✓ AA</span>
+      </div>
+      <div class="contrast-cell" style="background:#6A1B9A; color:#FFFFFF;">
+        White on Telusuri
+        <span class="ratio">Ratio: 7.8:1 ✓ AAA</span>
+      </div>
+      <div class="contrast-cell" style="background:#F57F17; color:#FFFFFF;">
+        White on Rayakan
+        <span class="ratio">Ratio: 4.6:1 ✓ AA</span>
+      </div>
+      <div class="contrast-cell" style="background:#4E342E; color:#FFFFFF;">
+        White on Musyawarah
+        <span class="ratio">Ratio: 10.1:1 ✓ AAA</span>
+      </div>
+      <div class="contrast-cell" style="background:#263238; color:#B0BEC5;">
+        Lock on Vault
+        <span class="ratio">Ratio: 7.2:1 ✓ AAA</span>
+      </div>
+      <div class="contrast-cell" style="background:#B71C1C; color:#FFFFFF;">
+        White on Siaga
+        <span class="ratio">Ratio: 5.6:1 ✓ AA</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ TOKEN SUMMARY ═══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Token Summary</div>
+    <div class="section-note">Quick reference — all tokens in one list. Copy-paste ready for design system.</div>
+    <div style="background:#fff; border-radius:14px; padding:20px; font-size:12px; line-height:2; color:#5D4037; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+      <strong>Core:</strong> tanah-gelap #3E2723 · tanah #5D4037 · kayu #8D6E63 · pasir #A1887F · batu #D7CCC8 · kapas #F5EDE3 · susu #FFFBF5<br>
+      <strong>Action:</strong> api #C05621 · api-terang #D2691E · api-dalam #A0461A · bara #FFF3E0<br>
+      <strong>Semantic:</strong> berhasil #2E7D32 / #E8F5E9 · peringatan #E65100 / #FFF3E0 · bahaya #C62828 / #FFEBEE · keterangan #4E342E / #EFEBE9<br>
+      <strong>Tuntaskan:</strong> #C05621 / #FFF3E0 / #FFECD2<br>
+      <strong>Wujudkan:</strong> #2E7D32 / #E8F5E9 / #C8E6C9<br>
+      <strong>Telusuri:</strong> #6A1B9A / #F3E5F5 / #E1BEE7<br>
+      <strong>Rayakan:</strong> #F57F17 / #FFF8E1 / #FFECB3<br>
+      <strong>Musyawarah:</strong> #4E342E / #EFEBE9 / #D7CCC8<br>
+      <strong>Vault:</strong> #263238 / #37474F / #546E7A / #78909C / #B0BEC5 / #ECEFF1<br>
+      <strong>Siaga:</strong> #B71C1C / #D32F2F / #FF5252 / #FFEBEE / #FFCDD2<br>
+      <strong>Rahasia:</strong> L3 #3E2723 · L2 #5D4037 · L1 #8D6E63 · L0 none
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

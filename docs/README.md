@@ -1,6 +1,16 @@
-# Gotong Royong Technical Documentation
+# Gotong Royong Documentation
 
-This directory contains comprehensive technical specifications for building and deploying the Gotong Royong mutual credit platform.
+This directory contains technical specifications and design documentation for building and deploying the Gotong Royong mutual credit platform.
+
+## Stack Lock Notice
+
+Implementation planning and execution are locked to:
+- Rust 2024 + Axum + Tokio + Tower/tower-http
+- SurrealDB `v3.0.0-beta.4` (SDK 3 beta channel)
+- Redis + S3-compatible object storage
+
+Canonical decision:
+- `research/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
 
 ## Table of Contents
 
@@ -14,6 +24,15 @@ This directory contains comprehensive technical specifications for building and 
 - [Event Payloads](api/event-payloads.md) - JSON schemas for all event types
 - [Authentication](api/authentication.md) - HMAC-SHA256 implementation
 - [Error Handling](api/error-handling.md) - Status codes and retry logic
+
+### Design Documentation
+- [Design Index](DESIGN-INDEX.md) - Canonical entrypoint for design references and links
+- [Design Context](design/context/DESIGN-CONTEXT.md) - Locked terminology and cross-feature conventions
+- [Design DNA](design/specs/DESIGN-DNA-v0.1.md) - Formalized design system and component catalog
+- [AI Spec](design/specs/AI-SPEC-v0.2.md) - 10 AI touch point definitions
+- [UI/UX Spec](design/specs/UI-UX-SPEC-v0.5.md) - 29-section interaction and screen spec
+- [Prototype Gallery](design/README.md) - HTML reference collection
+- [Design Archive](design/archive/README.md) - Legacy Word drafts and historical artifacts
 
 ### Database
 - [Schema Requirements](database/schema-requirements.md) - Required tables and relationships
@@ -61,6 +80,13 @@ This directory contains comprehensive technical specifications for building and 
 3. Then: [Validation Rules](por-evidence/validation-rules.md)
 4. Then: [Webhook Specification](api/webhook-spec.md)
 
+### Product Designer
+1. Start: [Design Index](DESIGN-INDEX.md)
+2. Then: [DESIGN-CONTEXT.md](design/context/DESIGN-CONTEXT.md)
+3. Then: [DESIGN-DNA-v0.1.md](design/specs/DESIGN-DNA-v0.1.md)
+4. Then: [UI-UX-SPEC-v0.5.md](design/specs/UI-UX-SPEC-v0.5.md)
+5. Then: [C3-navigation-feed.html](design/prototypes/C3-navigation-feed.html)
+
 ### Product Manager
 1. Start: [System Overview](architecture/system-overview.md)
 2. Then: [Data Flow](architecture/data-flow.md)
@@ -75,7 +101,7 @@ This directory contains comprehensive technical specifications for building and 
 ## Document Conventions
 
 - **Code blocks** use language tags for syntax highlighting
-- **[TBD]** or **[TO BE DECIDED]** mark conceptual decisions to be made
+- **[TBD]** marks non-blocking future enhancements only (not core stack decisions)
 - **Mermaid diagrams** are used for visual flow representation
 - **Tables** structure comparative data
 - **Cross-references** use relative paths within this docs directory
@@ -86,5 +112,5 @@ When updating these docs:
 1. Maintain consistency with existing formatting
 2. Update cross-references if files are renamed
 3. Keep diagrams in sync with implementation
-4. Mark conceptual decisions as [TBD] clearly
+4. Do not mark core stack/runtime choices as [TBD]; follow ADR lock
 5. Include code examples where appropriate

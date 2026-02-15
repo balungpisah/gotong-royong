@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>Gotong Royong — Card Faces + Stage Detail Pages</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,system-ui,sans-serif;background:#f0f0f0;color:#1a1a1a;max-width:420px;margin:0 auto;min-height:100vh}
+
+/* Track colors (canonical; align with DESIGN-DNA / prototypes) */
+:root{
+  --tuntaskan:#C05621;--tuntaskan-bg:#FFF3E0;
+  --wujudkan:#2E7D32;--wujudkan-bg:#E8F5E9;
+  --telusuri:#6A1B9A;--telusuri-bg:#F3E5F5;
+  --rayakan:#F57F17;--rayakan-bg:#FFF8E1;
+  --musyawarah:#4E342E;--musyawarah-bg:#EFEBE9;
+}
+
+/* Shared */
+.screen{min-height:100vh;background:#f0f0f0}
+.back-btn{display:flex;align-items:center;gap:6px;padding:14px 16px;font-size:15px;color:#555;background:#fff;border-bottom:1px solid #e0e0e0;cursor:pointer;font-weight:500}
+.back-btn:hover{background:#f5f5f5}
+
+/* Feed */
+.feed-header{background:#fff;padding:20px 16px 14px;border-bottom:1px solid #e0e0e0}
+.feed-header h1{font-size:20px;font-weight:700}
+.feed-header p{font-size:13px;color:#777;margin-top:2px}
+
+/* Filter chips */
+.filter-chips{display:flex;gap:8px;padding:10px 16px;overflow-x:auto;background:#fff;border-bottom:1px solid #e0e0e0;white-space:nowrap}
+.filter-chip{padding:6px 12px;border-radius:16px;font-size:12px;font-weight:600;background:#f0f0f0;color:#666;cursor:pointer;border:1px solid #ddd;transition:all 0.15s}
+.filter-chip.active{background:var(--tuntaskan);color:#fff;border-color:var(--tuntaskan)}
+.filter-chip:active{opacity:0.8}
+
+.feed{padding:10px 12px 100px}
+
+/* Card grid */
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card{background:#fff;border-radius:8px;padding:12px;cursor:pointer;transition:all 0.15s;border:1px solid #e8e8e8}
+.card:active{transform:scale(0.97);opacity:0.9}
+.card.completed{opacity:0.6}
+
+.card-track-label{display:inline-block;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:8px;text-transform:uppercase}
+.card-track-label.tuntaskan{background:var(--tuntaskan-bg);color:var(--tuntaskan)}
+.card-track-label.wujudkan{background:var(--wujudkan-bg);color:var(--wujudkan)}
+.card-track-label.telusuri{background:var(--telusuri-bg);color:var(--telusuri)}
+.card-track-label.rayakan{background:var(--rayakan-bg);color:var(--rayakan)}
+.card-track-label.musyawarah{background:var(--musyawarah-bg);color:var(--musyawarah)}
+
+.card-title{font-size:13px;font-weight:600;line-height:1.4;margin-bottom:6px}
+.card-meta{font-size:11px;color:#888;line-height:1.3}
+
+/* Detail page */
+.detail-container{display:flex;flex-direction:column;min-height:100vh}
+.detail-content{flex:1;padding:16px;overflow-y:auto}
+.detail-section{margin-bottom:20px}
+.detail-section h2{font-size:14px;font-weight:700;margin-bottom:8px;color:#333}
+.detail-section p{font-size:13px;line-height:1.6;color:#555;margin-bottom:12px}
+.detail-pill{display:inline-block;padding:6px 10px;border-radius:12px;font-size:11px;font-weight:600;margin-right:6px;margin-bottom:4px}
+.detail-pill.tuntaskan{background:var(--tuntaskan-bg);color:var(--tuntaskan)}
+.detail-pill.wujudkan{background:var(--wujudkan-bg);color:var(--wujudkan)}
+.detail-pill.telusuri{background:var(--telusuri-bg);color:var(--telusuri)}
+.detail-pill.rayakan{background:var(--rayakan-bg);color:var(--rayakan)}
+.detail-pill.musyawarah{background:var(--musyawarah-bg);color:var(--musyawarah)}
+
+.detail-bottom{background:#fff;border-top:1px solid #e0e0e0;padding:16px;text-align:center}
+.detail-btn{display:inline-block;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;color:#fff;background:var(--tuntaskan);border:none;cursor:pointer}
+.detail-btn:active{opacity:0.8}
+
+/* Tab bar */
+.tab-bar{position:fixed;bottom:0;left:0;right:0;max-width:420px;margin:0 auto;height:64px;background:#fff;border-top:1px solid #e0e0e0;display:flex;justify-content:space-around;align-items:center;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#999;cursor:pointer;flex:1;padding-top:8px}
+.tab.active{color:var(--tuntaskan)}
+
+/* FAB */
+.fab{position:fixed;bottom:72px;right:16px;width:56px;height:56px;border-radius:50%;background:var(--tuntaskan);color:#fff;font-size:24px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(192,86,33,0.3);transition:all 0.15s}
+.fab:active{transform:scale(0.9)}
+.fab:hover{box-shadow:0 6px 16px rgba(192,86,33,0.4)}
+
+/* Onboarding */
+.onboarding-screen{min-height:100vh;background:#fff;display:flex;flex-direction:column;justify-content:space-between;padding:40px 20px;text-align:center}
+.onboarding-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+.onboarding-skip{background:none;border:none;color:#E65100;font-size:13px;font-weight:600;cursor:pointer;padding:0}
+.onboarding-skip:active{opacity:0.7}
+
+.onboarding-content{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:20px}
+.onboarding-title{font-size:28px;font-weight:700;color:#1a1a1a;line-height:1.2}
+.onboarding-subtitle{font-size:15px;color:#666;line-height:1.5}
+.onboarding-illustration{width:120px;height:120px;background:#f0f0f0;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:48px}
+
+.onboarding-input{width:100%;padding:12px 16px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin:8px 0;font-family:inherit}
+.onboarding-input:focus{outline:none;border-color:var(--tuntaskan)}
+
+.onboarding-input-group{margin:16px 0}
+.onboarding-input-label{display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:8px;text-align:left}
+
+.onboarding-button{width:100%;padding:14px;border-radius:8px;border:none;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;background:var(--tuntaskan);color:#fff}
+.onboarding-button:active{opacity:0.8}
+
+.onboarding-link{color:var(--tuntaskan);text-decoration:none;font-size:13px;font-weight:600;cursor:pointer}
+.onboarding-link:active{opacity:0.7}
+
+.onboarding-location-pill{display:inline-block;background:#f0f0f0;padding:8px 12px;border-radius:16px;font-size:13px;margin:8px 0}
+
+.onboarding-search{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;margin:8px 0;font-family:inherit}
+
+.onboarding-card{background:#f9f9f9;border:1px solid #e0e0e0;border-radius:8px;padding:12px;text-align:left;margin:12px 0}
+.onboarding-card-title{font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:4px}
+.onboarding-card-meta{font-size:12px;color:#888}
+
+.onboarding-avatar{width:80px;height:80px;border-radius:50%;background:#e0e0e0;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;margin:0 auto 16px}
+
+.onboarding-checkmark{font-size:48px;margin-bottom:20px}
+
+/* Bagikan Sheet */
+.bagikan-sheet{position:fixed;bottom:0;left:0;right:0;max-width:420px;margin:0 auto;background:#fff;border-radius:12px 12px 0 0;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;z-index:1000}
+
+.bagikan-header{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #e0e0e0}
+.bagikan-header h2{font-size:16px;font-weight:700;margin:0}
+.close-btn{background:none;border:none;font-size:20px;color:#666;cursor:pointer;padding:0}
+.close-btn:active{opacity:0.7}
+
+.bagikan-content{flex:1;padding:16px;overflow-y:auto}
+
+.bagikan-camera{width:100px;height:100px;background:#f0f0f0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:40px;margin:0 auto 20px;cursor:pointer}
+.bagikan-camera:active{opacity:0.8}
+
+.bagikan-textarea{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit}
+.bagikan-textarea:focus{outline:none;border-color:var(--tuntaskan)}
+
+.bagikan-photos{display:flex;gap:8px;margin:16px 0;justify-content:flex-start;flex-wrap:wrap}
+.bagikan-photo-slot{width:60px;height:60px;background:#f0f0f0;border:1px dashed #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer}
+.bagikan-photo-slot:active{background:#e8e8e8}
+
+.bagikan-location{display:inline-block;background:#f0f0f0;padding:8px 12px;border-radius:16px;font-size:13px;margin:12px 0}
+.bagikan-location-edit{margin-left:8px;cursor:pointer}
+
+.bagikan-button{width:100%;padding:14px;border-radius:8px;border:none;font-size:15px;font-weight:600;cursor:pointer;background:var(--tuntaskan);color:#fff;margin-top:16px}
+.bagikan-button:active{opacity:0.8}
+
+.bagikan-thinking{text-align:center;padding:20px;color:#666;font-size:14px}
+
+.bagikan-suggestion{background:#f9f9f9;border:1px solid #e0e0e0;border-radius:8px;padding:12px;margin:16px 0;text-align:center}
+.bagikan-suggestion-label{font-size:12px;color:#666;margin-bottom:6px}
+.bagikan-suggestion-pill{display:inline-block;background:var(--tuntaskan);color:#fff;padding:8px 12px;border-radius:16px;font-size:12px;font-weight:600;margin-right:8px}
+.bagikan-suggestion-confidence{display:inline-block;background:#f0f0f0;color:#666;padding:6px 10px;border-radius:12px;font-size:11px;font-weight:600}
+
+.bagikan-change-btn{display:inline-block;background:#f0f0f0;border:1px solid #ddd;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;margin-top:8px}
+.bagikan-change-btn:active{background:#e8e8e8}
+
+.bagikan-toggle-group{margin:16px 0;text-align:left}
+.bagikan-toggle-label{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;margin:12px 0}
+.toggle-switch{width:48px;height:28px;background:#ddd;border-radius:14px;cursor:pointer;position:relative;transition:background 0.2s}
+.toggle-switch.on{background:var(--tuntaskan)}
+.toggle-switch.on::after{left:calc(100% - 2px)}
+.toggle-switch::after{content:'';position:absolute;width:24px;height:24px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left 0.2s}
+
+.bagikan-radio-group{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
+.bagikan-radio{padding:6px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#fff;cursor:pointer}
+.bagikan-radio.selected{background:var(--tuntaskan);color:#fff;border-color:var(--tuntaskan)}
+
+.bagikan-level-pills{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
+.bagikan-level{padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:11px;background:#fff;cursor:pointer;font-weight:600}
+.bagikan-level.selected{background:var(--tuntaskan);color:#fff;border-color:var(--tuntaskan)}
+
+.bagikan-frequency{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
+.bagikan-freq-opt{padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#fff;cursor:pointer;font-weight:600}
+.bagikan-freq-opt.selected{background:var(--tuntaskan);color:#fff;border-color:var(--tuntaskan)}
+
+.bagikan-preview{background:#f9f9f9;border:1px solid #e0e0e0;border-radius:8px;padding:12px;margin:16px 0}
+.bagikan-preview-title{font-size:13px;font-weight:600;color:#666;margin-bottom:4px}
+
+.toast{position:fixed;bottom:80px;left:16px;right:16px;max-width:388px;background:#333;color:#fff;padding:12px 16px;border-radius:8px;font-size:13px;text-align:center;z-index:1001}
+
+/* Backdrop */
+.modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:999}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+const cardData = [
+  {id:1,track:"tuntaskan",title:"Perbaiki jalan berlubang di Jl. Merdeka",desc:"Sudah 2 tahun, semoga segera diperbaiki",contact:"Ibu Siti",avatar:"👩",timestamp:"3 jam lalu",community:"RT 05/RW 03"},
+  {id:2,track:"wujudkan",title:"Bangun ruang baca komunitas",desc:"Anak-anak butuh tempat belajar yang nyaman",contact:"Pak Budi",avatar:"👨",timestamp:"Kemarin",community:"RT 05/RW 03"},
+  {id:3,track:"telusuri",title:"Bagaimana cara daftar program PKH?",desc:"Ada yang sudah pengalaman?",contact:"Aditya",avatar:"🧑",timestamp:"2 hari lalu",community:"Kel. Manggarai"},
+  {id:4,track:"rayakan",title:"Gotong royong perbaiki jalan sukses!",desc:"200+ warga terlibat, jalan jadi mulus",contact:"Lurah Manggarai",avatar:"🎉",timestamp:"5 hari lalu",community:"Kel. Manggarai"},
+  {id:5,track:"musyawarah",title:"Musyawarah rencana kegiatan Q1 2024",desc:"Kapan bisa berkumpul semua?",contact:"Eka",avatar:"💬",timestamp:"1 minggu lalu",community:"RT 05/RW 03"},
+	  {id:6,track:"wujudkan",title:"Adakan pemeriksaan kesehatan gratis Sabtu depan",desc:"Jam 08.00 di balai RT",contact:"Posyandu",avatar:"🏥",timestamp:"1 minggu lalu",community:"RT 05/RW 03"},
+  {id:7,track:"tuntaskan",title:"Lampu jalan sering mati",desc:"Terutama di gang belakang sekolah",contact:"Warga",avatar:"💡",timestamp:"1 minggu lalu",community:"Kel. Manggarai"},
+  {id:8,track:"rayakan",title:"Program literasi anak berhasil!",desc:"50 anak sudah bisa membaca dengan lancar",contact:"PAUD Ceria",avatar:"📚",timestamp:"2 minggu lalu",community:"RT 05/RW 03"},
+];
+
+const trackNames={tuntaskan:"Tuntaskan",wujudkan:"Wujudkan",telusuri:"Telusuri",rayakan:"Rayakan",musyawarah:"Musyawarah"};
+
+function App(){
+  const [view,setView]=useState("onboarding");
+  const [currentCardId,setCurrentCardId]=useState(null);
+  const [filter,setFilter]=useState("semua");
+  const [onboardingStep,setOnboardingStep]=useState(1);
+  const [showBagikan,setShowBagikan]=useState(false);
+  const [bagikanStep,setBagikanStep]=useState(1);
+  const [cards,setCards]=useState(cardData);
+  const [toast,setToast]=useState("");
+
+  // Onboarding state
+  const [phone,setPhone]=useState("");
+  const [otp,setOtp]=useState("");
+  const [showOtp,setShowOtp]=useState(false);
+  const [fullName,setFullName]=useState("");
+  const [avatar,setAvatar]=useState("🧑");
+
+  // Bagikan state
+  const [bagikanText,setBagikanText]=useState("");
+  const [bagikanLocation,setBagikanLocation]=useState("Kel. Manggarai");
+  const [bagikanPhotos,setBagikanPhotos]=useState([]);
+  const [bagikanTrack,setBagikanTrack]=useState("tuntaskan");
+  const [bagikanConfidence,setBagikanConfidence]=useState("87");
+  const [bagikanSecret,setBagikanSecret]=useState(false);
+  const [bagikanSecretLevel,setBagikanSecretLevel]=useState(0);
+  const [bagikanRoutine,setBagikanRoutine]=useState(false);
+  const [bagikanFrequency,setBagikanFrequency]=useState("weekly");
+  const [bagikanLocationMode,setBagikanLocationMode]=useState("tepat");
+  const [showTrackOptions,setShowTrackOptions]=useState(false);
+  const [bagikanThinking,setBagikanThinking]=useState(false);
+
+	  const trackOptions=["tuntaskan","wujudkan","telusuri","rayakan","musyawarah"];
+
+  const handleOnboardingNext=()=>{
+    if(onboardingStep<5){
+      setOnboardingStep(onboardingStep+1);
+    }else{
+      setView("feed");
+    }
+  };
+
+  const handleOnboardingSkip=()=>{
+    setView("feed");
+  };
+
+  const handlePhone=()=>{
+    setShowOtp(true);
+  };
+
+  const handleOtp=()=>{
+    handleOnboardingNext();
+  };
+
+  const filteredCards=filter==="semua"?cards:cards.filter(c=>c.track===filter);
+
+  const handleBagikanNext=()=>{
+    if(bagikanStep===1){
+      setBagikanStep(2);
+      setBagikanThinking(true);
+      setTimeout(()=>{
+        setBagikanThinking(false);
+      },1000);
+    }else if(bagikanStep===2){
+      setBagikanStep(3);
+    }else if(bagikanStep===3){
+      setBagikanStep(4);
+    }else if(bagikanStep===4){
+      // Submit
+      const newCard={
+        id:cards.length+1,
+        track:bagikanTrack,
+        title:bagikanText.substring(0,50)+"...",
+        desc:bagikanText,
+        contact:fullName||"Pengguna",
+        avatar:avatar,
+        timestamp:"Baru saja",
+        community:bagikanLocation
+      };
+      setCards([newCard,...cards]);
+      setToast("Berhasil dibagikan!");
+      setShowBagikan(false);
+      setBagikanStep(1);
+      setBagikanText("");
+      setBagikanPhotos([]);
+      setTimeout(()=>setToast(""),2000);
+    }
+  };
+
+  const handleBagikanClose=()=>{
+    setShowBagikan(false);
+    setBagikanStep(1);
+    setBagikanText("");
+    setBagikanPhotos([]);
+  };
+
+  return(
+    <div>
+      {view==="onboarding"&&(
+        <OnboardingFlow
+          step={onboardingStep}
+          onNext={handleOnboardingNext}
+          onSkip={handleOnboardingSkip}
+          phone={phone}
+          setPhone={setPhone}
+          otp={otp}
+          setOtp={setOtp}
+          showOtp={showOtp}
+          onPhoneSubmit={handlePhone}
+          onOtpSubmit={handleOtp}
+          fullName={fullName}
+          setFullName={setFullName}
+          avatar={avatar}
+          setAvatar={setAvatar}
+          setView={setView}
+        />
+      )}
+      {view==="feed"&&(
+        <FeedView
+          cards={filteredCards}
+          filter={filter}
+          onFilterChange={setFilter}
+          onCardClick={(id)=>{setCurrentCardId(id);setView("detail");}}
+          onFabClick={()=>setShowBagikan(true)}
+          onTabChange={setView}
+        />
+      )}
+      {view==="detail"&&currentCardId&&(
+        <DetailView
+          card={cards.find(c=>c.id===currentCardId)}
+          onBack={()=>{setView("feed");setCurrentCardId(null);}}
+        />
+      )}
+      {showBagikan&&(
+        <BagikanFlow
+          step={bagikanStep}
+          text={bagikanText}
+          setText={setBagikanText}
+          location={bagikanLocation}
+          setLocation={setBagikanLocation}
+          photos={bagikanPhotos}
+          setPhotos={setBagikanPhotos}
+          track={bagikanTrack}
+          setTrack={setBagikanTrack}
+          confidence={bagikanConfidence}
+          showTrackOptions={showTrackOptions}
+          setShowTrackOptions={setShowTrackOptions}
+          trackOptions={trackOptions}
+          secret={bagikanSecret}
+          setSecret={setBagikanSecret}
+          secretLevel={bagikanSecretLevel}
+          setSecretLevel={setBagikanSecretLevel}
+          routine={bagikanRoutine}
+          setRoutine={setBagikanRoutine}
+          frequency={bagikanFrequency}
+          setFrequency={setBagikanFrequency}
+          locationMode={bagikanLocationMode}
+          setLocationMode={setBagikanLocationMode}
+          thinking={bagikanThinking}
+          onNext={handleBagikanNext}
+          onClose={handleBagikanClose}
+        />
+      )}
+      {toast&&<div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+function OnboardingFlow({step,onNext,onSkip,phone,setPhone,otp,setOtp,showOtp,onPhoneSubmit,onOtpSubmit,fullName,setFullName,avatar,setAvatar,setView}){
+  if(step===1){
+    return(
+      <div className="onboarding-screen">
+        <div className="onboarding-header">
+          <div></div>
+          <button className="onboarding-skip" onClick={onSkip}>Lewati →</button>
+        </div>
+        <div className="onboarding-content">
+          <div className="onboarding-illustration">🤝</div>
+          <h1 className="onboarding-title">Gotong Royong</h1>
+          <p className="onboarding-subtitle">Komunitas digital untuk aksi nyata</p>
+        </div>
+        <button className="onboarding-button" onClick={onNext}>Mulai</button>
+      </div>
+    );
+  }
+  if(step===2){
+    return(
+      <div className="onboarding-screen">
+        <div className="onboarding-header">
+          <div></div>
+          <button className="onboarding-skip" onClick={onSkip}>Lewati →</button>
+        </div>
+        <div className="onboarding-content">
+          <h2 className="onboarding-title">Verifikasi Nomor HP</h2>
+          <div className="onboarding-input-group">
+            <label className="onboarding-input-label">Nomor Telepon</label>
+            <input
+              type="tel"
+              placeholder="+62 812345678"
+              value={phone}
+              onChange={(e)=>setPhone(e.target.value)}
+              className="onboarding-input"
+            />
+          </div>
+          {showOtp?(
+            <>
+              <div className="onboarding-input-group">
+                <label className="onboarding-input-label">Kode OTP</label>
+                <input
+                  type="text"
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e)=>setOtp(e.target.value)}
+                  className="onboarding-input"
+                />
+              </div>
+              <button className="onboarding-button" onClick={onOtpSubmit}>Verifikasi</button>
+            </>
+          ):(
+            <button className="onboarding-button" onClick={onPhoneSubmit}>Kirim OTP</button>
+          )}
+        </div>
+      </div>
+    );
+  }
+  if(step===3){
+    return(
+      <div className="onboarding-screen">
+        <div className="onboarding-header">
+          <div></div>
+          <button className="onboarding-skip" onClick={onSkip}>Lewati →</button>
+        </div>
+        <div className="onboarding-content">
+          <h2 className="onboarding-title">Profil Kamu</h2>
+          <div className="onboarding-avatar" onClick={()=>setAvatar("📸")}>{avatar}</div>
+          <div className="onboarding-input-group">
+            <label className="onboarding-input-label">Nama Lengkap</label>
+            <input
+              type="text"
+              placeholder="Masukkan nama lengkap"
+              value={fullName}
+              onChange={(e)=>setFullName(e.target.value)}
+              className="onboarding-input"
+            />
+          </div>
+        </div>
+        <button className="onboarding-button" onClick={onNext}>Lanjut</button>
+      </div>
+    );
+  }
+  if(step===4){
+    return(
+      <div className="onboarding-screen">
+        <div className="onboarding-header">
+          <div></div>
+          <button className="onboarding-skip" onClick={onSkip}>Lewati →</button>
+        </div>
+        <div className="onboarding-content">
+          <h2 className="onboarding-title">Komunitas Kamu</h2>
+          <div className="onboarding-location-pill">📍 Sepertinya kamu di Kel. Manggarai — bergabung?</div>
+          <div className="onboarding-card">
+            <div className="onboarding-card-title">RT 05/RW 03, Kel. Manggarai</div>
+            <div className="onboarding-card-meta">124 anggota</div>
+          </div>
+          <input
+            type="text"
+            placeholder="Cari komunitas lain..."
+            className="onboarding-search"
+          />
+          <a className="onboarding-link">Punya kode undangan?</a>
+        </div>
+        <button className="onboarding-button" onClick={onNext}>Bergabung</button>
+      </div>
+    );
+  }
+  if(step===5){
+    return(
+      <div className="onboarding-screen">
+        <div className="onboarding-content">
+          <div className="onboarding-checkmark">✅</div>
+          <h2 className="onboarding-title">Selamat datang di RT 05!</h2>
+          <p className="onboarding-subtitle">Lihat apa yang terjadi di komunitasmu</p>
+        </div>
+        <button className="onboarding-button" onClick={()=>{setView("feed");}}>Ke Beranda →</button>
+      </div>
+    );
+  }
+}
+
+function FeedView({cards,filter,onFilterChange,onCardClick,onFabClick,onTabChange}){
+  return(
+    <div className="screen">
+      <div className="feed-header">
+        <h1>Beranda</h1>
+        <p>RT 05/RW 03, Kel. Manggarai</p>
+      </div>
+      <div className="filter-chips">
+	        {["semua","tuntaskan","wujudkan","telusuri","rayakan","musyawarah"].map(f=>(
+	          <div
+	            key={f}
+	            className={`filter-chip ${f===filter?"active":""}`}
+	            onClick={()=>onFilterChange(f)}
+	          >
+	            {f==="semua"?"Semua":trackNames[f]||f}
+	          </div>
+	        ))}
+      </div>
+      <div className="feed">
+        <div className="card-grid">
+          {cards.map(card=>(
+            <div key={card.id} className="card" onClick={()=>onCardClick(card.id)}>
+	              <div className={`card-track-label ${card.track}`}>{trackNames[card.track]||card.track}</div>
+              <div className="card-title">{card.title}</div>
+              <div className="card-meta">{card.avatar} {card.contact} · {card.timestamp}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <button className="fab" onClick={onFabClick}>+</button>
+      <div className="tab-bar">
+        <div className="tab active">🏠 Beranda</div>
+        <div className="tab">🔍 Jelajahi</div>
+        <div className="tab">👥 Komunitas</div>
+        <div className="tab">👤 Akun</div>
+      </div>
+    </div>
+  );
+}
+
+function DetailView({card,onBack}){
+  return(
+    <div className="screen">
+      <div className="back-btn" onClick={onBack}>← Kembali</div>
+      <div className="detail-container">
+        <div className="detail-content">
+          <div className="detail-section">
+            <div className="detail-pill" style={{background:`var(--${card.track}-bg)`,color:`var(--${card.track})`}}>{trackNames[card.track]}</div>
+            <h2 style={{marginTop:"12px"}}>{card.title}</h2>
+          </div>
+          <div className="detail-section">
+            <p>Oleh <strong>{card.avatar} {card.contact}</strong></p>
+            <p style={{fontSize:"12px",color:"#999"}}>{card.timestamp} • {card.community}</p>
+          </div>
+          <div className="detail-section">
+            <h2>Detail</h2>
+            <p>{card.desc}</p>
+          </div>
+          <div className="detail-section">
+            <h2>Diskusi (0)</h2>
+            <p style={{color:"#999"}}>Jadilah yang pertama berkomentar</p>
+          </div>
+        </div>
+        <div className="detail-bottom">
+          <button className="detail-btn" style={{background:`var(--${card.track})`}}>Ambil Aksi</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BagikanFlow({step,text,setText,location,setLocation,photos,setPhotos,track,setTrack,confidence,showTrackOptions,setShowTrackOptions,trackOptions,secret,setSecret,secretLevel,setSecretLevel,routine,setRoutine,frequency,setFrequency,locationMode,setLocationMode,thinking,onNext,onClose}){
+  return(
+    <>
+      <div className="modal-backdrop" onClick={onClose}></div>
+      <div className="bagikan-sheet">
+        <div className="bagikan-header">
+          <h2>{step===1?"Bagikan":step===2?"Klasifikasi":step===3?"Pengaturan":"Pratinjau"}</h2>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+
+        {step===1&&(
+          <div className="bagikan-content">
+            <div className="bagikan-camera">📸</div>
+            <textarea
+              placeholder="Ceritakan apa yang kamu lihat/pikirkan..."
+              value={text}
+              onChange={(e)=>setText(e.target.value)}
+              className="bagikan-textarea"
+            ></textarea>
+            <div style={{fontSize:"12px",color:"#666",marginTop:"12px"}}>Foto:</div>
+            <div className="bagikan-photos">
+              {[0,1,2,3,4].map(i=>(
+                <div key={i} className="bagikan-photo-slot" onClick={()=>setPhotos([...photos,i])}>+</div>
+              ))}
+            </div>
+            <div className="bagikan-location">📍 {location} <span className="bagikan-location-edit">✏️</span></div>
+            <button className="bagikan-button" onClick={onNext}>Selanjutnya →</button>
+          </div>
+        )}
+
+        {step===2&&(
+          <div className="bagikan-content">
+            {thinking?(
+              <div className="bagikan-thinking">🤔 AI menganalisis...</div>
+            ):(
+              <>
+                <div className="bagikan-suggestion">
+                  <div className="bagikan-suggestion-label">Saran klasifikasi:</div>
+                  <div>
+                    <span className="bagikan-suggestion-pill">{trackNames[track]}</span>
+                    <span className="bagikan-suggestion-confidence">{confidence}%</span>
+                  </div>
+                  <div style={{marginTop:"8px"}}>
+                    <button className="bagikan-change-btn" onClick={()=>setShowTrackOptions(!showTrackOptions)}>Ubah</button>
+                  </div>
+                </div>
+                {showTrackOptions&&(
+                  <div style={{marginTop:"12px"}}>
+                    {trackOptions.map(opt=>(
+                      <button
+                        key={opt}
+                        className={`bagikan-radio ${track===opt?"selected":""}`}
+                        onClick={()=>{setTrack(opt);setShowTrackOptions(false);}}
+                        style={{display:"block",width:"100%",marginBottom:"8px",textAlign:"left",padding:"10px 12px"}}
+                      >
+                        {trackNames[opt]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            <button className="bagikan-button" onClick={onNext} disabled={thinking}>Selanjutnya →</button>
+          </div>
+        )}
+
+        {step===3&&(
+          <div className="bagikan-content">
+            <div className="bagikan-toggle-group">
+              <div className="bagikan-toggle-label">
+                <span>Rahasia (Opsional)</span>
+                <div className={`toggle-switch ${secret?"on":""}`} onClick={()=>setSecret(!secret)}></div>
+              </div>
+              {secret&&(
+                <div className="bagikan-level-pills">
+                  {[0,1,2,3].map(level=>(
+                    <button
+                      key={level}
+                      className={`bagikan-level ${secretLevel===level?"selected":""}`}
+                      onClick={()=>setSecretLevel(level)}
+                    >
+                      Level {level}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bagikan-toggle-group">
+              <div className="bagikan-toggle-label">
+                <span>Rutin (Opsional)</span>
+                <div className={`toggle-switch ${routine?"on":""}`} onClick={()=>setRoutine(!routine)}></div>
+              </div>
+              {routine&&(
+                <div className="bagikan-frequency">
+                  {["Harian","Mingguan","Bulanan"].map((freq,idx)=>(
+                    <button
+                      key={idx}
+                      className={`bagikan-freq-opt ${frequency===freq.toLowerCase()?"selected":""}`}
+                      onClick={()=>setFrequency(freq.toLowerCase())}
+                    >
+                      {freq}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bagikan-toggle-group">
+              <div style={{fontSize:"13px",fontWeight:"600",margin:"12px 0"}}>Lokasi</div>
+              <div className="bagikan-radio-group">
+                {["Tepat","Area umum","Sembunyikan"].map(loc=>(
+                  <button
+                    key={loc}
+                    className={`bagikan-radio ${locationMode===loc.toLowerCase()?"selected":""}`}
+                    onClick={()=>setLocationMode(loc.toLowerCase())}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button className="bagikan-button" onClick={onNext}>Pratinjau →</button>
+          </div>
+        )}
+
+        {step===4&&(
+          <div className="bagikan-content">
+            <div style={{fontSize:"12px",color:"#666",marginBottom:"12px"}}>Pratinjau:</div>
+            <div className="bagikan-preview">
+              <div className="bagikan-preview-title" style={{color:`var(--${track})`}}>
+                {trackNames[track]}
+              </div>
+              <div style={{fontSize:"13px",fontWeight:"600",marginTop:"6px"}}>{text.substring(0,60)}...</div>
+              <div style={{fontSize:"11px",color:"#888",marginTop:"6px"}}>Baru saja</div>
+            </div>
+            <button className="bagikan-button" style={{background:`var(--${track})`}} onClick={onNext}>Bagikan</button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>

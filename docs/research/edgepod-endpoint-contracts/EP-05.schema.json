@@ -1,0 +1,342 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gotong-royong.internal/schema/edgepod-EP-05.schema.json",
+  "title": "Edge-Pod contract for EP-05",
+  "endpoint_id": "EP-05",
+  "path": "/api/v1/edge-pod/ai/05/gaming-risk",
+  "method": "POST",
+  "prompt_id": "GAMING-001",
+  "prompt_source": "14-prompt-versioning.md",
+  "prompt_version": "v0.2.0",
+  "definitions": {
+    "Actor": {
+      "type": "object",
+      "required": [
+        "user_id",
+        "platform_user_id",
+        "role"
+      ],
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform_user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "member",
+            "admin",
+            "moderator",
+            "humas",
+            "bendahara",
+            "pic",
+            "system"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "GeoPoint": {
+      "type": "object",
+      "required": [
+        "lat",
+        "lng"
+      ],
+      "properties": {
+        "lat": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lng": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        }
+      },
+      "additionalProperties": true
+    },
+    "BaseRequest": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "correlation_id",
+        "actor",
+        "trigger",
+        "payload_version"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "pattern": "^req_[A-Za-z0-9_-]{8,}$"
+        },
+        "correlation_id": {
+          "type": "string",
+          "minLength": 4
+        },
+        "actor": {
+          "$ref": "#/definitions/Actor"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string",
+          "enum": [
+            "user_action",
+            "timer",
+            "webhook",
+            "async_batch"
+          ]
+        },
+        "payload_version": {
+          "type": "string"
+        },
+        "privacy_level": {
+          "type": "string",
+          "enum": [
+            "open",
+            "l1",
+            "l2",
+            "vault"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "SuccessEnvelope": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "result_version",
+        "output"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result_version": {
+          "type": "string",
+          "pattern": "^v\\d+\\.\\d+\\.\\d+$"
+        },
+        "output": {
+          "type": "object"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reason_code": {
+          "type": "string"
+        },
+        "actor_context": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "ErrorEnvelope": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "result_version",
+        "error"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result_version": {
+          "type": "string",
+          "pattern": "^v\\d+\\.\\d+\\.\\d+$"
+        },
+        "error": {
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "retryable"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "MODEL_UNAVAILABLE",
+                "INVALID_INPUT",
+                "TIMEOUT",
+                "SCHEMA_VIOLATION",
+                "RETRYABLE_TRANSIENT",
+                "POLICY_BLOCK"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "request_schema": {
+    "allOf": [
+      {
+        "$ref": "#/definitions/BaseRequest"
+      },
+      {
+        "type": "object",
+        "required": [
+          "query_users",
+          "lookback_hours",
+          "platform"
+        ],
+        "properties": {
+          "query_users": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "seed_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "focus_metric": {
+            "type": "string",
+            "enum": [
+              "posting_rate",
+              "vouch_rate",
+              "revenue",
+              "dispute",
+              "generic"
+            ]
+          },
+          "lookback_hours": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "platform": {
+            "type": "string",
+            "minLength": 1
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    ]
+  },
+  "success_response_schema": {
+    "allOf": [
+      {
+        "$ref": "#/definitions/SuccessEnvelope"
+      },
+      {
+        "required": [
+          "output"
+        ],
+        "properties": {
+          "output": {
+            "type": "object",
+            "required": [
+              "flags",
+              "summary",
+              "recommendation"
+            ],
+            "properties": {
+              "flags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "user_id",
+                    "metric",
+                    "flag",
+                    "reason_code",
+                    "severity"
+                  ],
+                  "properties": {
+                    "user_id": {
+                      "type": "string"
+                    },
+                    "metric": {
+                      "type": "string"
+                    },
+                    "flag": {
+                      "type": "boolean"
+                    },
+                    "reason_code": {
+                      "type": "string"
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    }
+                  }
+                }
+              },
+              "summary": {
+                "type": "object",
+                "required": [
+                  "total_flags",
+                  "critical_count"
+                ],
+                "properties": {
+                  "total_flags": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "critical_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "recommendation": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "manual_review",
+                  "slow_mode",
+                  "suspend_actions"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "error_response_schema": {
+    "$ref": "#/definitions/ErrorEnvelope"
+  }
+}

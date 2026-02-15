@@ -1,0 +1,15 @@
+# Rust build artifacts
+/target
+
+# macOS
+.DS_Store
+
+# Local tool state (if any)
+.omc/
+
+# Logs
+*.log
+
+# Editor/IDE
+.vscode/
+.idea/

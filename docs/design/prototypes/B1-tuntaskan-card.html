@@ -1,0 +1,1525 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — B1 · Tuntaskan Card (v3)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --fs-h2:20px; --fs-h3:16px; --fs-body:14px; --fs-small:12px;
+    --fs-caption:11px; --fs-micro:9px;
+    --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-6:24px; --sp-8:32px;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+    --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+    --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+    --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+    --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63;
+    --c-pasir:#A1887F; --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+    --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+    --c-berhasil:#2E7D32; --c-berhasil-l:#E8F5E9;
+    --c-peringatan:#E65100; --c-peringatan-l:#FFF3E0;
+    --c-bahaya:#C62828; --c-bahaya-l:#FFEBEE;
+    --c-keterangan:#4E342E; --c-keterangan-l:#EFEBE9;
+    --t-tuntaskan:#C05621; --t-tuntaskan-soft:#FFF3E0; --t-tuntaskan-muted:#FFECD2;
+    --t-musyawarah:#4E342E; --t-musyawarah-soft:#EFEBE9;
+  }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: #e8e0d8; color: var(--c-tanah-gelap);
+    min-height: 100vh;
+  }
+
+  .doc-bar {
+    background: var(--t-tuntaskan); color: #fff;
+    padding: 16px 24px; text-align: center;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .doc-bar h1 { font-size: 15px; font-weight: 700; }
+  .doc-bar p { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+
+  .scenario-nav {
+    background: var(--c-tanah-gelap);
+    display: flex; justify-content: center; flex-wrap: wrap;
+    position: sticky; top: 52px; z-index: 99;
+  }
+  .scenario-btn {
+    padding: 8px 8px; font-size: 9px; font-weight: 700;
+    cursor: pointer; border: none; background: transparent;
+    color: rgba(255,255,255,0.35); border-bottom: 2px solid transparent;
+    transition: all 0.2s; font-family: 'Nunito', sans-serif;
+  }
+  .scenario-btn:hover { color: rgba(255,255,255,0.7); }
+  .scenario-btn.active { color: #fff; border-bottom-color: var(--t-tuntaskan); }
+  .scenario-label {
+    width: 100%; text-align: center; padding: 6px;
+    font-size: 10px; color: rgba(255,255,255,0.25); background: #2c1e1a;
+  }
+
+  .phone-frame {
+    width: 375px; margin: 24px auto;
+    background: var(--c-kapas);
+    border-radius: 28px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.08);
+    min-height: 760px;
+    display: flex; flex-direction: column;
+  }
+
+  .app-bar {
+    background: var(--c-susu);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--c-batu);
+    flex-shrink: 0;
+  }
+  .app-bar .back-btn {
+    width: 32px; height: 32px; border-radius: var(--r-full);
+    background: var(--c-kapas); border: none; cursor: pointer;
+    font-size: 16px; color: var(--c-tanah);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .app-bar .title {
+    font-size: var(--fs-h3); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+  }
+
+  /* ═══════════════════════════
+     TAB BAR — cross-cutting component
+     ═══════════════════════════ */
+  .tab-bar {
+    display: flex; background: var(--c-susu);
+    border-bottom: 1px solid var(--c-batu);
+    flex-shrink: 0; position: relative;
+  }
+  .tab-btn {
+    flex: 1; padding: 10px 8px;
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-pasir); background: transparent;
+    border: none; cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all 0.2s; position: relative;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .tab-btn.active { color: var(--t-tuntaskan); }
+  .tab-btn.active::after {
+    content: ''; position: absolute; bottom: -1px; left: 16px; right: 16px;
+    height: 2.5px; background: var(--t-tuntaskan); border-radius: 2px 2px 0 0;
+  }
+  .tab-btn .tab-icon { font-size: 12px; }
+  .tab-btn .tab-notif {
+    width: 6px; height: 6px; border-radius: var(--r-full);
+    background: var(--c-bahaya); flex-shrink: 0;
+  }
+  .swipe-hint {
+    text-align: center; padding: 4px;
+    font-size: 8px; color: var(--c-batu); background: var(--c-susu);
+    letter-spacing: 2px;
+  }
+
+  .tab-panel { display: none; flex: 1; flex-direction: column; overflow-y: auto; }
+  .tab-panel.active { display: flex; }
+
+  .feed-content {
+    flex: 1; overflow-y: auto;
+    padding: var(--sp-3);
+    display: flex; flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .section-label {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    color: var(--c-pasir); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: var(--sp-1);
+  }
+
+  /* ═══════════════════════════
+     SEED CARD — B0 universal base
+     ═══════════════════════════ */
+  .seed-card {
+    background: var(--c-susu);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--c-batu);
+    position: relative;
+  }
+  .seed-card .track-strip {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    width: 4px; background: var(--t-tuntaskan);
+  }
+
+  .card-header {
+    padding: var(--sp-3) var(--sp-3) var(--sp-2);
+    padding-left: calc(var(--sp-3) + 8px);
+  }
+  .card-header-top {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: var(--sp-2); flex-wrap: wrap;
+  }
+  .seed-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    background: var(--t-tuntaskan-soft); color: var(--t-tuntaskan);
+  }
+  .urgency-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+  }
+  .urgency-badge.mendesak { background: var(--c-bahaya-l); color: var(--c-bahaya); }
+
+  .card-title {
+    font-size: var(--fs-body); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); line-height: 1.4;
+    margin-bottom: var(--sp-2);
+  }
+  .card-author { display: flex; align-items: center; gap: 6px; }
+  .author-avatar {
+    width: 22px; height: 22px; border-radius: var(--r-full);
+    background: var(--c-kayu); display: flex; align-items: center;
+    justify-content: center; font-size: 9px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .author-name { font-size: var(--fs-caption); font-weight: var(--fw-semi); color: var(--c-tanah); }
+  .author-tier { font-size: var(--fs-micro); color: var(--c-pasir); font-weight: var(--fw-semi); }
+  .card-time { margin-left: auto; font-size: var(--fs-micro); color: var(--c-pasir); }
+
+  .card-body {
+    padding: 0 var(--sp-3) var(--sp-3);
+    padding-left: calc(var(--sp-3) + 8px);
+  }
+  .card-text {
+    font-size: var(--fs-small); color: var(--c-tanah); line-height: 1.6;
+  }
+  .card-more {
+    font-size: var(--fs-caption); color: var(--c-api);
+    font-weight: var(--fw-semi); cursor: pointer; margin-top: var(--sp-1);
+  }
+  .card-media { display: flex; gap: 6px; margin-top: var(--sp-2); }
+  .media-thumb {
+    width: 52px; height: 52px; border-radius: var(--r-sm);
+    background: var(--c-kapas); border: 1px solid var(--c-batu);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--c-pasir);
+  }
+  .card-location {
+    display: flex; align-items: center; gap: 4px;
+    font-size: var(--fs-micro); color: var(--c-kayu); margin-top: var(--sp-2);
+  }
+
+  /* Stepper */
+  .card-stepper {
+    padding: var(--sp-2) var(--sp-3);
+    padding-left: calc(var(--sp-2) + 8px);
+    border-top: 1px solid var(--c-batu);
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto;
+  }
+  .step { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .step .step-dot { width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0; }
+  .step .step-label { font-size: 8px; font-weight: var(--fw-bold); }
+  .step-connector { width: 12px; height: 1px; flex-shrink: 0; margin: 0 2px; }
+  .step.done .step-dot { background: var(--c-pasir); }
+  .step.done .step-label { color: var(--c-pasir); }
+  .step-connector.done { background: var(--c-pasir); }
+  .step.current .step-dot { background: var(--t-tuntaskan); box-shadow: 0 0 0 2px var(--c-susu), 0 0 0 3.5px var(--t-tuntaskan); }
+  .step.current .step-label { color: var(--t-tuntaskan); font-weight: var(--fw-extra); }
+  .step.future .step-dot { background: transparent; border: 1.5px solid var(--c-batu); }
+  .step.future .step-label { color: var(--c-batu); }
+  .step-connector.future { background: var(--c-batu); }
+  .step.complete .step-dot { background: var(--c-berhasil); }
+  .step.complete .step-label { color: var(--c-berhasil); font-weight: var(--fw-extra); }
+
+  /* Footer */
+  .card-footer {
+    padding: var(--sp-2) var(--sp-3);
+    padding-left: calc(var(--sp-2) + 8px);
+    border-top: 1px solid var(--c-batu);
+    display: flex; align-items: center; gap: var(--sp-3);
+  }
+  .footer-action {
+    display: flex; align-items: center; gap: 4px;
+    font-size: var(--fs-caption); color: var(--c-kayu); font-weight: var(--fw-semi);
+  }
+  .fa-icon { font-size: 13px; }
+  .ai-badge {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+  }
+  .ai-badge.classified { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .ai-badge.summary { background: var(--c-keterangan-l); color: var(--c-keterangan); }
+  .ai-badge.dampak { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .ai-badge.resolve { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+
+  /* ═══════════════════════════
+     CHAT — WhatsApp-style conversation
+     ═══════════════════════════ */
+  .chat-area {
+    flex: 1; overflow-y: auto;
+    padding: var(--sp-3); padding-bottom: 60px;
+    display: flex; flex-direction: column; gap: var(--sp-2);
+    background: var(--c-kapas);
+  }
+
+  .chat-bubble {
+    max-width: 80%; padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-md); font-size: var(--fs-caption);
+    line-height: 1.5; position: relative;
+  }
+  .chat-bubble.other {
+    background: var(--c-susu); align-self: flex-start;
+    border: 1px solid var(--c-batu);
+    border-top-left-radius: 3px;
+  }
+  .chat-bubble.self {
+    background: var(--t-tuntaskan-soft); align-self: flex-end;
+    border: 1px solid var(--t-tuntaskan-muted);
+    border-top-right-radius: 3px;
+  }
+  .chat-name {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    margin-bottom: 2px;
+  }
+  .chat-bubble.other .chat-name { color: var(--c-kayu); }
+  .chat-bubble.self .chat-name { color: var(--t-tuntaskan); }
+  .chat-text { color: var(--c-tanah-gelap); }
+  .chat-time {
+    font-size: 8px; color: var(--c-pasir);
+    text-align: right; margin-top: 2px;
+  }
+
+  /* AI inline card in chat */
+  .ai-chat-card {
+    align-self: center; max-width: 90%;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--c-keterangan-l); border-radius: var(--r-md);
+    border: 1px dashed var(--c-kayu);
+    margin: var(--sp-1) 0;
+  }
+  .ai-chat-header {
+    display: flex; align-items: center; gap: 4px;
+    font-size: var(--fs-micro); font-weight: var(--fw-extra); color: var(--c-kayu);
+    margin-bottom: var(--sp-1);
+  }
+  .ai-chat-text {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.5; font-style: italic;
+  }
+
+  /* Chat input bar */
+  .chat-input-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--c-susu); border-top: 1px solid var(--c-batu);
+    padding: var(--sp-2) var(--sp-3);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chat-input {
+    flex: 1; padding: 8px 12px; border-radius: var(--r-full);
+    border: 1px solid var(--c-batu); background: var(--c-kapas);
+    font-size: var(--fs-caption); font-family: 'Nunito', sans-serif;
+    color: var(--c-tanah-gelap);
+  }
+  .chat-input::placeholder { color: var(--c-pasir); }
+  .chat-send {
+    width: 32px; height: 32px; border-radius: var(--r-full);
+    background: var(--t-tuntaskan); border: none; color: #fff;
+    font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ═══════════════════════════
+     TUNTASKAN-SPECIFIC
+     ═══════════════════════════ */
+
+  /* AI-07 summary */
+  .ai-summary {
+    margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3);
+    background: var(--c-keterangan-l); border-radius: var(--r-md);
+    border-left: 3px solid var(--c-kayu);
+  }
+  .ai-summary-header {
+    display: flex; align-items: center; gap: 4px;
+    font-size: var(--fs-micro); font-weight: var(--fw-extra); color: var(--c-kayu);
+    margin-bottom: var(--sp-1);
+  }
+  .ai-summary-text {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.5; font-style: italic;
+  }
+
+  /* Proposal extraction */
+  .proposal-card {
+    margin-top: var(--sp-2); padding: var(--sp-3);
+    background: var(--c-bara); border-radius: var(--r-md);
+    border: 1.5px solid var(--t-tuntaskan-muted);
+  }
+  .proposal-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--t-tuntaskan); margin-bottom: var(--sp-2);
+  }
+  .proposal-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: var(--sp-1) 0;
+  }
+  .proposal-radio {
+    width: 16px; height: 16px; border-radius: var(--r-full);
+    border: 2px solid var(--c-batu); flex-shrink: 0;
+    margin-top: 2px; display: flex; align-items: center;
+    justify-content: center;
+  }
+  .proposal-radio.selected { border-color: var(--t-tuntaskan); }
+  .proposal-radio.selected::after {
+    content: ''; width: 8px; height: 8px; border-radius: var(--r-full);
+    background: var(--t-tuntaskan);
+  }
+  .proposal-text { font-size: var(--fs-caption); color: var(--c-tanah-gelap); line-height: 1.4; flex: 1; }
+  .proposal-votes { font-size: var(--fs-micro); color: var(--c-kayu); font-weight: var(--fw-bold); flex-shrink: 0; }
+
+  /* Musyawarah fork chip */
+  .musyawarah-chip {
+    margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3);
+    background: var(--t-musyawarah-soft); border-radius: var(--r-md);
+    border: 1px dashed var(--c-pasir);
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .musyawarah-chip:hover { border-color: var(--t-musyawarah); }
+  .musyawarah-chip .mc-icon { font-size: 16px; }
+  .musyawarah-chip .mc-text {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.3; flex: 1;
+  }
+  .musyawarah-chip .mc-text strong { color: var(--t-musyawarah); }
+  .musyawarah-chip .mc-arrow { font-size: 12px; color: var(--c-pasir); }
+
+  /* Gate button */
+  .gate-btn {
+    margin-top: var(--sp-3);
+    width: 100%; padding: var(--sp-3);
+    border-radius: var(--r-md); border: none;
+    font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .gate-btn.ready { background: var(--t-tuntaskan); color: #fff; }
+  .gate-btn.ready:hover { background: var(--c-api-terang); }
+
+  /* ═══════════════════════════
+     PAPAN GOTONG ROYONG (Rancang)
+     ═══════════════════════════ */
+  .papan-gr {
+    background: var(--c-susu); border-radius: var(--r-lg);
+    border: 2px solid var(--t-tuntaskan-muted);
+    overflow: hidden;
+  }
+  .papan-header {
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--t-tuntaskan-soft);
+    border-bottom: 1px solid var(--t-tuntaskan-muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .papan-header .ph-icon { font-size: 18px; }
+  .papan-header .ph-title {
+    font-size: var(--fs-small); font-weight: var(--fw-extra);
+    color: var(--t-tuntaskan);
+  }
+  .papan-header .ph-status {
+    margin-left: auto; font-size: var(--fs-micro);
+    font-weight: var(--fw-extra); padding: 2px 8px;
+    border-radius: var(--r-full);
+  }
+  .ph-status.filling { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+  .ph-status.ready { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+
+  .papan-body { padding: var(--sp-3); }
+
+  /* PIC section */
+  .pic-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--t-tuntaskan-soft);
+    border-radius: var(--r-md); border: 1px solid var(--t-tuntaskan-muted);
+    margin-bottom: var(--sp-3);
+  }
+  .pic-avatar {
+    width: 28px; height: 28px; border-radius: var(--r-full);
+    background: var(--t-tuntaskan); display: flex; align-items: center;
+    justify-content: center; font-size: 10px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .pic-info { flex: 1; }
+  .pic-label { font-size: var(--fs-micro); color: var(--c-kayu); font-weight: var(--fw-semi); }
+  .pic-name { font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--c-tanah-gelap); }
+  .pic-status {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    padding: 2px 6px; border-radius: var(--r-full);
+    background: var(--c-berhasil-l); color: var(--c-berhasil);
+  }
+
+  /* Rencana Aksi */
+  .rencana-section { margin-bottom: var(--sp-3); }
+  .rencana-title {
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap); margin-bottom: var(--sp-2);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .rencana-title .ai-draft {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    color: var(--c-kayu); background: var(--c-keterangan-l);
+    padding: 1px 6px; border-radius: var(--r-full);
+  }
+  .action-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: var(--sp-1) 0; font-size: var(--fs-caption);
+    color: var(--c-tanah); line-height: 1.4;
+  }
+  .check {
+    width: 16px; height: 16px; border-radius: var(--r-sm);
+    flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 9px; margin-top: 1px;
+  }
+  .check.pending { background: transparent; border: 1.5px solid var(--c-batu); }
+  .check.done { background: var(--c-berhasil); color: #fff; }
+  .check.active { background: var(--t-tuntaskan-soft); border: 1.5px solid var(--t-tuntaskan); color: var(--t-tuntaskan); }
+  .action-item.is-done { color: var(--c-pasir); text-decoration: line-through; }
+
+  /* ═══ DAFTAR KONTRIBUSI ═══ */
+  .kontribusi-section { margin-bottom: var(--sp-3); }
+  .kontribusi-title {
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap); margin-bottom: var(--sp-2);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .kontribusi-slot {
+    border: 1.5px solid var(--c-batu); border-radius: var(--r-md);
+    margin-bottom: var(--sp-2); overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .kontribusi-slot.filled { border-color: rgba(46,125,50,0.3); }
+  .kontribusi-slot.partial { border-color: var(--t-tuntaskan-muted); }
+
+  .ks-header {
+    padding: var(--sp-2) var(--sp-3);
+    display: flex; align-items: center; gap: 6px;
+    background: var(--c-kapas);
+  }
+  .ks-type-icon { font-size: 14px; flex-shrink: 0; }
+  .ks-type-label {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+  }
+  .ks-count {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    padding: 2px 8px; border-radius: var(--r-full);
+  }
+  .ks-count.full { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .ks-count.partial { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+
+  .ks-body { padding: var(--sp-2) var(--sp-3); }
+
+  .ks-person {
+    display: flex; align-items: center; gap: 6px;
+    padding: var(--sp-1) 0;
+  }
+  .ks-person-avatar {
+    width: 20px; height: 20px; border-radius: var(--r-full);
+    background: var(--c-kayu); display: flex; align-items: center;
+    justify-content: center; font-size: 8px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .ks-person-avatar.anon { background: var(--c-batu); color: var(--c-pasir); }
+  .ks-person-name { font-size: var(--fs-caption); color: var(--c-tanah); flex: 1; }
+  .ks-person-name.anon { font-style: italic; color: var(--c-pasir); }
+  .ks-person-detail { font-size: var(--fs-micro); color: var(--c-kayu); }
+  .ks-person-visibility { font-size: 10px; color: var(--c-pasir); flex-shrink: 0; }
+
+  .ks-empty-slot {
+    display: flex; align-items: center; gap: 6px;
+    padding: var(--sp-2);
+    border: 1.5px dashed var(--c-batu); border-radius: var(--r-md);
+    cursor: pointer; transition: all 0.15s;
+    margin-top: var(--sp-1);
+  }
+  .ks-empty-slot:hover { border-color: var(--t-tuntaskan); background: var(--t-tuntaskan-soft); }
+  .ks-empty-slot .ks-plus {
+    width: 20px; height: 20px; border-radius: var(--r-full);
+    background: var(--c-kapas); display: flex; align-items: center;
+    justify-content: center; font-size: 12px; color: var(--c-pasir);
+    font-weight: 800;
+  }
+  .ks-empty-slot .ks-cta {
+    font-size: var(--fs-caption); color: var(--c-pasir);
+    font-weight: var(--fw-semi);
+  }
+
+  /* Galang sub-widget */
+  .galang-widget {
+    margin-top: var(--sp-1);
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--c-bara); border-radius: var(--r-md);
+    border: 1px solid var(--t-tuntaskan-muted);
+  }
+  .galang-header {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: var(--sp-1);
+  }
+  .galang-header .gh-icon { font-size: 12px; }
+  .galang-header .gh-label {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    color: var(--t-tuntaskan);
+  }
+  .galang-header .gh-amount {
+    margin-left: auto;
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap);
+  }
+  .galang-bar {
+    height: 6px; border-radius: 3px; background: var(--c-batu);
+    overflow: hidden;
+  }
+  .galang-bar .gfill { height: 100%; border-radius: 3px; background: var(--t-tuntaskan); }
+  .galang-meta {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: var(--sp-1);
+    font-size: var(--fs-micro); color: var(--c-kayu);
+  }
+
+  /* Target waktu */
+  .target-waktu {
+    display: flex; align-items: center; gap: 8px;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--c-kapas); border-radius: var(--r-md);
+    margin-bottom: var(--sp-3);
+  }
+  .tw-icon { font-size: 14px; }
+  .tw-label { font-size: var(--fs-caption); color: var(--c-tanah); flex: 1; }
+  .tw-date { font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--c-tanah-gelap); }
+
+  /* Readiness indicator */
+  .readiness {
+    padding: var(--sp-3);
+    background: var(--c-kapas); border-radius: var(--r-md);
+    border: 1px solid var(--c-batu);
+  }
+  .readiness-title {
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap); margin-bottom: var(--sp-2);
+  }
+  .readiness-items { display: flex; flex-direction: column; gap: var(--sp-1); }
+  .readiness-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--fs-caption); color: var(--c-tanah);
+  }
+  .ri-check {
+    width: 14px; height: 14px; border-radius: var(--r-full);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; flex-shrink: 0;
+  }
+  .ri-check.yes { background: var(--c-berhasil); color: #fff; }
+  .ri-check.warn { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+
+  /* Verification */
+  .verify-section {
+    margin-top: var(--sp-2); padding: var(--sp-3);
+    background: #fff; border-radius: var(--r-md);
+    border: 2px solid var(--c-berhasil);
+  }
+  .verify-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-berhasil); margin-bottom: var(--sp-2);
+  }
+  .verify-question {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.5; margin-bottom: var(--sp-2);
+  }
+  .verify-votes { display: flex; gap: 6px; }
+  .verify-vote {
+    flex: 1; padding: var(--sp-2); border-radius: var(--r-md);
+    text-align: center; font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    cursor: pointer; font-family: 'Nunito', sans-serif; border: none;
+  }
+  .verify-vote.yes { background: var(--c-berhasil-l); color: var(--c-berhasil); border: 1.5px solid var(--c-berhasil) !important; }
+  .verify-vote.no { background: var(--c-bahaya-l); color: var(--c-bahaya); border: 1.5px solid transparent !important; }
+  .verify-progress {
+    margin-top: var(--sp-2); display: flex; align-items: center; gap: 6px;
+  }
+  .verify-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--c-batu); overflow: hidden; }
+  .verify-bar .fill { height: 100%; border-radius: 3px; background: var(--c-berhasil); }
+  .verify-count { font-size: var(--fs-micro); color: var(--c-kayu); font-weight: var(--fw-bold); }
+
+  /* Resolution */
+  .resolution-card {
+    margin-top: var(--sp-2); padding: var(--sp-3);
+    background: var(--c-berhasil-l); border-radius: var(--r-md);
+    border: 1px solid rgba(46,125,50,0.2);
+  }
+  .resolution-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-berhasil); margin-bottom: var(--sp-2);
+  }
+  .resolution-text {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.5; margin-bottom: var(--sp-2);
+  }
+  .resolution-meta {
+    display: flex; gap: var(--sp-3);
+    font-size: var(--fs-micro); color: var(--c-kayu);
+  }
+  .resolution-meta span { display: flex; align-items: center; gap: 3px; }
+
+  .dampak-row {
+    margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3);
+    background: var(--c-berhasil-l); border-radius: var(--r-md);
+    border: 1px solid rgba(46,125,50,0.15);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dampak-icon { font-size: 14px; }
+  .dampak-text { font-size: var(--fs-caption); color: var(--c-berhasil); font-weight: var(--fw-semi); line-height: 1.3; }
+
+  .satisfaction-row {
+    margin-top: var(--sp-2); display: flex; align-items: center; gap: 6px;
+    font-size: var(--fs-caption); color: var(--c-kayu);
+  }
+  .satisfaction-stars { font-size: 14px; letter-spacing: 2px; }
+
+  .scenario { display: none; flex-direction: column; height: 100%; }
+  .scenario.active { display: flex; }
+
+  /* Date separator in chat */
+  .chat-date {
+    align-self: center;
+    padding: 2px 10px; border-radius: var(--r-full);
+    background: rgba(0,0,0,0.06);
+    font-size: 8px; font-weight: var(--fw-bold); color: var(--c-pasir);
+    margin: var(--sp-1) 0;
+  }
+
+  /* Emoji reactions */
+  .chat-reactions {
+    display: flex; gap: 4px; margin-top: 3px;
+  }
+  .chat-react {
+    padding: 1px 5px; border-radius: var(--r-full);
+    background: var(--c-kapas); border: 1px solid var(--c-batu);
+    font-size: 9px; display: flex; align-items: center; gap: 2px;
+  }
+  .chat-react .react-count { font-size: 8px; color: var(--c-pasir); font-weight: var(--fw-bold); }
+
+  @media (max-width: 420px) {
+    .phone-frame { width: 100%; border-radius: 0; margin: 0; min-height: 100vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-bar">
+  <h1>B1 · Tuntaskan Card (v3)</h1>
+  <p>Swipeable tab pattern: structured content ↔ conversation · cross-cutting component</p>
+</div>
+
+<nav class="scenario-nav">
+  <button class="scenario-btn active" onclick="showScenario('keresahan')">1. Keresahan</button>
+  <button class="scenario-btn" onclick="showScenario('bahas')">2. Bahas</button>
+  <button class="scenario-btn" onclick="showScenario('rancang')">3. Rancang</button>
+  <button class="scenario-btn" onclick="showScenario('garap')">4. Garap</button>
+  <button class="scenario-btn" onclick="showScenario('periksa')">5. Periksa</button>
+  <button class="scenario-btn" onclick="showScenario('tuntas')">6. Tuntas</button>
+  <div class="scenario-label">← swipe tabs inside each stage · structured ↔ conversation</div>
+</nav>
+
+<div class="phone-frame">
+
+  <!-- ════════ 1. KERESAHAN — no tabs (initial seed, no conversation yet) ════════ -->
+  <div id="s-keresahan" class="scenario active">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Tuntaskan</div></div>
+    <div class="feed-content">
+      <div class="section-label">Benih — masalah dilaporkan</div>
+      <div class="seed-card">
+        <div class="track-strip"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge">🔧 Keresahan</span>
+            <span class="urgency-badge mendesak">🔴 Mendesak</span>
+          </div>
+          <div class="card-title">Dana pembangunan pos ronda tidak transparan, warga bingung</div>
+          <div class="card-author">
+            <div class="author-avatar">AR</div>
+            <span class="author-name">Andi Raharjo</span>
+            <span class="author-tier">· Pilar</span>
+            <span class="card-time">15m lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya. Ada pembelian material yang tidak sesuai RAB.</div>
+          <div class="card-more">...selengkapnya</div>
+          <div class="card-media">
+            <div class="media-thumb">📷</div>
+            <div class="media-thumb">📎</div>
+          </div>
+          <div class="card-location">📍 RT 03/04, Kel. Merdeka</div>
+        </div>
+        <div class="card-stepper">
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Rancang</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Periksa</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action"><span class="fa-icon">💬</span><span>0</span></div>
+          <div class="footer-action"><span class="fa-icon">👥</span><span>1</span></div>
+          <span class="ai-badge classified">🤖 92%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 2. BAHAS — tabs: Diskusi | Rangkuman ════════ -->
+  <div id="s-bahas" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Dana pos ronda</div></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab(this, 'bahas-diskusi')">
+        <span class="tab-icon">💬</span> Diskusi
+        <span class="tab-notif"></span>
+      </button>
+      <button class="tab-btn" onclick="showTab(this, 'bahas-rangkuman')">
+        <span class="tab-icon">📋</span> Rangkuman
+      </button>
+    </div>
+    <div class="swipe-hint">‹ geser ›</div>
+
+    <!-- Tab 1: Diskusi (chat) -->
+    <div id="bahas-diskusi" class="tab-panel active" style="position:relative;">
+      <div class="chat-area">
+        <div class="chat-date">Hari ini</div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Andi Raharjo</div>
+          <div class="chat-text">Assalamualaikum warga RT 03. Saya mau sampaikan keresahan soal dana pos ronda. Nota pembelian material yang saya lihat tidak sesuai RAB awal.</div>
+          <div class="chat-time">08:15</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Bu Sari</div>
+          <div class="chat-text">Waalaikumsalam. Saya juga merasa janggal, Pak. Saya kebetulan simpan foto nota pembelian semen kemarin. Harganya beda jauh dari yang tertulis di RAB.</div>
+          <div class="chat-time">08:22</div>
+          <div class="chat-reactions">
+            <span class="chat-react">👍 <span class="react-count">3</span></span>
+          </div>
+        </div>
+
+        <div class="chat-bubble self">
+          <div class="chat-name">Anda</div>
+          <div class="chat-text">Bu Sari bisa share fotonya? Biar kita bisa bandingkan langsung.</div>
+          <div class="chat-time">08:25</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Bu Sari</div>
+          <div class="chat-text">Ini ya 📷 [foto nota semen]</div>
+          <div class="chat-time">08:27</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Mas Rizal</div>
+          <div class="chat-text">Saya kontraktor, bisa bantu cek kewajaran harga material kalau mau. Harga semen di foto ini memang di atas pasar ~30%.</div>
+          <div class="chat-time">08:34</div>
+          <div class="chat-reactions">
+            <span class="chat-react">🙏 <span class="react-count">5</span></span>
+            <span class="chat-react">👍 <span class="react-count">2</span></span>
+          </div>
+        </div>
+
+        <!-- AI-07 inline: summary update -->
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-07 · Ringkasan sementara</div>
+          <div class="ai-chat-text">Dua warga mengkonfirmasi ketidaksesuaian harga. Bu Sari punya bukti foto nota. Mas Rizal menawarkan keahlian sebagai kontraktor untuk audit.</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Dewi W.</div>
+          <div class="chat-text">Menurut saya kita perlu audit sendiri dulu sebelum konfrontasi langsung. Biar ada data kuat.</div>
+          <div class="chat-time">09:01</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Budi</div>
+          <div class="chat-text">Saya setuju audit. Tapi ada baiknya juga undang pengurus untuk klarifikasi langsung biar fair.</div>
+          <div class="chat-time">09:15</div>
+        </div>
+
+        <!-- AI-07 inline: proposal extraction -->
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-07 · 2 usulan terdeteksi</div>
+          <div class="ai-chat-text">1) Audit terbuka — kumpulkan bukti dulu (Dewi, Andi, Bu Sari +6 setuju)<br>2) Minta penjelasan langsung ke pengurus RT (Pak Budi +3 setuju)<br><br>→ Lihat detail & vote di tab 📋 Rangkuman</div>
+        </div>
+
+        <div class="chat-bubble self">
+          <div class="chat-name">Anda</div>
+          <div class="chat-text">Setuju audit dulu. Kalau datanya jelas, pembicaraan dengan pengurus juga lebih produktif.</div>
+          <div class="chat-time">09:22</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Hendra</div>
+          <div class="chat-text">Saya bersedia jadi penanggung jawab kalau warga sepakat. Saya bisa koordinasi pengumpulan data.</div>
+          <div class="chat-time">09:30</div>
+          <div class="chat-reactions">
+            <span class="chat-react">🙏 <span class="react-count">7</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" placeholder="Ketik pesan..." disabled>
+        <button class="chat-send">›</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: Rangkuman (structured) -->
+    <div id="bahas-rangkuman" class="tab-panel">
+      <div class="feed-content">
+        <div class="section-label">AI-07 mengekstrak dari 15 pesan</div>
+
+        <!-- AI-07 summary -->
+        <div class="ai-summary">
+          <div class="ai-summary-header">🤖 AI-07 · Rangkuman 15 pesan</div>
+          <div class="ai-summary-text">
+            Warga sepakat ada ketidaksesuaian dana. Bu Sari punya bukti nota. Mas Rizal (kontraktor) konfirmasi harga di atas pasar ~30%. Dua pendekatan diusulkan. Pak Hendra bersedia jadi PIC.
+          </div>
+        </div>
+
+        <!-- Extracted proposals -->
+        <div class="proposal-card">
+          <div class="proposal-header">📋 Usulan dari diskusi</div>
+          <div class="proposal-item">
+            <div class="proposal-radio selected"></div>
+            <div class="proposal-text"><strong>Audit terbuka</strong> — kumpulkan nota, bandingkan RAB, presentasikan di rapat RT</div>
+            <div class="proposal-votes">9 👍</div>
+          </div>
+          <div class="proposal-item">
+            <div class="proposal-radio"></div>
+            <div class="proposal-text"><strong>Minta penjelasan</strong> — undang pengurus RT untuk klarifikasi langsung</div>
+            <div class="proposal-votes">4 👍</div>
+          </div>
+        </div>
+
+        <!-- Musyawarah fork -->
+        <div class="musyawarah-chip">
+          <span class="mc-icon">🤝</span>
+          <div class="mc-text">
+            Ada perbedaan pendapat? <strong>Buka musyawarah</strong> untuk putuskan bersama
+          </div>
+          <span class="mc-arrow">›</span>
+        </div>
+
+        <!-- Gate -->
+        <button class="gate-btn ready">Lanjut ke Rancang — Audit Terbuka ›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 3. RANCANG — tabs: Papan GR | Koordinasi ════════ -->
+  <div id="s-rancang" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Rancang</div></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab(this, 'rancang-papan')">
+        <span class="tab-icon">📋</span> Papan GR
+      </button>
+      <button class="tab-btn" onclick="showTab(this, 'rancang-chat')">
+        <span class="tab-icon">💬</span> Koordinasi
+        <span class="tab-notif"></span>
+      </button>
+    </div>
+    <div class="swipe-hint">‹ geser ›</div>
+
+    <!-- Tab 1: Papan Gotong Royong -->
+    <div id="rancang-papan" class="tab-panel active">
+      <div class="feed-content">
+        <div class="papan-gr">
+          <div class="papan-header">
+            <span class="ph-icon">📋</span>
+            <span class="ph-title">Papan Gotong Royong</span>
+            <span class="ph-status filling">Mengisi slot</span>
+          </div>
+          <div class="papan-body">
+
+            <!-- PIC -->
+            <div class="pic-row">
+              <div class="pic-avatar">PH</div>
+              <div class="pic-info">
+                <div class="pic-label">Penanggung Jawab (PIC)</div>
+                <div class="pic-name">Pak Hendra · Pilar · RT 03</div>
+              </div>
+              <span class="pic-status">✓ Bersedia</span>
+            </div>
+
+            <!-- Rencana Aksi -->
+            <div class="rencana-section">
+              <div class="rencana-title">
+                📝 Rencana Aksi
+                <span class="ai-draft">Draft AI-07</span>
+              </div>
+              <div class="action-item">
+                <div class="check pending"></div>
+                <div>Kumpulkan nota pembelian material dari Bu Sari</div>
+              </div>
+              <div class="action-item">
+                <div class="check pending"></div>
+                <div>Minta RAB asli dari pengurus RT</div>
+              </div>
+              <div class="action-item">
+                <div class="check pending"></div>
+                <div>Bandingkan harga pasar vs nota pembelian</div>
+              </div>
+              <div class="action-item">
+                <div class="check pending"></div>
+                <div>Presentasikan temuan di rapat RT hari Minggu</div>
+              </div>
+              <div class="action-item">
+                <div class="check pending"></div>
+                <div>Tentukan langkah perbaikan bersama</div>
+              </div>
+            </div>
+
+            <!-- Target Waktu -->
+            <div class="target-waktu">
+              <span class="tw-icon">📅</span>
+              <span class="tw-label">Target selesai</span>
+              <span class="tw-date">Minggu, 16 Feb 2026</span>
+            </div>
+
+            <!-- ═══ DAFTAR KONTRIBUSI ═══ -->
+            <div class="kontribusi-section">
+              <div class="kontribusi-title">🤝 Daftar Kontribusi</div>
+
+              <!-- Tenaga -->
+              <div class="kontribusi-slot filled">
+                <div class="ks-header">
+                  <span class="ks-type-icon">🧑</span>
+                  <span class="ks-type-label">Tenaga — Tim audit (perlu 3)</span>
+                  <span class="ks-count full">3/3 ✓</span>
+                </div>
+                <div class="ks-body">
+                  <div class="ks-person">
+                    <div class="ks-person-avatar">BS</div>
+                    <span class="ks-person-name">Bu Sari</span>
+                    <span class="ks-person-detail">punya nota pembelian</span>
+                    <span class="ks-person-visibility">👁</span>
+                  </div>
+                  <div class="ks-person">
+                    <div class="ks-person-avatar">DW</div>
+                    <span class="ks-person-name">Dewi Wulandari</span>
+                    <span class="ks-person-detail">cek harga pasar</span>
+                    <span class="ks-person-visibility">👁</span>
+                  </div>
+                  <div class="ks-person">
+                    <div class="ks-person-avatar anon">👤</div>
+                    <span class="ks-person-name anon">Anonim</span>
+                    <span class="ks-person-detail">bantu kompilasi data</span>
+                    <span class="ks-person-visibility">👤</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Keahlian -->
+              <div class="kontribusi-slot filled">
+                <div class="ks-header">
+                  <span class="ks-type-icon">🧠</span>
+                  <span class="ks-type-label">Keahlian — Hitung RAB</span>
+                  <span class="ks-count full">1/1 ✓</span>
+                </div>
+                <div class="ks-body">
+                  <div class="ks-person">
+                    <div class="ks-person-avatar" style="background:var(--c-api);">MR</div>
+                    <span class="ks-person-name">Mas Rizal</span>
+                    <span class="ks-person-detail">pengalaman kontraktor</span>
+                    <span class="ks-person-visibility">👁</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Konsumsi (partial) -->
+              <div class="kontribusi-slot partial">
+                <div class="ks-header">
+                  <span class="ks-type-icon">🍱</span>
+                  <span class="ks-type-label">Konsumsi — Rapat Minggu</span>
+                  <span class="ks-count partial">1/2</span>
+                </div>
+                <div class="ks-body">
+                  <div class="ks-person">
+                    <div class="ks-person-avatar anon">👤</div>
+                    <span class="ks-person-name anon">Anonim</span>
+                    <span class="ks-person-detail">kue & teh 10 porsi</span>
+                    <span class="ks-person-visibility">👤</span>
+                  </div>
+                  <div class="ks-empty-slot">
+                    <div class="ks-plus">+</div>
+                    <span class="ks-cta">Saya bisa bantu konsumsi</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dana (Galang sub-widget) -->
+              <div class="kontribusi-slot partial">
+                <div class="ks-header">
+                  <span class="ks-type-icon">💰</span>
+                  <span class="ks-type-label">Dana — Fotokopi & cetak</span>
+                  <span class="ks-count partial">Rp 35rb/50rb</span>
+                </div>
+                <div class="ks-body">
+                  <div class="galang-widget">
+                    <div class="galang-header">
+                      <span class="gh-icon">📊</span>
+                      <span class="gh-label">Galang Dana</span>
+                      <span class="gh-amount">Rp 35.000 / 50.000</span>
+                    </div>
+                    <div class="galang-bar"><div class="gfill" style="width:70%;"></div></div>
+                    <div class="galang-meta">
+                      <span>👤 3 orang berkontribusi</span>
+                      <span>· jumlah per orang tersembunyi</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Readiness -->
+            <div class="readiness">
+              <div class="readiness-title">Kesiapan untuk Garap:</div>
+              <div class="readiness-items">
+                <div class="readiness-item"><div class="ri-check yes">✓</div> PIC sudah ditunjuk</div>
+                <div class="readiness-item"><div class="ri-check yes">✓</div> Rencana aksi sudah ada</div>
+                <div class="readiness-item"><div class="ri-check yes">✓</div> Tim audit terisi (3/3)</div>
+                <div class="readiness-item"><div class="ri-check yes">✓</div> Keahlian RAB terisi (1/1)</div>
+                <div class="readiness-item"><div class="ri-check warn">~</div> Konsumsi masih kurang (1/2)</div>
+                <div class="readiness-item"><div class="ri-check warn">~</div> Dana 70% terkumpul</div>
+              </div>
+            </div>
+
+            <button class="gate-btn ready" style="margin-top:var(--sp-3);">
+              Siap Garap › (PIC memutuskan)
+            </button>
+            <div style="font-size:var(--fs-micro); color:var(--c-pasir); text-align:center; margin-top:var(--sp-1);">
+              Konsumsi & dana belum penuh — PIC bisa tetap lanjut jika dirasa cukup
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Koordinasi (chat) -->
+    <div id="rancang-chat" class="tab-panel" style="position:relative;">
+      <div class="chat-area">
+        <div class="chat-date">Hari ini</div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Hendra (PIC)</div>
+          <div class="chat-text">Terima kasih warga sudah menunjuk saya. Saya sudah lihat draft rencana dari AI. Cukup lengkap, tinggal ditambahkan siapa yang survey harga pasar.</div>
+          <div class="chat-time">10:05</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Dewi W.</div>
+          <div class="chat-text">Saya bisa survey harga ke toko bangunan dekat pasar. Hari Jumat libur jadi bisa sekalian.</div>
+          <div class="chat-time">10:12</div>
+          <div class="chat-reactions">
+            <span class="chat-react">👍 <span class="react-count">3</span></span>
+          </div>
+        </div>
+
+        <div class="chat-bubble self">
+          <div class="chat-name">Anda</div>
+          <div class="chat-text">Kalau butuh fotokopi RAB, saya bisa bantu cetak di kantor.</div>
+          <div class="chat-time">10:18</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Bu Sari</div>
+          <div class="chat-text">Nota semen sudah saya foto, nanti malam saya upload ke sini ya. Ada 4 nota lagi yang perlu dicari di rumah.</div>
+          <div class="chat-time">10:25</div>
+        </div>
+
+        <!-- AI-07 inline -->
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-07 · Update Papan GR</div>
+          <div class="ai-chat-text">Dewi ditambahkan ke slot Tenaga (survey harga). Bu Sari akan upload bukti nota. Rencana aksi diperbarui di tab 📋 Papan GR.</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Hendra (PIC)</div>
+          <div class="chat-text">Btw siapa yang bisa bawa snack buat rapat hari Minggu? Kita perlu makan kecil buat ~10 orang.</div>
+          <div class="chat-time">10:40</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">🍱 Anonim</div>
+          <div class="chat-text">Saya bisa bawa kue dan teh. Nanti saya daftar lewat Papan ya 👤</div>
+          <div class="chat-time">10:45</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" placeholder="Koordinasi tim..." disabled>
+        <button class="chat-send">›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 4. GARAP — tabs: Progres | Koordinasi ════════ -->
+  <div id="s-garap" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Tuntaskan</div></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab(this, 'garap-progres')">
+        <span class="tab-icon">✅</span> Progres
+      </button>
+      <button class="tab-btn" onclick="showTab(this, 'garap-chat')">
+        <span class="tab-icon">💬</span> Koordinasi
+        <span class="tab-notif"></span>
+      </button>
+    </div>
+    <div class="swipe-hint">‹ geser ›</div>
+
+    <!-- Tab 1: Progres -->
+    <div id="garap-progres" class="tab-panel active">
+      <div class="feed-content">
+        <div class="seed-card">
+          <div class="track-strip"></div>
+          <div class="card-header">
+            <div class="card-header-top"><span class="seed-badge">🔧 Keresahan</span></div>
+            <div class="card-title">Dana pembangunan pos ronda tidak transparan</div>
+            <div class="card-author">
+              <div class="author-avatar">AR</div>
+              <span class="author-name">Andi Raharjo</span><span class="author-tier">· Pilar</span>
+              <span class="card-time">2h lalu</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="pic-row">
+              <div class="pic-avatar">PH</div>
+              <div class="pic-info">
+                <div class="pic-label">PIC — Penanggung Jawab</div>
+                <div class="pic-name">Pak Hendra · Pilar</div>
+              </div>
+            </div>
+
+            <div class="rencana-section" style="margin-top:var(--sp-3);">
+              <div class="rencana-title">📋 Progres Rencana Aksi</div>
+              <div class="action-item is-done">
+                <div class="check done">✓</div>
+                <div>Kumpulkan nota pembelian material</div>
+              </div>
+              <div class="action-item is-done">
+                <div class="check done">✓</div>
+                <div>Minta RAB asli dari pengurus RT</div>
+              </div>
+              <div class="action-item">
+                <div class="check active">●</div>
+                <div><strong>Bandingkan harga pasar vs nota</strong></div>
+              </div>
+              <div class="action-item">
+                <div class="check pending"></div>
+                <div>Presentasikan temuan di rapat RT</div>
+              </div>
+              <div class="action-item">
+                <div class="check pending"></div>
+                <div>Tentukan langkah perbaikan bersama</div>
+              </div>
+            </div>
+          </div>
+          <div class="card-stepper">
+            <div class="step done"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+            <div class="step-connector done"></div>
+            <div class="step done"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+            <div class="step-connector done"></div>
+            <div class="step done"><div class="step-dot"></div><div class="step-label">Rancang</div></div>
+            <div class="step-connector done"></div>
+            <div class="step current"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+            <div class="step-connector future"></div>
+            <div class="step future"><div class="step-dot"></div><div class="step-label">Periksa</div></div>
+            <div class="step-connector future"></div>
+            <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+          </div>
+          <div class="card-footer">
+            <div class="footer-action"><span class="fa-icon">💬</span><span>21</span></div>
+            <div class="footer-action"><span class="fa-icon">👥</span><span>11</span></div>
+            <div class="footer-action"><span class="fa-icon">⏱</span><span>1h</span></div>
+            <span class="ai-badge classified">🤖 92%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Koordinasi (chat) -->
+    <div id="garap-chat" class="tab-panel" style="position:relative;">
+      <div class="chat-area">
+        <div class="chat-date">Jumat, 14 Feb</div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Bu Sari</div>
+          <div class="chat-text">Nota sudah saya kumpulkan semua, total 7 nota pembelian. Saya foto dan upload di sini ✅</div>
+          <div class="chat-time">14:20</div>
+          <div class="chat-reactions">
+            <span class="chat-react">👍 <span class="react-count">4</span></span>
+          </div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Hendra (PIC)</div>
+          <div class="chat-text">Mantap Bu Sari! RAB asli juga sudah saya dapat dari Pak Lurah. Langkah 1 dan 2 selesai ✅</div>
+          <div class="chat-time">15:02</div>
+        </div>
+
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-07 · Progres diperbarui</div>
+          <div class="ai-chat-text">2 item checklist diselesaikan. Item 3 (bandingkan harga) sekarang aktif. Lihat di tab ✅ Progres.</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Dewi W.</div>
+          <div class="chat-text">Saya sudah survey 3 toko bangunan hari ini. Harga rata-rata semen 50-55rb/sak. Di nota tertulis 72rb. Selisih lumayan 😬</div>
+          <div class="chat-time">16:30</div>
+          <div class="chat-reactions">
+            <span class="chat-react">😱 <span class="react-count">3</span></span>
+          </div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Mas Rizal</div>
+          <div class="chat-text">Saya sudah compile spreadsheet perbandingan. Total selisih yang saya hitung: Rp 1,2 juta dari 7 item pembelian.</div>
+          <div class="chat-time">18:15</div>
+        </div>
+
+        <div class="chat-bubble self">
+          <div class="chat-name">Anda</div>
+          <div class="chat-text">Dokumen fotokopi sudah saya cetak. Besok saya antar ke Pak Hendra sebelum rapat.</div>
+          <div class="chat-time">19:00</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" placeholder="Update progres..." disabled>
+        <button class="chat-send">›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 5. PERIKSA — tabs: Laporan | Tanggapan ════════ -->
+  <div id="s-periksa" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Tuntaskan</div></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab(this, 'periksa-laporan')">
+        <span class="tab-icon">📊</span> Laporan
+      </button>
+      <button class="tab-btn" onclick="showTab(this, 'periksa-chat')">
+        <span class="tab-icon">💬</span> Tanggapan
+        <span class="tab-notif"></span>
+      </button>
+    </div>
+    <div class="swipe-hint">‹ geser ›</div>
+
+    <!-- Tab 1: Laporan -->
+    <div id="periksa-laporan" class="tab-panel active">
+      <div class="feed-content">
+        <div class="seed-card">
+          <div class="track-strip"></div>
+          <div class="card-header">
+            <div class="card-header-top"><span class="seed-badge">🔧 Keresahan</span></div>
+            <div class="card-title">Dana pembangunan pos ronda tidak transparan</div>
+            <div class="card-author">
+              <div class="author-avatar">AR</div>
+              <span class="author-name">Andi Raharjo</span><span class="author-tier">· Pilar</span>
+              <span class="card-time">5h lalu</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="ai-summary" style="border-left-color:var(--c-berhasil);">
+              <div class="ai-summary-header" style="color:var(--c-berhasil);">📋 Laporan PIC</div>
+              <div class="ai-summary-text" style="font-style:normal;">
+                Temuan: selisih harga material Rp 1,2 juta. Pengurus RT sudah mengembalikan selisih ke kas. RAB diperbaiki dan dipublikasikan. Pengawasan pembelian berikutnya melibatkan 2 warga.
+              </div>
+            </div>
+
+            <div class="verify-section">
+              <div class="verify-header">✓ Verifikasi Komunitas</div>
+              <div class="verify-question">Apakah masalah ini sudah teratasi dengan baik?</div>
+              <div class="verify-votes">
+                <button class="verify-vote yes">👍 Sudah (7)</button>
+                <button class="verify-vote no">👎 Belum (1)</button>
+              </div>
+              <div class="verify-progress">
+                <div class="verify-bar"><div class="fill" style="width:87.5%;"></div></div>
+                <span class="verify-count">87%</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-stepper">
+            <div class="step done"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+            <div class="step-connector done"></div>
+            <div class="step done"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+            <div class="step-connector done"></div>
+            <div class="step done"><div class="step-dot"></div><div class="step-label">Rancang</div></div>
+            <div class="step-connector done"></div>
+            <div class="step done"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+            <div class="step-connector done"></div>
+            <div class="step current"><div class="step-dot"></div><div class="step-label">Periksa</div></div>
+            <div class="step-connector future"></div>
+            <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+          </div>
+          <div class="card-footer">
+            <div class="footer-action"><span class="fa-icon">💬</span><span>28</span></div>
+            <div class="footer-action"><span class="fa-icon">🗳</span><span>8</span></div>
+            <span class="ai-badge resolve">🤖 AI-05 ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Tanggapan (chat) -->
+    <div id="periksa-chat" class="tab-panel" style="position:relative;">
+      <div class="chat-area">
+        <div class="chat-date">Minggu, 16 Feb</div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Hendra (PIC)</div>
+          <div class="chat-text">Warga, rapat tadi berjalan baik. Pengurus mengakui ada kelalaian dan sudah kembalikan selisih Rp 1,2 juta ke kas. RAB baru sudah ditandatangani.</div>
+          <div class="chat-time">13:00</div>
+          <div class="chat-reactions">
+            <span class="chat-react">🎉 <span class="react-count">6</span></span>
+            <span class="chat-react">🙏 <span class="react-count">8</span></span>
+          </div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Bu Sari</div>
+          <div class="chat-text">Alhamdulillah! Prosesnya fair dan tidak ada yang merasa dipermalukan. Bagus sekali hasilnya.</div>
+          <div class="chat-time">13:08</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="chat-name">Pak Budi</div>
+          <div class="chat-text">Saya awalnya usulkan klarifikasi langsung, tapi ternyata audit dulu memang langkah yang tepat. Data bicara sendiri 👍</div>
+          <div class="chat-time">13:15</div>
+        </div>
+
+        <div class="chat-bubble self">
+          <div class="chat-name">Anda</div>
+          <div class="chat-text">Terima kasih semua yang terlibat. Ini bukti gotong royong kerja nyata! Saya vote Sudah ✅</div>
+          <div class="chat-time">13:22</div>
+        </div>
+
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">🤖 AI-05 · Verifikasi</div>
+          <div class="ai-chat-text">87% komunitas memverifikasi penyelesaian. Threshold tercapai. Kartu siap ditandai Tuntas oleh PIC.</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" placeholder="Tanggapan Anda..." disabled>
+        <button class="chat-send">›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 6. TUNTAS — no tabs (closed state, archival) ════════ -->
+  <div id="s-tuntas" class="scenario">
+    <div class="app-bar"><button class="back-btn">‹</button><div class="title">Tuntaskan</div></div>
+    <div class="feed-content">
+      <div class="section-label">Selesai — masalah terselesaikan</div>
+      <div class="seed-card" style="border-color:rgba(46,125,50,0.3);">
+        <div class="track-strip" style="background:var(--c-berhasil);"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge" style="background:var(--c-berhasil-l); color:var(--c-berhasil);">✓ Tuntas</span>
+          </div>
+          <div class="card-title">Dana pembangunan pos ronda tidak transparan</div>
+          <div class="card-author">
+            <div class="author-avatar">AR</div>
+            <span class="author-name">Andi Raharjo</span><span class="author-tier">· Pilar</span>
+            <span class="card-time">5h lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="resolution-card">
+            <div class="resolution-header">✓ Resolusi</div>
+            <div class="resolution-text">
+              Selisih Rp 1,2 juta dikembalikan ke kas RT. RAB dipublikasikan terbuka. Kebijakan baru: pembelian material harus melibatkan minimal 2 warga pengawas.
+            </div>
+            <div class="resolution-meta">
+              <span>⏱ 5 hari</span>
+              <span>👥 14 terlibat</span>
+              <span>🤝 6 kontributor</span>
+            </div>
+          </div>
+          <div class="dampak-row">
+            <span class="dampak-icon">🌱</span>
+            <div class="dampak-text">Dampak: transparansi keuangan RT meningkat, kebijakan pengawasan baru</div>
+          </div>
+          <div class="satisfaction-row">
+            <span>Kepuasan pelapor:</span>
+            <span class="satisfaction-stars">⭐⭐⭐⭐⭐</span>
+            <span style="font-size:var(--fs-micro); color:var(--c-berhasil); font-weight:var(--fw-bold);">Sangat Puas</span>
+          </div>
+        </div>
+        <div class="card-stepper">
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+          <div class="step-connector done"></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector done"></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Rancang</div></div>
+          <div class="step-connector done"></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+          <div class="step-connector done"></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Periksa</div></div>
+          <div class="step-connector done"></div>
+          <div class="step complete"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action"><span class="fa-icon">💬</span><span>28</span></div>
+          <div class="footer-action"><span class="fa-icon">👥</span><span>14</span></div>
+          <span class="ai-badge dampak">🌱 Dampak Terukur</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showScenario(id) {
+  document.querySelectorAll('.scenario').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function showTab(btn, panelId) {
+  const scenario = btn.closest('.scenario');
+  scenario.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  scenario.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(panelId).classList.add('active');
+}
+</script>
+
+</body>
+</html>

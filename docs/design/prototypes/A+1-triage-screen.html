@@ -1,0 +1,1017 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — A+1 · Entry Page Flow (v4 — Context Bar)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --fs-h2:20px; --fs-h3:16px; --fs-body:14px; --fs-small:12px;
+    --fs-caption:11px; --fs-micro:9px;
+    --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-6:24px; --sp-8:32px;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+    --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+    --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+    --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+    --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63;
+    --c-pasir:#A1887F; --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+    --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+    --c-berhasil:#2E7D32; --c-berhasil-l:#E8F5E9;
+    --c-peringatan:#E65100; --c-peringatan-l:#FFF3E0;
+    --c-bahaya:#C62828; --c-bahaya-l:#FFEBEE;
+    --c-tuntaskan:#C05621; --c-wujudkan:#2E7D32; --c-telusuri:#6A1B9A;
+    --c-rayakan:#F57F17; --c-musyawarah:#4E342E;
+    --c-vault:#263238; --c-vault-surface:#37474F;
+    --c-siaga:#B71C1C; --c-siaga-accent:#D32F2F;
+  }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: #e8e0d8; color: var(--c-tanah-gelap);
+    min-height: 100vh;
+  }
+
+  /* ── Design doc header ── */
+  .doc-bar {
+    background: var(--c-tanah-gelap); color: #fff;
+    padding: 16px 24px; text-align: center;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .doc-bar h1 { font-size: 15px; font-weight: 700; }
+  .doc-bar p { font-size: 11px; opacity: 0.5; margin-top: 2px; }
+
+  /* ── Scenario switcher ── */
+  .scenario-nav {
+    background: var(--c-tanah-gelap);
+    display: flex; justify-content: center; flex-wrap: wrap;
+    padding-bottom: 0; position: sticky; top: 52px; z-index: 99;
+  }
+  .scenario-btn {
+    padding: 8px 10px; font-size: 9px; font-weight: 700;
+    cursor: pointer; border: none; background: transparent;
+    color: #777; border-bottom: 2px solid transparent;
+    transition: all 0.2s; font-family: 'Nunito', sans-serif;
+  }
+  .scenario-btn:hover { color: #bbb; }
+  .scenario-btn.active { color: #fff; border-bottom-color: var(--c-api); }
+  .scenario-label {
+    width: 100%; text-align: center; padding: 6px;
+    font-size: 10px; color: #666; background: #2a1f1b;
+  }
+
+  /* ═══════════════════════════
+     PHONE FRAME
+     ═══════════════════════════ */
+  .phone-frame {
+    width: 375px; margin: 24px auto;
+    background: var(--c-kapas);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05);
+    height: 760px;
+    display: flex; flex-direction: column;
+  }
+
+  /* ── App Top Bar ── */
+  .app-bar {
+    background: var(--c-susu);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--c-batu);
+    flex-shrink: 0;
+  }
+  .app-bar .back-btn {
+    width: 32px; height: 32px; border-radius: var(--r-full);
+    background: var(--c-kapas); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: var(--c-kayu);
+  }
+  .app-bar .title {
+    font-size: var(--fs-h3); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+  }
+
+  /* ═══════════════════════════
+     CHAT AREA
+     ═══════════════════════════ */
+  .chat-area {
+    flex: 1; overflow-y: auto;
+    padding: var(--sp-4) var(--sp-3);
+    display: flex; flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .bubble-row {
+    display: flex; gap: 8px;
+    max-width: 92%;
+    animation: bubbleIn 0.25s ease-out;
+  }
+  @keyframes bubbleIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .bubble-row.ai { align-self: flex-start; }
+  .bubble-row.user { align-self: flex-end; flex-direction: row-reverse; }
+
+  .bubble-avatar {
+    width: 28px; height: 28px; border-radius: var(--r-full);
+    flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 12px; margin-top: 2px;
+  }
+  .bubble-row.ai .bubble-avatar {
+    background: linear-gradient(135deg, var(--c-api-terang), var(--c-api));
+    color: #fff; font-weight: 800;
+  }
+  .bubble-row.user .bubble-avatar {
+    background: var(--c-batu); color: var(--c-kayu); font-weight: 700;
+  }
+
+  .bubble {
+    padding: var(--sp-3) var(--sp-4);
+    font-size: var(--fs-body); line-height: 1.55;
+    border-radius: var(--r-lg); position: relative;
+  }
+  .bubble-row.ai .bubble {
+    background: var(--c-susu); color: var(--c-tanah-gelap);
+    border-bottom-left-radius: var(--r-sm);
+    box-shadow: var(--shadow-sm);
+  }
+  .bubble-row.user .bubble {
+    background: var(--c-tanah); color: var(--c-susu);
+    border-bottom-right-radius: var(--r-sm);
+  }
+
+  .bubble .typing-dots { display: inline-flex; gap: 3px; padding: 2px 0; }
+  .bubble .typing-dots span {
+    width: 7px; height: 7px; border-radius: var(--r-full);
+    background: var(--c-api);
+    animation: dot-bounce 1.2s ease-in-out infinite;
+  }
+  .bubble .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .bubble .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-bounce {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  .quick-replies {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--sp-2);
+  }
+  .qr-chip {
+    font-family: 'Nunito', sans-serif;
+    background: var(--c-kapas); border: 1.5px solid var(--c-batu);
+    border-radius: var(--r-full); padding: 5px 14px;
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-tanah); cursor: pointer; transition: all 0.15s;
+  }
+  .qr-chip:hover { background: var(--c-bara); border-color: var(--c-api); color: var(--c-api); }
+
+  .chat-spacer { flex: 1; }
+
+  /* ═══════════════════════════════════════
+     CONTEXT BAR — the morphing strip
+     above keyboard, fed by AI XML metadata
+     ═══════════════════════════════════════ */
+  .ctx-bar {
+    flex-shrink: 0;
+    border-top: 1px solid var(--c-batu);
+    background: var(--c-susu);
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+
+  /* ── State: Listening (idle / no signal) ── */
+  .ctx-bar.listening {
+    padding: var(--sp-2) var(--sp-4);
+  }
+  .ctx-listening-inner {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ctx-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--fs-caption); color: var(--c-pasir); font-weight: var(--fw-semi);
+  }
+  .ctx-status .pulse {
+    width: 6px; height: 6px; border-radius: var(--r-full);
+    background: var(--c-pasir);
+    animation: gentle-pulse 2s ease-in-out infinite;
+  }
+  @keyframes gentle-pulse {
+    0%, 100% { opacity: 0.4; } 50% { opacity: 1; }
+  }
+  .ctx-skip-btn {
+    font-family: 'Nunito', sans-serif;
+    background: transparent; border: 1.5px solid var(--c-batu);
+    border-radius: var(--r-full); padding: 4px 12px;
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    color: var(--c-pasir); cursor: pointer; transition: all 0.15s;
+  }
+  .ctx-skip-btn:hover { border-color: var(--c-kayu); color: var(--c-kayu); }
+
+  /* ── State: Probing (some signal, needs more) ── */
+  .ctx-bar.probing {
+    padding: var(--sp-2) var(--sp-4);
+  }
+  .ctx-probing-inner {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ctx-signal-bar {
+    flex: 1; height: 3px; background: var(--c-batu);
+    border-radius: var(--r-full); overflow: hidden;
+  }
+  .ctx-signal-bar .fill {
+    height: 100%; border-radius: var(--r-full);
+    background: var(--c-api); transition: width 0.5s ease;
+  }
+  .ctx-probing-label {
+    font-size: var(--fs-micro); color: var(--c-pasir); font-weight: var(--fw-bold);
+    white-space: nowrap;
+  }
+
+  /* ── State: Leaning (medium confidence, tappable hint) ── */
+  .ctx-bar.leaning {
+    padding: var(--sp-2) var(--sp-3);
+  }
+  .ctx-leaning-inner {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ctx-hint-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--c-bara); border: 1.5px solid var(--c-api);
+    border-radius: var(--r-full); padding: 6px 14px;
+    cursor: pointer; transition: all 0.15s; flex: 1;
+  }
+  .ctx-hint-pill:hover { background: #ffe8d0; box-shadow: var(--shadow-sm); }
+  .ctx-hint-pill .badge-dot {
+    width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0;
+  }
+  .ctx-hint-pill .hint-track {
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-tanah-gelap);
+  }
+  .ctx-hint-pill .hint-conf {
+    font-size: var(--fs-micro); color: var(--c-pasir); font-weight: var(--fw-bold);
+    margin-left: auto;
+  }
+  .ctx-hint-pill .hint-arrow {
+    font-size: 10px; color: var(--c-api); font-weight: 800;
+  }
+  .ctx-other-btn {
+    font-family: 'Nunito', sans-serif;
+    background: transparent; border: 1.5px solid var(--c-batu);
+    border-radius: var(--r-full); padding: 6px 10px;
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    color: var(--c-pasir); cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .ctx-other-btn:hover { border-color: var(--c-kayu); color: var(--c-kayu); }
+
+  /* ── State: Ready (high confidence, expanded card) ── */
+  .ctx-bar.ready {
+    padding: var(--sp-3) var(--sp-3);
+    background: var(--c-susu);
+    border-top: 2px solid var(--c-api);
+  }
+  .ctx-ready-header {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: var(--sp-2);
+  }
+  .ctx-ready-header .ai-dot {
+    width: 18px; height: 18px; border-radius: var(--r-full);
+    background: linear-gradient(135deg, var(--c-api-terang), var(--c-api));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: #fff; font-weight: 800;
+  }
+  .ctx-ready-header .ready-label {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--c-tanah-gelap);
+  }
+
+  .ctx-route-main {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--c-bara); border: 1.5px solid var(--c-api);
+    border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
+    cursor: pointer; transition: all 0.15s;
+    margin-bottom: var(--sp-2);
+  }
+  .ctx-route-main:hover { box-shadow: var(--shadow-md); background: #ffe0c0; }
+  .ctx-route-main .badge-sm {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: var(--fs-micro); font-weight: 800; padding: 3px 8px;
+    border-radius: var(--r-sm); color: #fff; text-transform: uppercase;
+    letter-spacing: 0.5px; flex-shrink: 0;
+  }
+  .ctx-route-main .route-info { flex: 1; min-width: 0; }
+  .ctx-route-main .route-title {
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap);
+  }
+  .ctx-route-main .route-sub {
+    font-size: var(--fs-micro); color: var(--c-kayu); margin-top: 1px;
+  }
+  .ctx-route-main .conf-pct {
+    font-size: var(--fs-caption); font-weight: var(--fw-extra);
+    color: var(--c-api); flex-shrink: 0;
+  }
+
+  .ctx-route-alt {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--c-kapas); border: 1px solid var(--c-batu);
+    border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3);
+    cursor: pointer; transition: all 0.15s;
+    font-size: var(--fs-caption); color: var(--c-kayu);
+    margin-bottom: var(--sp-2);
+  }
+  .ctx-route-alt:hover { border-color: var(--c-kayu); background: var(--c-batu); }
+  .ctx-route-alt .alt-badge {
+    font-size: 8px; font-weight: 800; padding: 2px 6px;
+    border-radius: var(--r-sm); color: #fff; text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .ctx-route-alt .alt-name { font-weight: var(--fw-bold); flex: 1; }
+  .ctx-route-alt .alt-pct { font-size: var(--fs-micro); color: var(--c-pasir); }
+
+  .ctx-actions {
+    display: flex; gap: 6px;
+  }
+  .ctx-actions .btn {
+    font-family: 'Nunito', sans-serif; border: none; cursor: pointer;
+    font-weight: var(--fw-bold); border-radius: var(--r-md);
+    font-size: var(--fs-caption); padding: 9px 14px;
+    transition: all 0.15s;
+  }
+  .btn-confirm { background: var(--c-api); color: #fff; flex: 1; }
+  .btn-confirm:hover { background: var(--c-api-terang); }
+  .btn-change { background: var(--c-kapas); color: var(--c-tanah); border: 1px solid var(--c-batu) !important; }
+  .btn-change:hover { background: var(--c-batu); }
+
+  /* ── State: Vault-tinted ── */
+  .ctx-bar.vault-ready {
+    padding: var(--sp-3) var(--sp-3);
+    background: #ECEFF1;
+    border-top: 2px solid #546E7A;
+  }
+  .ctx-bar.vault-ready .ctx-ready-header .ai-dot {
+    background: linear-gradient(135deg, #546E7A, var(--c-vault));
+  }
+  .ctx-bar.vault-ready .ctx-route-main {
+    background: #CFD8DC; border-color: #78909C;
+  }
+  .ctx-bar.vault-ready .ctx-route-main:hover { background: #B0BEC5; }
+  .ctx-bar.vault-ready .ctx-route-main .route-title { color: var(--c-vault); }
+  .ctx-bar.vault-ready .ctx-route-main .conf-pct { color: #546E7A; }
+  .btn-vault { background: var(--c-vault); color: #B0BEC5; flex: 1; }
+  .btn-vault:hover { background: #37474F; }
+
+  /* ── State: Siaga-tinted ── */
+  .ctx-bar.siaga-ready {
+    padding: var(--sp-3) var(--sp-3);
+    background: var(--c-bahaya-l);
+    border-top: 2px solid var(--c-siaga);
+    animation: siaga-pulse 1.5s ease-in-out 3;
+  }
+  @keyframes siaga-pulse {
+    0%, 100% { background: var(--c-bahaya-l); }
+    50% { background: #FFCDD2; }
+  }
+  .ctx-bar.siaga-ready .ctx-ready-header .ai-dot {
+    background: linear-gradient(135deg, var(--c-siaga-accent), var(--c-siaga));
+  }
+  .ctx-bar.siaga-ready .ctx-route-main {
+    background: #FFCDD2; border-color: #EF9A9A;
+  }
+  .ctx-bar.siaga-ready .ctx-route-main:hover { background: #ef9a9a; }
+  .ctx-bar.siaga-ready .ctx-route-main .conf-pct { color: var(--c-siaga); }
+  .btn-siaga { background: var(--c-siaga); color: #fff; flex: 1; }
+  .btn-siaga:hover { background: #d32f2f; }
+  .ctx-emergency-extras {
+    display: flex; gap: var(--sp-2); margin-bottom: var(--sp-2);
+    font-size: var(--fs-caption); color: var(--c-kayu);
+  }
+  .ctx-emergency-extras a { color: var(--c-siaga); font-weight: var(--fw-bold); text-decoration: none; }
+
+  /* ── State: Split ── */
+  .ctx-bar.split-ready {
+    padding: var(--sp-3) var(--sp-3);
+    background: var(--c-susu);
+    border-top: 2px solid var(--c-peringatan);
+  }
+  .ctx-split-items { display: flex; flex-direction: column; gap: var(--sp-1); margin-bottom: var(--sp-2); }
+  .ctx-split-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--c-kapas); border: 1px solid var(--c-batu);
+    border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-caption);
+  }
+  .ctx-split-item .split-badge {
+    font-size: 8px; font-weight: 800; padding: 2px 6px;
+    border-radius: var(--r-sm); color: #fff; text-transform: uppercase; flex-shrink: 0;
+  }
+  .ctx-split-item .split-title { font-weight: var(--fw-bold); color: var(--c-tanah-gelap); flex: 1; }
+  .ctx-split-sep {
+    text-align: center; font-size: 8px; font-weight: 800;
+    color: var(--c-pasir); text-transform: uppercase; letter-spacing: 1px;
+    padding: 0 var(--sp-2);
+  }
+  .ctx-warn {
+    background: var(--c-peringatan-l); border-left: 3px solid var(--c-peringatan);
+    padding: var(--sp-2) var(--sp-3); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    font-size: var(--fs-micro); color: var(--c-peringatan);
+    line-height: 1.4; font-weight: var(--fw-semi);
+    margin-bottom: var(--sp-2);
+  }
+
+  /* ── State: Manual grid ── */
+  .ctx-bar.manual {
+    padding: var(--sp-3) var(--sp-3);
+    background: var(--c-susu);
+    border-top: 1px solid var(--c-batu);
+  }
+  .ctx-manual-label {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-kayu); margin-bottom: var(--sp-2);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .manual-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
+  }
+  .manual-opt {
+    background: var(--c-kapas); border: 1.5px solid var(--c-batu);
+    border-radius: var(--r-md); padding: var(--sp-2);
+    cursor: pointer; transition: all 0.15s; text-align: center;
+  }
+  .manual-opt:hover { border-color: var(--c-api); background: var(--c-bara); }
+  .manual-opt .mo-icon { font-size: 18px; margin-bottom: 1px; }
+  .manual-opt .mo-name { font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--c-tanah-gelap); }
+  .manual-opt .mo-seed { font-size: 8px; color: var(--c-pasir); margin-top: 1px; }
+
+  /* ═══════════════════════════
+     CHAT INPUT BAR
+     ═══════════════════════════ */
+  .chat-input-bar {
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--c-susu);
+    flex-shrink: 0;
+  }
+  .chat-input-tools {
+    display: flex; gap: 6px; padding-bottom: 6px;
+    font-size: 16px; color: var(--c-pasir);
+  }
+  .chat-input-tools span { cursor: pointer; }
+  .chat-input-tools span:hover { color: var(--c-kayu); }
+  .chat-input-field {
+    flex: 1; border: 1.5px solid var(--c-batu); border-radius: var(--r-lg);
+    padding: 10px 14px; font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-body); background: var(--c-kapas);
+    color: var(--c-tanah-gelap); outline: none;
+    min-height: 40px; max-height: 100px; resize: none; line-height: 1.4;
+  }
+  .chat-input-field::placeholder { color: var(--c-pasir); }
+  .chat-input-field:focus { border-color: var(--c-api); background: var(--c-susu); }
+  .send-btn {
+    width: 40px; height: 40px; border-radius: var(--r-full);
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all 0.15s; flex-shrink: 0;
+  }
+  .send-btn.active { background: var(--c-api); color: #fff; }
+  .send-btn.idle { background: var(--c-batu); color: var(--c-pasir); cursor: default; }
+
+  /* ── Scenarios ── */
+  .scenario { display: none; flex-direction: column; height: 100%; }
+  .scenario.active { display: flex; }
+
+  /* ── Design annotation ── */
+  .xml-note {
+    margin: 4px var(--sp-3) 0;
+    font-size: 9px; font-family: 'Courier New', monospace;
+    color: var(--c-pasir); background: var(--c-kapas);
+    padding: 3px 8px; border-radius: var(--r-sm);
+    border-left: 2px solid var(--c-batu);
+    opacity: 0.7;
+  }
+
+  @media (max-width: 420px) {
+    .phone-frame { width: 100%; border-radius: 0; margin: 0; height: 100vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-bar">
+  <h1>A+1 · Entry Page — Bagikan Flow (v4)</h1>
+  <p>Context bar above keyboard morphs via AI XML metadata. One continuous chat.</p>
+</div>
+
+<nav class="scenario-nav">
+  <button class="scenario-btn active" onclick="showScenario('greet')">1. Sapaan</button>
+  <button class="scenario-btn" onclick="showScenario('probing')">2. Probing</button>
+  <button class="scenario-btn" onclick="showScenario('leaning')">3. Leaning</button>
+  <button class="scenario-btn" onclick="showScenario('komunitas')">4a. Komunitas</button>
+  <button class="scenario-btn" onclick="showScenario('sensitif')">4b. Sensitif</button>
+  <button class="scenario-btn" onclick="showScenario('darurat')">4c. Darurat</button>
+  <button class="scenario-btn" onclick="showScenario('split')">4d. Split</button>
+  <button class="scenario-btn" onclick="showScenario('rendah')">4e. Manual</button>
+  <button class="scenario-btn" onclick="showScenario('skip')">Skip</button>
+  <div class="scenario-label">← Design review states. Real user sees one chat + morphing context bar.</div>
+</nav>
+
+<!-- ═══════════════════════════
+     THE PHONE
+     ═══════════════════════════ -->
+<div class="phone-frame">
+
+  <div class="app-bar">
+    <button class="back-btn">‹</button>
+    <div class="title">Bagikan</div>
+  </div>
+
+  <!-- ════════ 1. SAPAAN — listening state ════════ -->
+  <div id="s-greet" class="scenario active">
+    <div class="chat-area">
+      <div class="chat-spacer"></div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div>
+          <div class="bubble">Halo! Apa yang Anda saksikan hari ini? Ceritakan saja, saya bantu arahkan.</div>
+          <div style="font-size:var(--fs-micro); color:var(--c-pasir); margin-top:3px; margin-left:4px;">AI-00 · baru saja</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTEXT BAR: Listening -->
+    <div class="ctx-bar listening">
+      <div class="ctx-listening-inner">
+        <div class="ctx-status"><div class="pulse"></div> Mendengarkan...</div>
+        <button class="ctx-skip-btn">Pilih sendiri ›</button>
+      </div>
+    </div>
+    <div class="xml-note">&lt;triage status="listening" /&gt;</div>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools"><span>📷</span><span>📍</span></div>
+      <textarea class="chat-input-field" rows="1" placeholder="Ketik cerita Anda..."></textarea>
+      <div class="send-btn idle">➤</div>
+    </div>
+  </div>
+
+  <!-- ════════ 2. PROBING — some signal, needs more ════════ -->
+  <div id="s-probing" class="scenario">
+    <div class="chat-area">
+      <div class="chat-spacer"></div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Halo! Apa yang Anda saksikan hari ini?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Jalan depan rumah pak RT rusak parah. Sudah tiga minggu, motor dan becak sering jatuh.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div>
+          <div class="bubble">
+            Wah, ini sudah lama ya. Apakah sudah pernah dilaporkan ke kelurahan?
+            <div class="quick-replies">
+              <span class="qr-chip">Belum pernah</span>
+              <span class="qr-chip">Sudah, belum ditanggapi</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTEXT BAR: Probing (signal building) -->
+    <div class="ctx-bar probing">
+      <div class="ctx-probing-inner">
+        <div class="ctx-status"><div class="pulse" style="background:var(--c-api);"></div></div>
+        <div class="ctx-signal-bar"><div class="fill" style="width:35%;"></div></div>
+        <div class="ctx-probing-label">Perlu info lebih</div>
+        <button class="ctx-skip-btn">Pilih sendiri ›</button>
+      </div>
+    </div>
+    <div class="xml-note">&lt;triage status="probing" confidence="0.35" needs="prior_report" /&gt;</div>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools"><span>📷</span><span>📍</span></div>
+      <textarea class="chat-input-field" rows="1" placeholder="Ketik cerita Anda..."></textarea>
+      <div class="send-btn active">➤</div>
+    </div>
+  </div>
+
+  <!-- ════════ 3. LEANING — medium confidence, tappable hint ════════ -->
+  <div id="s-leaning" class="scenario">
+    <div class="chat-area">
+      <div class="chat-spacer"></div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Halo! Apa yang Anda saksikan hari ini?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Jalan depan rumah pak RT rusak parah. Sudah tiga minggu, motor dan becak sering jatuh.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Apakah sudah pernah dilaporkan ke kelurahan?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Sudah pak RT bilang ke kelurahan, tapi ga ada respons.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Saya paham. Satu lagi — apakah warga lain juga terdampak atau ini lebih ke arah rumah Anda saja?</div></div>
+      </div>
+    </div>
+
+    <!-- CONTEXT BAR: Leaning (tappable suggestion pill) -->
+    <div class="ctx-bar leaning">
+      <div class="ctx-leaning-inner">
+        <div class="ctx-hint-pill">
+          <div class="badge-dot" style="background:var(--c-tuntaskan);"></div>
+          <span class="hint-track">Mungkin: Tuntaskan</span>
+          <span class="hint-conf">62%</span>
+          <span class="hint-arrow">→</span>
+        </div>
+        <button class="ctx-other-btn">Lainnya</button>
+      </div>
+    </div>
+    <div class="xml-note">&lt;triage status="leaning" track="tuntaskan" confidence="0.62" /&gt;</div>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools"><span>📷</span><span>📍</span></div>
+      <textarea class="chat-input-field" rows="1" placeholder="Ketik cerita Anda..."></textarea>
+      <div class="send-btn active">➤</div>
+    </div>
+  </div>
+
+  <!-- ════════ 4a. KOMUNITAS — high confidence, full card ════════ -->
+  <div id="s-komunitas" class="scenario">
+    <div class="chat-area">
+      <div class="chat-spacer"></div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Halo! Apa yang Anda saksikan hari ini?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Jalan depan rumah pak RT rusak parah. Sudah tiga minggu, motor dan becak sering jatuh.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Apakah sudah pernah dilaporkan?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Sudah, tapi ga ada respons.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Apakah warga lain juga terdampak?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Iya, banyak. Hampir semua motor yang lewat situ kena.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Baik, saya sudah cukup paham. Lihat saran saya di bawah 👇</div></div>
+      </div>
+    </div>
+
+    <!-- CONTEXT BAR: Ready — Komunitas/Tuntaskan -->
+    <div class="ctx-bar ready">
+      <div class="ctx-ready-header">
+        <div class="ai-dot">✦</div>
+        <div class="ready-label">Saran AI-00</div>
+      </div>
+      <div class="ctx-route-main">
+        <span class="badge-sm" style="background:var(--c-tuntaskan);">Tuntaskan</span>
+        <div class="route-info">
+          <div class="route-title">Keresahan — infrastruktur</div>
+          <div class="route-sub">Galang dukungan warga untuk perbaikan jalan</div>
+        </div>
+        <span class="conf-pct">87%</span>
+      </div>
+      <div class="ctx-route-alt">
+        <span class="alt-badge" style="background:var(--c-musyawarah);">M</span>
+        <span class="alt-name">Musyawarah</span>
+        <span class="alt-pct">11%</span>
+      </div>
+      <div class="ctx-actions">
+        <button class="btn btn-confirm">Setuju — Tuntaskan</button>
+        <button class="btn btn-change">Ubah</button>
+      </div>
+    </div>
+    <div class="xml-note">&lt;triage status="ready" track="tuntaskan" confidence="0.87" alt="musyawarah:0.11" seed="keresahan" /&gt;</div>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools"><span>📷</span><span>📍</span></div>
+      <textarea class="chat-input-field" rows="1" placeholder="Atau jelaskan lebih lanjut..."></textarea>
+      <div class="send-btn active">➤</div>
+    </div>
+  </div>
+
+  <!-- ════════ 4b. SENSITIF — vault tinted ════════ -->
+  <div id="s-sensitif" class="scenario">
+    <div class="chat-area">
+      <div class="chat-spacer"></div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Halo! Apa yang Anda saksikan hari ini?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div>
+          <div class="bubble">Saya mengerti. Apakah Anda merasa nyaman jika ini dilihat warga lain?
+            <div class="quick-replies">
+              <span class="qr-chip">Simpan pribadi dulu</span>
+              <span class="qr-chip">Mau posting anonim</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Simpan pribadi dulu, belum siap.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar" style="background:linear-gradient(135deg, #546E7A, var(--c-vault));">⚷</div>
+        <div><div class="bubble">Baik, saya arahkan ke catatan pribadi. Lihat di bawah 👇</div></div>
+      </div>
+    </div>
+
+    <!-- CONTEXT BAR: Vault-tinted -->
+    <div class="ctx-bar vault-ready">
+      <div class="ctx-ready-header">
+        <div class="ai-dot">⚷</div>
+        <div class="ready-label" style="color:var(--c-vault);">Perlindungan Saksi</div>
+      </div>
+      <div class="ctx-route-main">
+        <span class="badge-sm" style="background:var(--c-vault);">🔒 Catatan Saksi</span>
+        <div class="route-info">
+          <div class="route-title" style="color:var(--c-vault);">Simpan catatan pribadi</div>
+          <div class="route-sub">Terenkripsi · bertanda waktu · hanya Anda</div>
+        </div>
+      </div>
+      <div class="ctx-route-alt">
+        <span class="alt-badge" style="background:var(--c-tuntaskan);">T</span>
+        <span class="alt-name">Tuntaskan (Rahasia L2)</span>
+      </div>
+      <div class="ctx-actions">
+        <button class="btn btn-vault">🔒 Simpan ke Catatan</button>
+        <button class="btn btn-change">Ubah</button>
+      </div>
+    </div>
+    <div class="xml-note">&lt;triage status="ready" mode="vault" sensitivity="high" alt="tuntaskan:rahasia-l2" /&gt;</div>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools"><span>📷</span><span>📍</span></div>
+      <textarea class="chat-input-field" rows="1" placeholder="Atau jelaskan lebih lanjut..."></textarea>
+      <div class="send-btn active">➤</div>
+    </div>
+  </div>
+
+  <!-- ════════ 4c. DARURAT — siaga tinted ════════ -->
+  <div id="s-darurat" class="scenario">
+    <div class="chat-area">
+      <div class="chat-spacer"></div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Halo! Apa yang Anda saksikan hari ini?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Banjir besar di RT 05! Air sudah masuk rumah warga, setengah meter! Butuh bantuan evakuasi sekarang!</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar" style="background:linear-gradient(135deg, var(--c-siaga-accent), var(--c-siaga));">🚨</div>
+        <div><div class="bubble" style="border-left:3px solid var(--c-siaga);"><strong style="color:var(--c-siaga);">Darurat terdeteksi.</strong> Saya langsung siapkan broadcast 👇</div></div>
+      </div>
+    </div>
+
+    <!-- CONTEXT BAR: Siaga — pulsing red -->
+    <div class="ctx-bar siaga-ready">
+      <div class="ctx-ready-header">
+        <div class="ai-dot">🚨</div>
+        <div class="ready-label" style="color:var(--c-siaga);">Siaga — Darurat</div>
+      </div>
+      <div class="ctx-route-main">
+        <span class="badge-sm" style="background:var(--c-siaga);">🚨 Siaga</span>
+        <div class="route-info">
+          <div class="route-title">Broadcast darurat ke warga</div>
+          <div class="route-sub">Dikirim ke semua anggota area sekitar</div>
+        </div>
+      </div>
+      <div class="ctx-emergency-extras">
+        <span>📍 RT 05 / RW 12 (otomatis)</span>
+        <span>· 📞 <a href="#">Hubungi 112</a></span>
+      </div>
+      <div class="ctx-route-alt">
+        <span class="alt-badge" style="background:var(--c-tuntaskan);">T</span>
+        <span class="alt-name">Bukan darurat — posting biasa</span>
+      </div>
+      <div class="ctx-actions">
+        <button class="btn btn-siaga">🚨 Kirim Siaga Sekarang</button>
+      </div>
+    </div>
+    <div class="xml-note">&lt;triage status="ready" mode="siaga" urgency="critical" location="auto:rt05-rw12" /&gt;</div>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools"><span>📷</span><span>📍</span></div>
+      <textarea class="chat-input-field" rows="1" placeholder="Tambah info darurat..."></textarea>
+      <div class="send-btn active">➤</div>
+    </div>
+  </div>
+
+  <!-- ════════ 4d. SPLIT — two entities ════════ -->
+  <div id="s-split" class="scenario">
+    <div class="chat-area">
+      <div class="chat-spacer"></div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Halo! Apa yang Anda saksikan hari ini?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Banjir besar di RT 05, air sudah masuk rumah warga. Dan saya lihat dana tanggul yang kemarin dikumpulkan sepertinya tidak dipakai sebagaimana mestinya.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Saya mendeteksi dua hal berbeda. Sebaiknya dipisah supaya masing-masing bisa ditangani tepat. Lihat di bawah 👇</div></div>
+      </div>
+    </div>
+
+    <!-- CONTEXT BAR: Split -->
+    <div class="ctx-bar split-ready">
+      <div class="ctx-ready-header">
+        <div class="ai-dot">✦</div>
+        <div class="ready-label">2 hal terdeteksi</div>
+      </div>
+      <div class="ctx-split-items">
+        <div class="ctx-split-item">
+          <span class="split-badge" style="background:var(--c-siaga);">🚨 Siaga</span>
+          <span class="split-title">Banjir besar di RT 05</span>
+        </div>
+        <div class="ctx-split-sep">dipisah</div>
+        <div class="ctx-split-item">
+          <span class="split-badge" style="background:var(--c-vault);">🔒 Catatan</span>
+          <span class="split-title">Dugaan penyalahgunaan dana</span>
+        </div>
+      </div>
+      <div class="ctx-warn">⚠ Memposting Bagian 1 publik bisa mengaitkan Anda dengan Bagian 2.</div>
+      <div class="ctx-actions">
+        <button class="btn btn-confirm">Setuju — kirim keduanya</button>
+        <button class="btn btn-change">Edit</button>
+      </div>
+    </div>
+    <div class="xml-note">&lt;triage status="ready" mode="split" entities="siaga,vault" linkability="warning" /&gt;</div>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools"><span>📷</span><span>📍</span></div>
+      <textarea class="chat-input-field" rows="1" placeholder="Atau jelaskan lebih lanjut..."></textarea>
+      <div class="send-btn active">➤</div>
+    </div>
+  </div>
+
+  <!-- ════════ 4e. MANUAL — low confidence ════════ -->
+  <div id="s-rendah" class="scenario">
+    <div class="chat-area">
+      <div class="chat-spacer"></div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Halo! Apa yang Anda saksikan hari ini?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Soal lapangan voli yang di belakang balai desa itu, gimana ya menurut warga?</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Bisa ceritakan lebih lanjut? Apakah ada masalah dengan lapangannya, atau ada ide?</div></div>
+      </div>
+      <div class="bubble-row user">
+        <div class="bubble-avatar">DP</div>
+        <div><div class="bubble">Ya gimana gitu, pengen tau aja pendapat warga lain.</div></div>
+      </div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Hmm, saya belum cukup yakin. Bisa pilih sendiri di bawah 👇</div></div>
+      </div>
+    </div>
+
+    <!-- CONTEXT BAR: Manual grid -->
+    <div class="ctx-bar manual">
+      <div class="ctx-manual-label">✦ Pilih jalur yang sesuai:</div>
+      <div class="manual-grid">
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-tuntaskan);">🔧</div>
+          <div class="mo-name">Tuntaskan</div>
+          <div class="mo-seed">Ada masalah</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-wujudkan);">💡</div>
+          <div class="mo-name">Wujudkan</div>
+          <div class="mo-seed">Ada ide</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-telusuri);">🔍</div>
+          <div class="mo-name">Telusuri</div>
+          <div class="mo-seed">Ada pertanyaan</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-rayakan);">🎉</div>
+          <div class="mo-name">Rayakan</div>
+          <div class="mo-seed">Kabar baik</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-musyawarah);">🤝</div>
+          <div class="mo-name">Musyawarah</div>
+          <div class="mo-seed">Perlu keputusan</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-vault-surface);">🔒</div>
+          <div class="mo-name">Catatan</div>
+          <div class="mo-seed">Simpan pribadi</div>
+        </div>
+      </div>
+    </div>
+    <div class="xml-note">&lt;triage status="uncertain" confidence="0.28" fallback="manual" /&gt;</div>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools"><span>📷</span><span>📍</span></div>
+      <textarea class="chat-input-field" rows="1" placeholder="Atau ceritakan lebih lanjut..."></textarea>
+      <div class="send-btn active">➤</div>
+    </div>
+  </div>
+
+  <!-- ════════ SKIP — user taps "Pilih sendiri" immediately ════════ -->
+  <div id="s-skip" class="scenario">
+    <div class="chat-area">
+      <div class="chat-spacer"></div>
+      <div class="bubble-row ai">
+        <div class="bubble-avatar">✦</div>
+        <div><div class="bubble">Halo! Apa yang Anda saksikan hari ini?</div></div>
+      </div>
+    </div>
+
+    <!-- CONTEXT BAR: Manual (skip straight to grid) -->
+    <div class="ctx-bar manual">
+      <div class="ctx-manual-label">✦ Pilih jalur yang sesuai:</div>
+      <div class="manual-grid">
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-tuntaskan);">🔧</div>
+          <div class="mo-name">Tuntaskan</div>
+          <div class="mo-seed">Ada masalah</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-wujudkan);">💡</div>
+          <div class="mo-name">Wujudkan</div>
+          <div class="mo-seed">Ada ide</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-telusuri);">🔍</div>
+          <div class="mo-name">Telusuri</div>
+          <div class="mo-seed">Ada pertanyaan</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-rayakan);">🎉</div>
+          <div class="mo-name">Rayakan</div>
+          <div class="mo-seed">Kabar baik</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-musyawarah);">🤝</div>
+          <div class="mo-name">Musyawarah</div>
+          <div class="mo-seed">Perlu keputusan</div>
+        </div>
+        <div class="manual-opt">
+          <div class="mo-icon" style="color:var(--c-vault-surface);">🔒</div>
+          <div class="mo-name">Catatan</div>
+          <div class="mo-seed">Simpan pribadi</div>
+        </div>
+      </div>
+    </div>
+    <div class="xml-note">User tapped "Pilih sendiri" → context bar morphs to manual grid</div>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools"><span>📷</span><span>📍</span></div>
+      <textarea class="chat-input-field" rows="1" placeholder="Atau ceritakan dulu kalau belum yakin..."></textarea>
+      <div class="send-btn active">➤</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showScenario(id) {
+  document.querySelectorAll('.scenario').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

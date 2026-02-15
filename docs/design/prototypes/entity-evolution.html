@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Entity Evolution — How a Witness Morphs</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0f172a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',system-ui,sans-serif;padding:20px}
+    .label{color:#64748b;font-size:10px;margin-top:10px;text-align:center;max-width:390px;line-height:1.6}
+    .label b{color:#94a3b8}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    ::-webkit-scrollbar{width:0}
+    button{transition:all .1s}button:active{transform:scale(.97)}
+    textarea:focus{outline:none;border-color:#2563eb!important}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div class="label"><b>Use buttons at top</b> to switch stages. Watch the entity morph — same witness, different UI at each phase.</div>
+
+  <script type="text/babel">
+    const {useState,useRef,useEffect} = React;
+
+    const C={bg:"#f8f9fb",card:"#fff",border:"#e8ecf1",text:"#1e293b",sub:"#64748b",muted:"#94a3b8",blue:"#2563eb",green:"#059669",red:"#ef4444",amber:"#f59e0b"};
+    const stages=["seed","define","path","execute","accept","impact"];
+    const stageLabels=["Seed","Define","Path","Execute","Accept","Impact"];
+
+    /* ─── Activity thread data per stage ─── */
+    const threads={
+      seed:[
+        {type:"ai",text:"New witness received. Tagged: Civil Engineering, Emergency Response. Complexity: 72%."},
+        {type:"witness",who:"Rina",text:"Drainage blocked by construction debris near Kelurahan Manggarai. 40+ households at risk.",hasPhoto:true,hasLocation:true},
+        {type:"action",who:"Adi",text:"I see this too. It's worse near the east canal.",icon:"\uD83D\uDC41\uFE0F"},
+        {type:"action",who:"Ibu Sari",text:"Confirmed. My house flooded last week.",icon:"\uD83D\uDC41\uFE0F"},
+        {type:"ai",text:"3 co-witnesses confirmed. Context Triad: Visual \u2713 Location \u2713 Corroboration \u2713. Ready for Define stage."},
+      ],
+      define:[
+        {type:"transition",text:"Moved to Define \u2014 community is defining what to do"},
+        {type:"ai",text:"Based on the witness and co-witness reports, I suggest these criteria for resolution:",list:["Clear blocked drainage in affected section","Inspect culvert structural integrity","Formal notification to RT/RW authorities"]},
+        {type:"message",who:"Rina",role:"Sensemaker",text:"Add: involve local RT/RW directly. They have budget for this."},
+        {type:"message",who:"Dr. Andi",role:"Sensemaker",text:"Agree. Also need a civil engineer to assess if culvert is structurally compromised, not just blocked."},
+        {type:"ai",text:"Updated criteria with community input. Proposing transition to Path."},
+        {type:"vote",proposal:"Lock criteria and move to Path",yes:6,no:1,threshold:5,status:"passed"},
+      ],
+      path:[
+        {type:"transition",text:"Moved to Path \u2014 plan is being created"},
+        {type:"ai",text:"Based on locked criteria, here's a suggested task breakdown:",tasks:[
+          {name:"Clear drainage debris (west section)",esco:"Civil Engineering",diff:60},
+          {name:"Notify RT/RW formally + request budget",esco:"Social Cohesion",diff:30},
+          {name:"Engineer inspection of culvert",esco:"Civil Engineering",diff:70},
+        ]},
+        {type:"message",who:"Pak Heru",role:"Sensemaker",text:"Task 3 should happen BEFORE task 1. If culvert is structurally bad, clearing debris could make it worse."},
+        {type:"ai",text:"Good point. Updated task order: inspection first, then clearing. Dependency added."},
+        {type:"vote",proposal:"Approve task plan (3 tasks, est. 2 weeks)",yes:8,no:0,threshold:5,status:"passed"},
+      ],
+      execute:[
+        {type:"transition",text:"Moved to Execute \u2014 work is happening"},
+        {type:"task_update",task:"Notify RT/RW formally",who:"Ibu Sari",status:"done",text:"Done. RT/RW acknowledged, budget request submitted.",hasEvidence:true},
+        {type:"task_update",task:"Engineer inspection of culvert",who:"Pak Budi",status:"active",text:"Cleared 60% of debris today. East section still blocked.",hasEvidence:true,heartbeat:"1d ago"},
+        {type:"ai",text:"1/3 tasks complete. Task 'Clear drainage debris' is unclaimed (Novice-reserved for 36 more hours)."},
+        {type:"task_update",task:"Clear drainage debris",who:null,status:"unclaimed",text:"Needs someone with Civil Engineering competence (C_eff \u2265 0.3)."},
+        {type:"message",who:"Pak Budi",role:"Executor",text:"Found some old concrete blocks too. Might need heavier equipment for those.",hasPhoto:true},
+        {type:"stall_warning",task:"Engineer inspection",who:"Dr. Andi",text:"No heartbeat in 5 days. Update or task will be released."},
+      ],
+      accept:[
+        {type:"transition",text:"Moved to Accept \u2014 solution being verified"},
+        {type:"ai",text:"All 3 tasks marked complete. 8 evidence items submitted. Assigning verification to qualified reviewers (C_eff \u2265 0.5 in Civil Engineering)."},
+        {type:"verification",who:"Yanti",role:"Verifier",text:"Reviewed all evidence. Drainage is clear, culvert inspected and stable. RT/RW budget approved.",verdict:"approve",hasEvidence:true},
+        {type:"ai",text:"Verification passed. 48-hour challenge window open until Feb 20 18:00. Anyone can dispute."},
+        {type:"challenge_window",deadline:"23h remaining",disputes:0},
+      ],
+      impact:[
+        {type:"transition",text:"Moved to Impact \u2014 confirming real-world benefit"},
+        {type:"ai",text:"Solution accepted. Now confirming impact. Minimum 30 days post-Accept, needs 2 independent attestations from affected residents."},
+        {type:"impact_attestation",who:"Ibu Sari",text:"My house hasn't flooded since the repair. Clean water drainage working.",verified:true},
+        {type:"impact_attestation",who:"Warga RT 05",text:"The whole block is better. Kids can walk to school without wading through water.",verified:true},
+        {type:"ai",text:"\uD83C\uDF1F Impact confirmed! 2 independent attestations received. 40 families benefited. Reputation distributed to all contributors."},
+        {type:"impact_complete",summary:"40 families now have proper drainage",duration:"45 days seed to impact",participants:8,roles:["Witness","Co-witness","Sensemaker","Executor","Verifier","Beneficiary"]},
+      ],
+    };
+
+    /* ─── Thread message components ─── */
+
+    function AiMsg({item}){
+      return <div style={{padding:"8px 12px",margin:"4px 0",background:"#f0f4ff",borderRadius:"2px 10px 10px 10px",border:"1px solid #dbeafe"}}>
+        <div style={{fontSize:9,fontWeight:600,color:C.blue,marginBottom:3}}>{"\uD83E\uDD16"} AI Mediator</div>
+        <div style={{fontSize:12,color:C.text,lineHeight:1.5}}>{item.text}</div>
+        {item.list&&<div style={{marginTop:6}}>{item.list.map((l,i)=><div key={i} style={{fontSize:11,color:C.sub,lineHeight:1.8,paddingLeft:8,borderLeft:"2px solid #dbeafe"}}>{i+1}. {l}</div>)}</div>}
+        {item.tasks&&<div style={{marginTop:8,background:"#fff",borderRadius:8,border:"1px solid "+C.border,overflow:"hidden"}}>
+          {item.tasks.map((t,i)=><div key={i} style={{padding:"8px 10px",borderBottom:i<item.tasks.length-1?"1px solid #f1f5f9":"none",display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:16,height:16,borderRadius:4,border:"2px solid #cbd5e1",flexShrink:0}}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:C.text,fontWeight:500}}>{t.name}</div>
+              <div style={{fontSize:9,color:C.muted}}>{t.esco} · Diff: {t.diff}%</div>
+            </div>
+          </div>)}
+        </div>}
+      </div>;
+    }
+
+    function HumanMsg({item}){
+      const isWitness=item.type==="witness";
+      return <div style={{padding:"8px 12px",margin:"4px 0",background:isWitness?"#fffbeb":"#fff",borderRadius:"10px 2px 10px 10px",border:"1px solid "+(isWitness?"#fde68a":C.border)}}>
+        <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:3}}>
+          <span style={{fontSize:9,fontWeight:600,color:C.text}}>{item.who}</span>
+          {item.role&&<span style={{fontSize:8,color:C.blue,background:"#eff6ff",padding:"0 4px",borderRadius:3}}>{item.role}</span>}
+        </div>
+        <div style={{fontSize:12,color:C.text,lineHeight:1.5}}>{item.text}</div>
+        {item.hasPhoto&&<div style={{marginTop:6,width:60,height:44,background:"#f1f5f9",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{"\uD83D\uDCF7"}</div>}
+        {item.hasLocation&&<div style={{marginTop:4,fontSize:9,color:C.green}}>{"\uD83D\uDCCD"} Manggarai, Jakarta Selatan</div>}
+      </div>;
+    }
+
+    function ActionMsg({item}){
+      return <div style={{padding:"6px 12px",margin:"2px 0",display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:14}}>{item.icon}</span>
+        <span style={{fontSize:11,color:C.sub}}><b style={{color:C.text}}>{item.who}</b> {item.text}</span>
+      </div>;
+    }
+
+    function TransitionMsg({item}){
+      return <div style={{textAlign:"center",padding:"10px 0",margin:"4px 0"}}>
+        <div style={{display:"inline-block",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:20,padding:"4px 14px",fontSize:10,color:C.green,fontWeight:600}}>{"\u2192"} {item.text}</div>
+      </div>;
+    }
+
+    function VoteMsg({item}){
+      const pct=Math.round(item.yes/(item.yes+item.no)*100);
+      return <div style={{padding:"10px 12px",margin:"4px 0",background:"#fff",borderRadius:10,border:"1px solid "+C.border}}>
+        <div style={{fontSize:9,fontWeight:600,color:C.muted,marginBottom:4}}>{"\uD83D\uDDF3\uFE0F"} GOVERNANCE VOTE</div>
+        <div style={{fontSize:12,color:C.text,fontWeight:500,marginBottom:6}}>{item.proposal}</div>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+          <div style={{flex:1,height:6,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
+            <div style={{width:pct+"%",height:"100%",background:item.status==="passed"?C.green:C.blue,borderRadius:3}}/>
+          </div>
+          <span style={{fontSize:10,color:item.status==="passed"?C.green:C.sub,fontWeight:600}}>{pct}%</span>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:C.muted}}>
+          <span>{item.yes} yes · {item.no} no</span>
+          <span style={{color:item.status==="passed"?C.green:C.amber,fontWeight:600}}>{item.status==="passed"?"\u2713 Passed":"Voting..."}</span>
+        </div>
+      </div>;
+    }
+
+    function TaskUpdateMsg({item}){
+      const sc={done:C.green,active:C.blue,unclaimed:C.muted};
+      const sl={done:"\u2705",active:"\u26A1",unclaimed:"\u25CB"};
+      return <div style={{padding:"8px 12px",margin:"3px 0",background:"#fff",borderRadius:10,border:"1px solid "+(item.status==="active"?"#dbeafe":C.border),borderLeft:"3px solid "+sc[item.status]}}>
+        <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:2}}>
+          <span style={{fontSize:12}}>{sl[item.status]}</span>
+          <span style={{fontSize:10,fontWeight:600,color:C.text}}>{item.task}</span>
+          {item.who&&<span style={{fontSize:9,color:C.muted,marginLeft:"auto"}}>{item.who}</span>}
+        </div>
+        <div style={{fontSize:11,color:C.sub,lineHeight:1.5,marginLeft:18}}>{item.text}</div>
+        {item.hasEvidence&&<div style={{marginLeft:18,marginTop:4,display:"inline-flex",alignItems:"center",gap:3,fontSize:9,color:C.green,background:"#f0fdf4",padding:"1px 6px",borderRadius:4}}>{"\uD83D\uDCCE"} Evidence attached</div>}
+        {item.heartbeat&&<div style={{marginLeft:18,marginTop:3,fontSize:9,color:item.heartbeat.includes("5d")?C.red:C.muted}}>{"\u23F0"} Heartbeat: {item.heartbeat}</div>}
+      </div>;
+    }
+
+    function StallWarning({item}){
+      return <div style={{padding:"8px 12px",margin:"4px 0",background:"#fef2f2",borderRadius:10,border:"1px solid #fecaca"}}>
+        <div style={{fontSize:9,fontWeight:600,color:C.red,marginBottom:2}}>{"\u26A0\uFE0F"} STALL WARNING</div>
+        <div style={{fontSize:11,color:C.text}}><b>{item.task}</b> — {item.text}</div>
+      </div>;
+    }
+
+    function VerificationMsg({item}){
+      return <div style={{padding:"10px 12px",margin:"4px 0",background:item.verdict==="approve"?"#f0fdf4":"#fef2f2",borderRadius:10,border:"1px solid "+(item.verdict==="approve"?"#bbf7d0":"#fecaca")}}>
+        <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:3}}>
+          <span style={{fontSize:9,fontWeight:600,color:C.text}}>{item.who}</span>
+          <span style={{fontSize:8,color:C.green,background:"#dcfce7",padding:"0 4px",borderRadius:3}}>{item.role}</span>
+        </div>
+        <div style={{fontSize:12,color:C.text,lineHeight:1.5}}>{item.text}</div>
+        <div style={{marginTop:4,fontSize:10,color:C.green,fontWeight:600}}>{item.verdict==="approve"?"\u2705 Approved":"\u274C Rejected"}</div>
+      </div>;
+    }
+
+    function ChallengeWindow({item}){
+      return <div style={{padding:"10px 12px",margin:"4px 0",background:"#fffbeb",borderRadius:10,border:"1px solid #fde68a",textAlign:"center"}}>
+        <div style={{fontSize:10,fontWeight:600,color:C.amber}}>{"\u23F3"} Challenge Window Open</div>
+        <div style={{fontSize:18,fontWeight:700,color:C.text,margin:"4px 0"}}>{item.deadline}</div>
+        <div style={{fontSize:10,color:C.muted}}>{item.disputes} disputes filed</div>
+      </div>;
+    }
+
+    function ImpactAttestation({item}){
+      return <div style={{padding:"8px 12px",margin:"3px 0",background:"#f0fdf4",borderRadius:10,border:"1px solid #bbf7d0"}}>
+        <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:2}}>
+          <span style={{fontSize:12}}>{"\uD83C\uDF1F"}</span>
+          <span style={{fontSize:10,fontWeight:600,color:C.text}}>{item.who}</span>
+          <span style={{fontSize:8,color:C.green,background:"#dcfce7",padding:"0 4px",borderRadius:3}}>Beneficiary</span>
+        </div>
+        <div style={{fontSize:12,color:C.text,lineHeight:1.5}}>{item.text}</div>
+      </div>;
+    }
+
+    function ImpactComplete({item}){
+      return <div style={{padding:"16px",margin:"8px 0",background:"linear-gradient(135deg,#f0fdf4,#ecfdf5)",borderRadius:14,border:"1px solid #86efac",textAlign:"center"}}>
+        <div style={{fontSize:24,marginBottom:4}}>{"\uD83C\uDF1F"}</div>
+        <div style={{fontSize:14,fontWeight:700,color:C.text}}>Impact Confirmed</div>
+        <div style={{fontSize:12,color:C.sub,margin:"4px 0 8px"}}>{item.summary}</div>
+        <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:8}}>
+          <div style={{background:"#fff",borderRadius:8,padding:"6px 12px"}}><div style={{fontSize:14,fontWeight:700,color:C.text}}>{item.duration}</div><div style={{fontSize:8,color:C.muted}}>Duration</div></div>
+          <div style={{background:"#fff",borderRadius:8,padding:"6px 12px"}}><div style={{fontSize:14,fontWeight:700,color:C.text}}>{item.participants}</div><div style={{fontSize:8,color:C.muted}}>People</div></div>
+        </div>
+        <div style={{display:"flex",gap:3,justifyContent:"center",flexWrap:"wrap"}}>
+          {item.roles.map((r,i)=><span key={i} style={{fontSize:8,color:C.green,background:"#dcfce7",padding:"1px 6px",borderRadius:4}}>{r}</span>)}
+        </div>
+      </div>;
+    }
+
+    /* ─── Render a thread item ─── */
+    function ThreadItem({item}){
+      switch(item.type){
+        case "ai": return <AiMsg item={item}/>;
+        case "witness": case "message": return <HumanMsg item={item}/>;
+        case "action": return <ActionMsg item={item}/>;
+        case "transition": return <TransitionMsg item={item}/>;
+        case "vote": return <VoteMsg item={item}/>;
+        case "task_update": return <TaskUpdateMsg item={item}/>;
+        case "stall_warning": return <StallWarning item={item}/>;
+        case "verification": return <VerificationMsg item={item}/>;
+        case "challenge_window": return <ChallengeWindow item={item}/>;
+        case "impact_attestation": return <ImpactAttestation item={item}/>;
+        case "impact_complete": return <ImpactComplete item={item}/>;
+        default: return null;
+      }
+    }
+
+    /* ─── Stage-specific action bar ─── */
+    function ActionBar({stage}){
+      const bars={
+        seed:<div style={{display:"flex",gap:6}}>
+          <button style={{flex:2,padding:"10px 0",borderRadius:10,background:C.blue,color:"#fff",border:"none",fontSize:12,fontWeight:600,cursor:"pointer"}}>{"\uD83D\uDC41\uFE0F"} I see this too</button>
+          <button style={{flex:1,padding:"10px 0",borderRadius:10,background:"#fff",color:C.muted,border:"1px solid "+C.border,fontSize:11,cursor:"pointer"}}>Skeptical</button>
+        </div>,
+        define:<div>
+          <div style={{display:"flex",gap:4,marginBottom:6}}>
+            <input placeholder="Suggest criteria change..." style={{flex:1,padding:"8px 10px",borderRadius:8,border:"1px solid "+C.border,fontSize:11,fontFamily:"inherit"}}/>
+            <button style={{padding:"8px 12px",borderRadius:8,background:C.blue,color:"#fff",border:"none",fontSize:11,fontWeight:600,cursor:"pointer"}}>Send</button>
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button style={{flex:1,padding:"8px 0",borderRadius:8,background:"#f0fdf4",color:C.green,border:"1px solid #bbf7d0",fontSize:11,fontWeight:600,cursor:"pointer"}}>{"\uD83D\uDDF3\uFE0F"} Vote to advance</button>
+          </div>
+        </div>,
+        path:<div style={{display:"flex",gap:6}}>
+          <button style={{flex:2,padding:"10px 0",borderRadius:10,background:C.green,color:"#fff",border:"none",fontSize:12,fontWeight:600,cursor:"pointer"}}>{"\u2705"} Approve plan</button>
+          <button style={{flex:1,padding:"10px 0",borderRadius:10,background:"#fff",color:C.red,border:"1px solid #fecaca",fontSize:11,cursor:"pointer"}}>Object</button>
+        </div>,
+        execute:<div>
+          <div style={{display:"flex",gap:4,marginBottom:6}}>
+            <input placeholder="Post update or evidence..." style={{flex:1,padding:"8px 10px",borderRadius:8,border:"1px solid "+C.border,fontSize:11,fontFamily:"inherit"}}/>
+            <button style={{padding:"8px 6px",borderRadius:8,background:"#fff",color:C.sub,border:"1px solid "+C.border,fontSize:14,cursor:"pointer"}}>{"\uD83D\uDCF7"}</button>
+            <button style={{padding:"8px 12px",borderRadius:8,background:C.blue,color:"#fff",border:"none",fontSize:11,fontWeight:600,cursor:"pointer"}}>Send</button>
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button style={{flex:1,padding:"8px 0",borderRadius:8,background:"#eff6ff",color:C.blue,border:"1px solid #dbeafe",fontSize:10,fontWeight:600,cursor:"pointer"}}>{"\u26A1"} Claim a task</button>
+            <button style={{flex:1,padding:"8px 0",borderRadius:8,background:"#eff6ff",color:C.blue,border:"1px solid #dbeafe",fontSize:10,fontWeight:600,cursor:"pointer"}}>{"\u2764\uFE0F"} Send heartbeat</button>
+          </div>
+        </div>,
+        accept:<div style={{display:"flex",gap:6}}>
+          <button style={{flex:2,padding:"10px 0",borderRadius:10,background:C.green,color:"#fff",border:"none",fontSize:12,fontWeight:600,cursor:"pointer"}}>{"\u2705"} Verify solution</button>
+          <button style={{flex:1,padding:"10px 0",borderRadius:10,background:"#fff",color:C.red,border:"1px solid #fecaca",fontSize:11,cursor:"pointer"}}>{"\u2694\uFE0F"} Dispute</button>
+        </div>,
+        impact:<div style={{display:"flex",gap:6}}>
+          <button style={{flex:2,padding:"10px 0",borderRadius:10,background:C.amber,color:"#fff",border:"none",fontSize:12,fontWeight:600,cursor:"pointer"}}>{"\uD83C\uDF1F"} Confirm impact</button>
+          <button style={{flex:1,padding:"10px 0",borderRadius:10,background:"#fff",color:C.sub,border:"1px solid "+C.border,fontSize:11,cursor:"pointer"}}>Share</button>
+        </div>,
+      };
+      return <div style={{padding:"8px 12px",borderTop:"1px solid "+C.border,background:"#fff"}}>{bars[stage]}</div>;
+    }
+
+    /* ─── Stage panel (structured UI that morphs) ─── */
+    function StagePanel({stage}){
+      if(stage==="seed") return <div style={{padding:"8px 12px",background:"#fffbeb",borderBottom:"1px solid #fde68a"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div><div style={{fontSize:10,fontWeight:600,color:C.amber}}>Needs confirmation</div><div style={{fontSize:9,color:C.muted}}>3 co-witnesses · 2 more suggested</div></div>
+          <div style={{display:"flex",gap:3}}>{[1,1,1,0,0].map((f,i)=><div key={i} style={{width:10,height:10,borderRadius:"50%",background:f?"#f59e0b":"#fde68a"}}/>)}</div>
+        </div>
+      </div>;
+
+      if(stage==="define") return <div style={{padding:"8px 12px",background:"#eff6ff",borderBottom:"1px solid #dbeafe"}}>
+        <div style={{fontSize:10,fontWeight:600,color:C.blue,marginBottom:4}}>Criteria Draft (editable)</div>
+        <div style={{fontSize:10,color:C.text,lineHeight:1.8}}>
+          {["1. Clear blocked drainage","2. Inspect culvert integrity","3. Formal RT/RW notification","4. Involve local RT/RW (added by Rina)"].map((c,i)=><div key={i}>{c}</div>)}
+        </div>
+      </div>;
+
+      if(stage==="path") return <div style={{padding:"8px 12px",background:"#f0fdf4",borderBottom:"1px solid #bbf7d0"}}>
+        <div style={{fontSize:10,fontWeight:600,color:C.green,marginBottom:4}}>Task Plan (3 tasks)</div>
+        <div style={{display:"flex",gap:4}}>
+          {["Inspect \u2192","Clear \u2192","Notify"].map((t,i)=><div key={i} style={{flex:1,padding:"4px 6px",background:"#fff",borderRadius:6,fontSize:9,textAlign:"center",color:C.text,border:"1px solid #d1fae5"}}>{t}</div>)}
+        </div>
+      </div>;
+
+      if(stage==="execute") return <div style={{padding:"8px 12px",background:"#eff6ff",borderBottom:"1px solid #dbeafe"}}>
+        <div style={{fontSize:10,fontWeight:600,color:C.blue,marginBottom:4}}>Task Board (1/3 done)</div>
+        <div style={{display:"flex",gap:4}}>
+          {[{l:"Done",c:1,bg:"#dcfce7"},{l:"Active",c:1,bg:"#dbeafe"},{l:"Open",c:1,bg:"#f1f5f9"}].map((col,i)=>
+            <div key={i} style={{flex:1,background:col.bg,borderRadius:6,padding:"6px",textAlign:"center"}}>
+              <div style={{fontSize:8,fontWeight:600,color:C.muted}}>{col.l}</div>
+              <div style={{fontSize:16,fontWeight:700,color:C.text}}>{col.c}</div>
+            </div>
+          )}
+        </div>
+      </div>;
+
+      if(stage==="accept") return <div style={{padding:"8px 12px",background:"#f0fdf4",borderBottom:"1px solid #bbf7d0"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div><div style={{fontSize:10,fontWeight:600,color:C.green}}>Verification in progress</div><div style={{fontSize:9,color:C.muted}}>1 verifier approved · challenge window open</div></div>
+          <div style={{fontSize:11,fontWeight:700,color:C.amber}}>{"\u23F3"} 23h</div>
+        </div>
+      </div>;
+
+      if(stage==="impact") return <div style={{padding:"8px 12px",background:"linear-gradient(135deg,#fef3c7,#f0fdf4)",borderBottom:"1px solid #fde68a"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div><div style={{fontSize:10,fontWeight:600,color:C.green}}>{"\uD83C\uDF1F"} Impact confirmed!</div><div style={{fontSize:9,color:C.muted}}>2 attestations · 40 families benefited</div></div>
+          <div style={{fontSize:18}}>{"\uD83C\uDF1F"}</div>
+        </div>
+      </div>;
+
+      return null;
+    }
+
+    /* ─── Main App ─── */
+    function App(){
+      const [stage,setStage]=useState("seed");
+      const scrollRef=useRef(null);
+      const si=stages.indexOf(stage);
+
+      // Accumulate all threads up to current stage
+      const allItems=[];
+      for(let i=0;i<=si;i++){
+        const s=stages[i];
+        if(threads[s]) allItems.push(...threads[s]);
+      }
+
+      useEffect(()=>{
+        if(scrollRef.current) scrollRef.current.scrollTop=scrollRef.current.scrollHeight;
+      },[stage]);
+
+      return (
+        <div style={{width:390,height:760,borderRadius:32,overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.3)",background:"#fff",position:"relative",fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
+          {/* Status bar */}
+          <div style={{height:36,background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:C.text,letterSpacing:.5}}>Gotong Royong</div>
+
+          {/* Stage selector */}
+          <div style={{display:"flex",padding:"0 8px 6px",gap:2,background:"#fff",borderBottom:"1px solid "+C.border}}>
+            {stages.map((s,i)=>{
+              const active=i===si,past=i<si;
+              return <button key={s} onClick={()=>setStage(s)} style={{flex:1,padding:"6px 0",borderRadius:8,border:"none",background:active?C.blue:past?"#dcfce7":"#f8f9fb",color:active?"#fff":past?C.green:C.muted,fontSize:9,fontWeight:active?700:500,cursor:"pointer"}}>{stageLabels[i]}</button>;
+            })}
+          </div>
+
+          {/* Header */}
+          <div style={{padding:"8px 12px",background:"#fff",borderBottom:"1px solid "+C.border}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+              <span style={{background:"#eff6ff",color:C.blue,fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:4}}>Resolve</span>
+              <span style={{fontSize:9,color:C.muted}}>{stageLabels[si]}</span>
+              <div style={{marginLeft:"auto",display:"flex",gap:3}}>
+                {stages.map((s,i)=><div key={i} style={{width:i<=si?14:10,height:3,borderRadius:2,background:i<=si?C.blue:"#e2e8f0"}}/>)}
+              </div>
+            </div>
+            <div style={{fontSize:14,fontWeight:700,color:C.text,lineHeight:1.3}}>Flooding risk in Kelurahan Manggarai</div>
+            <div style={{display:"flex",gap:3,marginTop:4}}>
+              {["Witness","Sensemaker","Endorser"].filter((_,i)=>i<=Math.min(si,2)).map((r,i)=><span key={i} style={{fontSize:8,color:C.sub,background:"#f1f5f9",padding:"1px 5px",borderRadius:3}}>
+                {r}
+              </span>)}
+            </div>
+          </div>
+
+          {/* Stage panel (morphs) */}
+          <StagePanel stage={stage}/>
+
+          {/* Thread (scrollable) */}
+          <div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"4px 6px",background:C.bg}}>
+            {allItems.map((item,i)=><div key={i} style={{animation:"fadeIn .15s ease"}}><ThreadItem item={item}/></div>)}
+          </div>
+
+          {/* Action bar (morphs) */}
+          <ActionBar stage={stage}/>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

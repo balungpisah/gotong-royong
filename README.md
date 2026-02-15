@@ -15,9 +15,11 @@ A backend platform that:
 
 ## Tech Stack
 
-- **Backend Framework**: TBD (Node.js/Express, Rust/Actix, Python/FastAPI)
-- **Database**: PostgreSQL (primary), MySQL (supported)
-- **Cache**: Redis (optional, for performance)
+- **Language/Edition**: Rust 2024
+- **Backend Framework**: Axum + Tokio + Tower/tower-http
+- **Database**: SurrealDB v3 beta (current lock: `v3.0.0-beta-4`)
+- **Realtime**: WebSocket (primary), SSE and polling fallbacks
+- **Cache**: Redis (idempotency, rate controls, ephemeral fanout metadata)
 - **Storage**: S3-compatible object storage (for evidence files)
 - **Authentication**: JWT + HMAC-SHA256 webhook signatures
 - **Integration**: REST API + webhooks to Markov Engine
@@ -28,7 +30,7 @@ See [docs/development/setup-guide.md](docs/development/setup-guide.md) for insta
 
 ## Documentation
 
-Complete technical specifications are in the [docs/](docs/) directory:
+Complete technical specifications and design docs are in the [docs/](docs/) directory:
 
 - [Architecture Overview](docs/architecture/system-overview.md)
 - [API Specifications](docs/api/webhook-spec.md)
@@ -36,6 +38,7 @@ Complete technical specifications are in the [docs/](docs/) directory:
 - [PoR Evidence Format](docs/por-evidence/evidence-format.md)
 - [Deployment Guide](docs/deployment/infrastructure.md)
 - [Development Setup](docs/development/setup-guide.md)
+- [Design Index](docs/DESIGN-INDEX.md)
 
 ## Markov Engine Integration
 

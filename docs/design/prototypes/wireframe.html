@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Gotong Royong — Wireframe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{background:linear-gradient(135deg,#0f172a,#1e293b);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',system-ui,sans-serif;padding:20px}
+    .note{color:#64748b;font-size:10px;margin-top:12px;text-align:center;max-width:390px;line-height:1.7}
+    .note b{color:#94a3b8}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    @keyframes slideRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+    @keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+    textarea:focus,input:focus{border-color:#2563eb!important;outline:none}
+    button{transition:all .1s}button:active{transform:scale(.97)}
+    ::-webkit-scrollbar{width:0}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div class="note"><b>Wireframe Prototype</b> — Tap cards to open Witness Detail · Missions tab shows your active quests · Multi-role badges on each card</div>
+
+  <script type="text/babel">
+    const {useState,useCallback,useMemo} = React;
+
+    /* ══════════════════════════════════════════
+       DATA MODEL
+       ══════════════════════════════════════════ */
+
+    const USER = {name:"Rina",fullName:"Rina Widiastuti",tier:"Pillar",pillar:"field_social",i:.87,j:.82,c:.71,domains:["Social Cohesion","Health Services","Emergency Response","Community Mediation"],wCount:23,impact:8,executed:5,verified:12,budgetUsed:.35,heroPoints:320,heroTier:"Penjaga Cuaca"};
+    const WEATHER = {status:"berawan",gdf:6.2,label:"Berawan",icon:"\uD83C\uDF24\uFE0F",msg:"Calm neighborhood. A few things need attention."};
+
+    // Witnesses with USER's roles on each
+    const W = [
+      {id:1,track:"resolve",stage:"execute",summary:"Flooding risk in Kelurahan Manggarai",detail:"Drainage blocked by construction debris. 40+ households at risk during rainy season. RT/RW has been notified but no action yet.",complexity:.72,co:8,domain:"Civil Engineering",esco:["Emergency Response","Civil Engineering","Social Cohesion"],days:12,conf:false,tasks:3,done:1,dist:"0.3 km",lat:-6.2088,lng:106.8456,
+        people:[{n:"Pak Budi",role:"Executor"},{n:"Ibu Sari",role:"Executor"},{n:"Adi",role:"Co-witness"}],
+        myRoles:["Witness","Sensemaker","Endorser"],
+        myActions:[{role:"Endorser",action:"Vote on task assignment",urgent:false}],
+        journey:[
+          {stage:"Seed",date:"Jan 15",who:"You",what:"Witnessed flooding risk"},
+          {stage:"Define",date:"Jan 18",who:"You + Dr. Andi",what:"Defined: drainage clearance needed"},
+          {stage:"Path",date:"Jan 22",who:"Community vote",what:"Plan locked: 3 tasks, est. 2 weeks"},
+          {stage:"Execute",date:"Jan 25",who:"Active",what:"1/3 tasks done"}
+        ]
+      },
+      {id:6,track:"resolve",stage:"seed",summary:"Suspicious chemical waste dumping near Kali Ciliwung",detail:"Observed at night near the riverbank. Strong chemical smell. No visible company markings on containers.",complexity:.85,co:1,domain:"Environmental",esco:["Environmental Protection","Legal"],days:0,conf:true,dist:"0.8 km",lat:-6.212,lng:106.835,isNew:true,tasks:0,done:0,
+        people:[{n:"Anonymous",role:"Witness"}],
+        myRoles:[],myActions:[],journey:[{stage:"Seed",date:"Today",who:"Anonymous",what:"Confidential witness submitted"}]
+      },
+      {id:2,track:"celebrate",stage:"recognize",summary:"Posyandu Melati: free health checks for 120 elderly residents",detail:"Monthly program by local health volunteers. Blood pressure, blood sugar, basic consultations. Community requesting formal recognition.",complexity:.35,co:14,domain:"Health Services",esco:["Health Services","Social Cohesion"],days:5,conf:false,dist:"1.2 km",lat:-6.215,lng:106.852,tasks:0,done:0,
+        people:[{n:"Ibu Wati",role:"Witness"},{n:"Dr. Nia",role:"Sensemaker"},{n:"Pak Heru",role:"Co-witness"},{n:"Dina",role:"Co-witness"}],
+        myRoles:["Co-witness","Endorser"],
+        myActions:[{role:"Endorser",action:"Vote on recognition",urgent:true,deadline:"4h"}],
+        journey:[
+          {stage:"Seed",date:"Feb 2",who:"Ibu Wati",what:"Witnessed health check program"},
+          {stage:"Corroborate",date:"Feb 3",who:"14 co-witnesses",what:"You + 13 others confirmed"},
+          {stage:"Recognize",date:"Feb 7",who:"Active vote",what:"Community voting on recognition"}
+        ]
+      },
+      {id:8,track:"resolve",stage:"execute",summary:"School roof in SDN 04 leaking during rain",detail:"Students study in hallways when it rains. Principal submitted repair request 3 months ago. Community raising funds.",complexity:.55,co:6,domain:"Infrastructure",esco:["Civil Engineering","Education"],days:7,conf:false,dist:"0.5 km",lat:-6.207,lng:106.842,tasks:3,done:1,
+        people:[{n:"Pak Guru",role:"Witness"},{n:"Ibu RT",role:"Co-witness"},{n:"You",role:"Executor"}],
+        myRoles:["Executor"],
+        myActions:[{role:"Executor",action:"Heartbeat due in 2 days",urgent:false},{role:"Executor",action:"Submit progress photo",urgent:false}],
+        journey:[
+          {stage:"Seed",date:"Jan 28",who:"Pak Guru",what:"Witnessed leaking roof"},
+          {stage:"Define",date:"Jan 30",who:"Community",what:"Defined: roof repair + waterproofing"},
+          {stage:"Path",date:"Feb 1",who:"Community vote",what:"3 tasks: tiles, membrane, inspection"},
+          {stage:"Execute",date:"Feb 5",who:"Active",what:"You claimed 'Remove damaged tiles'"}
+        ]
+      },
+      {id:4,track:"explore",stage:"hypotheses",summary:"Is the new fogging schedule reducing dengue in RT 05?",detail:"Dengue cases dropped 40% since new bi-weekly schedule. Correlation isn't causation. Need health data analysis.",complexity:.58,co:5,domain:"Health",esco:["Health","Data Analysis"],days:8,conf:false,dist:"2.1 km",lat:-6.22,lng:106.84,tasks:0,done:0,
+        people:[{n:"Dr. Andi",role:"Witness"},{n:"Siti",role:"Co-witness"}],
+        myRoles:["Endorser"],
+        myActions:[{role:"Endorser",action:"Review hypothesis proposals",urgent:false}],
+        journey:[
+          {stage:"Seed",date:"Feb 4",who:"Dr. Andi",what:"Asked: is fogging reducing dengue?"},
+          {stage:"Hypotheses",date:"Feb 7",who:"Active",what:"3 hypotheses proposed, voting open"}
+        ]
+      },
+      {id:5,track:"resolve",stage:"impact",summary:"Community well in Gang Mawar repaired",detail:"40 families now have clean water access. Repair took 3 weeks with volunteer labor and donated materials.",complexity:.45,co:11,domain:"Infrastructure",esco:["Infrastructure","Health"],days:45,conf:false,dist:"1.5 km",lat:-6.205,lng:106.85,tasks:5,done:5,
+        people:[{n:"Pak RT",role:"Witness"},{n:"Ibu Eni",role:"Executor"},{n:"Joko",role:"Executor"},{n:"Yanti",role:"Verifier"},{n:"Bambang",role:"Co-witness"}],
+        myRoles:["Co-witness","Beneficiary"],
+        myActions:[{role:"Beneficiary",action:"Confirm impact (optional)",urgent:false}],
+        journey:[
+          {stage:"Seed",date:"Dec 20",who:"Pak RT",what:"Witnessed broken well"},
+          {stage:"Define",date:"Dec 22",who:"Community",what:"Defined: well repair needed"},
+          {stage:"Path",date:"Dec 28",who:"Vote",what:"5 tasks, volunteer labor"},
+          {stage:"Execute",date:"Jan 5",who:"Ibu Eni, Joko + 3",what:"All 5 tasks completed"},
+          {stage:"Accept",date:"Jan 20",who:"Yanti",what:"Solution verified"},
+          {stage:"Impact",date:"Feb 3",who:"Active",what:"40 families confirm clean water"}
+        ]
+      },
+      {id:3,track:"resolve",stage:"define",summary:"Street vendors displaced from Jl. Sudirman",detail:"15 vendors affected, most are primary earners. Community mediation requested between vendors and city planning.",complexity:.65,co:3,domain:"Social Services",esco:["Social Services","Legal","Community Mediation"],days:2,conf:true,dist:"3.0 km",lat:-6.202,lng:106.838,tasks:0,done:0,
+        people:[{n:"Pak Agus",role:"Witness"},{n:"Ibu Ria",role:"Co-witness"}],
+        myRoles:["Sensemaker"],
+        myActions:[{role:"Sensemaker",action:"Help define criteria",urgent:true,deadline:"today"}],
+        journey:[
+          {stage:"Seed",date:"Feb 10",who:"Pak Agus",what:"Witnessed vendor displacement"},
+          {stage:"Define",date:"Feb 11",who:"Active",what:"You are helping define criteria"}
+        ]
+      },
+      {id:7,track:"celebrate",stage:"impact",summary:"Kampung Warna painted by youth volunteers",detail:"Tourism increased 30%. Youth-led initiative with 45 volunteers over 2 weekends. Mural themes chosen by residents.",complexity:.3,co:22,domain:"Culture",esco:["Indonesian Craft & Heritage","Social Cohesion"],days:60,conf:false,dist:"1.8 km",lat:-6.218,lng:106.848,tasks:0,done:0,
+        people:[{n:"Raka",role:"Witness"},{n:"Putri",role:"Executor"},{n:"Dimas",role:"Co-witness"},{n:"Ayu",role:"Co-witness"}],
+        myRoles:[],myActions:[],
+        journey:[
+          {stage:"Seed",date:"Dec 1",who:"Raka",what:"Witnessed mural project"},
+          {stage:"Corroborate",date:"Dec 5",who:"22 co-witnesses",what:"Massive corroboration"},
+          {stage:"Recognize",date:"Dec 15",who:"Community",what:"Formally recognized"},
+          {stage:"Impact",date:"Jan 30",who:"Tourism data",what:"30% tourism increase confirmed"}
+        ]
+      },
+    ];
+
+    // Tasks for witnesses at Execute stage
+    const TASKS = {
+      1: [ // Flooding
+        {id:"t1",name:"Clear drainage debris (west section)",esco:"Civil Engineering",diff:.6,status:"active",assignee:"Pak Budi",heartbeat:"1d ago",evidence:2},
+        {id:"t2",name:"Notify RT/RW formally",esco:"Social Cohesion",diff:.3,status:"done",assignee:"Ibu Sari",evidence:1},
+        {id:"t3",name:"Inspect culvert condition",esco:"Civil Engineering",diff:.7,status:"active",assignee:null,noviceSlot:true},
+      ],
+      8: [ // School roof
+        {id:"t4",name:"Remove damaged roof tiles",esco:"Civil Engineering",diff:.5,status:"active",assignee:"You",heartbeat:"3d ago",evidence:1,isYours:true},
+        {id:"t5",name:"Install waterproof membrane",esco:"Civil Engineering",diff:.7,status:"pending",assignee:null},
+        {id:"t6",name:"Final roof inspection",esco:"Civil Engineering",diff:.4,status:"pending",assignee:null},
+      ]
+    };
+
+    const NOTIFS = [
+      {id:1,type:"stage",msg:"Your flooding witness moved to Execute — someone picked up debris clearing!",time:"2h",wid:1,roles:["Witness"]},
+      {id:2,type:"co",msg:"3 more neighbors confirmed the Posyandu health checks",time:"4h",wid:2,roles:["Co-witness"]},
+      {id:3,type:"impact",msg:"Community well repair: 40 families now have clean water!",time:"1d",wid:5,roles:["Co-witness","Beneficiary"]},
+      {id:4,type:"urgent",msg:"Vote on Posyandu recognition closes in 4 hours",time:"now",wid:2,roles:["Endorser"]},
+      {id:5,type:"task",msg:"Your school roof task: heartbeat due in 2 days",time:"6h",wid:8,roles:["Executor"]},
+    ];
+
+    /* ── Constants ── */
+    const TC={resolve:"#2563eb",celebrate:"#f59e0b",explore:"#8b5cf6"};
+    const TBG={resolve:"#eff6ff",celebrate:"#fffbeb",explore:"#f5f3ff"};
+    const TL={resolve:"Resolve",celebrate:"Celebrate",explore:"Explore"};
+    const SL={resolve:["Seed","Define","Path","Execute","Accept","Impact","Archive"],celebrate:["Seed","Corroborate","Recognize","Impact","Archive"],explore:["Seed","Hypotheses","Experiments","Conclusion","Archive"]};
+    const ROLE_ICONS={"Witness":"\uD83D\uDC41\uFE0F","Co-witness":"\uD83D\uDC41\uFE0F\u200D\uD83D\uDDE8\uFE0F","Sensemaker":"\uD83E\uDDE0","Executor":"\u26A1","Verifier":"\u2705","Beneficiary":"\uD83C\uDF1F","Endorser":"\uD83D\uDDF3\uFE0F","Challenger":"\u2694\uFE0F","Juror":"\u2696\uFE0F"};
+    const PC={tech_build:"#0ea5e9",field_social:"#f97316",logic_audit:"#94a3b8",culture_context:"#dc2626"};
+
+    function si(track,stage){const s={resolve:["seed","define","path","execute","accept","impact","archive"],celebrate:["seed","corroborate","recognize","impact","archive"],explore:["seed","hypotheses","experiments","conclusion","archive"]};return s[track]?.indexOf(stage)??0;}
+    function stageHuman(w){const m={seed:"Just witnessed \u2014 needs confirmation",define:"Community is defining what to do",path:"Voting on the plan",execute:w.done+"/"+w.tasks+" tasks done"+(w.tasks-w.done>0?" \u2014 help needed":""),accept:"Checking the results",impact:"Impact being confirmed",archive:"Completed",corroborate:"Being verified by neighbors",recognize:"Community voting to recognize",hypotheses:"Exploring explanations",experiments:"Testing theories",conclusion:"Drawing conclusions"};return m[w.stage]||"";}
+
+    /* ══════════════════════════════════════════
+       SHARED COMPONENTS
+       ══════════════════════════════════════════ */
+
+    const S={bg:"#f8f9fb",card:"#fff",border:"#e8ecf1",text:"#1e293b",sub:"#64748b",muted:"#94a3b8",acc:"#2563eb"};
+
+    function StageBar({track,stage,compact}){
+      const labels=SL[track],idx=si(track,stage),c=TC[track];
+      return <div style={{display:"flex",gap:compact?1:2}}>{labels.map((l,i)=>{
+        const a=i<=idx,cur=i===idx;
+        return <div key={i} style={{flex:1,textAlign:"center"}}>
+          <div style={{height:compact?3:4,borderRadius:2,background:a?c:"#e2e8f0",position:"relative"}}>
+            {cur&&<div style={{position:"absolute",right:0,top:-2,width:8,height:8,borderRadius:"50%",background:c,border:"2px solid #fff"}}/>}
+          </div>
+          {!compact&&<div style={{fontSize:7,color:a?c:"#cbd5e1",fontWeight:cur?700:400,marginTop:2}}>{l}</div>}
+        </div>;
+      })}</div>;
+    }
+
+    function RoleBadges({roles,size="sm"}){
+      if(!roles||!roles.length)return null;
+      const fs=size==="sm"?9:10;
+      return <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+        {roles.map((r,i)=><span key={i} style={{fontSize:fs,color:S.sub,background:"#f1f5f9",padding:"1px 6px",borderRadius:6,whiteSpace:"nowrap"}}>{ROLE_ICONS[r]||""} {r}</span>)}
+      </div>;
+    }
+
+    function SectionLabel({children}){return <div style={{fontSize:11,fontWeight:700,color:S.muted,textTransform:"uppercase",letterSpacing:.5,padding:"8px 16px 4px"}}>{children}</div>;}
+
+    function BackHeader({title,onBack,right}){
+      return <div style={{height:44,display:"flex",alignItems:"center",padding:"0 12px",borderBottom:"1px solid "+S.border,background:"#fff"}}>
+        <button onClick={onBack} style={{background:"none",border:"none",fontSize:18,color:S.sub,cursor:"pointer",padding:"0 4px"}}>{"\u2190"}</button>
+        <div style={{flex:1,textAlign:"center",fontSize:14,fontWeight:700,color:S.text}}>{title}</div>
+        {right||<div style={{width:26}}/>}
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       HOME (Feed)
+       ══════════════════════════════════════════ */
+
+    function GreetingBar({onWeatherTap}){
+      const bg={cerah:"linear-gradient(135deg,#fef3c7,#fde68a)",berawan:"linear-gradient(135deg,#eef2ff,#dbeafe)",hujan:"linear-gradient(135deg,#dbeafe,#bfdbfe)",badai:"linear-gradient(135deg,#1e293b,#334155)"};
+      return <div style={{background:bg[WEATHER.status],padding:"10px 16px 8px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:S.text}}>Hai, {USER.name} {WEATHER.icon}</div>
+            <div style={{fontSize:11,color:S.sub,marginTop:1}}>{WEATHER.msg}</div>
+          </div>
+          <div onClick={onWeatherTap} style={{cursor:"pointer",textAlign:"center",padding:"3px 8px",borderRadius:8,background:"rgba(0,0,0,.04)"}}>
+            <div style={{fontSize:9,color:S.muted}}>Community</div>
+            <div style={{fontSize:13,fontWeight:700,color:S.text}}>{W.length} active</div>
+          </div>
+        </div>
+      </div>;
+    }
+
+    function WitnessPrompt({onStart}){
+      return <div style={{margin:"10px 14px 4px",background:"#fff",borderRadius:14,padding:"14px",border:"1px solid "+S.border}}>
+        <div style={{fontSize:14,fontWeight:600,color:S.text,marginBottom:8}}>What's happening around you?</div>
+        <div style={{display:"flex",gap:6}}>
+          {[{m:"photo",i:"\uD83D\uDCF7",l:"Photo"},{m:"text",i:"\u270D\uFE0F",l:"Write"},{m:"anon",i:"\uD83D\uDD12",l:"Anonymous"}].map(b=>
+            <button key={b.m} onClick={()=>onStart(b.m)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"12px 6px",borderRadius:10,border:"1px solid "+S.border,background:"#fafbfc",cursor:"pointer"}}>
+              <span style={{fontSize:20}}>{b.i}</span>
+              <span style={{fontSize:10,color:S.sub}}>{b.l}</span>
+            </button>
+          )}
+        </div>
+      </div>;
+    }
+
+    function FeedCard({w,onTap}){
+      const c=TC[w.track];
+      const ppl=w.people||[];
+      const pplStr=ppl.length<=2?ppl.map(p=>p.n).join(" & "):(ppl.slice(0,2).map(p=>p.n).join(", ")+" + "+(ppl.length-2));
+      const hasRoles=w.myRoles&&w.myRoles.length>0;
+      const urgentAction=w.myActions?.find(a=>a.urgent);
+      return <div onClick={()=>onTap(w.id)} style={{background:"#fff",borderRadius:12,marginBottom:6,padding:"10px 12px",cursor:"pointer",borderLeft:"3px solid "+c,position:"relative",animation:"fadeIn .15s ease"}}>
+        {w.isNew&&<div style={{position:"absolute",top:6,right:8,background:"#ef4444",color:"#fff",fontSize:7,fontWeight:700,padding:"1px 5px",borderRadius:4}}>NEW</div>}
+        <div style={{fontSize:13,fontWeight:600,color:S.text,lineHeight:1.4,marginBottom:4,paddingRight:w.isNew?28:0}}>{w.summary}</div>
+        {hasRoles&&<div style={{marginBottom:4}}><RoleBadges roles={w.myRoles}/></div>}
+        {urgentAction&&<div style={{fontSize:10,color:"#dc2626",fontWeight:600,marginBottom:4,padding:"2px 6px",background:"#fef2f2",borderRadius:4,display:"inline-block"}}>{"\u23F0"} {urgentAction.action}{urgentAction.deadline?" · "+urgentAction.deadline:""}</div>}
+        <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:S.muted}}>
+          <span>{pplStr}</span>
+          <span style={{opacity:.3}}>&middot;</span>
+          <span>{w.dist}</span>
+          <span style={{marginLeft:"auto"}}>{w.days===0?"Just now":w.days+"d"}</span>
+        </div>
+        <div style={{marginTop:6}}><StageBar track={w.track} stage={w.stage} compact/></div>
+      </div>;
+    }
+
+    function HomeScreen({onTapCard,onStartCreate,onWeatherTap}){
+      const forYou=W.filter(w=>w.myRoles.length>0||w.isNew);
+      const nearby=W.filter(w=>w.myRoles.length===0&&!w.isNew&&parseFloat(w.dist)<=2);
+      const rest=W.filter(w=>w.myRoles.length===0&&!w.isNew&&parseFloat(w.dist)>2);
+      return <div style={{flex:1,overflow:"auto",background:S.bg}}>
+        <WitnessPrompt onStart={onStartCreate}/>
+        <div style={{paddingBottom:60}}>
+          {forYou.length>0&&<><SectionLabel>{"\u26A1"} For you</SectionLabel><div style={{padding:"0 14px"}}>{forYou.map(w=><FeedCard key={w.id} w={w} onTap={onTapCard}/>)}</div></>}
+          {nearby.length>0&&<><SectionLabel>{"\uD83D\uDCCD"} Near you</SectionLabel><div style={{padding:"0 14px"}}>{nearby.map(w=><FeedCard key={w.id} w={w} onTap={onTapCard}/>)}</div></>}
+          {rest.length>0&&<><SectionLabel>{"\uD83C\uDFD8\uFE0F"} Community</SectionLabel><div style={{padding:"0 14px"}}>{rest.map(w=><FeedCard key={w.id} w={w} onTap={onTapCard}/>)}</div></>}
+        </div>
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       MISSIONS (Gamification Hub)
+       ══════════════════════════════════════════ */
+
+    function MissionsScreen({onTapCard}){
+      const [sub,setSub]=useState("stories");
+      const myStories=W.filter(w=>w.myRoles.includes("Witness"));
+      const myWork=W.filter(w=>w.myRoles.includes("Executor"));
+      const myContrib=W.filter(w=>w.myRoles.length>0&&!w.myRoles.includes("Witness")&&!w.myRoles.includes("Executor"));
+      const myVotes=W.filter(w=>w.myActions?.some(a=>a.role==="Endorser"||a.role==="Sensemaker"));
+
+      const tabs=[{k:"stories",l:"Stories",c:myStories.length},{k:"work",l:"Work",c:myWork.length},{k:"contrib",l:"Helped",c:myContrib.length},{k:"votes",l:"Actions",c:myVotes.length}];
+
+      function MissionCard({w}){
+        const c=TC[w.track];
+        const actions=w.myActions||[];
+        return <div onClick={()=>onTapCard(w.id)} style={{background:"#fff",borderRadius:12,marginBottom:8,overflow:"hidden",cursor:"pointer",border:"1px solid "+S.border}}>
+          <div style={{padding:"10px 12px 0"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+              <span style={{background:TBG[w.track],color:c,fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:4}}>{TL[w.track]}</span>
+              <span style={{fontSize:10,color:S.muted}}>{stageHuman(w)}</span>
+            </div>
+            <div style={{fontSize:13,fontWeight:600,color:S.text,lineHeight:1.4,marginBottom:6}}>{w.summary}</div>
+            <RoleBadges roles={w.myRoles}/>
+          </div>
+          <div style={{padding:"6px 12px"}}><StageBar track={w.track} stage={w.stage} compact/></div>
+          {actions.length>0&&<div style={{padding:"6px 12px 10px",borderTop:"1px solid #f8f9fb"}}>
+            <div style={{fontSize:9,fontWeight:600,color:S.muted,marginBottom:3}}>WHAT'S NEEDED FROM YOU</div>
+            {actions.map((a,i)=><div key={i} style={{fontSize:11,color:a.urgent?"#dc2626":S.sub,fontWeight:a.urgent?600:400,lineHeight:1.6}}>
+              {ROLE_ICONS[a.role]||""} <span style={{color:S.muted,fontSize:9}}>as {a.role}:</span> {a.action}{a.deadline?" \u2014 "+a.deadline:""}
+            </div>)}
+          </div>}
+        </div>;
+      }
+
+      const items={stories:myStories,work:myWork,contrib:myContrib,votes:myVotes}[sub]||[];
+
+      return <div style={{flex:1,overflow:"auto",background:S.bg}}>
+        {/* Stats strip */}
+        <div style={{display:"flex",gap:0,background:"#fff",borderBottom:"1px solid "+S.border}}>
+          {[{l:"Witnessed",v:USER.wCount},{l:"Impacted",v:USER.impact,gold:true},{l:"Executed",v:USER.executed},{l:"Verified",v:USER.verified}].map((s,i)=>
+            <div key={i} style={{flex:1,padding:"10px 4px",textAlign:"center",borderRight:i<3?"1px solid #f1f5f9":"none"}}>
+              <div style={{fontSize:18,fontWeight:700,color:s.gold?"#f59e0b":S.text}}>{s.v}</div>
+              <div style={{fontSize:8,color:S.muted}}>{s.l}</div>
+            </div>
+          )}
+        </div>
+        {/* Sub tabs */}
+        <div style={{display:"flex",background:"#fff",borderBottom:"1px solid "+S.border}}>
+          {tabs.map(t=><button key={t.k} onClick={()=>setSub(t.k)} style={{flex:1,padding:"8px 0",background:"none",border:"none",borderBottom:sub===t.k?"2px solid "+S.acc:"2px solid transparent",cursor:"pointer"}}>
+            <div style={{fontSize:11,fontWeight:sub===t.k?700:400,color:sub===t.k?S.acc:S.muted}}>{t.l}</div>
+            <div style={{fontSize:8,color:S.muted}}>{t.c}</div>
+          </button>)}
+        </div>
+        {/* Cards */}
+        <div style={{padding:"8px 14px 60px"}}>
+          {items.length===0&&<div style={{textAlign:"center",padding:30,color:S.muted,fontSize:12}}>No active {sub} yet</div>}
+          {items.map(w=><MissionCard key={w.id} w={w}/>)}
+        </div>
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       WITNESS DETAIL (Push Screen)
+       ══════════════════════════════════════════ */
+
+    function WitnessDetailScreen({wid,onBack,onOpenTask}){
+      const w=W.find(x=>x.id===wid);
+      if(!w)return null;
+      const c=TC[w.track],idx=si(w.track,w.stage),labels=SL[w.track];
+      const tasks=TASKS[w.id]||[];
+      const hasRoles=w.myRoles.length>0;
+
+      return <div style={{position:"absolute",inset:0,background:"#fff",zIndex:100,display:"flex",flexDirection:"column",animation:"slideRight .2s ease"}}>
+        <BackHeader title="Witness Detail" onBack={onBack}/>
+        <div style={{flex:1,overflow:"auto",background:S.bg}}>
+          {/* Header card */}
+          <div style={{background:"#fff",padding:"14px 16px",borderBottom:"1px solid "+S.border}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+              <span style={{background:TBG[w.track],color:c,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6}}>{TL[w.track]}</span>
+              {w.conf&&<span style={{fontSize:10,color:S.sub}}>{"\uD83D\uDD12"} Confidential</span>}
+            </div>
+            <div style={{fontSize:16,fontWeight:700,color:S.text,lineHeight:1.4,marginBottom:4}}>{w.summary}</div>
+            <div style={{fontSize:12,color:S.sub,lineHeight:1.6,marginBottom:10}}>{w.detail}</div>
+            {hasRoles&&<div style={{marginBottom:8}}><div style={{fontSize:9,fontWeight:600,color:S.muted,marginBottom:3}}>YOUR ROLES</div><RoleBadges roles={w.myRoles} size="md"/></div>}
+            <StageBar track={w.track} stage={w.stage}/>
+            <div style={{fontSize:11,color:S.sub,marginTop:6}}>{stageHuman(w)}</div>
+          </div>
+
+          {/* What's needed from you */}
+          {w.myActions.length>0&&<div style={{margin:"8px 14px",background:c+"08",border:"1px solid "+c+"20",borderRadius:10,padding:12}}>
+            <div style={{fontSize:10,fontWeight:700,color:c,marginBottom:4}}>WHAT'S NEEDED FROM YOU</div>
+            {w.myActions.map((a,i)=><div key={i} style={{fontSize:12,color:S.text,lineHeight:1.8}}>
+              {ROLE_ICONS[a.role]} <span style={{color:S.muted,fontSize:10}}>as {a.role}:</span> {a.action}
+              {a.urgent&&<span style={{color:"#dc2626",fontSize:10,fontWeight:600}}> \u2014 {a.deadline}</span>}
+            </div>)}
+          </div>}
+
+          {/* Journey Timeline */}
+          <SectionLabel>Journey</SectionLabel>
+          <div style={{padding:"0 14px 8px"}}>
+            <div style={{background:"#fff",borderRadius:10,overflow:"hidden",border:"1px solid "+S.border}}>
+              {w.journey.map((j,i)=>{
+                const stageIdx=labels.indexOf(j.stage);
+                const isCurrent=i===w.journey.length-1;
+                return <div key={i} style={{padding:"8px 12px",borderBottom:i<w.journey.length-1?"1px solid #f8f9fb":"none",background:isCurrent?c+"05":"#fff"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{width:20,height:20,borderRadius:"50%",background:stageIdx<=idx?c:"#e2e8f0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {isCurrent?<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>:<div style={{fontSize:8,color:"#fff"}}>{"\u2713"}</div>}
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:11,fontWeight:600,color:S.text}}>{j.stage}</span>
+                        <span style={{fontSize:9,color:S.muted}}>{j.date}</span>
+                      </div>
+                      <div style={{fontSize:10,color:S.sub}}>{j.who}: {j.what}</div>
+                    </div>
+                  </div>
+                </div>;
+              })}
+            </div>
+          </div>
+
+          {/* Tasks (if Execute stage) */}
+          {tasks.length>0&&<>
+            <SectionLabel>Tasks ({w.done}/{w.tasks} done)</SectionLabel>
+            <div style={{padding:"0 14px 8px"}}>
+              {tasks.map(t=><div key={t.id} onClick={t.isYours?()=>onOpenTask(w.id,t.id):undefined} style={{background:"#fff",borderRadius:10,padding:"10px 12px",marginBottom:6,border:"1px solid "+(t.isYours?c+"40":S.border),cursor:t.isYours?"pointer":"default"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                  <div style={{width:14,height:14,borderRadius:"50%",background:t.status==="done"?"#22c55e":t.status==="active"?c:"#e2e8f0",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {t.status==="done"&&<span style={{fontSize:8,color:"#fff"}}>{"\u2713"}</span>}
+                  </div>
+                  <div style={{flex:1,fontSize:12,fontWeight:500,color:S.text}}>{t.name}</div>
+                  {t.isYours&&<span style={{fontSize:8,color:c,fontWeight:700,background:c+"10",padding:"1px 5px",borderRadius:3}}>YOUR TASK</span>}
+                </div>
+                <div style={{display:"flex",gap:8,fontSize:10,color:S.muted,marginLeft:20}}>
+                  <span>{t.esco}</span>
+                  <span>Diff: {Math.round(t.diff*100)}%</span>
+                  {t.assignee&&<span>{t.assignee==="You"?"You":t.assignee}</span>}
+                  {!t.assignee&&<span style={{color:c,fontWeight:600}}>Unclaimed{t.noviceSlot?" (Novice reserved)":""}</span>}
+                </div>
+                {t.isYours&&<div style={{marginTop:6,marginLeft:20,display:"flex",gap:6}}>
+                  <span style={{fontSize:9,color:t.heartbeat?.includes("3d")?"#f59e0b":S.muted}}>{"\u23F0"} Heartbeat: {t.heartbeat}</span>
+                  <span style={{fontSize:9,color:S.muted}}>{"\uD83D\uDCCE"} {t.evidence} evidence</span>
+                </div>}
+              </div>)}
+            </div>
+          </>}
+
+          {/* Participants */}
+          <SectionLabel>People involved ({w.people.length})</SectionLabel>
+          <div style={{padding:"0 14px 8px"}}>
+            <div style={{background:"#fff",borderRadius:10,padding:10,border:"1px solid "+S.border,display:"flex",flexWrap:"wrap",gap:6}}>
+              {w.people.map((p,i)=><span key={i} style={{fontSize:11,color:S.text,background:"#f8fafc",padding:"3px 8px",borderRadius:8}}>
+                {p.n} <span style={{fontSize:9,color:S.muted}}>{p.role}</span>
+              </span>)}
+            </div>
+          </div>
+
+          {/* ESCO tags */}
+          <SectionLabel>ESCO Domains</SectionLabel>
+          <div style={{padding:"0 14px 8px"}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+              {w.esco.map((t,i)=><span key={i} style={{background:"#f1f5f9",color:S.sub,fontSize:10,padding:"3px 8px",borderRadius:8}}>{t}</span>)}
+            </div>
+          </div>
+
+          {/* Context Triad */}
+          <SectionLabel>Evidence (Context Triad)</SectionLabel>
+          <div style={{padding:"0 14px 8px"}}>
+            <div style={{display:"flex",gap:12,background:"#fff",borderRadius:10,padding:10,border:"1px solid "+S.border}}>
+              <div style={{fontSize:11,color:!w.conf?"#059669":"#cbd5e1"}}>{!w.conf?"\uD83D\uDCF7":"\u25FB\uFE0F"} Visual</div>
+              <div style={{fontSize:11,color:"#059669"}}>{"\uD83D\uDCCD"} Location</div>
+              <div style={{fontSize:11,color:w.co>0?"#059669":"#cbd5e1"}}>{"\uD83D\uDC65"} {w.co} co-witnesses</div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{padding:"8px 14px 20px",display:"flex",gap:6}}>
+            {w.myActions.length>0&&<button style={{flex:2,padding:"10px 0",borderRadius:10,border:"none",background:c,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>{w.myActions[0].action}</button>}
+            <button style={{flex:1,padding:"10px 0",borderRadius:10,border:"1px solid "+S.border,background:"#fff",color:S.sub,fontSize:11,cursor:"pointer"}}>Share</button>
+            <button style={{flex:1,padding:"10px 0",borderRadius:10,border:"1px solid #fee2e2",background:"#fff",color:"#ef4444",fontSize:11,cursor:"pointer"}}>Dispute</button>
+          </div>
+        </div>
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       TASK DETAIL (Push from Witness Detail)
+       ══════════════════════════════════════════ */
+
+    function TaskDetailScreen({wid,tid,onBack}){
+      const w=W.find(x=>x.id===wid);
+      const tasks=TASKS[wid]||[];
+      const t=tasks.find(x=>x.id===tid);
+      if(!w||!t)return null;
+      const c=TC[w.track];
+
+      return <div style={{position:"absolute",inset:0,background:"#fff",zIndex:150,display:"flex",flexDirection:"column",animation:"slideRight .2s ease"}}>
+        <BackHeader title="Your Task" onBack={onBack}/>
+        <div style={{flex:1,overflow:"auto",background:S.bg}}>
+          <div style={{background:"#fff",padding:"14px 16px",borderBottom:"1px solid "+S.border}}>
+            <div style={{fontSize:9,fontWeight:600,color:S.muted,marginBottom:4}}>PART OF</div>
+            <div style={{fontSize:12,color:S.sub,marginBottom:8}}>{w.summary}</div>
+            <div style={{fontSize:16,fontWeight:700,color:S.text,marginBottom:8}}>{t.name}</div>
+            <div style={{display:"flex",gap:10,fontSize:11,color:S.sub}}>
+              <span>{t.esco}</span>
+              <span>Difficulty: {Math.round(t.diff*100)}%</span>
+            </div>
+          </div>
+
+          {/* Heartbeat status */}
+          <div style={{margin:"10px 14px",background:t.heartbeat?.includes("3d")?"#fffbeb":"#f0fdf4",border:"1px solid "+(t.heartbeat?.includes("3d")?"#fde68a":"#bbf7d0"),borderRadius:10,padding:12}}>
+            <div style={{fontSize:10,fontWeight:600,color:t.heartbeat?.includes("3d")?"#92400e":"#166534",marginBottom:2}}>{"\u23F0"} HEARTBEAT STATUS</div>
+            <div style={{fontSize:12,color:S.text}}>Last update: {t.heartbeat}</div>
+            <div style={{fontSize:10,color:S.sub,marginTop:2}}>{t.heartbeat?.includes("3d")?"Due soon — update your progress to avoid stall warning":"On track"}</div>
+          </div>
+
+          {/* Progress update */}
+          <SectionLabel>Update Progress</SectionLabel>
+          <div style={{padding:"0 14px 8px"}}>
+            <div style={{background:"#fff",borderRadius:10,padding:12,border:"1px solid "+S.border}}>
+              <textarea placeholder="What did you do since last update?" style={{width:"100%",minHeight:60,padding:8,borderRadius:8,border:"1px solid "+S.border,fontSize:12,fontFamily:"inherit",resize:"none"}}/>
+              <div style={{display:"flex",gap:6,marginTop:8}}>
+                <button style={{flex:1,padding:"10px 0",borderRadius:8,border:"1px solid "+S.border,background:"#fafbfc",color:S.sub,fontSize:11,cursor:"pointer"}}>{"\uD83D\uDCF7"} Add Photo</button>
+                <button style={{flex:1,padding:"10px 0",borderRadius:8,border:"1px solid "+S.border,background:"#fafbfc",color:S.sub,fontSize:11,cursor:"pointer"}}>{"\uD83D\uDCCE"} Upload File</button>
+              </div>
+              <button style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:8,border:"none",background:c,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>{"\u2764\uFE0F"} Send Heartbeat</button>
+            </div>
+          </div>
+
+          {/* Evidence submitted */}
+          <SectionLabel>Evidence Submitted ({t.evidence})</SectionLabel>
+          <div style={{padding:"0 14px 8px"}}>
+            <div style={{background:"#fff",borderRadius:10,padding:10,border:"1px solid "+S.border}}>
+              {[...Array(t.evidence)].map((_,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:i<t.evidence-1?"1px solid #f8f9fb":"none"}}>
+                <div style={{width:32,height:32,borderRadius:6,background:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{"\uD83D\uDCF7"}</div>
+                <div>
+                  <div style={{fontSize:11,color:S.text}}>Photo {i+1}</div>
+                  <div style={{fontSize:9,color:S.muted}}>{i===0?"Feb 6":"Feb 8"} · Verified</div>
+                </div>
+              </div>)}
+            </div>
+          </div>
+
+          {/* Other tasks in this witness */}
+          <SectionLabel>Other tasks in this witness</SectionLabel>
+          <div style={{padding:"0 14px 20px"}}>
+            {tasks.filter(x=>x.id!==tid).map(ot=><div key={ot.id} style={{background:"#fff",borderRadius:8,padding:"8px 10px",marginBottom:4,border:"1px solid "+S.border}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:10,height:10,borderRadius:"50%",background:ot.status==="done"?"#22c55e":ot.status==="active"?"#60a5fa":"#e2e8f0"}}/>
+                <span style={{fontSize:11,color:S.text}}>{ot.name}</span>
+              </div>
+              <div style={{fontSize:9,color:S.muted,marginLeft:16}}>{ot.assignee||"Unclaimed"} · {ot.status}</div>
+            </div>)}
+          </div>
+
+          {/* Complete task */}
+          <div style={{padding:"0 14px 20px"}}>
+            <button style={{width:"100%",padding:12,background:"#059669",color:"#fff",borderRadius:10,border:"none",fontSize:13,fontWeight:700,cursor:"pointer"}}>{"\u2705"} Mark Task Complete</button>
+          </div>
+        </div>
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       MAP SCREEN
+       ══════════════════════════════════════════ */
+
+    function MapScreen({onTapPin,selectedId}){
+      const cx=106.84,cy=-6.21,sc=2800;
+      const pos=(lat,lng)=>({x:(lng-cx)*sc+195,y:(lat-cy)*-sc+220});
+      return <div style={{flex:1,position:"relative",background:"linear-gradient(180deg,#e8f0e8,#d4dfd4,#c8d8c4)",overflow:"hidden"}}>
+        <svg width="100%" height="100%" style={{position:"absolute"}}>
+          <line x1="0" y1="180" x2="390" y2="180" stroke="#b8c8b0" strokeWidth="3"/>
+          <line x1="0" y1="260" x2="390" y2="260" stroke="#b8c8b0" strokeWidth="3"/>
+          <line x1="140" y1="0" x2="140" y2="460" stroke="#b8c8b0" strokeWidth="3"/>
+          <line x1="260" y1="0" x2="260" y2="460" stroke="#b8c8b0" strokeWidth="3"/>
+          <path d="M 20,0 Q 80,120 50,250 Q 30,350 60,460" stroke="#93c5fd" strokeWidth="8" fill="none" opacity=".5"/>
+        </svg>
+        {W.map(w=>{
+          const p=pos(w.lat,w.lng),cl=TC[w.track],sel=selectedId===w.id,sz=sel?30:22;
+          const hasRole=w.myRoles.length>0;
+          return <div key={w.id} onClick={()=>onTapPin(w)} style={{position:"absolute",left:p.x-sz/2,top:p.y-sz/2,cursor:"pointer",zIndex:sel?20:10}}>
+            <div style={{width:sz,height:sz,borderRadius:w.track==="explore"?"4px":"50%",background:cl,border:sel?"3px solid #fff":hasRole?"2px solid #fff":"2px solid "+cl+"80",boxShadow:sel?"0 0 12px "+cl+"80":"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",fontWeight:700}}>{w.co||""}</div>
+            {hasRole&&!sel&&<div style={{position:"absolute",bottom:-3,right:-3,width:8,height:8,borderRadius:"50%",background:"#f59e0b",border:"1px solid #fff"}}/>}
+          </div>;
+        })}
+        <div style={{position:"absolute",bottom:8,left:8,background:"rgba(255,255,255,.9)",borderRadius:6,padding:"4px 8px",fontSize:9,display:"flex",gap:8}}>
+          {Object.entries(TC).map(([t,cl])=><span key={t} style={{color:cl,textTransform:"capitalize"}}>{"\u25CF"} {t}</span>)}
+          <span style={{color:"#f59e0b"}}>{"\u25CF"} = you</span>
+        </div>
+      </div>;
+    }
+
+    function MapSheet({w,onClose,onDetail}){
+      if(!w)return null;
+      const c=TC[w.track];
+      return <div style={{position:"absolute",bottom:0,left:0,right:0,background:"#fff",borderRadius:"14px 14px 0 0",boxShadow:"0 -4px 20px rgba(0,0,0,.12)",zIndex:50,padding:"8px 14px 12px",animation:"slideUp .2s ease"}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:6}}><div style={{width:28,height:3,borderRadius:2,background:"#d1d5db"}}/></div>
+        <div style={{fontSize:13,fontWeight:600,color:S.text,marginBottom:4}}>{w.summary}</div>
+        {w.myRoles.length>0&&<div style={{marginBottom:4}}><RoleBadges roles={w.myRoles}/></div>}
+        <div style={{fontSize:10,color:S.sub,marginBottom:6}}>{stageHuman(w)}</div>
+        <StageBar track={w.track} stage={w.stage} compact/>
+        <div style={{display:"flex",gap:6,marginTop:8}}>
+          <button onClick={()=>onDetail(w.id)} style={{flex:2,padding:"8px 0",borderRadius:8,border:"none",background:c,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>Open Detail</button>
+          <button onClick={onClose} style={{flex:1,padding:"8px 0",borderRadius:8,border:"1px solid "+S.border,background:"#fff",color:S.muted,fontSize:11,cursor:"pointer"}}>Close</button>
+        </div>
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       ME (Profile + Career)
+       ══════════════════════════════════════════ */
+
+    function MeScreen(){
+      const u=USER;
+      const pc=PC[u.pillar];
+      return <div style={{flex:1,overflow:"auto",background:S.bg}}>
+        <div style={{padding:"14px 14px 60px"}}>
+          {/* Profile header */}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <div style={{width:52,height:52,borderRadius:"50%",border:"3px solid "+pc,background:pc+"15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{"\uD83D\uDC64"}</div>
+            <div>
+              <div style={{fontSize:15,fontWeight:700,color:S.text}}>{u.fullName}</div>
+              <div style={{fontSize:11,color:pc,fontWeight:600}}>{u.tier} &middot; Field & Social</div>
+            </div>
+          </div>
+
+          {/* I / C / J (subtle, no numbers by default) */}
+          <div style={{background:"#fff",borderRadius:12,padding:14,marginBottom:10,border:"1px solid "+S.border}}>
+            <div style={{fontSize:10,fontWeight:600,color:S.muted,marginBottom:8}}>Trust Health</div>
+            {[{l:"Integrity",v:u.i,c:"#22c55e"},{l:"Competence",v:u.c,c:"#3b82f6"},{l:"Judgment",v:u.j,c:"#8b5cf6"}].map((s,i)=>
+              <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<2?6:0}}>
+                <span style={{fontSize:10,color:S.sub,width:70}}>{s.l}</span>
+                <div style={{flex:1,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden"}}>
+                  <div style={{width:s.v*100+"%",height:"100%",borderRadius:2,background:s.c}}/>
+                </div>
+              </div>
+            )}
+            <div style={{fontSize:8,color:S.muted,marginTop:6,textAlign:"center"}}>Tap for details (numbers hidden by default)</div>
+          </div>
+
+          {/* Stats */}
+          <div style={{display:"flex",gap:6,marginBottom:10}}>
+            {[{l:"Witnessed",v:u.wCount},{l:"Impact",v:u.impact,g:true},{l:"Domains",v:u.domains.length}].map((s,i)=>
+              <div key={i} style={{flex:1,background:"#fff",borderRadius:10,padding:"10px 6px",textAlign:"center",border:"1px solid "+S.border}}>
+                <div style={{fontSize:18,fontWeight:700,color:s.g?"#f59e0b":S.text}}>{s.v}</div>
+                <div style={{fontSize:8,color:S.muted}}>{s.l}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Influence Budget */}
+          <div style={{background:"#fff",borderRadius:12,padding:14,marginBottom:10,border:"1px solid "+S.border}}>
+            <div style={{fontSize:10,fontWeight:600,color:S.muted,marginBottom:6}}>Influence Budget</div>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <svg width="50" height="50" viewBox="0 0 50 50"><circle cx="25" cy="25" r="21" fill="none" stroke="#f1f5f9" strokeWidth="4"/><circle cx="25" cy="25" r="21" fill="none" stroke={S.acc} strokeWidth="4" strokeDasharray={u.budgetUsed*132+" 132"} strokeLinecap="round" transform="rotate(-90 25 25)"/></svg>
+              <div><div style={{fontSize:11,color:S.sub}}>{Math.round(u.budgetUsed*100)}% used</div><div style={{fontSize:9,color:S.muted}}>Vouch + Governance unified pool</div></div>
+            </div>
+          </div>
+
+          {/* Domains */}
+          <div style={{background:"#fff",borderRadius:12,padding:14,marginBottom:10,border:"1px solid "+S.border}}>
+            <div style={{fontSize:10,fontWeight:600,color:S.muted,marginBottom:6}}>ESCO Domains</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+              {u.domains.map((d,i)=><span key={i} style={{background:i===0?pc+"12":"#f8fafc",color:i===0?pc:S.sub,fontSize:10,padding:"3px 8px",borderRadius:8}}>{d}</span>)}
+            </div>
+          </div>
+
+          {/* Weather Hero */}
+          <div style={{background:"#fff",borderRadius:12,padding:14,marginBottom:10,border:"1px solid "+S.border}}>
+            <div style={{fontSize:10,fontWeight:600,color:S.muted,marginBottom:6}}>Weather Hero</div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>{"\uD83C\uDF24\uFE0F"}</span>
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:S.text}}>{u.heroTier}</div>
+                <div style={{fontSize:10,color:S.muted}}>{u.heroPoints} points · Next: Pembersih Langit (500)</div>
+              </div>
+            </div>
+          </div>
+
+          {/* CV Hidup */}
+          <button style={{width:"100%",padding:12,background:"#1e293b",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:600,cursor:"pointer",marginBottom:6}}>{"\uD83D\uDCC4"} View CV Hidup</button>
+          <button style={{width:"100%",padding:12,background:"#fff",color:S.sub,borderRadius:10,border:"1px solid "+S.border,fontSize:12,cursor:"pointer"}}>{"\u2699\uFE0F"} Settings</button>
+        </div>
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       CREATE FLOW
+       ══════════════════════════════════════════ */
+
+    function CreateFlow({onClose,mode}){
+      const [step,setStep]=useState(mode==="photo"?0:1);
+      const [claim,setClaim]=useState(null);
+      const claims=[{t:"bad",l:"Problem",i:"\u26A0\uFE0F",c:"#ef4444"},{t:"good",l:"Achievement",i:"\uD83C\uDF89",c:"#f59e0b"},{t:"unknown",l:"Question",i:"\uD83D\uDD2C",c:"#8b5cf6"}];
+
+      return <div style={{position:"absolute",inset:0,background:"#fff",zIndex:200,display:"flex",flexDirection:"column",animation:"slideUp .2s ease"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 14px",borderBottom:"1px solid "+S.border}}>
+          <span style={{fontSize:11,color:S.muted}}>Step {Math.min(step+1,3)} of 3</span>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:14,color:S.muted,cursor:"pointer"}}>{"\u2715"}</button>
+        </div>
+        <div style={{display:"flex",gap:2,padding:"0 14px",marginTop:4}}>{[0,1,2].map(i=><div key={i} style={{flex:1,height:3,borderRadius:2,background:i<=step?S.acc:"#e2e8f0"}}/>)}</div>
+
+        {step===0&&<div style={{padding:14,flex:1,display:"flex",flexDirection:"column"}}>
+          <div style={{fontSize:16,fontWeight:700,color:S.text,marginBottom:4}}>Capture what you see</div>
+          <div style={{fontSize:11,color:S.muted,marginBottom:14}}>A photo helps the community understand faster</div>
+          <div style={{flex:1,background:"#f1f5f9",borderRadius:12,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}>
+            <div style={{width:48,height:48,borderRadius:"50%",background:"#e2e8f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{"\uD83D\uDCF7"}</div>
+            <div style={{fontSize:12,color:S.sub}}>Tap to take photo</div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:4,padding:8,background:"#f0fdf4",borderRadius:8,marginBottom:10,fontSize:10,color:"#059669"}}>{"\uD83D\uDCCD"} Manggarai, Jakarta Selatan</div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>setStep(1)} style={{flex:1,padding:10,background:"#f1f5f9",color:S.sub,borderRadius:8,border:"none",fontSize:12,cursor:"pointer"}}>Skip</button>
+            <button onClick={()=>setStep(1)} style={{flex:2,padding:10,background:S.acc,color:"#fff",borderRadius:8,border:"none",fontSize:12,fontWeight:600,cursor:"pointer"}}>Next</button>
+          </div>
+        </div>}
+
+        {step===1&&<div style={{padding:14,flex:1,display:"flex",flexDirection:"column"}}>
+          <div style={{fontSize:16,fontWeight:700,color:S.text,marginBottom:4}}>What happened?</div>
+          <div style={{fontSize:11,color:S.muted,marginBottom:10}}>Describe what you witnessed</div>
+          {mode==="anon"&&<div style={{display:"flex",alignItems:"center",gap:4,padding:6,background:"#f8fafc",borderRadius:6,marginBottom:10,fontSize:10,color:S.sub}}>{"\uD83D\uDD12"} Your identity will be hidden</div>}
+          <textarea placeholder="I saw..." style={{flex:1,minHeight:80,padding:10,borderRadius:8,border:"1px solid "+S.border,fontSize:12,fontFamily:"inherit",resize:"none",marginBottom:10}}/>
+          <div style={{fontSize:11,fontWeight:600,color:S.sub,marginBottom:6}}>What kind?</div>
+          <div style={{display:"flex",gap:4,marginBottom:12}}>
+            {claims.map(c=><button key={c.t} onClick={()=>setClaim(c.t)} style={{flex:1,padding:10,borderRadius:8,border:claim===c.t?"2px solid "+c.c:"1px solid "+S.border,background:claim===c.t?c.c+"08":"#fff",cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:16,marginBottom:2}}>{c.i}</div>
+              <div style={{fontSize:10,color:claim===c.t?c.c:S.sub,fontWeight:600}}>{c.l}</div>
+            </button>)}
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>setStep(0)} style={{flex:1,padding:10,background:"#f1f5f9",color:S.sub,borderRadius:8,border:"none",fontSize:12,cursor:"pointer"}}>Back</button>
+            <button onClick={()=>setStep(2)} style={{flex:2,padding:10,background:claim?S.acc:"#94a3b8",color:"#fff",borderRadius:8,border:"none",fontSize:12,fontWeight:600,cursor:"pointer"}}>Next</button>
+          </div>
+        </div>}
+
+        {step===2&&<div style={{padding:14,flex:1,display:"flex",flexDirection:"column"}}>
+          <div style={{fontSize:16,fontWeight:700,color:S.text,marginBottom:4}}>Review & submit</div>
+          <div style={{fontSize:11,color:S.muted,marginBottom:12}}>AI will process and create a community story</div>
+          <div style={{background:"#f8fafc",borderRadius:10,padding:12,marginBottom:10,border:"1px solid "+S.border}}>
+            <div style={{fontSize:9,fontWeight:600,color:S.muted,marginBottom:4}}>AI-GENERATED PREVIEW</div>
+            <div style={{fontSize:12,color:S.text,lineHeight:1.5,marginBottom:6}}>"Reports of blocked drainage causing flooding risk."</div>
+            <div style={{display:"flex",gap:4}}><span style={{background:"#dbeafe",color:S.acc,fontSize:8,padding:"1px 5px",borderRadius:4}}>Civil Engineering</span><span style={{background:"#dbeafe",color:S.acc,fontSize:8,padding:"1px 5px",borderRadius:4}}>Emergency Response</span></div>
+          </div>
+          <div style={{fontSize:11,fontWeight:600,color:S.sub,marginBottom:6}}>Visibility</div>
+          <div style={{display:"flex",gap:4,marginBottom:12}}>
+            {[{m:"Open",d:"Everyone"},{m:mode==="anon"?"Anonymous":"Confidential",d:mode==="anon"?"Identity hidden":"AI-redacted"}].map((o,i)=><button key={o.m} style={{flex:1,padding:"8px 6px",borderRadius:8,border:i===0?"2px solid "+S.acc:"1px solid "+S.border,background:i===0?"#eff6ff":"#fff",cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:10,color:i===0?S.acc:S.sub,fontWeight:600}}>{o.m}</div>
+              <div style={{fontSize:8,color:S.muted}}>{o.d}</div>
+            </button>)}
+          </div>
+          <div style={{display:"flex",gap:6,marginTop:"auto"}}>
+            <button onClick={()=>setStep(1)} style={{flex:1,padding:10,background:"#f1f5f9",color:S.sub,borderRadius:8,border:"none",fontSize:12,cursor:"pointer"}}>Back</button>
+            <button onClick={onClose} style={{flex:2,padding:10,background:"#059669",color:"#fff",borderRadius:8,border:"none",fontSize:12,fontWeight:600,cursor:"pointer"}}>{"\u2705"} Submit Witness</button>
+          </div>
+        </div>}
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       WEATHER STATION
+       ══════════════════════════════════════════ */
+
+    function WeatherStation({onClose}){
+      const days=[{d:"Mon",g:2.1},{d:"Tue",g:2.8},{d:"Wed",g:3.5},{d:"Thu",g:5.1},{d:"Fri",g:5.8},{d:"Sat",g:6.0},{d:"Today",g:6.2}];
+      return <div style={{position:"absolute",inset:0,zIndex:200,background:"linear-gradient(180deg,#eef2ff,#f8fafc)",overflow:"auto",animation:"fadeIn .2s ease"}}>
+        <BackHeader title="Weather Station" onBack={onClose}/>
+        <div style={{padding:16}}>
+          <div style={{textAlign:"center",marginBottom:16}}>
+            <div style={{fontSize:36}}>{WEATHER.icon}</div>
+            <div style={{fontSize:18,fontWeight:700,color:S.text}}>{WEATHER.label}</div>
+            <div style={{fontSize:24,fontWeight:700,color:S.acc,marginTop:4}}>{WEATHER.gdf}%</div>
+            <div style={{fontSize:10,color:S.muted}}>Global Difficulty Floor</div>
+          </div>
+          <div style={{background:"#fff",borderRadius:12,padding:14,marginBottom:12,border:"1px solid "+S.border}}>
+            <div style={{fontSize:10,fontWeight:600,color:S.muted,marginBottom:10}}>7-DAY TREND</div>
+            <div style={{display:"flex",alignItems:"flex-end",gap:4,height:60}}>
+              {days.map((d,i)=><div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                <div style={{fontSize:7,color:S.muted}}>{d.g}%</div>
+                <div style={{width:"100%",height:(d.g/12)*50+"px",background:d.g>10?"#fbbf24":d.g>5?"#93c5fd":"#86efac",borderRadius:2}}/>
+                <div style={{fontSize:8,color:i===6?S.acc:S.muted,fontWeight:i===6?700:400}}>{d.d}</div>
+              </div>)}
+            </div>
+          </div>
+          <div style={{background:"#fff",borderRadius:12,padding:14,marginBottom:12,border:"1px solid "+S.border}}>
+            <div style={{fontSize:10,fontWeight:600,color:S.muted,marginBottom:8}}>DOMAIN EFFICIENCY</div>
+            {[{d:"Civil Engineering",e:.85,s:"Healthy"},{d:"Health Services",e:.72,s:"Sluggish"},{d:"Social Services",e:.48,s:"Critical"}].map((d,i)=>
+              <div key={i} style={{display:"flex",alignItems:"center",gap:6,marginBottom:i<2?6:0}}>
+                <span style={{fontSize:10,color:S.sub,width:100}}>{d.d}</span>
+                <div style={{flex:1,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden"}}>
+                  <div style={{width:d.e*100+"%",height:"100%",borderRadius:2,background:d.e>=.9?"#22c55e":d.e>=.7?"#f59e0b":d.e>=.5?"#f97316":"#ef4444"}}/>
+                </div>
+                <span style={{fontSize:9,color:d.e<.5?"#ef4444":S.muted,fontWeight:d.e<.5?600:400}}>{d.s}</span>
+              </div>
+            )}
+          </div>
+          <div style={{background:"#fff",borderRadius:12,padding:14,border:"1px solid "+S.border}}>
+            <div style={{fontSize:10,fontWeight:600,color:S.muted,marginBottom:8}}>COMMUNITY EVENTS</div>
+            <div style={{fontSize:10,color:S.sub,lineHeight:2}}>
+              <div>{"\u26A1"} Verification delay in Civil Engineering domain</div>
+              <div>{"\u2705"} Fraud report confirmed + resolved in Health Services</div>
+              <div>{"\uD83C\uDF3F"} Natural trust recovery underway (+0.3% GDF heal)</div>
+            </div>
+          </div>
+        </div>
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       IMPACT SPLASH (modal)
+       ══════════════════════════════════════════ */
+
+    function ImpactSplash({w,onClose}){
+      if(!w)return null;
+      return <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",animation:"fadeIn .3s ease"}}>
+        <div style={{width:"85%",background:"#fff",borderRadius:20,padding:24,textAlign:"center"}}>
+          <div style={{fontSize:36,marginBottom:8}}>{"\uD83C\uDF1F"}</div>
+          <div style={{fontSize:16,fontWeight:700,color:S.text,marginBottom:4}}>IMPACT CONFIRMED</div>
+          <div style={{fontSize:13,color:S.sub,lineHeight:1.5,marginBottom:14}}>{w.summary}</div>
+          <div style={{background:"#f0fdf4",borderRadius:10,padding:10,marginBottom:14}}>
+            <div style={{fontSize:10,color:"#166534",fontWeight:600}}>Your roles: {w.myRoles.join(" · ")}</div>
+            <div style={{fontSize:10,color:S.sub,marginTop:2}}>{w.people.length} people involved · {w.journey.length} stages completed</div>
+          </div>
+          <div style={{display:"flex",gap:6,marginBottom:8}}>
+            <div style={{flex:1,background:"#f8fafc",borderRadius:8,padding:8}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#f59e0b"}}>+1</div>
+              <div style={{fontSize:8,color:S.muted}}>Impact on CV</div>
+            </div>
+            <div style={{flex:1,background:"#f8fafc",borderRadius:8,padding:8}}>
+              <div style={{fontSize:14,fontWeight:700,color:S.acc}}>+0.02</div>
+              <div style={{fontSize:8,color:S.muted}}>Judgment</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{width:"100%",padding:10,background:S.acc,color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:600,cursor:"pointer"}}>View Full Story</button>
+        </div>
+      </div>;
+    }
+
+    /* ══════════════════════════════════════════
+       MAIN APP
+       ══════════════════════════════════════════ */
+
+    function App(){
+      const [tab,setTab]=useState("home");
+      const [screen,setScreen]=useState(null); // witnessDetail, taskDetail, createFlow, weather
+      const [selectedWid,setSelectedWid]=useState(null);
+      const [selectedTid,setSelectedTid]=useState(null);
+      const [createMode,setCreateMode]=useState(null);
+      const [mapSel,setMapSel]=useState(null);
+      const [showImpact,setShowImpact]=useState(false);
+
+      const openWitness=(wid)=>{setSelectedWid(wid);setScreen("witnessDetail");};
+      const openTask=(wid,tid)=>{setSelectedWid(wid);setSelectedTid(tid);setScreen("taskDetail");};
+      const backToMain=()=>{setScreen(null);setSelectedWid(null);setSelectedTid(null);};
+      const backToWitness=()=>{setScreen("witnessDetail");setSelectedTid(null);};
+
+      return (
+        <div style={{width:390,height:720,borderRadius:32,overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.3),0 0 0 1px rgba(255,255,255,.06)",background:"#fff",position:"relative",fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif"}}>
+          {/* Status bar */}
+          <div style={{height:40,background:"#fff",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 20px",fontSize:12,fontWeight:600,color:S.text}}>
+            <span>9:41</span>
+            <span style={{fontSize:10,fontWeight:700,letterSpacing:.5}}>Gotong Royong</span>
+            <span style={{fontSize:10}}>{"\uD83D\uDCF6"} {"\uD83D\uDD0B"}</span>
+          </div>
+
+          {/* Greeting bar (on home + missions) */}
+          {(tab==="home"||tab==="missions")&&!screen&&<GreetingBar onWeatherTap={()=>setScreen("weather")}/>}
+
+          {/* Content area */}
+          <div style={{height:720-40-(tab==="home"||tab==="missions"?46:0)-50,display:"flex",flexDirection:"column",position:"relative"}}>
+            {!screen&&tab==="home"&&<HomeScreen onTapCard={openWitness} onStartCreate={(m)=>{setCreateMode(m);setScreen("createFlow");}} onWeatherTap={()=>setScreen("weather")}/>}
+            {!screen&&tab==="missions"&&<MissionsScreen onTapCard={openWitness}/>}
+            {!screen&&tab==="map"&&<><MapScreen onTapPin={w=>setMapSel(w)} selectedId={mapSel?.id}/><MapSheet w={mapSel} onClose={()=>setMapSel(null)} onDetail={(id)=>{setMapSel(null);openWitness(id);}}/></>}
+            {!screen&&tab==="me"&&<MeScreen/>}
+
+            {screen==="witnessDetail"&&<WitnessDetailScreen wid={selectedWid} onBack={backToMain} onOpenTask={openTask}/>}
+            {screen==="taskDetail"&&<TaskDetailScreen wid={selectedWid} tid={selectedTid} onBack={backToWitness}/>}
+            {screen==="createFlow"&&<CreateFlow mode={createMode} onClose={backToMain}/>}
+            {screen==="weather"&&<WeatherStation onClose={backToMain}/>}
+
+            {showImpact&&<ImpactSplash w={W.find(x=>x.id===5)} onClose={()=>setShowImpact(false)}/>}
+          </div>
+
+          {/* Tab bar */}
+          {!screen&&<div style={{height:50,background:"#fff",borderTop:"1px solid "+S.border,display:"flex",alignItems:"center",justifyContent:"space-around"}}>
+            <TabBtn icon={"\uD83C\uDFE0"} label="Home" active={tab==="home"} onClick={()=>setTab("home")}/>
+            <TabBtn icon={"\uD83C\uDFAF"} label="Missions" active={tab==="missions"} badge={3} onClick={()=>setTab("missions")}/>
+            <TabBtn icon={"\uD83D\uDDFA\uFE0F"} label="Map" active={tab==="map"} onClick={()=>setTab("map")}/>
+            <TabBtn icon={"\uD83D\uDC64"} label="Me" active={tab==="me"} onClick={()=>setTab("me")}/>
+          </div>}
+
+          {/* Demo: Impact splash trigger */}
+          {!screen&&tab==="home"&&<div onClick={()=>setShowImpact(true)} style={{position:"absolute",bottom:56,right:14,background:"#059669",color:"#fff",fontSize:8,fontWeight:600,padding:"3px 8px",borderRadius:6,cursor:"pointer",opacity:.7}}>Demo: Impact Splash</div>}
+        </div>
+      );
+    }
+
+    function TabBtn({icon,label,active,onClick,badge}){
+      return <button onClick={onClick} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"2px 14px",position:"relative"}}>
+        <span style={{fontSize:16,filter:active?"none":"grayscale(1)",opacity:active?1:.4}}>{icon}</span>
+        <span style={{fontSize:8,color:active?S.acc:S.muted,fontWeight:active?700:400}}>{label}</span>
+        {badge&&<div style={{position:"absolute",top:-1,right:6,minWidth:12,height:12,borderRadius:6,background:"#ef4444",color:"#fff",fontSize:7,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 2px"}}>{badge}</div>}
+      </button>;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

@@ -4,8 +4,24 @@
 
 This document provides a summary of the comprehensive technical specification created for the Gotong Royong platform integration with the Markov Credential Engine.
 
+## Stack Lock Addendum (2026-02-15)
+
+Current implementation stack is locked to Rust 2024 + Axum + SurrealDB `v3.0.0-beta.4`.
+
+Canonical references:
+- `docs/research/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
+- `docs/backend-research.md`
+
+Notes:
+- Older summary sections describing PostgreSQL/MySQL/Knex/Alembic/Diesel defaults are historical and superseded for new implementation work.
+- Updated canonical operational docs are:
+  - `docs/development/setup-guide.md`
+  - `docs/deployment/infrastructure.md`
+  - `docs/database/schema-requirements.md`
+  - `docs/database/migrations.md`
+
 **Created**: 2026-02-10
-**Total Files**: 19 markdown documents + 1 root README
+**Total Files**: 33 markdown documents + 1 root README + 24 HTML prototype references + 5 legacy archive files
 **Total Content**: ~50,000+ lines of technical specification
 
 ## Documentation Structure
@@ -16,6 +32,13 @@ gotong-royong/
 ├── DOCUMENTATION-SUMMARY.md (this file)
 └── docs/
     ├── README.md (Documentation index and reading paths)
+    ├── DESIGN-INDEX.md (Design index and canonical links)
+    ├── design/ (design system docs + prototypes)
+    │   ├── context/ (design handoff, sequence, track map, fixes)
+    │   ├── specs/ (design system and AI/UI-UX specs)
+    │   ├── prototypes/ (24 HTML browser-viewable prototypes)
+    │   ├── archive/ (legacy Word documents)
+    │   └── README.md (design documentation onboarding)
     │
     ├── architecture/ (3 files)
     │   ├── system-overview.md
@@ -48,13 +71,15 @@ gotong-royong/
         └── local-development.md
 ```
 
+Design references are now canonical under `docs/design/...` with legacy root-path copies removed.
+
 ## Document Descriptions
 
 ### Root Level
 
 #### README.md
 - Platform introduction and tagline
-- Tech stack overview (TBD for implementation choice)
+- Tech stack overview (locked implementation profile)
 - Quick links to all documentation sections
 - Markov Engine integration references
 - Getting started pointer
@@ -149,29 +174,18 @@ gotong-royong/
 
 ### Database Section (2 files)
 
-#### schema-requirements.md (3,845 lines)
-- Complete ER diagram
-- 14 core tables with PostgreSQL schemas
-- Foreign key relationships
-- Check constraints
-- Indexes for performance
-- MySQL compatibility notes
-- PostGIS extension for geospatial queries
-- Data retention policies
-- Capacity planning estimates
-- Backup strategy
-- Row-level security examples
+#### schema-requirements.md (current canonical)
+- SurrealDB-first schema requirements and core records
+- Chat thread/member/message/read cursor/delivery event model
+- Transition ledger and idempotency index requirements
+- Realtime subscription keys and permission requirements
+- Data retention and validation requirements
 
-#### migrations.md (2,634 lines)
-- Migration principles (idempotency, backward compatibility)
-- Version control workflow
-- Migration tools (Knex.js, Alembic, Diesel)
-- 6 migration examples (create tables, add columns, constraints, data migrations)
-- Zero-downtime migration strategies
-- Rollback procedures
-- Testing migrations
-- CI/CD integration
-- Production deployment checklist
+#### migrations.md (current canonical)
+- SurrealDB migration workflow using `.surql` scripts
+- Verification query checks and CI gating
+- Version tracking, rollback, and operational checklist
+- Migration test matrix for idempotency/ordering/live/permission behavior
 
 ### PoR Evidence Section (3 files)
 
@@ -216,17 +230,11 @@ gotong-royong/
 
 ### Deployment Section (3 files)
 
-#### infrastructure.md (3,789 lines)
-- Development environment (Docker Compose)
-- Staging environment (single-node Kubernetes)
-- Production architecture (multi-node Kubernetes with HA)
-- Infrastructure as Code (Terraform for AWS)
-- Complete Kubernetes manifests (Deployment, Service, HPA, Ingress)
-- Horizontal and vertical scaling strategies
-- Multi-AZ deployment for HA
-- Health checks (liveness and readiness probes)
-- CI/CD pipeline (GitHub Actions)
-- Cost estimation (small scale: $275/mo, medium scale: $1,043/mo)
+#### infrastructure.md (current canonical)
+- SurrealDB/Rust locked deployment profile by environment
+- Pinned container baseline (`surrealdb:v3.0.0-beta-4`) + Redis + S3-compatible storage
+- Reliability gates, rollback triggers, and security baseline
+- Observability baseline for stream and API operations
 
 #### security-checklist.md (3,456 lines)
 - Pre-deployment checklist (50+ items)
@@ -259,15 +267,12 @@ gotong-royong/
 
 ### Development Section (3 files)
 
-#### setup-guide.md (2,987 lines)
-- Prerequisites (Docker, Node.js, Git, PostgreSQL, Redis)
-- Quick start with Docker Compose (8 steps)
-- Manual setup without Docker
-- Environment variables reference
-- Connecting to services (PostgreSQL, Redis, MinIO)
-- Common troubleshooting (port conflicts, connection failures)
-- IDE setup (VS Code, IntelliJ/WebStorm)
-- Getting help resources
+#### setup-guide.md (current canonical)
+- Rust + SurrealDB + Redis + MinIO local setup
+- Pinned SurrealDB `v3.0.0-beta.4` runtime workflow
+- Environment variable reference for locked stack
+- Probe-based validation command for SurrealDB patterns
+- Troubleshooting for WS live queries and dependency health
 
 #### testing-integration.md (3,234 lines)
 - Test pyramid strategy (70% unit, 25% integration, 5% E2E)
@@ -308,9 +313,9 @@ gotong-royong/
 - **Ready for implementation**: Team can start building immediately
 
 ### 2. Code Examples
-- **Multiple languages**: Node.js, Python, Rust, Go examples throughout
-- **Copy-paste ready**: All code examples are complete and working
-- **Framework agnostic**: Flexible for team's technology choice
+- **Current implementation profile**: Rust + SurrealDB aligned examples in canonical operational docs
+- **Historical references**: Older Node.js/Python/relational examples remain for archive context only
+- **Copy-paste ready**: Canonical setup/probe snippets are runnable against the locked stack
 
 ### 3. Production-Ready
 - **Security hardening**: Complete security checklist with 50+ items

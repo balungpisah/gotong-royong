@@ -1,0 +1,1140 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — B0 · Seed Card (Universal)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --fs-h2:20px; --fs-h3:16px; --fs-body:14px; --fs-small:12px;
+    --fs-caption:11px; --fs-micro:9px;
+    --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-6:24px; --sp-8:32px;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+    --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+    --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+    --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+    /* Tanah core */
+    --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63;
+    --c-pasir:#A1887F; --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+    --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+    --c-berhasil:#2E7D32; --c-berhasil-l:#E8F5E9;
+    --c-peringatan:#E65100; --c-peringatan-l:#FFF3E0;
+    --c-bahaya:#C62828; --c-bahaya-l:#FFEBEE;
+    --c-keterangan:#4E342E; --c-keterangan-l:#EFEBE9;
+    /* Track accents */
+    --t-tuntaskan:#C05621; --t-tuntaskan-soft:#FFF3E0; --t-tuntaskan-muted:#FFECD2;
+    --t-wujudkan:#2E7D32; --t-wujudkan-soft:#E8F5E9; --t-wujudkan-muted:#C8E6C9;
+    --t-telusuri:#6A1B9A; --t-telusuri-soft:#F3E5F5; --t-telusuri-muted:#E1BEE7;
+    --t-rayakan:#F57F17; --t-rayakan-soft:#FFF8E1; --t-rayakan-muted:#FFECB3;
+    --t-musyawarah:#4E342E; --t-musyawarah-soft:#EFEBE9; --t-musyawarah-muted:#D7CCC8;
+    /* Vault */
+    --v-deep:#263238; --v-surface:#37474F; --v-mid:#546E7A;
+    --v-soft:#78909C; --v-light:#B0BEC5; --v-wash:#ECEFF1;
+  }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: #e8e0d8; color: var(--c-tanah-gelap);
+    min-height: 100vh;
+  }
+
+  .doc-bar {
+    background: var(--c-tanah-gelap); color: #fff;
+    padding: 16px 24px; text-align: center;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .doc-bar h1 { font-size: 15px; font-weight: 700; }
+  .doc-bar p { font-size: 11px; opacity: 0.5; margin-top: 2px; }
+
+  .scenario-nav {
+    background: var(--c-tanah-gelap);
+    display: flex; justify-content: center; flex-wrap: wrap;
+    position: sticky; top: 52px; z-index: 99;
+  }
+  .scenario-btn {
+    padding: 8px 12px; font-size: 10px; font-weight: 700;
+    cursor: pointer; border: none; background: transparent;
+    color: rgba(255,255,255,0.35); border-bottom: 2px solid transparent;
+    transition: all 0.2s; font-family: 'Nunito', sans-serif;
+  }
+  .scenario-btn:hover { color: rgba(255,255,255,0.7); }
+  .scenario-btn.active { color: #fff; border-bottom-color: var(--c-api); }
+  .scenario-label {
+    width: 100%; text-align: center; padding: 6px;
+    font-size: 10px; color: rgba(255,255,255,0.25); background: #2c1e1a;
+  }
+
+  /* ═══════════════════════════
+     PHONE FRAME
+     ═══════════════════════════ */
+  .phone-frame {
+    width: 375px; margin: 24px auto;
+    background: var(--c-kapas);
+    border-radius: 28px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.08);
+    min-height: 760px;
+    display: flex; flex-direction: column;
+  }
+
+  .app-bar {
+    background: var(--c-susu);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--c-batu);
+    flex-shrink: 0;
+  }
+  .app-bar .title {
+    font-size: var(--fs-h3); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+  }
+
+  .feed-content {
+    flex: 1; overflow-y: auto;
+    padding: var(--sp-3);
+    display: flex; flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  /* ═══════════════════════════
+     SEED CARD — universal anatomy
+     ═══════════════════════════ */
+  .seed-card {
+    background: var(--c-susu);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--c-batu);
+    position: relative;
+  }
+
+  /* Track accent strip (left border) */
+  .seed-card .track-strip {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    width: 4px;
+  }
+  .track-strip.tuntaskan { background: var(--t-tuntaskan); }
+  .track-strip.wujudkan { background: var(--t-wujudkan); }
+  .track-strip.telusuri { background: var(--t-telusuri); }
+  .track-strip.rayakan { background: var(--t-rayakan); }
+  .track-strip.musyawarah { background: var(--t-musyawarah); }
+
+  /* ── Card Header ── */
+  .card-header {
+    padding: var(--sp-3) var(--sp-3) var(--sp-2);
+    padding-left: calc(var(--sp-3) + 8px); /* offset for track strip */
+  }
+  .card-header-top {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: var(--sp-2);
+  }
+  .seed-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    letter-spacing: 0.3px;
+  }
+  .seed-badge.tuntaskan { background: var(--t-tuntaskan-soft); color: var(--t-tuntaskan); }
+  .seed-badge.wujudkan { background: var(--t-wujudkan-soft); color: var(--t-wujudkan); }
+  .seed-badge.telusuri { background: var(--t-telusuri-soft); color: var(--t-telusuri); }
+  .seed-badge.rayakan { background: var(--t-rayakan-soft); color: var(--t-rayakan); }
+  .seed-badge.musyawarah { background: var(--t-musyawarah-soft); color: var(--t-musyawarah); }
+
+  .rahasia-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    margin-left: auto;
+  }
+  .rahasia-badge.l1 { background: var(--c-keterangan-l); color: var(--c-kayu); }
+  .rahasia-badge.l2 { background: var(--c-tanah); color: #fff; }
+  .rahasia-badge.l3 { background: var(--c-tanah-gelap); color: #fff; }
+
+  .card-title {
+    font-size: var(--fs-body); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); line-height: 1.4;
+    margin-bottom: var(--sp-2);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-author {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .card-author .author-avatar {
+    width: 22px; height: 22px; border-radius: var(--r-full);
+    background: var(--c-kayu); display: flex; align-items: center;
+    justify-content: center; font-size: 9px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .card-author .author-name {
+    font-size: var(--fs-caption); font-weight: var(--fw-semi);
+    color: var(--c-tanah);
+  }
+  .card-author .author-tier {
+    font-size: var(--fs-micro); color: var(--c-pasir);
+    font-weight: var(--fw-semi);
+  }
+  .card-author .card-time {
+    margin-left: auto; font-size: var(--fs-micro); color: var(--c-pasir);
+  }
+
+  /* ── Card Body ── */
+  .card-body {
+    padding: 0 var(--sp-3) var(--sp-3);
+    padding-left: calc(var(--sp-3) + 8px);
+  }
+  .card-text {
+    font-size: var(--fs-small); color: var(--c-tanah);
+    line-height: 1.6;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-more {
+    font-size: var(--fs-caption); color: var(--c-api);
+    font-weight: var(--fw-semi); cursor: pointer;
+    margin-top: var(--sp-1);
+  }
+  .card-media {
+    display: flex; gap: 6px; margin-top: var(--sp-2);
+  }
+  .card-media .media-thumb {
+    width: 52px; height: 52px; border-radius: var(--r-sm);
+    background: var(--c-kapas); border: 1px solid var(--c-batu);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--c-pasir);
+  }
+  .card-location {
+    display: flex; align-items: center; gap: 4px;
+    font-size: var(--fs-micro); color: var(--c-kayu);
+    margin-top: var(--sp-2);
+  }
+
+  /* ── Stepper ── */
+  .card-stepper {
+    padding: var(--sp-2) var(--sp-3);
+    padding-left: calc(var(--sp-2) + 8px);
+    border-top: 1px solid var(--c-batu);
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto;
+  }
+  .step {
+    display: flex; align-items: center; gap: 4px;
+    white-space: nowrap;
+  }
+  .step .step-dot {
+    width: 8px; height: 8px; border-radius: var(--r-full);
+    flex-shrink: 0;
+  }
+  .step .step-label {
+    font-size: 8px; font-weight: var(--fw-bold);
+    letter-spacing: 0.2px;
+  }
+  .step-connector {
+    width: 12px; height: 1px; flex-shrink: 0;
+    margin: 0 2px;
+  }
+  /* Step states */
+  .step.done .step-dot { background: var(--c-pasir); }
+  .step.done .step-label { color: var(--c-pasir); }
+  .step-connector.done { background: var(--c-pasir); }
+
+  .step.current .step-dot { box-shadow: 0 0 0 2px var(--c-susu), 0 0 0 3.5px currentColor; }
+  .step.current .step-label { font-weight: var(--fw-extra); }
+
+  .step.future .step-dot { background: transparent; border: 1.5px solid var(--c-batu); }
+  .step.future .step-label { color: var(--c-batu); }
+  .step-connector.future { background: var(--c-batu); }
+
+  /* Track-colored steps */
+  .stepper-tuntaskan .step.current .step-dot { background: var(--t-tuntaskan); color: var(--t-tuntaskan); }
+  .stepper-tuntaskan .step.current .step-label { color: var(--t-tuntaskan); }
+  .stepper-wujudkan .step.current .step-dot { background: var(--t-wujudkan); color: var(--t-wujudkan); }
+  .stepper-wujudkan .step.current .step-label { color: var(--t-wujudkan); }
+  .stepper-telusuri .step.current .step-dot { background: var(--t-telusuri); color: var(--t-telusuri); }
+  .stepper-telusuri .step.current .step-label { color: var(--t-telusuri); }
+  .stepper-rayakan .step.current .step-dot { background: var(--t-rayakan); color: var(--t-rayakan); }
+  .stepper-rayakan .step.current .step-label { color: var(--t-rayakan); }
+  .stepper-musyawarah .step.current .step-dot { background: var(--t-musyawarah); color: var(--t-musyawarah); }
+  .stepper-musyawarah .step.current .step-label { color: var(--t-musyawarah); }
+
+  /* ── Card Footer ── */
+  .card-footer {
+    padding: var(--sp-2) var(--sp-3);
+    padding-left: calc(var(--sp-2) + 8px);
+    border-top: 1px solid var(--c-batu);
+    display: flex; align-items: center; gap: var(--sp-3);
+  }
+  .footer-action {
+    display: flex; align-items: center; gap: 4px;
+    font-size: var(--fs-caption); color: var(--c-kayu);
+    font-weight: var(--fw-semi); cursor: pointer;
+    transition: color 0.15s;
+  }
+  .footer-action:hover { color: var(--c-tanah-gelap); }
+  .footer-action .fa-icon { font-size: 13px; }
+  .footer-action .fa-count { font-weight: var(--fw-bold); }
+
+  .ai-badge {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+  }
+  .ai-badge.classified { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .ai-badge.suggested { background: var(--c-bara); color: var(--c-api); }
+  .ai-badge.duplicate { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+  .ai-badge.stalled { background: var(--c-bahaya-l); color: var(--c-bahaya); }
+  .ai-badge.dampak { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+
+  /* ═══════════════════════════
+     ANATOMY ANNOTATIONS
+     ═══════════════════════════ */
+  .anatomy-card {
+    position: relative;
+  }
+  .anno {
+    position: absolute; font-size: 8px; font-weight: 700;
+    color: #fff; background: var(--c-api);
+    padding: 1px 6px; border-radius: var(--r-full);
+    white-space: nowrap; z-index: 10;
+    pointer-events: none;
+  }
+  .anno::before {
+    content: ''; position: absolute;
+    width: 0; height: 0;
+  }
+  .anno-line {
+    position: absolute; z-index: 9;
+    pointer-events: none;
+  }
+
+  /* ═══════════════════════════
+     RAHASIA OVERLAYS
+     ═══════════════════════════ */
+  .redacted-name {
+    background: var(--c-tanah); color: var(--c-tanah);
+    border-radius: 2px; padding: 0 4px;
+    font-size: inherit;
+  }
+  .redacted-text {
+    background: var(--c-tanah); color: var(--c-tanah);
+    border-radius: 2px; display: inline;
+    user-select: none;
+  }
+  .redacted-block {
+    background: repeating-linear-gradient(
+      -45deg, var(--c-batu), var(--c-batu) 2px,
+      var(--c-kapas) 2px, var(--c-kapas) 6px
+    );
+    border-radius: var(--r-sm);
+    padding: var(--sp-4);
+    text-align: center;
+    color: var(--c-pasir);
+    font-size: var(--fs-caption);
+    font-weight: var(--fw-bold);
+  }
+
+  /* ═══════════════════════════
+     FIVE TRACKS MINI VIEW
+     ═══════════════════════════ */
+  .mini-cards {
+    display: flex; flex-direction: column;
+    gap: var(--sp-2);
+  }
+  .mini-card {
+    background: var(--c-susu);
+    border-radius: var(--r-md);
+    padding: var(--sp-2) var(--sp-3);
+    padding-left: calc(var(--sp-3) + 8px);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--c-batu);
+    position: relative;
+    overflow: hidden;
+  }
+  .mini-card .track-strip {
+    position: absolute; top: 0; left: 0; bottom: 0; width: 4px;
+  }
+  .mini-card .mc-row {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .mini-card .mc-title {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mini-card .mc-stage {
+    font-size: 8px; font-weight: var(--fw-extra);
+    padding: 1px 6px; border-radius: var(--r-full);
+  }
+
+  /* ═══════════════════════════
+     SCENARIOS
+     ═══════════════════════════ */
+  .scenario { display: none; flex-direction: column; height: 100%; }
+  .scenario.active { display: flex; }
+
+  /* Section label inside phone */
+  .section-label {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    color: var(--c-pasir); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: var(--sp-1);
+  }
+
+  /* Annotation overlay for anatomy view */
+  .anno-overlay {
+    position: relative;
+  }
+  .anno-tag {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: var(--c-api); color: #fff;
+    padding: 1px 6px; border-radius: var(--r-full);
+    font-size: 7px; font-weight: var(--fw-extra);
+    letter-spacing: 0.3px; vertical-align: middle;
+    margin-left: 4px;
+  }
+  .anno-bracket {
+    border: 1.5px dashed var(--c-api);
+    border-radius: var(--r-md);
+    padding: 2px;
+    position: relative;
+  }
+  .anno-bracket-label {
+    position: absolute; top: -8px; left: 8px;
+    background: var(--c-api); color: #fff;
+    padding: 0 5px; border-radius: var(--r-full);
+    font-size: 7px; font-weight: var(--fw-extra);
+    letter-spacing: 0.3px;
+  }
+
+  /* PIC row */
+  .pic-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: var(--sp-2);
+    padding: var(--sp-2);
+    background: var(--c-kapas);
+    border-radius: var(--r-md);
+  }
+  .pic-row .pic-avatar {
+    width: 20px; height: 20px; border-radius: var(--r-full);
+    background: var(--c-api); display: flex; align-items: center;
+    justify-content: center; font-size: 8px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .pic-row .pic-label {
+    font-size: var(--fs-micro); color: var(--c-kayu); font-weight: var(--fw-semi);
+  }
+  .pic-row .pic-name {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--c-tanah-gelap);
+  }
+
+  /* Dampak summary */
+  .dampak-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: var(--sp-2);
+    padding: var(--sp-2);
+    background: var(--c-berhasil-l);
+    border-radius: var(--r-md);
+    border: 1px solid rgba(46,125,50,0.15);
+  }
+  .dampak-row .dampak-icon {
+    font-size: 14px; flex-shrink: 0;
+  }
+  .dampak-row .dampak-text {
+    font-size: var(--fs-caption); color: var(--c-berhasil);
+    font-weight: var(--fw-semi); line-height: 1.3;
+  }
+
+  @media (max-width: 420px) {
+    .phone-frame { width: 100%; border-radius: 0; margin: 0; min-height: 100vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-bar">
+  <h1>B0 · Seed Card — Universal Anatomy</h1>
+  <p>Base card shape shared by all 5 tracks. Track-specific details in B1–B5.</p>
+</div>
+
+<nav class="scenario-nav">
+  <button class="scenario-btn active" onclick="showScenario('anatomi')">1. Anatomi</button>
+  <button class="scenario-btn" onclick="showScenario('baru')">2. Baru</button>
+  <button class="scenario-btn" onclick="showScenario('aktif')">3. Aktif</button>
+  <button class="scenario-btn" onclick="showScenario('rahasia')">4. Rahasia</button>
+  <button class="scenario-btn" onclick="showScenario('lima')">5. Lima Warna</button>
+  <div class="scenario-label">← Universal card anatomy. Same shape, 5 track skins.</div>
+</nav>
+
+<div class="phone-frame">
+
+  <!-- ════════ 1. ANATOMI — annotated reference ════════ -->
+  <div id="s-anatomi" class="scenario active">
+    <div class="app-bar">
+      <div class="title">Anatomi Kartu</div>
+    </div>
+
+    <div class="feed-content">
+      <div class="section-label">Annotated reference — every slot labeled</div>
+
+      <div class="seed-card anno-overlay">
+        <div class="track-strip tuntaskan"></div>
+
+        <!-- HEADER -->
+        <div class="anno-bracket" style="margin:0;">
+          <div class="anno-bracket-label">HEADER</div>
+          <div class="card-header">
+            <div class="card-header-top">
+              <span class="seed-badge tuntaskan">🔧 Keresahan</span>
+              <span class="anno-tag">SEED BADGE</span>
+              <span class="rahasia-badge l1">🔒 L1</span>
+              <span class="anno-tag">RAHASIA</span>
+            </div>
+            <div class="card-title">
+              Dana pos ronda tidak transparan
+              <span class="anno-tag">TITLE</span>
+            </div>
+            <div class="card-author">
+              <div class="author-avatar">AR</div>
+              <span class="author-name">Andi R.</span>
+              <span class="author-tier">· Pilar</span>
+              <span class="card-time">2j lalu</span>
+              <span class="anno-tag">AUTHOR ROW</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- BODY -->
+        <div class="anno-bracket" style="margin:0; border-top:none;">
+          <div class="anno-bracket-label">BODY</div>
+          <div class="card-body">
+            <div class="card-text">
+              Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya.
+            </div>
+            <div class="card-more">...selengkapnya</div>
+            <div class="card-media">
+              <div class="media-thumb">📷</div>
+              <div class="media-thumb">📎</div>
+              <span class="anno-tag">MEDIA</span>
+            </div>
+            <div class="card-location">
+              📍 RT 03/04, Kel. Merdeka
+              <span class="anno-tag">LOCATION</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEPPER -->
+        <div class="anno-bracket" style="margin:0; border-top:none;">
+          <div class="anno-bracket-label">STEPPER</div>
+          <div class="card-stepper stepper-tuntaskan">
+            <div class="step done"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+            <div class="step-connector done"></div>
+            <div class="step current"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+            <div class="step-connector future"></div>
+            <div class="step future"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+            <div class="step-connector future"></div>
+            <div class="step future"><div class="step-dot"></div><div class="step-label">Periksa</div></div>
+            <div class="step-connector future"></div>
+            <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+          </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="anno-bracket" style="margin:0; border-top:none;">
+          <div class="anno-bracket-label">FOOTER</div>
+          <div class="card-footer">
+            <div class="footer-action">
+              <span class="fa-icon">💬</span>
+              <span class="fa-count">8</span>
+            </div>
+            <div class="footer-action">
+              <span class="fa-icon">👥</span>
+              <span class="fa-count">4</span>
+            </div>
+            <div class="footer-action">
+              <span class="fa-icon">⏱</span>
+              <span>2h</span>
+            </div>
+            <span class="ai-badge classified">🤖 92%</span>
+            <span class="anno-tag">AI BADGE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slot reference -->
+      <div style="background:var(--c-susu); border-radius:var(--r-lg); padding:var(--sp-3); border:1px solid var(--c-batu); margin-top:var(--sp-2);">
+        <div style="font-size:var(--fs-caption); font-weight:var(--fw-extra); color:var(--c-tanah-gelap); margin-bottom:var(--sp-2);">Slot Reference</div>
+        <div style="font-size:var(--fs-micro); color:var(--c-kayu); line-height:1.7;">
+          <strong>Track Strip</strong> — 4px left border, track color = identity<br>
+          <strong>Seed Badge</strong> — track icon + seed name (e.g., Keresahan)<br>
+          <strong>Rahasia</strong> — privacy level badge (L0 = hidden, L1–L3 shown)<br>
+          <strong>Title</strong> — max 2 lines, truncated<br>
+          <strong>Author Row</strong> — avatar + name + tier + timestamp<br>
+          <strong>Body</strong> — 3-line content + "selengkapnya" + media + location<br>
+          <strong>Stepper</strong> — track lifecycle stages, current = track-colored dot<br>
+          <strong>Footer</strong> — comments · supporters · time-in-stage · AI badge<br>
+          <strong>AI Badge</strong> — classification (green), suggestion (orange), duplicate (warning), stall (red)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 2. BARU — freshly created seed ════════ -->
+  <div id="s-baru" class="scenario">
+    <div class="app-bar">
+      <div class="title">Beranda</div>
+    </div>
+
+    <div class="feed-content">
+      <div class="section-label">Benih baru — baru saja diklasifikasi oleh AI-01</div>
+
+      <div class="seed-card">
+        <div class="track-strip tuntaskan"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge tuntaskan">🔧 Keresahan</span>
+          </div>
+          <div class="card-title">Dana pembangunan pos ronda tidak transparan, warga bingung</div>
+          <div class="card-author">
+            <div class="author-avatar">AR</div>
+            <span class="author-name">Andi Raharjo</span>
+            <span class="author-tier">· Pilar</span>
+            <span class="card-time">baru saja</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">
+            Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya. Ada pembelian material yang tidak sesuai RAB.
+          </div>
+          <div class="card-more">...selengkapnya</div>
+          <div class="card-media">
+            <div class="media-thumb">📷</div>
+            <div class="media-thumb">📎</div>
+          </div>
+          <div class="card-location">📍 RT 03/04, Kel. Merdeka</div>
+        </div>
+        <div class="card-stepper stepper-tuntaskan">
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Periksa</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action">
+            <span class="fa-icon">💬</span>
+            <span class="fa-count">0</span>
+          </div>
+          <div class="footer-action">
+            <span class="fa-icon">👥</span>
+            <span class="fa-count">1</span>
+          </div>
+          <span class="ai-badge classified">🤖 Tuntaskan · 92%</span>
+        </div>
+      </div>
+
+      <div style="font-size:var(--fs-micro); color:var(--c-kayu); text-align:center; line-height:1.5; margin-top:var(--sp-1);">
+        Fresh card: stepper starts at seed stage. AI-01 classified with confidence. No engagement yet.
+      </div>
+
+      <!-- Second example: Wujudkan seed -->
+      <div class="seed-card" style="margin-top:var(--sp-2);">
+        <div class="track-strip wujudkan"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge wujudkan">💡 Gagasan</span>
+          </div>
+          <div class="card-title">Bank sampah warga untuk pupuk kompos dan kerajinan</div>
+          <div class="card-author">
+            <div class="author-avatar" style="background:var(--t-wujudkan);">SW</div>
+            <span class="author-name">Sri Wahyuni</span>
+            <span class="author-tier">· Terverifikasi</span>
+            <span class="card-time">5m lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">
+            Bagaimana kalau kita buat bank sampah di RT? Sampah organik dijadikan kompos, plastik dikumpulkan. Bisa kurangi biaya buang sampah.
+          </div>
+          <div class="card-more">...selengkapnya</div>
+        </div>
+        <div class="card-stepper stepper-wujudkan">
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Gagasan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Rancang</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Rayakan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action">
+            <span class="fa-icon">💬</span>
+            <span class="fa-count">0</span>
+          </div>
+          <div class="footer-action">
+            <span class="fa-icon">👥</span>
+            <span class="fa-count">1</span>
+          </div>
+          <span class="ai-badge suggested">🤖 Wujudkan? · 74%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 3. AKTIF — mid-lifecycle card ════════ -->
+  <div id="s-aktif" class="scenario">
+    <div class="app-bar">
+      <div class="title">Beranda</div>
+    </div>
+
+    <div class="feed-content">
+      <div class="section-label">Kartu aktif — dalam proses, ada kemajuan</div>
+
+      <div class="seed-card">
+        <div class="track-strip tuntaskan"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge tuntaskan">🔧 Keresahan</span>
+          </div>
+          <div class="card-title">Dana pembangunan pos ronda tidak transparan, warga bingung</div>
+          <div class="card-author">
+            <div class="author-avatar">AR</div>
+            <span class="author-name">Andi Raharjo</span>
+            <span class="author-tier">· Pilar</span>
+            <span class="card-time">3h lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">
+            Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya.
+          </div>
+          <div class="card-more">...selengkapnya</div>
+          <div class="card-media">
+            <div class="media-thumb">📷</div>
+            <div class="media-thumb">📷</div>
+            <div class="media-thumb">📎</div>
+          </div>
+
+          <!-- PIC assigned -->
+          <div class="pic-row">
+            <div class="pic-avatar">PH</div>
+            <div>
+              <div class="pic-label">PIC (Penanggung Jawab)</div>
+              <div class="pic-name">Pak Hendra · RT 03</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-stepper stepper-tuntaskan">
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+          <div class="step-connector done"></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector done"></div>
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Garap</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Periksa</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action">
+            <span class="fa-icon">💬</span>
+            <span class="fa-count">14</span>
+          </div>
+          <div class="footer-action">
+            <span class="fa-icon">👥</span>
+            <span class="fa-count">7</span>
+          </div>
+          <div class="footer-action">
+            <span class="fa-icon">⏱</span>
+            <span>1h</span>
+          </div>
+          <span class="ai-badge classified">🤖 92%</span>
+        </div>
+      </div>
+
+      <div style="font-size:var(--fs-micro); color:var(--c-kayu); text-align:center; line-height:1.5; margin-top:var(--sp-1);">
+        Mid-lifecycle: stepper advanced to Garap, PIC assigned, engagement growing. Time-in-stage counter.
+      </div>
+
+      <!-- Stalled card example -->
+      <div class="seed-card" style="margin-top:var(--sp-3);">
+        <div class="track-strip telusuri"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge telusuri">🔍 Pertanyaan</span>
+          </div>
+          <div class="card-title">Kenapa air PDAM sering keruh di pagi hari?</div>
+          <div class="card-author">
+            <div class="author-avatar" style="background:var(--t-telusuri);">DW</div>
+            <span class="author-name">Dewi W.</span>
+            <span class="author-tier">· Anggota Baru</span>
+            <span class="card-time">2h lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">
+            Sudah beberapa minggu ini air PDAM keruh terutama pagi hari. Ada yang tahu penyebabnya? Apa perlu lapor ke PDAM?
+          </div>
+        </div>
+        <div class="card-stepper stepper-telusuri">
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Pertanyaan</div></div>
+          <div class="step-connector done"></div>
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Dugaan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Uji</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Temuan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action">
+            <span class="fa-icon">💬</span>
+            <span class="fa-count">3</span>
+          </div>
+          <div class="footer-action">
+            <span class="fa-icon">👥</span>
+            <span class="fa-count">2</span>
+          </div>
+          <div class="footer-action">
+            <span class="fa-icon">⏱</span>
+            <span>48h</span>
+          </div>
+          <span class="ai-badge stalled">⚠ Macet 48j</span>
+        </div>
+      </div>
+
+      <div style="font-size:var(--fs-micro); color:var(--c-kayu); text-align:center; line-height:1.5; margin-top:var(--sp-1);">
+        AI-04 stall detection: card stuck at "Dugaan" for 48h. Red badge alerts community.
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 4. RAHASIA — privacy overlays ════════ -->
+  <div id="s-rahasia" class="scenario">
+    <div class="app-bar">
+      <div class="title">Rahasia Levels</div>
+    </div>
+
+    <div class="feed-content">
+      <!-- L1: Terbatas -->
+      <div class="section-label">L1 — Terbatas (verified members only)</div>
+      <div class="seed-card">
+        <div class="track-strip tuntaskan"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge tuntaskan">🔧 Keresahan</span>
+            <span class="rahasia-badge l1">🔒 Terbatas</span>
+          </div>
+          <div class="card-title">Dana pembangunan pos ronda tidak transparan</div>
+          <div class="card-author">
+            <div class="author-avatar">AR</div>
+            <span class="author-name">Andi Raharjo</span>
+            <span class="author-tier">· Pilar</span>
+            <span class="card-time">3h lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">
+            Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya.
+          </div>
+        </div>
+        <div class="card-stepper stepper-tuntaskan">
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action">
+            <span class="fa-icon">💬</span><span class="fa-count">8</span>
+          </div>
+          <span class="ai-badge classified">🤖 92%</span>
+        </div>
+      </div>
+
+      <div style="font-size:var(--fs-micro); color:var(--c-kayu); text-align:center; line-height:1.5; margin:var(--sp-2) 0;">
+        L1: Full content visible, but only to verified community members. Badge shown.
+      </div>
+
+      <!-- L2: Rahasia — name redacted -->
+      <div class="section-label">L2 — Rahasia (name hidden)</div>
+      <div class="seed-card">
+        <div class="track-strip tuntaskan"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge tuntaskan">🔧 Keresahan</span>
+            <span class="rahasia-badge l2">🔒 Rahasia</span>
+          </div>
+          <div class="card-title">Dana pembangunan pos ronda tidak transparan</div>
+          <div class="card-author">
+            <div class="author-avatar" style="background:var(--c-pasir);">?</div>
+            <span class="author-name" style="color:var(--c-pasir); font-style:italic;">Anonim</span>
+            <span class="author-tier">· Terverifikasi</span>
+            <span class="card-time">3h lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">
+            Saya melihat dana pembangunan pos ronda yang dikumpulkan bulan lalu sepertinya tidak digunakan sebagaimana mestinya.
+          </div>
+        </div>
+        <div class="card-stepper stepper-tuntaskan">
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action">
+            <span class="fa-icon">💬</span><span class="fa-count">8</span>
+          </div>
+          <span class="ai-badge classified">🤖 92%</span>
+        </div>
+      </div>
+
+      <div style="font-size:var(--fs-micro); color:var(--c-kayu); text-align:center; line-height:1.5; margin:var(--sp-2) 0;">
+        L2: Content visible, author replaced with "Anonim". Tier still shown for trust context.
+      </div>
+
+      <!-- L3: Sangat Rahasia — content fully redacted -->
+      <div class="section-label">L3 — Sangat Rahasia (content hidden)</div>
+      <div class="seed-card">
+        <div class="track-strip tuntaskan"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge tuntaskan">🔧 Keresahan</span>
+            <span class="rahasia-badge l3">🔒 Sangat Rahasia</span>
+          </div>
+          <div class="card-title" style="color:var(--c-pasir); font-style:italic;">Judul disembunyikan</div>
+          <div class="card-author">
+            <div class="author-avatar" style="background:var(--c-batu);">🔒</div>
+            <span class="author-name" style="color:var(--c-pasir); font-style:italic;">Tersembunyi</span>
+            <span class="card-time">3h lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="redacted-block">
+            🔒 Konten hanya bisa dilihat oleh anggota yang ditunjuk
+          </div>
+        </div>
+        <div class="card-stepper stepper-tuntaskan">
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Keresahan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action" style="color:var(--c-batu);">
+            <span class="fa-icon">💬</span><span class="fa-count">—</span>
+          </div>
+          <span class="ai-badge classified">🤖 92%</span>
+        </div>
+      </div>
+
+      <div style="font-size:var(--fs-micro); color:var(--c-kayu); text-align:center; line-height:1.5; margin:var(--sp-2) 0;">
+        L3: Everything redacted. Hatched pattern for blocked content. Only designated members can access.
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 5. LIMA WARNA — all 5 track colors ════════ -->
+  <div id="s-lima" class="scenario">
+    <div class="app-bar">
+      <div class="title">Lima Warna</div>
+    </div>
+
+    <div class="feed-content">
+      <div class="section-label">Same shape, 5 track identities</div>
+
+      <div class="mini-cards">
+        <!-- Tuntaskan -->
+        <div class="mini-card">
+          <div class="track-strip tuntaskan"></div>
+          <div class="mc-row">
+            <span class="seed-badge tuntaskan">🔧 Keresahan</span>
+            <span class="mc-title">Dana pos ronda tidak transparan</span>
+            <span class="mc-stage" style="background:var(--t-tuntaskan-soft); color:var(--t-tuntaskan);">Bahas</span>
+          </div>
+        </div>
+
+        <!-- Wujudkan -->
+        <div class="mini-card">
+          <div class="track-strip wujudkan"></div>
+          <div class="mc-row">
+            <span class="seed-badge wujudkan">💡 Gagasan</span>
+            <span class="mc-title">Bank sampah warga</span>
+            <span class="mc-stage" style="background:var(--t-wujudkan-soft); color:var(--t-wujudkan);">Rancang</span>
+          </div>
+        </div>
+
+        <!-- Telusuri -->
+        <div class="mini-card">
+          <div class="track-strip telusuri"></div>
+          <div class="mc-row">
+            <span class="seed-badge telusuri">🔍 Pertanyaan</span>
+            <span class="mc-title">Air PDAM keruh pagi hari</span>
+            <span class="mc-stage" style="background:var(--t-telusuri-soft); color:var(--t-telusuri);">Dugaan</span>
+          </div>
+        </div>
+
+        <!-- Rayakan -->
+        <div class="mini-card">
+          <div class="track-strip rayakan"></div>
+          <div class="mc-row">
+            <span class="seed-badge rayakan">🎉 Kabar Baik</span>
+            <span class="mc-title">Gotong royong bersih sungai berhasil</span>
+            <span class="mc-stage" style="background:var(--t-rayakan-soft); color:var(--t-rayakan);">Sahkan</span>
+          </div>
+        </div>
+
+        <!-- Musyawarah -->
+        <div class="mini-card">
+          <div class="track-strip musyawarah"></div>
+          <div class="mc-row">
+            <span class="seed-badge musyawarah">🤝 Usul</span>
+            <span class="mc-title">Peraturan parkir motor di gang</span>
+            <span class="mc-stage" style="background:var(--t-musyawarah-soft); color:var(--t-musyawarah);">Putuskan</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:var(--fs-micro); color:var(--c-kayu); text-align:center; line-height:1.5; margin:var(--sp-3) 0 var(--sp-2);">
+        Track color = identity. Left strip + seed badge + stepper stage all use the same accent. Card shape never changes.
+      </div>
+
+      <!-- Full card example: Rayakan -->
+      <div class="section-label" style="margin-top:var(--sp-2);">Full card example — Rayakan</div>
+      <div class="seed-card">
+        <div class="track-strip rayakan"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge rayakan">🎉 Kabar Baik</span>
+          </div>
+          <div class="card-title">Gotong royong bersih sungai berhasil! 200 karung sampah diangkat</div>
+          <div class="card-author">
+            <div class="author-avatar" style="background:var(--t-rayakan);">BS</div>
+            <span class="author-name">Bu Sari</span>
+            <span class="author-tier">· Kunci</span>
+            <span class="card-time">1h lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">
+            Alhamdulillah, kerja bakti bersih sungai Ciliwung hari ini sukses besar. 50 warga turun, 200 karung sampah diangkat. Sungai sudah kelihatan airnya!
+          </div>
+          <div class="card-media">
+            <div class="media-thumb">📷</div>
+            <div class="media-thumb">📷</div>
+            <div class="media-thumb">📷</div>
+          </div>
+
+          <div class="dampak-row">
+            <div class="dampak-icon">🌱</div>
+            <div class="dampak-text">Dampak: 50 warga berpartisipasi, 200 karung sampah diangkat</div>
+          </div>
+        </div>
+        <div class="card-stepper stepper-rayakan">
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Kabar Baik</div></div>
+          <div class="step-connector done"></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Sahkan</div></div>
+          <div class="step-connector done"></div>
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Apresiasi</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action">
+            <span class="fa-icon">💬</span>
+            <span class="fa-count">23</span>
+          </div>
+          <div class="footer-action">
+            <span class="fa-icon">👏</span>
+            <span class="fa-count">42</span>
+          </div>
+          <span class="ai-badge dampak">🌱 Dampak Terukur</span>
+        </div>
+      </div>
+
+      <!-- Full card example: Musyawarah -->
+      <div class="section-label" style="margin-top:var(--sp-3);">Full card example — Musyawarah</div>
+      <div class="seed-card">
+        <div class="track-strip musyawarah"></div>
+        <div class="card-header">
+          <div class="card-header-top">
+            <span class="seed-badge musyawarah">🤝 Usul</span>
+          </div>
+          <div class="card-title">Perlu aturan parkir motor di gang agar ambulans bisa lewat</div>
+          <div class="card-author">
+            <div class="author-avatar" style="background:var(--t-musyawarah);">PH</div>
+            <span class="author-name">Pak Hendra</span>
+            <span class="author-tier">· Pilar</span>
+            <span class="card-time">5h lalu</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text">
+            Kemarin ambulans tidak bisa masuk gang karena motor parkir sembarangan. Perlu dibuat aturan bersama supaya jalur tetap bisa dilewati.
+          </div>
+        </div>
+        <div class="card-stepper stepper-musyawarah">
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Usul</div></div>
+          <div class="step-connector done"></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-label">Bahas</div></div>
+          <div class="step-connector done"></div>
+          <div class="step current"><div class="step-dot"></div><div class="step-label">Putuskan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Jalankan</div></div>
+          <div class="step-connector future"></div>
+          <div class="step future"><div class="step-dot"></div><div class="step-label">Tuntas</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="footer-action">
+            <span class="fa-icon">💬</span>
+            <span class="fa-count">31</span>
+          </div>
+          <div class="footer-action">
+            <span class="fa-icon">🗳</span>
+            <span class="fa-count">18</span>
+          </div>
+          <div class="footer-action">
+            <span class="fa-icon">⏱</span>
+            <span>3h</span>
+          </div>
+          <span class="ai-badge classified">🤖 AI-07 📝</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showScenario(id) {
+  document.querySelectorAll('.scenario').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

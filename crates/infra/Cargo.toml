@@ -1,0 +1,17 @@
+[package]
+name = "gotong-infra"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+config.workspace = true
+dotenvy.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+gotong-domain = { path = "../domain" }

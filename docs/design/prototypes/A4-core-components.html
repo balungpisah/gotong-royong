@@ -1,0 +1,717 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — A4 · Core Components (Tanah)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --fs-display:32px; --fs-h1:26px; --fs-h2:20px; --fs-h3:16px;
+    --fs-body:14px; --fs-small:12px; --fs-caption:11px; --fs-micro:9px;
+    --lh-tight:1.2; --lh-normal:1.5; --lh-relaxed:1.7;
+    --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px;
+    --sp-6:24px; --sp-8:32px; --sp-10:40px; --sp-12:48px; --sp-16:64px;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+    --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+    --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+    --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+    --shadow-xl:0 8px 40px rgba(62,39,35,0.16);
+    --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63;
+    --c-pasir:#A1887F; --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+    --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+    --c-berhasil:#2E7D32; --c-berhasil-l:#E8F5E9;
+    --c-peringatan:#E65100; --c-peringatan-l:#FFF3E0;
+    --c-bahaya:#C62828; --c-bahaya-l:#FFEBEE;
+    --c-keterangan:#4E342E; --c-keterangan-l:#EFEBE9;
+    --c-tuntaskan:#C05621; --c-wujudkan:#2E7D32; --c-telusuri:#6A1B9A;
+    --c-rayakan:#F57F17; --c-musyawarah:#4E342E;
+    --c-vault:#263238; --c-vault-surface:#37474F;
+    --c-siaga:#B71C1C; --c-siaga-accent:#D32F2F;
+  }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: var(--c-kapas); color: var(--c-tanah-gelap);
+    min-height: 100vh; padding: 0 0 60px 0;
+  }
+
+  .top-bar {
+    background: var(--c-tanah-gelap); color: #fff;
+    padding: 24px 32px; text-align: center;
+  }
+  .top-bar h1 { font-size: 18px; font-weight: 700; }
+  .top-bar p { font-size: 13px; opacity: 0.6; margin-top: 4px; }
+
+  .container { max-width: 920px; margin: 0 auto; padding: 24px; }
+
+  .section { margin-top: 40px; }
+  .section:first-child { margin-top: 0; }
+  .section-title {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--c-kayu); margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--c-batu);
+  }
+  .section-note {
+    font-size: 12px; color: var(--c-pasir); margin-bottom: 16px; line-height: 1.5;
+  }
+
+  .component-grid {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start;
+  }
+  .component-box {
+    background: var(--c-susu); border-radius: var(--r-lg);
+    padding: var(--sp-4); box-shadow: var(--shadow-sm);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .comp-label {
+    font-size: var(--fs-micro); font-weight: 700; color: var(--c-pasir);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* ═══════════════════════════════════
+     BUTTONS
+     ═══════════════════════════════════ */
+  .btn {
+    font-family: 'Nunito', sans-serif;
+    border: none; cursor: pointer;
+    font-weight: var(--fw-bold);
+    border-radius: var(--r-md);
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; transition: all 0.15s;
+    text-decoration: none;
+  }
+  /* Sizes */
+  .btn-lg { font-size: var(--fs-body); padding: 12px 24px; }
+  .btn-md { font-size: var(--fs-small); padding: 8px 18px; }
+  .btn-sm { font-size: var(--fs-caption); padding: 6px 14px; }
+
+  /* Primary */
+  .btn-primary { background: var(--c-api); color: #fff; }
+  .btn-primary:hover { background: var(--c-api-terang); }
+  .btn-primary:active { background: var(--c-api-dalam); }
+
+  /* Secondary */
+  .btn-secondary { background: var(--c-kapas); color: var(--c-tanah); }
+  .btn-secondary:hover { background: var(--c-batu); }
+
+  /* Outline */
+  .btn-outline { background: transparent; color: var(--c-api); border: 1.5px solid var(--c-api); }
+  .btn-outline:hover { background: var(--c-bara); }
+
+  /* Ghost */
+  .btn-ghost { background: transparent; color: var(--c-kayu); }
+  .btn-ghost:hover { background: var(--c-kapas); }
+
+  /* Danger */
+  .btn-danger { background: var(--c-bahaya); color: #fff; }
+  .btn-danger:hover { background: #B71C1C; }
+
+  /* Disabled */
+  .btn-disabled { background: var(--c-batu); color: var(--c-pasir); cursor: not-allowed; opacity: 0.7; }
+
+  /* Track-colored */
+  .btn-track-tuntaskan { background: var(--c-tuntaskan); color: #fff; }
+  .btn-track-wujudkan { background: var(--c-wujudkan); color: #fff; }
+  .btn-track-telusuri { background: var(--c-telusuri); color: #fff; }
+  .btn-track-rayakan { background: var(--c-rayakan); color: #fff; }
+  .btn-track-musyawarah { background: var(--c-musyawarah); color: #fff; }
+
+  /* Vault / Siaga */
+  .btn-vault { background: var(--c-vault); color: #B0BEC5; }
+  .btn-siaga { background: var(--c-siaga); color: #fff; }
+
+  /* ═══════════════════════════════════
+     BADGES
+     ═══════════════════════════════════ */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-micro); font-weight: 800;
+    padding: 3px 8px; border-radius: var(--r-sm);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .badge-tuntaskan { background: var(--c-bara); color: var(--c-tuntaskan); }
+  .badge-wujudkan { background: var(--c-berhasil-l); color: var(--c-wujudkan); }
+  .badge-telusuri { background: #F3E5F5; color: var(--c-telusuri); }
+  .badge-rayakan { background: #FFF8E1; color: var(--c-rayakan); }
+  .badge-musyawarah { background: var(--c-keterangan-l); color: var(--c-musyawarah); }
+
+  .badge-berhasil { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .badge-peringatan { background: var(--c-peringatan-l); color: var(--c-peringatan); }
+  .badge-bahaya { background: var(--c-bahaya-l); color: var(--c-bahaya); }
+  .badge-keterangan { background: var(--c-keterangan-l); color: var(--c-keterangan); }
+
+  .badge-rahasia {
+    background: var(--c-tanah-gelap); color: #D7CCC8;
+    font-size: 8px; letter-spacing: 1px;
+  }
+  .badge-vault {
+    background: var(--c-vault); color: #B0BEC5;
+  }
+  .badge-siaga {
+    background: var(--c-siaga); color: #fff;
+    animation: pulse-badge 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .badge-confidence {
+    background: var(--c-kapas); color: var(--c-kayu);
+    font-size: var(--fs-micro); font-weight: 700;
+    text-transform: none; letter-spacing: 0;
+  }
+
+  /* Stepper badge */
+  .badge-step {
+    background: var(--c-api); color: #fff;
+    border-radius: var(--r-sm); padding: 2px 6px;
+    font-size: var(--fs-micro); font-weight: 800;
+  }
+  .badge-step-done {
+    background: var(--c-berhasil-l); color: var(--c-berhasil);
+    border-radius: var(--r-sm); padding: 2px 6px;
+    font-size: var(--fs-micro); font-weight: 800;
+  }
+  .badge-step-future {
+    background: var(--c-kapas); color: var(--c-pasir);
+    border-radius: var(--r-sm); padding: 2px 6px;
+    font-size: var(--fs-micro); font-weight: 700;
+  }
+
+  /* ═══════════════════════════════════
+     INPUT FIELDS
+     ═══════════════════════════════════ */
+  .input-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .input-label {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-tanah);
+  }
+  .input-field {
+    font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-body); font-weight: var(--fw-regular);
+    color: var(--c-tanah-gelap); background: var(--c-kapas);
+    border: 1.5px solid var(--c-batu); border-radius: var(--r-md);
+    padding: 10px 14px; outline: none; transition: all 0.15s;
+    width: 100%;
+  }
+  .input-field::placeholder { color: var(--c-pasir); }
+  .input-field:focus { border-color: var(--c-api); background: var(--c-susu); box-shadow: 0 0 0 3px rgba(192,86,33,0.12); }
+  .input-field.error { border-color: var(--c-bahaya); background: var(--c-bahaya-l); }
+  .input-field:disabled { background: var(--c-batu); color: var(--c-pasir); cursor: not-allowed; }
+  .input-hint { font-size: var(--fs-caption); color: var(--c-pasir); }
+  .input-error { font-size: var(--fs-caption); color: var(--c-bahaya); font-weight: var(--fw-semi); }
+
+  .textarea-field {
+    font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-body); color: var(--c-tanah-gelap);
+    background: var(--c-kapas); border: 1.5px solid var(--c-batu);
+    border-radius: var(--r-md); padding: 12px 14px;
+    outline: none; resize: vertical; min-height: 80px;
+    width: 100%; transition: all 0.15s;
+  }
+  .textarea-field:focus { border-color: var(--c-api); background: var(--c-susu); box-shadow: 0 0 0 3px rgba(192,86,33,0.12); }
+
+  /* ═══════════════════════════════════
+     AVATARS
+     ═══════════════════════════════════ */
+  .avatar {
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Nunito', sans-serif; font-weight: var(--fw-bold);
+    color: #fff; background: var(--c-api-terang); flex-shrink: 0;
+  }
+  .avatar-xs { width: 20px; height: 20px; border-radius: var(--r-full); font-size: 8px; }
+  .avatar-sm { width: 28px; height: 28px; border-radius: var(--r-full); font-size: 10px; }
+  .avatar-md { width: 36px; height: 36px; border-radius: var(--r-full); font-size: 13px; }
+  .avatar-lg { width: 48px; height: 48px; border-radius: var(--r-full); font-size: 17px; }
+  .avatar-xl { width: 64px; height: 64px; border-radius: var(--r-full); font-size: 22px; }
+
+  .avatar-group { display: flex; }
+  .avatar-group .avatar { margin-left: -8px; border: 2px solid var(--c-susu); }
+  .avatar-group .avatar:first-child { margin-left: 0; }
+
+  .avatar-tier { position: relative; display: inline-flex; }
+  .avatar-tier .tier-badge {
+    position: absolute; bottom: -2px; right: -2px;
+    font-size: 7px; font-weight: 800; color: #fff;
+    padding: 1px 4px; border-radius: var(--r-full);
+    border: 1.5px solid var(--c-susu);
+  }
+
+  /* ═══════════════════════════════════
+     PILLS / TAGS
+     ═══════════════════════════════════ */
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: 'Nunito', sans-serif;
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    padding: 4px 12px; border-radius: var(--r-full);
+    white-space: nowrap;
+  }
+  .pill-default { background: var(--c-kapas); color: var(--c-tanah); }
+  .pill-active { background: var(--c-bara); color: var(--c-api); }
+  .pill-success { background: var(--c-berhasil-l); color: var(--c-berhasil); }
+  .pill-removable { background: var(--c-kapas); color: var(--c-tanah); cursor: pointer; }
+  .pill-removable .pill-x {
+    width: 14px; height: 14px; border-radius: var(--r-full);
+    background: var(--c-batu); color: var(--c-kayu);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 800;
+  }
+
+  .pill-track { color: #fff; }
+
+  /* ═══════════════════════════════════
+     STATUS INDICATORS
+     ═══════════════════════════════════ */
+  .status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: var(--r-full);
+  }
+  .status-active .status-dot { background: var(--c-berhasil); }
+  .status-active { color: var(--c-berhasil); }
+  .status-stalled .status-dot { background: var(--c-peringatan); }
+  .status-stalled { color: var(--c-peringatan); }
+  .status-tuntas .status-dot { background: var(--c-batu); }
+  .status-tuntas { color: var(--c-pasir); }
+  .status-review .status-dot { background: var(--c-api); animation: blink 1.5s ease-in-out infinite; }
+  .status-review { color: var(--c-api); }
+  .status-moderation .status-dot { background: var(--c-bahaya); animation: blink 1.5s ease-in-out infinite; }
+  .status-moderation { color: var(--c-bahaya); }
+  .status-sealed .status-dot { background: var(--c-vault); }
+  .status-sealed { color: var(--c-vault-surface); }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ═══════════════════════════════════
+     PROGRESS BAR
+     ═══════════════════════════════════ */
+  .progress-bar {
+    height: 6px; background: var(--c-kapas);
+    border-radius: var(--r-full); overflow: hidden;
+    width: 100%;
+  }
+  .progress-bar .fill { height: 100%; border-radius: var(--r-full); transition: width 0.3s; }
+
+  /* ═══════════════════════════════════
+     CONFIDENCE BAR
+     ═══════════════════════════════════ */
+  .confidence-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: var(--fs-caption); color: var(--c-kayu);
+  }
+  .confidence-bar {
+    flex: 1; height: 4px; background: var(--c-batu);
+    border-radius: var(--r-full); overflow: hidden;
+  }
+  .confidence-bar .fill { height: 100%; border-radius: var(--r-full); }
+
+  /* ═══════════════════════════════════
+     TOGGLE / SWITCH
+     ═══════════════════════════════════ */
+  .toggle {
+    width: 40px; height: 22px; border-radius: var(--r-full);
+    background: var(--c-batu); position: relative;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; border-radius: var(--r-full);
+    background: #fff; box-shadow: var(--shadow-sm); transition: transform 0.2s;
+  }
+  .toggle.on { background: var(--c-api); }
+  .toggle.on::after { transform: translateX(18px); }
+
+  /* ═══════════════════════════════════
+     DIVIDER
+     ═══════════════════════════════════ */
+  .divider {
+    height: 1px; background: var(--c-batu); margin: var(--sp-3) 0;
+  }
+
+  /* ═══════════════════════════════════
+     TOOLTIP
+     ═══════════════════════════════════ */
+  .tooltip-demo {
+    position: relative; display: inline-block;
+  }
+  .tooltip-bubble {
+    position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%);
+    background: var(--c-tanah-gelap); color: #fff;
+    font-size: var(--fs-caption); font-weight: var(--fw-semi);
+    padding: 5px 10px; border-radius: var(--r-sm);
+    white-space: nowrap; box-shadow: var(--shadow-md);
+  }
+  .tooltip-bubble::after {
+    content: ''; position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent; border-top-color: var(--c-tanah-gelap);
+  }
+
+  /* ═══════════════════════════════════
+     LAYOUT HELPERS
+     ═══════════════════════════════════ */
+  .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .flex-col { display: flex; flex-direction: column; gap: 8px; }
+  .w-full { width: 100%; }
+  .w-260 { width: 260px; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>A4 · Core Components — Tanah</h1>
+  <p>Atoms: buttons, badges, inputs, avatars, pills, status, progress, toggles</p>
+</div>
+
+<div class="container">
+
+  <!-- ═══════════════ BUTTONS ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Buttons</div>
+    <div class="section-note">5 variants × 3 sizes. Primary for main actions, secondary for alternatives, outline for reversible actions, ghost for subtle actions, danger for destructive.</div>
+
+    <div class="component-box w-full">
+      <div class="comp-label">Variants — Medium</div>
+      <div class="flex-wrap">
+        <button class="btn btn-md btn-primary">Bagikan</button>
+        <button class="btn btn-md btn-secondary">Batal</button>
+        <button class="btn btn-md btn-outline">Ubah</button>
+        <button class="btn btn-md btn-ghost">Lewati</button>
+        <button class="btn btn-md btn-danger">Hapus</button>
+        <button class="btn btn-md btn-disabled" disabled>Nonaktif</button>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Sizes</div>
+      <div class="flex-wrap">
+        <button class="btn btn-lg btn-primary">Large — Kirim</button>
+        <button class="btn btn-md btn-primary">Medium — Kirim</button>
+        <button class="btn btn-sm btn-primary">Small — Kirim</button>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Track-Colored</div>
+      <div class="flex-wrap">
+        <button class="btn btn-sm btn-track-tuntaskan">Tuntaskan</button>
+        <button class="btn btn-sm btn-track-wujudkan">Wujudkan</button>
+        <button class="btn btn-sm btn-track-telusuri">Telusuri</button>
+        <button class="btn btn-sm btn-track-rayakan">Rayakan</button>
+        <button class="btn btn-sm btn-track-musyawarah">Musyawarah</button>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Special Modes</div>
+      <div class="flex-wrap">
+        <button class="btn btn-md btn-vault">🔒 Simpan ke Catatan</button>
+        <button class="btn btn-md btn-siaga">🚨 Kirim Siaga</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ BADGES ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Badges</div>
+    <div class="section-note">Track badges, semantic badges, special mode badges, stepper state badges, confidence indicator.</div>
+
+    <div class="component-box w-full">
+      <div class="comp-label">Track</div>
+      <div class="flex-wrap">
+        <span class="badge badge-tuntaskan">Tuntaskan</span>
+        <span class="badge badge-wujudkan">Wujudkan</span>
+        <span class="badge badge-telusuri">Telusuri</span>
+        <span class="badge badge-rayakan">Rayakan</span>
+        <span class="badge badge-musyawarah">Musyawarah</span>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Seed Types</div>
+      <div class="flex-wrap">
+        <span class="badge badge-tuntaskan">Keresahan</span>
+        <span class="badge badge-wujudkan">Gagasan</span>
+        <span class="badge badge-telusuri">Pertanyaan</span>
+        <span class="badge badge-rayakan">Kabar Baik</span>
+        <span class="badge badge-musyawarah">Usul</span>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Semantic</div>
+      <div class="flex-wrap">
+        <span class="badge badge-berhasil">Tuntas</span>
+        <span class="badge badge-peringatan">Stalled</span>
+        <span class="badge badge-bahaya">Ditolak</span>
+        <span class="badge badge-keterangan">Draft</span>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Special Modes</div>
+      <div class="flex-wrap">
+        <span class="badge badge-rahasia">🔒 Rahasia L2</span>
+        <span class="badge badge-vault">🔒 Catatan Saksi</span>
+        <span class="badge badge-siaga">🚨 Siaga</span>
+        <span class="badge badge-confidence">Keyakinan: 87%</span>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Stepper States</div>
+      <div class="flex-wrap">
+        <span class="badge badge-step-done">✓ Keresahan</span>
+        <span class="badge badge-step">Bahas</span>
+        <span class="badge badge-step-future">Garap</span>
+        <span class="badge badge-step-future">Periksa</span>
+        <span class="badge badge-step-future">Tuntas</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ INPUTS ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Input Fields</div>
+    <div class="section-note">Text input, textarea, and all states: default, focus, error, disabled. Warm Kapas background with Api focus ring.</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div class="component-box">
+        <div class="comp-label">Default</div>
+        <div class="input-wrap">
+          <label class="input-label">Judul</label>
+          <input class="input-field" type="text" placeholder="Tulis judul...">
+          <span class="input-hint">Otomatis dari 60 karakter pertama</span>
+        </div>
+      </div>
+
+      <div class="component-box">
+        <div class="comp-label">Focused</div>
+        <div class="input-wrap">
+          <label class="input-label">Lokasi</label>
+          <input class="input-field" type="text" value="RT 05 / RW 12" style="border-color:var(--c-api); background:var(--c-susu); box-shadow:0 0 0 3px rgba(192,86,33,0.12);">
+        </div>
+      </div>
+
+      <div class="component-box">
+        <div class="comp-label">Error</div>
+        <div class="input-wrap">
+          <label class="input-label">Deskripsi</label>
+          <input class="input-field error" type="text" value="">
+          <span class="input-error">Deskripsi tidak boleh kosong</span>
+        </div>
+      </div>
+
+      <div class="component-box">
+        <div class="comp-label">Disabled</div>
+        <div class="input-wrap">
+          <label class="input-label">Track</label>
+          <input class="input-field" type="text" value="Tuntaskan (terkunci)" disabled>
+        </div>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Textarea — Compose Box</div>
+      <textarea class="textarea-field" placeholder="Apa yang Anda saksikan hari ini?"></textarea>
+    </div>
+  </div>
+
+  <!-- ═══════════════ AVATARS ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Avatars</div>
+    <div class="section-note">5 sizes (XS–XL), avatar group (stacked), avatar with tier badge. Pill-round, warm orange default.</div>
+
+    <div class="component-box w-full">
+      <div class="comp-label">Sizes</div>
+      <div class="flex-wrap">
+        <span class="avatar avatar-xs">S</span>
+        <span class="avatar avatar-sm">SR</span>
+        <span class="avatar avatar-md">SR</span>
+        <span class="avatar avatar-lg">SR</span>
+        <span class="avatar avatar-xl">SR</span>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Avatar Group (supporters)</div>
+      <div class="avatar-group">
+        <span class="avatar avatar-sm" style="background:#C05621;">SR</span>
+        <span class="avatar avatar-sm" style="background:#2E7D32;">BH</span>
+        <span class="avatar avatar-sm" style="background:#6A1B9A;">DW</span>
+        <span class="avatar avatar-sm" style="background:#F57F17;">AP</span>
+        <span class="avatar avatar-sm" style="background:var(--c-kayu);">+8</span>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Avatar with Tier Badge</div>
+      <div class="flex-wrap" style="gap:16px;">
+        <div class="avatar-tier">
+          <span class="avatar avatar-md">NW</span>
+          <span class="tier-badge" style="background:var(--c-batu); color:var(--c-kayu);">0</span>
+        </div>
+        <div class="avatar-tier">
+          <span class="avatar avatar-md" style="background:#8D6E63;">AB</span>
+          <span class="tier-badge" style="background:var(--c-kayu);">1</span>
+        </div>
+        <div class="avatar-tier">
+          <span class="avatar avatar-md" style="background:#2E7D32;">TV</span>
+          <span class="tier-badge" style="background:var(--c-berhasil);">2</span>
+        </div>
+        <div class="avatar-tier">
+          <span class="avatar avatar-md" style="background:#C05621;">PL</span>
+          <span class="tier-badge" style="background:var(--c-api);">3</span>
+        </div>
+        <div class="avatar-tier">
+          <span class="avatar avatar-md" style="background:var(--c-tanah-gelap);">KC</span>
+          <span class="tier-badge" style="background:var(--c-tanah-gelap);">4</span>
+        </div>
+      </div>
+      <div style="font-size:var(--fs-caption); color:var(--c-pasir); margin-top:4px;">
+        0: Pengguna Baru · 1: Anggota Baru · 2: Terverifikasi · 3: Pilar · 4: Kunci
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PILLS ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Pills / Tags</div>
+    <div class="section-note">Filter pills, skill tags, removable tags. Pill-round shape for soft feel.</div>
+
+    <div class="component-box w-full">
+      <div class="comp-label">Filter Pills</div>
+      <div class="flex-wrap">
+        <span class="pill pill-active">Semua</span>
+        <span class="pill pill-default">Tuntaskan</span>
+        <span class="pill pill-default">Wujudkan</span>
+        <span class="pill pill-default">Telusuri</span>
+        <span class="pill pill-default">Rayakan</span>
+        <span class="pill pill-default">Musyawarah</span>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Track-Colored Pills</div>
+      <div class="flex-wrap">
+        <span class="pill pill-track" style="background:var(--c-tuntaskan);">Keresahan</span>
+        <span class="pill pill-track" style="background:var(--c-wujudkan);">Gagasan</span>
+        <span class="pill pill-track" style="background:var(--c-telusuri);">Pertanyaan</span>
+        <span class="pill pill-track" style="background:var(--c-rayakan);">Kabar Baik</span>
+        <span class="pill pill-track" style="background:var(--c-musyawarah);">Usul</span>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Removable Tags (skills, locations)</div>
+      <div class="flex-wrap">
+        <span class="pill pill-removable">Tukang Bangunan <span class="pill-x">×</span></span>
+        <span class="pill pill-removable">RT 05 <span class="pill-x">×</span></span>
+        <span class="pill pill-removable">Infrastruktur <span class="pill-x">×</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STATUS ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Status Indicators</div>
+    <div class="section-note">Dot + label for card/task states. Blinking dot for AI review states (Dalam peninjauan, Menunggu moderasi).</div>
+
+    <div class="component-box w-full">
+      <div class="flex-wrap" style="gap:20px;">
+        <span class="status status-active"><span class="status-dot"></span> Active</span>
+        <span class="status status-stalled"><span class="status-dot"></span> Stalled</span>
+        <span class="status status-tuntas"><span class="status-dot"></span> Tuntas</span>
+        <span class="status status-review"><span class="status-dot"></span> Dalam Peninjauan</span>
+        <span class="status status-moderation"><span class="status-dot"></span> Menunggu Moderasi</span>
+        <span class="status status-sealed"><span class="status-dot"></span> Tersegel</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PROGRESS ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Progress & Confidence Bars</div>
+    <div class="section-note">Progress bars for Galang (resource pooling) and task completion. Confidence bar for AI classification display.</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div class="component-box">
+        <div class="comp-label">Galang Progress — 65%</div>
+        <div class="progress-bar"><div class="fill" style="width:65%; background:var(--c-api);"></div></div>
+        <div style="font-size:var(--fs-caption); color:var(--c-kayu);">Rp 6.500.000 / Rp 10.000.000</div>
+      </div>
+      <div class="component-box">
+        <div class="comp-label">Task Progress — 3/8</div>
+        <div class="progress-bar"><div class="fill" style="width:37.5%; background:var(--c-berhasil);"></div></div>
+        <div style="font-size:var(--fs-caption); color:var(--c-kayu);">3 dari 8 tugas selesai</div>
+      </div>
+      <div class="component-box">
+        <div class="comp-label">AI Confidence — High (87%)</div>
+        <div class="confidence-row">
+          <span>87%</span>
+          <div class="confidence-bar"><div class="fill" style="width:87%; background:var(--c-api);"></div></div>
+        </div>
+      </div>
+      <div class="component-box">
+        <div class="comp-label">AI Confidence — Low (42%)</div>
+        <div class="confidence-row">
+          <span>42%</span>
+          <div class="confidence-bar"><div class="fill" style="width:42%; background:var(--c-peringatan);"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TOGGLES & MISC ═══════════════ -->
+  <div class="section">
+    <div class="section-title">Toggles, Dividers, Tooltips</div>
+    <div class="section-note">Toggle switch for settings (e.g., Rahasia level). Divider for section separators. Tooltip for contextual help.</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+      <div class="component-box" style="align-items:center;">
+        <div class="comp-label">Toggle Off</div>
+        <div class="toggle"></div>
+      </div>
+      <div class="component-box" style="align-items:center;">
+        <div class="comp-label">Toggle On</div>
+        <div class="toggle on"></div>
+      </div>
+      <div class="component-box" style="align-items:center;">
+        <div class="comp-label">Tooltip</div>
+        <div class="tooltip-demo">
+          <div class="tooltip-bubble">Rahasia Level 2</div>
+          <span class="badge badge-rahasia">🔒 L2</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="component-box w-full" style="margin-top:10px;">
+      <div class="comp-label">Divider</div>
+      <div style="padding:0 var(--sp-4);">
+        <div style="font-size:var(--fs-body); color:var(--c-tanah);">Content above</div>
+        <div class="divider"></div>
+        <div style="font-size:var(--fs-body); color:var(--c-tanah);">Content below</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

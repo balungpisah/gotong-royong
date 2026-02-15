@@ -1,5 +1,16 @@
 # Local Development
 
+## Stack Lock Notice
+
+Canonical implementation stack is Rust 2024 + Axum + SurrealDB `v3.0.0-beta.4`.
+
+Use these as source of truth for active setup/runtime decisions:
+- `setup-guide.md`
+- `../backend-research.md`
+- `../research/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
+
+This document still contains pre-lock polyglot workflow examples and should be treated as historical guidance until fully rewritten.
+
 ## Overview
 
 This guide covers the day-to-day development workflow for the Gotong Royong platform, including code organization, development practices, debugging, and common tasks.

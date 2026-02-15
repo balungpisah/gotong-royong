@@ -1,0 +1,185 @@
+> [← Back to AI Spec index](../AI-SPEC-v0.2.md)
+
+## 5. AI-01: Track & Seed Classification
+
+### 5.1 Property Table
+
+| Property | Value |
+|---|---|
+| **ID** | AI-01 |
+| **Name** | Track & Seed Classification |
+| **Trigger** | (v0.2) Invoked by AI-00 during triage; also re-invoked at submission if changes detected |
+| **UI Location** | (v0.2) Runs inside AI-00 context bar morphing; user does not see model output directly |
+| **Interaction Mode** | Synchronous, blocking |
+| **Latency Budget** | < 1 second per invocation |
+| **Model Tier** | Medium (Haiku-class) |
+| **UI-UX-SPEC Ref** | Section 19 (Bagikan), implicit in triage flow |
+
+### 5.2 Purpose
+
+**AI-01 classifies a witness report into:**
+- One of 5 Community tracks (Tuntaskan, Wujudkan, Telusuri, Rayakan, Musyawarah)
+- One of 5 seed types (Keresahan, Gagasan, Pertanyaan, Kabar Baik, Usul)
+- Extracts 0–3 relevant ESCO skills
+
+**Key change in v0.2:** AI-01 is not triggered by user submission; it is invoked **internally by AI-00** during conversation. This means classification happens *before* the user commits, enabling the context bar morphing UX.
+
+### 5.3 Input
+
+```json
+{
+  "text": "string (witness story, cleaned text)",
+  "location": {
+    "lat": "number",
+    "lng": "number"
+  },
+  "seed_candidate_id": "string (optional, if pre-seeded)",
+  "conversation_context": "string (optional, full conversation from AI-00)",
+  "metadata": {
+    "user_reputation": "int",
+    "community_id": "string",
+    "time_zone": "string"
+  }
+}
+```
+
+### 5.4 Output
+
+```json
+{
+  "track": "enum: tuntaskan | wujudkan | telusuri | rayakan | musyawarah",
+  "track_confidence": "float 0.0–1.0",
+  "seed_type": "enum: Keresahan | Gagasan | Pertanyaan | Kabar Baik | Usul",
+  "seed_confidence": "float 0.0–1.0",
+  "esco_skills": [
+    {
+      "code": "string (ESCO code, e.g., 'S1.1.5')",
+      "label": "string (Bahasa Indonesia)",
+      "relevance": "float 0.0–1.0"
+    }
+  ],
+  "reasoning": "string (1–2 sentences explaining classification)",
+  "is_ambiguous": "boolean (true if track_confidence < 0.5)",
+  "alternative_track": "enum (if is_ambiguous=true)",
+  "alternative_confidence": "float"
+}
+```
+
+### 5.5 Confidence Thresholds & Decision Rules
+
+| Threshold | Action |
+|---|---|
+| **≥ 0.80** | Confident classification. Show Ready state in context bar. |
+| **0.50–0.79** | Leaning classification. Show Leaning state; offer preview. |
+| **< 0.50** | Ambiguous. Show Manual state; suggest 2 alternatives. |
+
+### 5.6 Prompt Strategy
+
+**System Prompt:**
+
+```
+You are a community issue classifier for Gotong Royong.
+
+Classify each witness report into:
+1. Track: tuntaskan (solve problem), wujudkan (realize aspiration), telusuri (investigate), rayakan (celebrate), musyawarah (deliberate)
+2. Seed Type: Keresahan (concern), Gagasan (idea), Pertanyaan (question), Kabar Baik (good news), Usul (suggestion)
+3. ESCO Skills: 0–3 most relevant skills involved in addressing this issue
+
+Guidelines:
+- Tuntaskan: stories about problems to solve (broken road, pollution, missing services)
+- Wujudkan: stories about positive visions or aspirations (build library, plant trees)
+- Telusuri: stories about mysteries or accountability (who is responsible? what caused this?)
+- Rayakan: stories about achievements and wins (we fixed the road!)
+- Musyawarah: stories about decisions the community must make (how should we spend budget?)
+
+Seed types:
+- Keresahan: "Ada lubang di jalan" (concern, often leads to tasks in Tuntaskan)
+- Gagasan: "Mari kita buat perpustakaan" (idea, often leads to tasks in Wujudkan)
+- Pertanyaan: "Siapa yang bertanggung jawab?" (question, often leads to investigation in Telusuri)
+- Kabar Baik: "Jalan sudah diperbaiki!" (good news, often input for Rayakan)
+- Usul: "Kita seharusnya menanam pohon di taman" (suggestion, can go to any track)
+
+Output JSON with: track, track_confidence, seed_type, seed_confidence, esco_skills (array), reasoning.
+```
+
+### 5.7 Few-Shot Examples
+
+**Example 1 (Tuntaskan + Keresahan):**
+
+Input: "Ada lubang besar di Jl. Merdeka dekat pasar yang bikin macet dan membahayakan motor. Sudah bilang ke RT tapi nggak ada respon."
+
+Output:
+```json
+{
+  "track": "tuntaskan",
+  "track_confidence": 0.95,
+  "seed_type": "Keresahan",
+  "seed_confidence": 0.92,
+  "esco_skills": [
+    {"code": "S1.3.2", "label": "Manajemen infrastruktur sipil", "relevance": 0.8},
+    {"code": "S4.1.1", "label": "Koordinasi dengan pemerintah lokal", "relevance": 0.6}
+  ],
+  "reasoning": "Cerita tentang infrastruktur yang rusak; memerlukan perbaikan konkret (tuntaskan). Seed type Keresahan karena mengekspresikan keprihatinan tentang masalah yang ada."
+}
+```
+
+**Example 2 (Wujudkan + Gagasan):**
+
+Input: "Aku punya ide: kita bisa buat perpustakaan digital di komunitas supaya semua orang bisa akses buku gratis. Aku bisa bantu bikin websitenya."
+
+Output:
+```json
+{
+  "track": "wujudkan",
+  "track_confidence": 0.91,
+  "seed_type": "Gagasan",
+  "seed_confidence": 0.89,
+  "esco_skills": [
+    {"code": "S5.2.3", "label": "Pengembangan aplikasi web", "relevance": 0.85},
+    {"code": "S3.2.1", "label": "Manajemen konten digital", "relevance": 0.7}
+  ],
+  "reasoning": "Gagasan untuk mewujudkan perpustakaan digital; memerlukan brainstorm, perencanaan, dan eksekusi teknis. Seed type Gagasan karena mengajukan visi baru."
+}
+```
+
+**Example 3 (Telusuri + Pertanyaan):**
+
+Input: "Siapa yang bertanggung jawab atas polusi di sungai? Sudah ada laporan? Apa yang pemerintah lakukan?"
+
+Output:
+```json
+{
+  "track": "telusuri",
+  "track_confidence": 0.88,
+  "seed_type": "Pertanyaan",
+  "seed_confidence": 0.86,
+  "esco_skills": [
+    {"code": "S2.4.1", "label": "Penelitian keberlanjutan lingkungan", "relevance": 0.75},
+    {"code": "S4.2.2", "label": "Komunikasi dengan lembaga publik", "relevance": 0.65}
+  ],
+  "reasoning": "Pertanyaan investigasi tentang polusi dan akuntabilitas; memerlukan riset untuk menemukan jawaban. Seed type Pertanyaan karena mengajukan isu yang perlu dijawab."
+}
+```
+
+### 5.8 Edge Cases & Fallback
+
+| Case | Handling |
+|---|---|
+| **Mixed signals** (e.g., "Kami ingin tapi ada masalah") | Classify to primary track (Wujudkan > Tuntaskan), note alternative in `alternative_track` |
+| **Ambiguous location** (e.g., "tempat tertentu") | Use user's last known location; note uncertainty |
+| **No clear ESCO skills** | Return empty `esco_skills` array |
+| **Duplicate seed detected** (AI-03) | Proceed with classification; AI-03 handles merge logic separately |
+| **Model unavailable** | Return null; trigger Manual grid in AI-00 context bar |
+
+### 5.9 Post-Classification Pipeline
+
+After AI-01 classification:
+
+1. **Redaction (AI-02):** Text is passed to redaction LLM to mask PII
+2. **Duplicate Check (AI-03):** Redacted text is checked against existing seeds
+3. **Media Scan (AI-08):** Attached images are scanned for sensitive content
+4. **Moderation Gate (AI-04):** Compiled seed is submitted to moderation queue
+5. **Tandang Indexing:** Seed is added to vector index for future discovery
+
+---
+

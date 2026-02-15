@@ -1,0 +1,1554 @@
+<!-- Gotong Royong Design System · Reference: DESIGN-CONTEXT.md · Do not modify locked tokens -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — C2 · AI Surface States (v1)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --fs-h2:20px; --fs-h3:16px; --fs-body:14px; --fs-small:12px;
+    --fs-caption:11px; --fs-micro:9px;
+    --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-6:24px; --sp-8:32px;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+    --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+    --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+    --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+    /* Core palette */
+    --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63;
+    --c-pasir:#A1887F; --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+    --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+    /* Semantic */
+    --c-berhasil:#2E7D32; --c-berhasil-l:#E8F5E9;
+    --c-peringatan:#E65100; --c-peringatan-l:#FFF3E0;
+    --c-bahaya:#C62828; --c-bahaya-l:#FFEBEE;
+    --c-keterangan:#4E342E; --c-keterangan-l:#EFEBE9;
+    /* Track accents */
+    --t-tuntaskan:#C05621; --t-tuntaskan-soft:#FFF3E0; --t-tuntaskan-muted:#FFECD2;
+    --t-wujudkan:#2E7D32; --t-wujudkan-soft:#E8F5E9;
+    --t-telusuri:#6A1B9A; --t-telusuri-soft:#F3E5F5; --t-telusuri-muted:#E1BEE7;
+    --t-rayakan:#F57F17; --t-rayakan-soft:#FFF8E1;
+    --t-musyawarah:#4E342E; --t-musyawarah-soft:#EFEBE9;
+    /* Tandang */
+    --c-tandang:#00695C; --c-tandang-soft:#E0F2F1;
+    /* AI surface — uses existing palette, no new brand color */
+    --ai-neutral:#4E342E; --ai-neutral-l:#EFEBE9;
+    --ai-high:#2E7D32; --ai-high-l:#E8F5E9;
+    --ai-medium:#E65100; --ai-medium-l:#FFF3E0;
+    --ai-low:#78909C; --ai-low-l:#ECEFF1;
+    --ai-hold:#E65100; --ai-hold-l:#FFF3E0;
+  }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: #e8e0d8; color: var(--c-tanah-gelap);
+    min-height: 100vh;
+  }
+
+  /* ═══ Doc bar ═══ */
+  .doc-bar {
+    background: var(--c-kayu); color: #fff;
+    padding: 16px 24px; text-align: center;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .doc-bar h1 { font-size: 15px; font-weight: 700; }
+  .doc-bar p { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+
+  /* ═══ Scenario nav ═══ */
+  .scenario-nav {
+    background: var(--c-tanah-gelap);
+    display: flex; justify-content: center; flex-wrap: wrap;
+    position: sticky; top: 52px; z-index: 99;
+  }
+  .scenario-btn {
+    padding: 8px 10px; font-size: 9px; font-weight: 700;
+    cursor: pointer; border: none; background: transparent;
+    color: rgba(255,255,255,0.35); border-bottom: 2px solid transparent;
+    transition: all 0.2s; font-family: 'Nunito', sans-serif;
+  }
+  .scenario-btn:hover { color: rgba(255,255,255,0.7); }
+  .scenario-btn.active { color: #fff; border-bottom-color: var(--c-kayu); }
+  .scenario-label {
+    width: 100%; text-align: center; padding: 6px;
+    font-size: 10px; color: rgba(255,255,255,0.25); background: #2c1e1a;
+  }
+
+  /* ═══ Phone frame ═══ */
+  .phone-frame {
+    width: 375px; margin: 24px auto;
+    background: var(--c-kapas);
+    border-radius: 28px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.08);
+    min-height: 700px;
+    display: flex; flex-direction: column;
+  }
+
+  .view-section { display: none; }
+  .view-section.active { display: block; }
+
+  /* ═══ Annotation ═══ */
+  .annotation {
+    background: var(--c-susu); border-left: 3px solid var(--c-kayu);
+    padding: 12px 16px; margin: 16px;
+    font-size: var(--fs-small); color: var(--c-tanah);
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    line-height: 1.5;
+  }
+  .annotation strong { color: var(--c-tanah-gelap); }
+  .annotation .rule {
+    display: inline-block; background: var(--ai-neutral-l);
+    padding: 2px 6px; border-radius: var(--r-sm);
+    font-size: var(--fs-micro); font-weight: 700;
+    color: var(--ai-neutral); margin: 2px;
+  }
+
+  .section-title {
+    font-size: var(--fs-small); font-weight: var(--fw-extra);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 12px 16px 8px; color: var(--c-kayu);
+  }
+
+  .design-note {
+    margin: 12px 16px; padding: 10px 12px;
+    background: #fff; border: 1px dashed var(--c-batu);
+    border-radius: var(--r-md); font-size: var(--fs-micro);
+    color: var(--c-pasir); line-height: 1.5;
+  }
+  .design-note strong { color: var(--c-tanah); }
+
+  /* ═══════════════════════════════════════════════════
+     VIEW 1 — Lencana Keyakinan (Confidence Badges)
+     ═══════════════════════════════════════════════════ */
+
+  .confidence-band {
+    margin: 8px 16px; padding: 12px;
+    background: #fff; border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+  }
+  .cb-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .cb-indicator {
+    width: 10px; height: 10px; border-radius: var(--r-full);
+  }
+  .cb-indicator.high { background: var(--ai-high); }
+  .cb-indicator.medium { background: var(--ai-medium); }
+  .cb-indicator.low { background: var(--ai-low); }
+  .cb-label {
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+  }
+  .cb-range {
+    font-size: var(--fs-micro); color: var(--c-pasir);
+    font-weight: var(--fw-semi);
+  }
+  .cb-body {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.5; margin-bottom: 8px;
+  }
+  .cb-example {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 8px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+  }
+  .cb-example.high { background: var(--ai-high-l); color: var(--ai-high); }
+  .cb-example.medium { background: var(--ai-medium-l); color: var(--ai-medium); }
+  .cb-example.low { background: var(--ai-low-l); color: var(--ai-low); }
+
+  .cb-behavior {
+    margin-top: 6px; padding: 6px 8px;
+    background: var(--c-kapas); border-radius: var(--r-sm);
+    font-size: var(--fs-micro); color: var(--c-tanah);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .cb-behavior .behavior-icon { font-size: 14px; }
+
+  /* Confidence meter (generalized from B3) */
+  .confidence-meter {
+    margin: 8px 16px; padding: 12px;
+    background: #fff; border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+  }
+  .cm-label {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    color: var(--c-pasir); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .cm-bar-wrap {
+    height: 8px; background: var(--c-batu);
+    border-radius: var(--r-full); overflow: hidden;
+    position: relative;
+  }
+  .cm-fill {
+    height: 100%; border-radius: var(--r-full);
+    transition: width 0.3s;
+  }
+  .cm-fill.high { background: var(--ai-high); width: 92%; }
+  .cm-fill.medium { background: var(--ai-medium); width: 67%; }
+  .cm-fill.low { background: var(--ai-low); width: 34%; }
+  .cm-value {
+    display: flex; justify-content: space-between;
+    margin-top: 4px; font-size: var(--fs-micro);
+  }
+  .cm-pct { font-weight: var(--fw-bold); }
+  .cm-pct.high { color: var(--ai-high); }
+  .cm-pct.medium { color: var(--ai-medium); }
+  .cm-pct.low { color: var(--ai-low); }
+  .cm-semantic { color: var(--c-pasir); }
+
+  /* AI badge catalog */
+  .badge-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; margin: 8px 16px;
+  }
+  .ai-badge-demo {
+    padding: 8px; background: #fff;
+    border-radius: var(--r-md); box-shadow: var(--shadow-sm);
+    text-align: center;
+  }
+  .ai-badge-demo .badge-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 3px 8px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    margin-bottom: 4px;
+  }
+  .badge-pill.classified { background: var(--ai-high-l); color: var(--ai-high); }
+  .badge-pill.suggested { background: var(--ai-medium-l); color: var(--ai-medium); }
+  .badge-pill.stall { background: var(--c-bahaya-l); color: var(--c-bahaya); }
+  .badge-pill.dampak { background: var(--ai-high-l); color: var(--ai-high); }
+  .badge-pill.summary { background: var(--ai-neutral-l); color: var(--ai-neutral); }
+  .badge-pill.duplicate { background: var(--ai-medium-l); color: var(--ai-medium); }
+  .badge-pill.resolve { background: var(--ai-high-l); color: var(--ai-high); }
+  .badge-pill.sentiment { background: var(--t-telusuri-soft); color: var(--t-telusuri); }
+  .ai-badge-demo .badge-desc {
+    font-size: 8px; color: var(--c-pasir);
+    line-height: 1.3;
+  }
+
+  /* ═══════════════════════════════════════════════════
+     VIEW 2 — Chip Saran & Nudge
+     ═══════════════════════════════════════════════════ */
+
+  .chip-showcase {
+    margin: 8px 16px; padding: 12px;
+    background: #fff; border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+  }
+  .cs-title {
+    font-size: var(--fs-micro); font-weight: var(--fw-extra);
+    color: var(--c-pasir); text-transform: uppercase;
+    letter-spacing: 0.3px; margin-bottom: 8px;
+  }
+  .chip-row {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 8px;
+  }
+  .ai-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 12px; border-radius: var(--r-full);
+    font-size: var(--fs-caption); font-weight: var(--fw-semi);
+    cursor: pointer; border: 1.5px solid transparent;
+    transition: all 0.2s;
+    font-family: 'Nunito', sans-serif;
+  }
+  .ai-chip .chip-icon { font-size: 12px; }
+
+  /* Chip types */
+  .ai-chip.action { background: var(--t-tuntaskan-soft); color: var(--t-tuntaskan); border-color: var(--t-tuntaskan-muted); }
+  .ai-chip.action-green { background: var(--t-wujudkan-soft); color: var(--t-wujudkan); border-color: #C8E6C9; }
+  .ai-chip.edit { background: var(--ai-neutral-l); color: var(--ai-neutral); border-color: var(--c-batu); }
+  .ai-chip.analysis { background: var(--t-telusuri-soft); color: var(--t-telusuri); border-color: var(--t-telusuri-muted); }
+  .ai-chip.credit { background: var(--c-tandang-soft); color: var(--c-tandang); border-color: #B2DFDB; }
+
+  /* Chip states */
+  .ai-chip.state-hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .ai-chip.state-applied {
+    background: var(--ai-high-l); color: var(--ai-high);
+    border-color: #A5D6A7;
+  }
+  .ai-chip.state-dismissed {
+    opacity: 0.4; text-decoration: line-through;
+  }
+
+  /* AI inline card (universal pattern) */
+  .ai-inline-card {
+    margin: 8px 16px; padding: 10px 12px;
+    background: var(--ai-neutral-l);
+    border: 1.5px dashed var(--c-batu);
+    border-radius: var(--r-md);
+  }
+  .aic-header {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 6px;
+  }
+  .aic-icon { font-size: 14px; }
+  .aic-label {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    color: var(--c-kayu);
+  }
+  .aic-confidence {
+    margin-left: auto;
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    padding: 1px 6px; border-radius: var(--r-full);
+  }
+  .aic-confidence.high { background: var(--ai-high-l); color: var(--ai-high); }
+  .aic-confidence.medium { background: var(--ai-medium-l); color: var(--ai-medium); }
+  .aic-confidence.low { background: var(--ai-low-l); color: var(--ai-low); }
+  .aic-body {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    font-style: italic; line-height: 1.5;
+    margin-bottom: 8px;
+  }
+  .aic-actions {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+
+  /* Nudge card (gentler, for AI-09 credit suggestions) */
+  .nudge-card {
+    margin: 8px 16px; padding: 10px 12px;
+    background: var(--c-tandang-soft);
+    border: 1.5px solid #B2DFDB;
+    border-radius: var(--r-md);
+  }
+  .nudge-card .aic-label { color: var(--c-tandang); }
+
+  /* ═══════════════════════════════════════════════════
+     VIEW 3 — Ubah & Suggest-Don't-Overwrite
+     ═══════════════════════════════════════════════════ */
+
+  .diff-card {
+    margin: 8px 16px;
+    background: #fff; border-radius: var(--r-md);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+  }
+  .diff-header {
+    padding: 10px 12px;
+    background: var(--ai-neutral-l);
+    display: flex; align-items: center; gap: 6px;
+    border-bottom: 1px solid var(--c-batu);
+  }
+  .diff-header .dh-icon { font-size: 16px; }
+  .diff-header .dh-title {
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+  }
+  .source-tag {
+    font-size: 7px; padding: 1px 4px; border-radius: 3px;
+    font-weight: 700; vertical-align: middle;
+    display: inline-block;
+  }
+  .source-tag.ai { background: var(--t-telusuri-soft); color: var(--t-telusuri); }
+  .source-tag.human { background: var(--ai-neutral-l); color: var(--ai-neutral); }
+  .source-tag.system { background: var(--ai-low-l); color: var(--ai-low); }
+
+  .diff-field {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f0ebe6;
+  }
+  .diff-field:last-of-type { border-bottom: none; }
+  .df-label {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    color: var(--c-pasir); margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .df-old {
+    font-size: var(--fs-caption); color: var(--c-bahaya);
+    text-decoration: line-through;
+    background: var(--c-bahaya-l); padding: 4px 6px;
+    border-radius: var(--r-sm); margin-bottom: 3px;
+    line-height: 1.4;
+  }
+  .df-new {
+    font-size: var(--fs-caption); color: var(--ai-high);
+    background: var(--ai-high-l); padding: 4px 6px;
+    border-radius: var(--r-sm); line-height: 1.4;
+  }
+  .df-protected {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    background: var(--c-kapas); padding: 4px 6px;
+    border-radius: var(--r-sm);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .df-protected .lock-badge {
+    font-size: 7px; padding: 1px 4px; border-radius: 3px;
+    font-weight: 700; background: var(--c-peringatan-l);
+    color: var(--c-peringatan);
+  }
+
+  .diff-evidence {
+    padding: 8px 12px; margin: 0 12px 8px;
+    background: var(--c-kapas); border-radius: var(--r-sm);
+    border-left: 2px solid var(--c-batu);
+  }
+  .de-label {
+    font-size: 8px; font-weight: 700;
+    color: var(--c-pasir); margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .de-quote {
+    font-size: var(--fs-micro); color: var(--c-tanah);
+    font-style: italic; line-height: 1.4;
+  }
+  .de-source {
+    font-size: 8px; color: var(--c-pasir);
+    margin-top: 2px;
+  }
+
+  .diff-actions {
+    display: flex; gap: 6px; padding: 10px 12px;
+    border-top: 1px solid #f0ebe6;
+  }
+  .diff-btn {
+    flex: 1; padding: 8px;
+    border-radius: var(--r-md);
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer; border: none;
+    text-align: center;
+  }
+  .diff-btn.primary { background: var(--ai-high); color: #fff; }
+  .diff-btn.secondary { background: var(--ai-neutral-l); color: var(--ai-neutral); }
+  .diff-btn.dismiss { background: transparent; color: var(--c-pasir); border: 1px solid var(--c-batu); }
+
+  /* Ubah trigger button */
+  .ubah-btn {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 4px 10px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    background: var(--ai-neutral-l); color: var(--ai-neutral);
+    border: 1px solid var(--c-batu);
+    cursor: pointer; font-family: 'Nunito', sans-serif;
+  }
+
+  /* Cross-card write-back */
+  .cross-card-ref {
+    margin: 8px 16px; padding: 10px 12px;
+    background: #fff; border: 1.5px solid var(--c-batu);
+    border-radius: var(--r-md);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ccr-arrow {
+    font-size: 18px; color: var(--c-batu);
+  }
+  .ccr-target {
+    flex: 1;
+  }
+  .ccr-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 6px; border-radius: var(--r-full);
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    background: var(--t-tuntaskan-soft); color: var(--t-tuntaskan);
+  }
+  .ccr-title {
+    font-size: var(--fs-caption); color: var(--c-tanah-gelap);
+    font-weight: var(--fw-semi); margin-top: 2px;
+  }
+  .ccr-desc {
+    font-size: var(--fs-micro); color: var(--c-pasir);
+  }
+
+  /* ═══════════════════════════════════════════════════
+     VIEW 4 — Menunggu Moderasi
+     ═══════════════════════════════════════════════════ */
+
+  .mod-banner {
+    margin: 0 16px; padding: 10px 12px;
+    border-radius: var(--r-md);
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .mod-banner.author {
+    background: var(--ai-hold-l); border: 1px solid #FFCC80;
+  }
+  .mod-banner.moderator {
+    background: var(--t-telusuri-soft); border: 1px solid var(--t-telusuri-muted);
+  }
+  .mod-banner.public {
+    background: var(--ai-low-l); border: 1px solid #CFD8DC;
+  }
+  .mb-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+  .mb-content { flex: 1; }
+  .mb-title {
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); margin-bottom: 2px;
+  }
+  .mb-desc {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.4;
+  }
+  .mb-meta {
+    display: flex; gap: 8px; margin-top: 6px;
+    flex-wrap: wrap;
+  }
+  .mb-meta-item {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: var(--fs-micro); color: var(--c-pasir);
+  }
+
+  .mod-card {
+    margin: 8px 16px;
+    background: #fff; border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .mc-strip {
+    height: 3px;
+  }
+  .mc-strip.hold { background: var(--ai-hold); }
+  .mc-strip.safe { background: var(--ai-high); }
+  .mc-header {
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mc-avatar {
+    width: 36px; height: 36px; border-radius: var(--r-full);
+    background: var(--c-batu);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .mc-info { flex: 1; }
+  .mc-name {
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap);
+  }
+  .mc-time {
+    font-size: var(--fs-micro); color: var(--c-pasir);
+  }
+  .mc-body {
+    padding: 0 12px 10px;
+  }
+  .mc-text {
+    font-size: var(--fs-caption); color: var(--c-tanah);
+    line-height: 1.5;
+  }
+  .mc-flags {
+    padding: 8px 12px;
+    background: var(--c-kapas);
+    border-top: 1px solid #f0ebe6;
+  }
+  .mc-flag {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--fs-micro); margin-bottom: 4px;
+  }
+  .mc-flag:last-child { margin-bottom: 0; }
+  .mc-flag-icon { font-size: 12px; }
+  .mc-flag-reason {
+    flex: 1; color: var(--c-tanah);
+  }
+  .mc-flag-conf {
+    font-weight: var(--fw-bold); padding: 1px 5px;
+    border-radius: var(--r-full); font-size: 8px;
+  }
+  .mc-flag-conf.high { background: var(--c-bahaya-l); color: var(--c-bahaya); }
+  .mc-flag-conf.medium { background: var(--ai-medium-l); color: var(--ai-medium); }
+  .mc-flag-conf.low { background: var(--ai-low-l); color: var(--ai-low); }
+
+  .mc-actions {
+    display: flex; gap: 6px; padding: 10px 12px;
+    border-top: 1px solid #f0ebe6;
+  }
+  .mc-btn {
+    flex: 1; padding: 8px;
+    border-radius: var(--r-md);
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer; border: none;
+    text-align: center;
+  }
+  .mc-btn.approve { background: var(--ai-high); color: #fff; }
+  .mc-btn.reject { background: var(--c-bahaya-l); color: var(--c-bahaya); }
+  .mc-btn.escalate { background: var(--ai-neutral-l); color: var(--ai-neutral); }
+
+  /* Moderator queue */
+  .mod-queue-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px;
+  }
+  .mqh-title {
+    font-size: var(--fs-h3); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); flex: 1;
+  }
+  .mqh-count {
+    padding: 3px 10px; border-radius: var(--r-full);
+    background: var(--ai-hold-l); color: var(--ai-hold);
+    font-size: var(--fs-small); font-weight: var(--fw-extra);
+  }
+
+  /* Flow diagram */
+  .flow-diagram {
+    margin: 8px 16px; padding: 10px;
+    background: #fff; border-radius: var(--r-md);
+    display: flex; align-items: center; justify-content: center;
+    gap: 4px; flex-wrap: wrap;
+  }
+  .flow-step {
+    padding: 4px 8px; border-radius: var(--r-sm);
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    text-align: center;
+  }
+  .flow-step.ai { background: var(--ai-neutral-l); color: var(--ai-neutral); }
+  .flow-step.human { background: var(--ai-hold-l); color: var(--ai-hold); }
+  .flow-step.auto { background: var(--ai-high-l); color: var(--ai-high); }
+  .flow-arrow {
+    font-size: var(--fs-caption); color: var(--c-batu);
+  }
+
+  /* ═══════════════════════════════════════════════════
+     VIEW 5 — Deteksi Duplikat
+     ═══════════════════════════════════════════════════ */
+
+  .dup-comparison {
+    margin: 8px 16px;
+    background: #fff; border-radius: var(--r-md);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+  }
+  .dup-header {
+    padding: 10px 12px;
+    background: var(--ai-medium-l);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .dup-header .dh-icon { font-size: 16px; }
+  .dup-header .dh-title {
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+    color: var(--c-peringatan); flex: 1;
+  }
+
+  .dup-sim {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px; background: var(--c-kapas);
+  }
+  .sim-bar-wrap {
+    flex: 1; height: 6px;
+    background: var(--c-batu); border-radius: var(--r-full);
+    overflow: hidden;
+  }
+  .sim-fill {
+    height: 100%; border-radius: var(--r-full);
+    background: var(--c-peringatan);
+  }
+  .sim-pct {
+    font-size: var(--fs-small); font-weight: var(--fw-extra);
+    color: var(--c-peringatan);
+  }
+  .sim-label {
+    font-size: var(--fs-micro); color: var(--c-pasir);
+  }
+
+  .dup-sides {
+    display: flex;
+  }
+  .dup-side {
+    flex: 1; padding: 10px;
+    border-right: 1px solid #f0ebe6;
+  }
+  .dup-side:last-child { border-right: none; }
+  .ds-label {
+    font-size: 8px; font-weight: 700;
+    color: var(--c-pasir); margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .ds-id {
+    font-size: var(--fs-micro); color: var(--c-kayu);
+    font-weight: var(--fw-bold); margin-bottom: 4px;
+  }
+  .ds-title {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-tanah-gelap); margin-bottom: 4px;
+    line-height: 1.3;
+  }
+  .ds-text {
+    font-size: var(--fs-micro); color: var(--c-tanah);
+    line-height: 1.4;
+  }
+  .ds-match {
+    background: var(--ai-medium-l);
+    padding: 1px 3px; border-radius: 2px;
+  }
+
+  .dup-actions {
+    display: flex; gap: 6px; padding: 10px 12px;
+    border-top: 1px solid #f0ebe6;
+  }
+  .dup-btn {
+    flex: 1; padding: 8px;
+    border-radius: var(--r-md);
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer; border: none; text-align: center;
+  }
+  .dup-btn.merge { background: var(--c-peringatan); color: #fff; }
+  .dup-btn.different { background: var(--ai-neutral-l); color: var(--ai-neutral); }
+  .dup-btn.view { background: transparent; color: var(--c-kayu); border: 1px solid var(--c-batu); }
+
+  /* Context bar duplicate pill */
+  .ctx-dup-pill {
+    margin: 8px 16px; padding: 8px 12px;
+    background: var(--ai-medium-l);
+    border: 1px solid #FFCC80;
+    border-radius: var(--r-lg);
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer;
+  }
+  .cdp-icon { font-size: 18px; }
+  .cdp-text {
+    flex: 1; font-size: var(--fs-caption);
+    font-weight: var(--fw-semi); color: var(--c-peringatan);
+  }
+  .cdp-chevron {
+    font-size: 14px; color: var(--c-pasir);
+  }
+
+  /* Duplicate badge on seed card footer */
+  .seed-footer-demo {
+    margin: 8px 16px; padding: 10px 12px;
+    background: #fff; border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap;
+  }
+  .sfd-stat {
+    font-size: var(--fs-micro); color: var(--c-pasir);
+    display: flex; align-items: center; gap: 2px;
+  }
+
+  /* Perspective label */
+  .perspective-label {
+    margin: 12px 16px 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .pl-icon {
+    width: 24px; height: 24px; border-radius: var(--r-full);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .pl-icon.author { background: var(--ai-hold-l); }
+  .pl-icon.moderator { background: var(--t-telusuri-soft); }
+  .pl-icon.public { background: var(--ai-low-l); }
+  .pl-text {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-tanah);
+  }
+
+  /* Separator */
+  .sep {
+    height: 1px; background: var(--c-batu);
+    margin: 12px 16px;
+  }
+
+  /* Scroll body */
+  .scroll-body {
+    flex: 1; overflow-y: auto;
+    padding-bottom: 24px;
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-bar">
+  <h1>C2 · AI Surface States</h1>
+  <p>Cross-cutting AI patterns: confidence, chips, diff card, moderation, duplicate detection</p>
+</div>
+
+<div class="scenario-nav">
+  <div class="scenario-label">5 views — tap to navigate</div>
+  <button class="scenario-btn active" onclick="showView('v1')">KEYAKINAN</button>
+  <button class="scenario-btn" onclick="showView('v2')">CHIP SARAN</button>
+  <button class="scenario-btn" onclick="showView('v3')">UBAH & DIFF</button>
+  <button class="scenario-btn" onclick="showView('v4')">MODERASI</button>
+  <button class="scenario-btn" onclick="showView('v5')">DUPLIKAT</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW 1 — LENCANA KEYAKINAN (Confidence Badges)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="v1" class="view-section active">
+  <div class="phone-frame">
+    <div class="scroll-body">
+
+      <div class="annotation">
+        <strong>Prinsip "AI is Furniture"</strong> — AI tidak punya warna merek sendiri.
+        Elemen AI memakai palet Tanah yang sudah ada: coklat untuk netral, hijau untuk yakin,
+        oranye untuk ragu, abu-abu untuk rendah. AI terasa menyatu, bukan lapisan teknologi terpisah.
+      </div>
+
+      <div class="section-title">Tiga Tingkat Keyakinan</div>
+
+      <!-- HIGH -->
+      <div class="confidence-band">
+        <div class="cb-header">
+          <div class="cb-indicator high"></div>
+          <span class="cb-label">Tinggi</span>
+          <span class="cb-range">≥ 80%</span>
+        </div>
+        <div class="cb-body">
+          AI yakin. Hasil langsung diterapkan. Pengguna melihat hasilnya dan bisa mengubah.
+        </div>
+        <span class="cb-example high">🤖 Tuntaskan · 92%</span>
+        <div class="cb-behavior">
+          <span class="behavior-icon">⚡</span>
+          <span>Perilaku UI: <strong>Auto-apply</strong> — langsung diterapkan, tombol "Ubah" tersedia</span>
+        </div>
+      </div>
+
+      <!-- MEDIUM -->
+      <div class="confidence-band">
+        <div class="cb-header">
+          <div class="cb-indicator medium"></div>
+          <span class="cb-label">Sedang</span>
+          <span class="cb-range">50 – 79%</span>
+        </div>
+        <div class="cb-body">
+          AI menyarankan tetapi butuh konfirmasi manusia. Ditampilkan dengan tanda tanya.
+        </div>
+        <span class="cb-example medium">🤖 Wujudkan? · 74%</span>
+        <div class="cb-behavior">
+          <span class="behavior-icon">🤚</span>
+          <span>Perilaku UI: <strong>Suggest</strong> — perlu konfirmasi manusia sebelum diterapkan</span>
+        </div>
+      </div>
+
+      <!-- LOW -->
+      <div class="confidence-band">
+        <div class="cb-header">
+          <div class="cb-indicator low"></div>
+          <span class="cb-label">Rendah</span>
+          <span class="cb-range">< 50%</span>
+        </div>
+        <div class="cb-body">
+          AI tidak yakin. Menunjukkan ketidakpastian. Input manual sangat dianjurkan.
+        </div>
+        <span class="cb-example low">🤖 Belum yakin · 38%</span>
+        <div class="cb-behavior">
+          <span class="behavior-icon">✍️</span>
+          <span>Perilaku UI: <strong>Show uncertainty</strong> — dorong input manual oleh pengguna</span>
+        </div>
+      </div>
+
+      <div class="section-title">Meter Keyakinan (reusable)</div>
+
+      <div class="confidence-meter">
+        <div class="cm-label">Keyakinan Klasifikasi</div>
+        <div class="cm-bar-wrap"><div class="cm-fill high"></div></div>
+        <div class="cm-value">
+          <span class="cm-pct high">92%</span>
+          <span class="cm-semantic">Tinggi — auto-applied</span>
+        </div>
+      </div>
+
+      <div class="confidence-meter">
+        <div class="cm-label">Keyakinan Rangkuman</div>
+        <div class="cm-bar-wrap"><div class="cm-fill medium"></div></div>
+        <div class="cm-value">
+          <span class="cm-pct medium">67%</span>
+          <span class="cm-semantic">Sedang — perlu konfirmasi</span>
+        </div>
+      </div>
+
+      <div class="confidence-meter">
+        <div class="cm-label">Keyakinan Sentimen</div>
+        <div class="cm-bar-wrap"><div class="cm-fill low"></div></div>
+        <div class="cm-value">
+          <span class="cm-pct low">34%</span>
+          <span class="cm-semantic">Rendah — dorong input manual</span>
+        </div>
+      </div>
+
+      <div class="section-title">Katalog Badge AI (footer kartu)</div>
+
+      <div class="badge-grid">
+        <div class="ai-badge-demo">
+          <span class="badge-pill classified">🤖 Tuntaskan · 92%</span>
+          <div class="badge-desc">AI-01 · Klasifikasi<br>(Tinggi → hijau)</div>
+        </div>
+        <div class="ai-badge-demo">
+          <span class="badge-pill suggested">🤖 Wujudkan? · 74%</span>
+          <div class="badge-desc">AI-01 · Klasifikasi<br>(Sedang → oranye + ?)</div>
+        </div>
+        <div class="ai-badge-demo">
+          <span class="badge-pill summary">📝 AI-07</span>
+          <div class="badge-desc">AI-07 · Rangkuman<br>(Netral coklat)</div>
+        </div>
+        <div class="ai-badge-demo">
+          <span class="badge-pill stall">⚠️ Macet 48j</span>
+          <div class="badge-desc">AI-04 · Stall Detection<br>(Bahaya merah)</div>
+        </div>
+        <div class="ai-badge-demo">
+          <span class="badge-pill resolve">✓ 87% terverifikasi</span>
+          <div class="badge-desc">AI-05 · Resolusi<br>(Berhasil hijau)</div>
+        </div>
+        <div class="ai-badge-demo">
+          <span class="badge-pill dampak">🌱 Dampak</span>
+          <div class="badge-desc">AI-06 · Dampak<br>(Berhasil hijau)</div>
+        </div>
+        <div class="ai-badge-demo">
+          <span class="badge-pill duplicate">⚠️ Duplikat?</span>
+          <div class="badge-desc">AI-03 · Duplikat<br>(Peringatan oranye)</div>
+        </div>
+        <div class="ai-badge-demo">
+          <span class="badge-pill sentiment">💬 Panas</span>
+          <div class="badge-desc">AI-08 · Sentimen<br>(Telusuri ungu)</div>
+        </div>
+      </div>
+
+      <div class="design-note">
+        <strong>Aturan warna:</strong> Hijau = AI yakin/berhasil, Oranye = AI ragu/perlu perhatian,
+        Merah = peringatan/masalah, Abu-abu = AI tidak yakin, Coklat = netral/informasi,
+        Ungu = analisis/telusuri. Tidak ada "warna AI" khusus — AI menggunakan palet semantik Tanah.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW 2 — CHIP SARAN & NUDGE (Suggestion Chips)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="v2" class="view-section">
+  <div class="phone-frame">
+    <div class="scroll-body">
+
+      <div class="annotation">
+        <strong>Chip Saran</strong> — tombol kecil yang AI tawarkan di dalam alur percakapan.
+        Ada 4 tipe: <span class="rule">Action</span> <span class="rule">Edit</span>
+        <span class="rule">Analysis</span> <span class="rule">Credit</span>
+      </div>
+
+      <div class="section-title">Empat Tipe Chip</div>
+
+      <!-- Action chips -->
+      <div class="chip-showcase">
+        <div class="cs-title">Action — langkah selanjutnya</div>
+        <div class="chip-row">
+          <span class="ai-chip action"><span class="chip-icon">🔥</span> Buat Tuntaskan</span>
+          <span class="ai-chip action"><span class="chip-icon">📋</span> Lanjut ke Rancang</span>
+        </div>
+        <div class="chip-row">
+          <span class="ai-chip action-green"><span class="chip-icon">🎉</span> Buat Wujudkan</span>
+          <span class="ai-chip action-green"><span class="chip-icon">✅</span> Tuntaskan</span>
+        </div>
+      </div>
+
+      <!-- Edit chips -->
+      <div class="chip-showcase">
+        <div class="cs-title">Edit — ubah atau perbaiki</div>
+        <div class="chip-row">
+          <span class="ai-chip edit"><span class="chip-icon">✏️</span> Ubah</span>
+          <span class="ai-chip edit"><span class="chip-icon">🤖</span> Bantu edit</span>
+          <span class="ai-chip edit"><span class="chip-icon">🔄</span> Regenerasi</span>
+        </div>
+      </div>
+
+      <!-- Analysis chips -->
+      <div class="chip-showcase">
+        <div class="cs-title">Analysis — minta AI bantu analisis</div>
+        <div class="chip-row">
+          <span class="ai-chip analysis"><span class="chip-icon">📊</span> Lihat ringkasan</span>
+          <span class="ai-chip analysis"><span class="chip-icon">🤖</span> Bantu analisis</span>
+        </div>
+        <div class="chip-row">
+          <span class="ai-chip analysis"><span class="chip-icon">🔍</span> Cari pola</span>
+          <span class="ai-chip analysis"><span class="chip-icon">📈</span> Aktifkan Tinjau</span>
+        </div>
+      </div>
+
+      <!-- Credit chips -->
+      <div class="chip-showcase">
+        <div class="cs-title">Credit — Tandang nudge (AI-09)</div>
+        <div class="chip-row">
+          <span class="ai-chip credit"><span class="chip-icon">⭐</span> Jaminkan Pak Hendra?</span>
+        </div>
+        <div class="chip-row">
+          <span class="ai-chip credit"><span class="chip-icon">📊</span> Lihat kontribusi</span>
+          <span class="ai-chip credit"><span class="chip-icon">🛡️</span> Beri rating</span>
+        </div>
+      </div>
+
+      <div class="section-title">Status Chip (lifecycle)</div>
+
+      <div class="chip-showcase">
+        <div class="cs-title">Idle → Hover → Applied → Dismissed</div>
+        <div class="chip-row">
+          <span class="ai-chip action"><span class="chip-icon">📋</span> Lanjut ke Rancang</span>
+        </div>
+        <div class="chip-row">
+          <span class="ai-chip action state-hover"><span class="chip-icon">📋</span> Lanjut ke Rancang</span>
+        </div>
+        <div class="chip-row">
+          <span class="ai-chip state-applied"><span class="chip-icon">✅</span> Diterapkan</span>
+        </div>
+        <div class="chip-row">
+          <span class="ai-chip state-dismissed"><span class="chip-icon">📋</span> Lanjut ke Rancang</span>
+        </div>
+      </div>
+
+      <div class="section-title">AI Inline Card (pola universal)</div>
+
+      <div class="ai-inline-card">
+        <div class="aic-header">
+          <span class="aic-icon">🤖</span>
+          <span class="aic-label">AI-07 · Rangkuman sementara</span>
+          <span class="aic-confidence high">92%</span>
+        </div>
+        <div class="aic-body">
+          Dua warga mengkonfirmasi ketidaksesuaian harga bahan bangunan di koperasi RT 07.
+          Bu Sari punya bukti foto nota. Mas Rizal menawarkan keahlian sebagai kontraktor
+          untuk audit.
+        </div>
+        <div class="aic-actions">
+          <span class="ai-chip edit"><span class="chip-icon">✏️</span> Ubah</span>
+          <span class="ai-chip edit"><span class="chip-icon">🤖</span> Bantu edit</span>
+        </div>
+      </div>
+
+      <div class="design-note">
+        <strong>Dengan keyakinan sedang:</strong>
+      </div>
+
+      <div class="ai-inline-card">
+        <div class="aic-header">
+          <span class="aic-icon">🤖</span>
+          <span class="aic-label">AI-07 · Rangkuman posisi</span>
+          <span class="aic-confidence medium">67%</span>
+        </div>
+        <div class="aic-body">
+          Teridentifikasi 2 posisi utama: (1) Audit langsung oleh warga,
+          (2) Minta penjelasan pengurus dulu. Belum jelas preferensi mayoritas.
+        </div>
+        <div class="aic-actions">
+          <span class="ai-chip edit"><span class="chip-icon">✏️</span> Ubah</span>
+          <span class="ai-chip analysis"><span class="chip-icon">🤖</span> Bantu analisis</span>
+          <span class="ai-chip edit"><span class="chip-icon">🔄</span> Regenerasi</span>
+        </div>
+      </div>
+
+      <div class="section-title">Nudge Card (AI-09 · Tandang)</div>
+
+      <div class="nudge-card">
+        <div class="aic-header">
+          <span class="aic-icon">⭐</span>
+          <span class="aic-label">AI-09 · Saran kredit</span>
+        </div>
+        <div class="aic-body">
+          Pak Hendra telah menyelesaikan 4 tugas di fase Garap.
+          Pertimbangkan untuk menjaminkan (vouch) kompetensinya di bidang audit keuangan.
+        </div>
+        <div class="aic-actions">
+          <span class="ai-chip credit"><span class="chip-icon">⭐</span> Jaminkan</span>
+          <span class="ai-chip edit"><span class="chip-icon">👋</span> Nanti</span>
+        </div>
+      </div>
+
+      <div class="design-note">
+        <strong>Penempatan chip:</strong> Di dalam percakapan (setelah pesan AI), di footer AI inline card,
+        di context bar (A+1), dan sebagai standalone nudge card. Semua chip bisa di-dismiss dengan swipe.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW 3 — UBAH & SUGGEST-DON'T-OVERWRITE (Diff Card)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="v3" class="view-section">
+  <div class="phone-frame">
+    <div class="scroll-body">
+
+      <div class="annotation">
+        <strong>Suggest-Don't-Overwrite</strong> — Prinsip inti: AI tidak pernah langsung mengganti
+        konten manusia. AI selalu menyarankan via diff card, manusia yang memutuskan.
+        Tombol <span class="rule">Ubah</span> memicu diff view pada konten AI.
+      </div>
+
+      <div class="section-title">Tombol "Ubah" (trigger)</div>
+
+      <div style="margin: 8px 16px; padding: 12px; background: #fff; border-radius: var(--r-md); box-shadow: var(--shadow-sm);">
+        <div style="font-size: var(--fs-caption); color: var(--c-tanah); margin-bottom: 8px; line-height: 1.5; font-style: italic; border-left: 2px dashed var(--c-batu); padding-left: 8px;">
+          🤖 <strong>AI-07</strong> · "Dua warga mengkonfirmasi ketidaksesuaian harga. Bu Sari punya bukti…"
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button class="ubah-btn">✏️ Ubah</button>
+          <button class="ubah-btn">🤖 Bantu edit</button>
+        </div>
+        <div class="design-note" style="margin: 8px 0 0;">
+          <strong>Ubah</strong> = buka inline editor langsung. <strong>Bantu edit</strong> = AI buatkan versi baru → tampil sebagai diff card.
+        </div>
+      </div>
+
+      <div class="section-title">Diff Card — Anatomi</div>
+
+      <div class="diff-card">
+        <div class="diff-header">
+          <span class="dh-icon">🤖</span>
+          <span class="dh-title">AI-07 menyarankan perubahan</span>
+          <span class="source-tag ai">AI</span>
+        </div>
+
+        <div class="diff-field">
+          <div class="df-label">Judul</div>
+          <div class="df-old">Masalah harga bahan bangunan</div>
+          <div class="df-new">Ketidaksesuaian harga bahan bangunan koperasi RT 07</div>
+        </div>
+
+        <div class="diff-field">
+          <div class="df-label">Rangkuman</div>
+          <div class="df-old">Harga di koperasi mahal, warga komplen</div>
+          <div class="df-new">Dua warga mengkonfirmasi selisih harga ±30% antara koperasi dan toko luar. Bu Sari memiliki bukti foto nota pembelian.</div>
+        </div>
+
+        <div class="diff-field">
+          <div class="df-label">Dana Koperasi</div>
+          <div class="df-protected">
+            <span class="lock-badge">🔒 DILINDUNGI</span>
+            Rp 12.450.000 — AI tidak dapat mengubah field keuangan
+          </div>
+        </div>
+
+        <div class="diff-evidence">
+          <div class="de-label">💬 Sumber dari diskusi</div>
+          <div class="de-quote">"Saya bandingkan dengan toko Jaya Makmur, selisihnya hampir 30% untuk semen dan pasir" — Bu Sari, 2 jam lalu</div>
+          <div class="de-source">Diskusi Bahas · 3 dari 12 pesan mendukung</div>
+        </div>
+
+        <div class="diff-actions">
+          <button class="diff-btn primary">Terapkan Semua</button>
+          <button class="diff-btn secondary">Tinjau Satu-satu</button>
+          <button class="diff-btn dismiss">Abaikan</button>
+        </div>
+      </div>
+
+      <div class="section-title">"Tinjau Satu-satu" mode</div>
+
+      <div class="diff-card">
+        <div class="diff-header">
+          <span class="dh-icon">📝</span>
+          <span class="dh-title">Field 1 dari 2</span>
+          <span class="source-tag ai">AI</span>
+        </div>
+
+        <div class="diff-field">
+          <div class="df-label">Judul</div>
+          <div class="df-old">Masalah harga bahan bangunan</div>
+          <div class="df-new">Ketidaksesuaian harga bahan bangunan koperasi RT 07</div>
+        </div>
+
+        <div class="diff-actions">
+          <button class="diff-btn primary">✓ Terima</button>
+          <button class="diff-btn dismiss">✗ Tolak</button>
+          <button class="diff-btn secondary">✏️ Edit sendiri</button>
+        </div>
+      </div>
+
+      <div class="section-title">Cross-card Write-back</div>
+
+      <div class="annotation">
+        AI bisa menyarankan perubahan ke kartu <strong>lain</strong>. Contoh: temuan di Telusuri
+        menghasilkan saran untuk membuat Tuntaskan baru.
+      </div>
+
+      <div class="cross-card-ref">
+        <span class="ccr-arrow">↗️</span>
+        <div class="ccr-target">
+          <span class="ccr-badge">🔥 Tuntaskan baru</span>
+          <div class="ccr-title">Audit harga bahan koperasi RT 07</div>
+          <div class="ccr-desc">Disarankan berdasarkan temuan Telusuri #85 — ketidaksesuaian harga 30%</div>
+        </div>
+      </div>
+
+      <div class="cross-card-ref">
+        <span class="ccr-arrow">📊</span>
+        <div class="ccr-target">
+          <span class="ccr-badge" style="background: var(--c-tandang-soft); color: var(--c-tandang);">⭐ Kredit Tandang</span>
+          <div class="ccr-title">Distribusi kredit untuk Tuntaskan #142</div>
+          <div class="ccr-desc">AI-09 mengusulkan alokasi I/C/J — PIC perlu konfirmasi</div>
+        </div>
+      </div>
+
+      <div class="design-note">
+        <strong>Aturan diff card:</strong> (1) AI tidak pernah langsung overwrite — selalu diff card.
+        (2) Field 🔒 DILINDUNGI (keuangan) tidak bisa diubah AI.
+        (3) Sumber dari diskusi ditampilkan sebagai bukti.
+        (4) Cross-card write-back juga menggunakan diff card di kartu target.
+        (5) PIC (penanggung jawab) memiliki veto atas semua perubahan.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW 4 — MENUNGGU MODERASI (Moderation Hold)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="v4" class="view-section">
+  <div class="phone-frame">
+    <div class="scroll-body">
+
+      <div class="annotation">
+        <strong>Moderasi ≠ Rahasia.</strong> C1 (Rahasia) = privasi yang dipilih pengguna.
+        C2 (Moderasi) = AI menahan konten untuk ditinjau. Keduanya bisa terjadi bersamaan
+        (misalnya konten Rahasia L2 juga ditahan untuk moderasi).
+      </div>
+
+      <div class="section-title">Alur Moderasi</div>
+
+      <div class="flow-diagram">
+        <span class="flow-step ai">Konten masuk</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step ai">AI scan</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step human">Ditahan?</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step auto">Lolos otomatis</span>
+      </div>
+      <div class="flow-diagram">
+        <span class="flow-step human" style="background: var(--c-bahaya-l); color: var(--c-bahaya);">Ditahan</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step human">Moderator tinjau</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step auto">Lolos / Tolak / Eskalasi</span>
+      </div>
+
+      <div class="design-note">
+        <strong>Auto-release:</strong> Jika AI flag confidence < 60%, dan tidak ada moderator merespons
+        dalam 15 menit, konten otomatis lolos. Ini menghindari bottleneck.
+      </div>
+
+      <div class="section-title">Perspektif Pembuat</div>
+
+      <div class="perspective-label">
+        <span class="pl-icon author">👤</span>
+        <span class="pl-text">Dilihat pembuat konten</span>
+      </div>
+
+      <div class="mod-banner author" style="margin-top: 8px;">
+        <span class="mb-icon">⏳</span>
+        <div class="mb-content">
+          <div class="mb-title">Menunggu tinjauan otomatis</div>
+          <div class="mb-desc">
+            Konten Anda sedang diperiksa secara otomatis. Biasanya selesai dalam beberapa menit.
+          </div>
+          <div class="mb-meta">
+            <span class="mb-meta-item">🕐 Estimasi: < 2 menit</span>
+            <span class="mb-meta-item">📝 Alasan: bahasa sensitif terdeteksi</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mod-card" style="margin-top: 8px;">
+        <div class="mc-strip hold"></div>
+        <div class="mc-header">
+          <div class="mc-avatar">👤</div>
+          <div class="mc-info">
+            <div class="mc-name">Bu Ratna · <span style="font-size: 9px; color: var(--c-pasir);">◆◆◇◇</span></div>
+            <div class="mc-time">Baru saja · Tuntaskan</div>
+          </div>
+          <span class="badge-pill suggested" style="font-size: 8px;">⏳ Ditinjau</span>
+        </div>
+        <div class="mc-body">
+          <div class="mc-text">
+            Koperasi RT 07 menaikkan harga bahan bangunan secara tidak wajar.
+            Ada indikasi <span style="background: var(--c-bahaya-l); padding: 0 3px; border-radius: 2px;">penyelewengan dana</span> oleh pengurus…
+          </div>
+        </div>
+        <div style="padding: 8px 12px; border-top: 1px solid #f0ebe6;">
+          <div style="display: flex; gap: 6px;">
+            <button class="ubah-btn" style="font-size: 10px;">✏️ Edit & kirim ulang</button>
+            <button class="ubah-btn" style="font-size: 10px;">🗑️ Batalkan</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="section-title">Perspektif Moderator</div>
+
+      <div class="perspective-label">
+        <span class="pl-icon moderator">🛡️</span>
+        <span class="pl-text">Dilihat moderator (antrean)</span>
+      </div>
+
+      <div class="mod-queue-header">
+        <span class="mqh-title">Antrean Moderasi</span>
+        <span class="mqh-count">3</span>
+      </div>
+
+      <!-- Item 1 — high flag -->
+      <div class="mod-card">
+        <div class="mc-strip hold"></div>
+        <div class="mc-header">
+          <div class="mc-avatar">👤</div>
+          <div class="mc-info">
+            <div class="mc-name">Bu Ratna · <span style="font-size: 9px; color: var(--c-pasir);">◆◆◇◇ Kontributor</span></div>
+            <div class="mc-time">3 menit lalu · Tuntaskan</div>
+          </div>
+        </div>
+        <div class="mc-body">
+          <div class="mc-text">
+            Koperasi RT 07 menaikkan harga bahan bangunan secara tidak wajar.
+            Ada indikasi penyelewengan dana oleh pengurus…
+          </div>
+        </div>
+        <div class="mc-flags">
+          <div class="mc-flag">
+            <span class="mc-flag-icon">🔴</span>
+            <span class="mc-flag-reason">Tuduhan tanpa bukti (potensi fitnah)</span>
+            <span class="mc-flag-conf high">78%</span>
+          </div>
+          <div class="mc-flag">
+            <span class="mc-flag-icon">🟡</span>
+            <span class="mc-flag-reason">Menyebut nama individu</span>
+            <span class="mc-flag-conf medium">62%</span>
+          </div>
+        </div>
+        <div class="mc-actions">
+          <button class="mc-btn approve">✓ Loloskan</button>
+          <button class="mc-btn reject">✗ Tolak</button>
+          <button class="mc-btn escalate">⬆️ Eskalasi</button>
+        </div>
+      </div>
+
+      <!-- Item 2 — low flag -->
+      <div class="mod-card">
+        <div class="mc-strip" style="background: var(--ai-medium);"></div>
+        <div class="mc-header">
+          <div class="mc-avatar">👤</div>
+          <div class="mc-info">
+            <div class="mc-name">Mas Budi · <span style="font-size: 9px; color: var(--c-pasir);">◆◇◇◇ Pemula</span></div>
+            <div class="mc-time">8 menit lalu · Rayakan</div>
+          </div>
+        </div>
+        <div class="mc-body">
+          <div class="mc-text">
+            Bu guru kelas 6 luar biasa!! Anak saya dapat ranking karena bimbingannya…
+          </div>
+        </div>
+        <div class="mc-flags">
+          <div class="mc-flag">
+            <span class="mc-flag-icon">🟡</span>
+            <span class="mc-flag-reason">Terlalu banyak tanda seru (spam heuristic)</span>
+            <span class="mc-flag-conf low">41%</span>
+          </div>
+        </div>
+        <div class="mc-actions">
+          <button class="mc-btn approve">✓ Loloskan</button>
+          <button class="mc-btn reject">✗ Tolak</button>
+          <button class="mc-btn escalate">⬆️ Eskalasi</button>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="section-title">Perspektif Publik</div>
+
+      <div class="perspective-label">
+        <span class="pl-icon public">👥</span>
+        <span class="pl-text">Dilihat warga (di feed)</span>
+      </div>
+
+      <div class="mod-banner public" style="margin-top: 8px;">
+        <span class="mb-icon">🔍</span>
+        <div class="mb-content">
+          <div class="mb-title">Konten sedang diperiksa</div>
+          <div class="mb-desc">
+            Postingan ini sedang dalam tinjauan otomatis dan akan tampil segera jika memenuhi pedoman komunitas.
+          </div>
+        </div>
+      </div>
+
+      <div class="design-note">
+        <strong>Prinsip moderasi:</strong> (1) Transparan ke pembuat — selalu tahu status dan alasan.
+        (2) Tidak menghakimi ke publik — placeholder netral, tanpa detail flag.
+        (3) Informasi lengkap ke moderator — AI flag + confidence + alasan.
+        (4) Auto-release jika AI confidence rendah dan tidak ada respons moderator.
+        (5) Eskalasi untuk kasus berat → pengurus RT/komunitas.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW 5 — DETEKSI DUPLIKAT (Duplicate Detection)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="v5" class="view-section">
+  <div class="phone-frame">
+    <div class="scroll-body">
+
+      <div class="annotation">
+        <strong>AI-03 · Deteksi Duplikat</strong> — Muncul di dua momen:
+        (1) Saat triage (AI-00) sebelum seed terkirim,
+        (2) Setelah terkirim jika ada seed baru yang mirip.
+      </div>
+
+      <div class="section-title">Saat Triage (konteks bar)</div>
+
+      <div class="ctx-dup-pill">
+        <span class="cdp-icon">🔍</span>
+        <span class="cdp-text">Mirip dengan seed yang sudah ada — ketuk untuk lihat</span>
+        <span class="cdp-chevron">›</span>
+      </div>
+
+      <div class="design-note">
+        Pill ini muncul di context bar (A+1) saat AI-00 mendeteksi kemiripan dengan seed existing.
+        Pengguna bisa ketuk untuk membandingkan, atau abaikan dan lanjut kirim.
+      </div>
+
+      <div class="section-title">Kartu Perbandingan Duplikat</div>
+
+      <div class="dup-comparison">
+        <div class="dup-header">
+          <span class="dh-icon">⚠️</span>
+          <span class="dh-title">Konten mirip terdeteksi</span>
+        </div>
+
+        <div class="dup-sim">
+          <span class="sim-label">Kemiripan</span>
+          <div class="sim-bar-wrap">
+            <div class="sim-fill" style="width: 87%;"></div>
+          </div>
+          <span class="sim-pct">87%</span>
+        </div>
+
+        <div class="dup-sides">
+          <div class="dup-side">
+            <div class="ds-label">Seed yang ada</div>
+            <div class="ds-id">#089 · Tuntaskan</div>
+            <div class="ds-title">Harga bahan <span class="ds-match">bangunan koperasi</span> tidak wajar</div>
+            <div class="ds-text">
+              Warga mengeluh <span class="ds-match">harga bahan bangunan</span> di <span class="ds-match">koperasi RT 07</span>
+              jauh lebih mahal dari toko luar…
+            </div>
+            <div style="margin-top: 6px; font-size: 8px; color: var(--c-pasir);">
+              Bu Sari · 3 hari lalu · Bahas (12 komentar)
+            </div>
+          </div>
+          <div class="dup-side">
+            <div class="ds-label">Seed baru (Anda)</div>
+            <div class="ds-id">Draft · Tuntaskan</div>
+            <div class="ds-title">Audit <span class="ds-match">koperasi RT 07</span> — harga tidak transparan</div>
+            <div class="ds-text">
+              Saya menemukan <span class="ds-match">harga bahan bangunan</span> di <span class="ds-match">koperasi</span>
+              lebih mahal 30% dari pasar…
+            </div>
+            <div style="margin-top: 6px; font-size: 8px; color: var(--c-pasir);">
+              Bu Ratna · Baru saja
+            </div>
+          </div>
+        </div>
+
+        <div class="dup-actions">
+          <button class="dup-btn merge">🔗 Gabung ke #089</button>
+          <button class="dup-btn different">Ini berbeda</button>
+          <button class="dup-btn view">Lihat #089</button>
+        </div>
+      </div>
+
+      <div class="section-title">Setelah Penggabungan</div>
+
+      <div style="margin: 8px 16px; padding: 12px; background: var(--ai-high-l); border-radius: var(--r-md); border: 1px solid #A5D6A7;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px;">✅</span>
+          <div>
+            <div style="font-size: var(--fs-small); font-weight: var(--fw-bold); color: var(--ai-high);">Digabungkan ke #089</div>
+            <div style="font-size: var(--fs-micro); color: var(--c-tanah); margin-top: 2px;">
+              Konten Anda ditambahkan sebagai komentar pendukung di Tuntaskan #089.
+              Anda otomatis menjadi pendukung seed ini.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Badge Duplikat (di footer kartu)</div>
+
+      <div class="seed-footer-demo">
+        <span class="sfd-stat">💬 12</span>
+        <span class="sfd-stat">👥 8</span>
+        <span class="sfd-stat">⏱ 3h</span>
+        <span class="badge-pill duplicate">⚠️ Duplikat?</span>
+        <span class="badge-pill classified">🤖 Tuntaskan · 92%</span>
+      </div>
+
+      <div class="design-note">
+        Badge "⚠️ Duplikat?" muncul di footer kartu sampai diselesaikan
+        (digabung atau ditandai berbeda). Setelah digabung, badge berubah menjadi:
+      </div>
+
+      <div class="seed-footer-demo">
+        <span class="sfd-stat">💬 15</span>
+        <span class="sfd-stat">👥 10</span>
+        <span class="sfd-stat">⏱ 3h</span>
+        <span class="badge-pill" style="background: var(--ai-high-l); color: var(--ai-high);">🔗 +2 digabung</span>
+        <span class="badge-pill classified">🤖 Tuntaskan · 92%</span>
+      </div>
+
+      <div class="section-title">Kemiripan Rendah (≤ 60%)</div>
+
+      <div class="dup-comparison">
+        <div class="dup-header">
+          <span class="dh-icon">🔍</span>
+          <span class="dh-title" style="color: var(--c-kayu);">Mungkin terkait</span>
+        </div>
+
+        <div class="dup-sim">
+          <span class="sim-label">Kemiripan</span>
+          <div class="sim-bar-wrap">
+            <div class="sim-fill" style="width: 48%; background: var(--ai-low);"></div>
+          </div>
+          <span class="sim-pct" style="color: var(--ai-low);">48%</span>
+        </div>
+
+        <div class="dup-sides">
+          <div class="dup-side">
+            <div class="ds-label">Seed yang ada</div>
+            <div class="ds-id">#072 · Wujudkan</div>
+            <div class="ds-title">Toko bahan bangunan koperasi online</div>
+            <div class="ds-text">
+              Gagasan untuk membuat platform belanja bahan bangunan daring
+              agar warga bisa bandingkan harga…
+            </div>
+          </div>
+          <div class="dup-side">
+            <div class="ds-label">Seed baru (Anda)</div>
+            <div class="ds-id">Draft · Tuntaskan</div>
+            <div class="ds-title">Audit koperasi RT 07 — harga tidak transparan</div>
+            <div class="ds-text">
+              Masalah harga bahan bangunan di koperasi yang tidak wajar…
+            </div>
+          </div>
+        </div>
+
+        <div class="dup-actions">
+          <button class="dup-btn different" style="flex: 2;">Ini berbeda — lanjut kirim</button>
+          <button class="dup-btn view">Lihat #072</button>
+        </div>
+      </div>
+
+      <div class="design-note">
+        <strong>Aturan duplikat:</strong> (1) Kemiripan ≥ 80% → blokir kirim sampai pengguna memilih Gabung/Berbeda.
+        (2) 50–79% → tampilkan perbandingan tapi pengguna bisa langsung kirim.
+        (3) < 50% → tampilkan "Mungkin terkait" ringan, tidak memblokir.
+        (4) Setelah digabung, seed asli mendapat credit +I (kontribusi sipil) untuk pelapor duplikat.
+        (5) Penggabungan bisa dibatalkan oleh PIC dalam 24 jam.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function showView(id) {
+  document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>

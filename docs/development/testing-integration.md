@@ -1,5 +1,16 @@
 # Testing Integration
 
+## Stack Lock Notice
+
+Canonical implementation stack is Rust 2024 + Axum + SurrealDB `v3.0.0-beta.4`.
+
+Use these as source of truth for active stack/runtime decisions:
+- `setup-guide.md`
+- `../backend-research.md`
+- `../research/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
+
+This document includes pre-lock multi-language testing examples. They are useful as patterns, but implementation planning should prioritize Rust/SurrealDB-aligned tests.
+
 ## Overview
 
 This document describes the testing strategy for the Gotong Royong platform, including unit tests, integration tests, E2E tests, and testing the Markov Engine integration.

@@ -1,0 +1,2 @@
+-- 0003_permissions_private_channels
+-- Reserved for permission rules (PR-04). Intentionally empty.
