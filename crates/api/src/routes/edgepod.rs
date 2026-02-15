@@ -383,7 +383,10 @@ fn duplicate_output(payload: &EdgePodDuplicateRequest) -> EdgePodDuplicateOutput
     }
 }
 
-fn gaming_output(payload: &EdgePodGamingRequest) -> EdgePodGamingOutput {
+fn gaming_output(
+    payload: &EdgePodGamingRequest,
+    privileged_requester: bool,
+) -> EdgePodGamingOutput {
     if should_fallback_from_request(&payload.base.request_id, &payload.platform) {
         return EdgePodGamingOutput {
             flags: vec![],
@@ -409,7 +412,7 @@ fn gaming_output(payload: &EdgePodGamingRequest) -> EdgePodGamingOutput {
             payload.base.request_id, user_id, focus_metric
         ));
         let score = ((signature % 1000) as f64) / 1000.0;
-        let flag = score > 0.55 || payload.base.actor.role == "moderator";
+        let flag = score > 0.55 || privileged_requester;
         let severity = if score > 0.85 {
             "high"
         } else if score > 0.55 {
@@ -486,7 +489,6 @@ fn sensitive_media_output(
         );
     }
 
-    let mut safety_scores = Vec::new();
     let mut max_score = 0.0_f64;
     let mut scans = Vec::with_capacity(payload.media_urls.len());
     for media_url in &payload.media_urls {
@@ -505,7 +507,6 @@ fn sensitive_media_output(
             vec!["none".to_string()]
         };
         max_score = max_score.max(score);
-        safety_scores.push(score);
         scans.push(EdgePodSensitiveScan {
             media_url: media_url.clone(),
             detections,
@@ -837,7 +838,8 @@ pub(crate) async fn edgepod_gaming_risk(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let output = gaming_output(&payload);
+            let is_privileged_requester = auth.role.can_moderate();
+            let output = gaming_output(&payload, is_privileged_requester);
             let reason_code = if should_fallback_from_request(&request_id, &payload.platform) {
                 "MODEL_UNAVAILABLE"
             } else {

@@ -1535,6 +1535,163 @@ async fn edgepod_ep05_gaming_risk_success_and_replay() {
 }
 
 #[tokio::test]
+async fn edgepod_ep05_gaming_risk_token_role_controls_privilege() {
+    let app = test_app();
+
+    let role_sensitive_payload = json!({
+        "request_id": "req_ep05_priv_user_01",
+        "correlation_id": "corr-ep05-priv-01",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "moderator"
+        },
+        "trigger": "timer",
+        "payload_version": "2026-02-14",
+        "query_users": ["user-1", "user-2", "user-8"],
+        "lookback_hours": 24,
+        "platform": "web"
+    });
+    let user_request_with_moderator_role = Request::builder()
+        .method("POST")
+        .uri("/v1/edge-pod/ai/05/gaming-risk")
+        .header("content-type", "application/json")
+        .header(
+            "authorization",
+            format!(
+                "Bearer {}",
+                test_token_with_identity("test-secret", "user", "user-123")
+            ),
+        )
+        .header("x-request-id", "req_ep05_priv_user_01")
+        .body(Body::from(role_sensitive_payload.to_string()))
+        .unwrap();
+    let user_response = app
+        .clone()
+        .oneshot(user_request_with_moderator_role)
+        .await
+        .expect("response");
+    assert_eq!(user_response.status(), StatusCode::OK);
+    let user_body = to_bytes(user_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let user_envelope_with_payload_role: serde_json::Value =
+        serde_json::from_slice(&user_body).expect("json");
+    assert_eq!(
+        user_envelope_with_payload_role.get("reason_code"),
+        Some(&json!("OK"))
+    );
+    let user_total_flags = user_envelope_with_payload_role
+        .get("output")
+        .and_then(|output| output.get("summary"))
+        .and_then(|summary| summary.get("total_flags"))
+        .and_then(|value| value.as_u64())
+        .expect("user total flags");
+
+    let user_payload_member = json!({
+        "request_id": "req_ep05_priv_user_02",
+        "correlation_id": "corr-ep05-priv-03",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "member"
+        },
+        "trigger": "timer",
+        "payload_version": "2026-02-14",
+        "query_users": ["user-1", "user-2", "user-8"],
+        "lookback_hours": 24,
+        "platform": "web"
+    });
+    let user_request_with_member_role = Request::builder()
+        .method("POST")
+        .uri("/v1/edge-pod/ai/05/gaming-risk")
+        .header("content-type", "application/json")
+        .header(
+            "authorization",
+            format!(
+                "Bearer {}",
+                test_token_with_identity("test-secret", "user", "user-123")
+            ),
+        )
+        .header("x-request-id", "req_ep05_priv_user_02")
+        .body(Body::from(user_payload_member.to_string()))
+        .unwrap();
+    let user_response = app
+        .clone()
+        .oneshot(user_request_with_member_role)
+        .await
+        .expect("response");
+    assert_eq!(user_response.status(), StatusCode::OK);
+    let user_body = to_bytes(user_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let user_envelope_with_member_role: serde_json::Value =
+        serde_json::from_slice(&user_body).expect("json");
+    assert_eq!(
+        user_envelope_with_member_role.get("reason_code"),
+        Some(&json!("OK"))
+    );
+    let member_total_flags = user_envelope_with_member_role
+        .get("output")
+        .and_then(|output| output.get("summary"))
+        .and_then(|summary| summary.get("total_flags"))
+        .and_then(|value| value.as_u64())
+        .expect("member total flags");
+
+    assert_eq!(user_total_flags, member_total_flags);
+
+    let moderator_payload = json!({
+        "request_id": "req_ep05_priv_mod_01",
+        "correlation_id": "corr-ep05-priv-02",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "member"
+        },
+        "trigger": "timer",
+        "payload_version": "2026-02-14",
+        "query_users": ["user-1", "user-2", "user-8"],
+        "lookback_hours": 24,
+        "platform": "web"
+    });
+    let moderator_request = Request::builder()
+        .method("POST")
+        .uri("/v1/edge-pod/ai/05/gaming-risk")
+        .header("content-type", "application/json")
+        .header(
+            "authorization",
+            format!(
+                "Bearer {}",
+                test_token_with_identity("test-secret", "moderator", "user-123")
+            ),
+        )
+        .header("x-request-id", "req_ep05_priv_mod_01")
+        .body(Body::from(moderator_payload.to_string()))
+        .unwrap();
+    let moderator_response = app
+        .clone()
+        .oneshot(moderator_request)
+        .await
+        .expect("response");
+    assert_eq!(moderator_response.status(), StatusCode::OK);
+    let moderator_body = to_bytes(moderator_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let moderator_envelope: serde_json::Value =
+        serde_json::from_slice(&moderator_body).expect("json");
+    assert_eq!(moderator_envelope.get("reason_code"), Some(&json!("OK")));
+    let moderator_total_flags = moderator_envelope
+        .get("output")
+        .and_then(|output| output.get("summary"))
+        .and_then(|summary| summary.get("total_flags"))
+        .and_then(|value| value.as_u64())
+        .expect("moderator total flags");
+
+    assert_eq!(moderator_total_flags, 3);
+    assert!(moderator_total_flags > user_total_flags);
+}
+
+#[tokio::test]
 async fn edgepod_ep08_sensitive_media_success() {
     let app = test_app();
     let token = test_token("test-secret");
