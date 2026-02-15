@@ -67,7 +67,10 @@ impl ChatRealtimeBus {
 
     pub async fn publish(&self, thread_id: &str, message: ChatMessage) {
         let sender = self.sender_for(thread_id).await;
-        let _ = sender.send(message);
+        if sender.send(message).is_err() {
+            let mut senders = self.senders.write().await;
+            senders.remove(thread_id);
+        }
     }
 
     pub async fn subscribe(&self, thread_id: &str) -> broadcast::Receiver<ChatMessage> {

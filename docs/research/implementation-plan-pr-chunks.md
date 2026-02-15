@@ -400,11 +400,13 @@ Deliverables:
 - Surreal beta go/no-go suite for ordering.
 - Surreal beta go/no-go suite for permission filtering.
 - Surreal beta go/no-go suite for reconnect resilience.
+- Cross-instance real-time fanout strategy for WS/SSE (Redis or equivalent) with deterministic replay compatibility and permission revalidation.
 - Rollback runbook and rehearsal report.
 
 Validation:
 - All P0 gates pass in staging.
 - Rollback drill succeeds with documented timing and checks.
+- Realtime transport can be safely scaled beyond one API instance without dropping stream delivery.
 
 Exit criteria:
 - Backend is ready for staged production rollout.
@@ -415,7 +417,8 @@ Exit criteria:
 - Integration tests with pinned Surreal runtime (`3.0.0-beta.4`).
 - Webhook signing, retry, and idempotency tests for Markov integration.
 - Contract tests for Edge-Pod and HTTP envelopes.
-- Realtime tests for live stream semantics and permission filtering.
+- Realtime tests for live stream semantics, reconnect recovery, and permission filtering.
+- Scaling tests for multi-instance realtime fanout behavior (ordered replay and stream continuity).
 - Smoke suite covering `UI-03`, `UI-07`, `UI-08`, `UI-09`, `UI-10..12`.
 
 ## Delivery Notes

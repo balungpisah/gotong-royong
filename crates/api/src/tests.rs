@@ -834,3 +834,59 @@ async fn chat_poll_messages_endpoint() {
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].get("body"), Some(&json!("poll me")));
 }
+
+#[tokio::test]
+async fn chat_messages_query_rejects_since_message_without_created_at() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let thread_request = json!({
+        "scope_id": "scope-chat-catchup",
+        "privacy_level": "public",
+    });
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/threads")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "chat-catchup-1")
+        .body(Body::from(thread_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(create_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let thread: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let thread_id = thread
+        .get("thread_id")
+        .and_then(|value| value.as_str())
+        .expect("thread_id")
+        .to_string();
+
+    let message_request = json!({
+        "body": "catchup test",
+        "attachments": [],
+    });
+    let send_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/chat/threads/{thread_id}/messages/send"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "chat-catchup-2")
+        .body(Body::from(message_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(send_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let poll_request = Request::builder()
+        .method("GET")
+        .uri(format!(
+            "/v1/chat/threads/{thread_id}/messages/poll?since_message_id=msg-dummy"
+        ))
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(poll_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}

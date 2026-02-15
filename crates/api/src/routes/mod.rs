@@ -717,12 +717,18 @@ struct MarkChatReadCursorRequest {
     message_id: String,
 }
 
-fn build_message_catchup_from_query(query: &ChatMessagesQuery) -> MessageCatchup {
-    build_message_catchup(
+fn build_message_catchup_from_query(query: &ChatMessagesQuery) -> Result<MessageCatchup, ApiError> {
+    if query.since_created_at_ms.is_none() && query.since_message_id.is_some() {
+        return Err(ApiError::Validation(
+            "since_created_at_ms is required when since_message_id is provided".into(),
+        ));
+    }
+
+    Ok(build_message_catchup(
         query.limit,
         query.since_created_at_ms,
         query.since_message_id.clone(),
-    )
+    ))
 }
 
 fn chat_message_stream_events(message: ChatMessage) -> Event {
@@ -957,12 +963,27 @@ async fn list_chat_messages_by_query(
     query: ChatMessagesQuery,
 ) -> Result<Vec<ChatMessage>, ApiError> {
     let service = ChatService::new(state.chat_repo.clone());
-    let cursor = build_message_catchup_from_query(&query);
+    let cursor = build_message_catchup_from_query(&query)?;
     let messages = service
         .list_messages(thread_id, actor, cursor)
         .await
         .map_err(map_domain_error)?;
     Ok(messages)
+}
+
+async fn fetch_replay_messages(
+    state: &AppState,
+    actor: &ActorIdentity,
+    thread_id: &str,
+    since_created_at_ms: i64,
+    since_message_id: String,
+) -> Result<Vec<ChatMessage>, ApiError> {
+    let replay_query = ChatMessagesQuery {
+        since_created_at_ms: Some(since_created_at_ms),
+        since_message_id: Some(since_message_id),
+        limit: None,
+    };
+    list_chat_messages_by_query(state, actor, thread_id, replay_query).await
 }
 
 async fn send_chat_message(
@@ -1112,9 +1133,11 @@ async fn stream_chat_messages_sse(
     let mut receiver = state.chat_realtime.subscribe(&thread_id).await;
     let mut messages = list_chat_messages_by_query(&state, &actor, &thread_id, query).await?;
     let mut seen = HashSet::new();
+    let mut replay_cursor = None::<(i64, String)>;
 
     for message in messages.drain(..) {
         seen.insert(message.message_id.clone());
+        replay_cursor = Some((message.created_at_ms, message.message_id.clone()));
         let _ = tx.send(Ok(chat_message_stream_events(message)));
     }
 
@@ -1130,6 +1153,7 @@ async fn stream_chat_messages_sse(
     tokio::spawn(async move {
         let mut heartbeat = interval(Duration::from_secs(15));
         let mut seen_messages = seen;
+        let mut replay_cursor = replay_cursor;
         loop {
             tokio::select! {
                 event = receiver.recv() => {
@@ -1145,12 +1169,64 @@ async fn stream_chat_messages_sse(
                                 let _ = sender.send(Ok(Event::default().event("closed").data("permission_lost")));
                                 break;
                             }
+                            replay_cursor = Some((message.created_at_ms, message.message_id.clone()));
                             let _ = sender.send(Ok(chat_message_stream_events(message)));
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                            let _ = sender.send(Ok(
-                                Event::default().event("replay").data("missed_messages")
-                            ));
+                            let Some((since_created_at_ms, since_message_id)) = replay_cursor.clone()
+                            else {
+                                let _ = sender.send(Ok(
+                                    Event::default().event("replay").data("missed_messages")
+                                ));
+                                continue;
+                            };
+
+                            if assert_chat_stream_access(&state_clone, &thread_id, &actor_identity)
+                                .await
+                                .is_err()
+                            {
+                                let _ = sender.send(Ok(
+                                    Event::default().event("closed").data("permission_lost"),
+                                ));
+                                break;
+                            }
+
+                            let replay_messages =
+                                match fetch_replay_messages(
+                                    &state_clone,
+                                    &actor_identity,
+                                    &thread_id,
+                                    since_created_at_ms,
+                                    since_message_id,
+                                )
+                                .await
+                            {
+                                Ok(messages) => messages,
+                                Err(_) => {
+                                    let _ = sender.send(Ok(
+                                        Event::default().event("error").data("replay_failed")
+                                    ));
+                                    continue;
+                                }
+                            };
+
+                            let mut replayed = false;
+                            for message in replay_messages {
+                                if !seen_messages.insert(message.message_id.clone()) {
+                                    continue;
+                                }
+                                replay_cursor = Some((message.created_at_ms, message.message_id.clone()));
+                                replayed = true;
+                                let _ = sender.send(Ok(chat_message_stream_events(message)));
+                            }
+
+                            if !replayed {
+                                let _ = sender.send(Ok(
+                                    Event::default()
+                                        .event("replay")
+                                        .data("missed_messages"),
+                                ));
+                            }
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     }
@@ -1179,9 +1255,11 @@ async fn handle_chat_websocket(
 ) {
     let (mut sender, mut incoming) = socket.split();
     let mut seen = HashSet::new();
+    let mut replay_cursor = None::<(i64, String)>;
 
     for message in backlog.drain(..) {
         seen.insert(message.message_id.clone());
+        replay_cursor = Some((message.created_at_ms, message.message_id.clone()));
         if sender
             .send(Message::Text(websocket_payload(&message)))
             .await
@@ -1209,6 +1287,7 @@ async fn handle_chat_websocket(
                         if !seen.insert(message.message_id.clone()) {
                             continue;
                         }
+                        replay_cursor = Some((message.created_at_ms, message.message_id.clone()));
                         if sender.send(Message::Text(websocket_payload(&message))).await.is_err() {
                             return;
                         }
@@ -1223,15 +1302,78 @@ async fn handle_chat_websocket(
                         return;
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                        if sender
-                            .send(Message::Text(
-                                "{\"event_type\":\"error\",\"message\":\"missed_messages_reconnect\"}"
-                                    .to_string(),
-                            ))
-                            .await
-                            .is_err()
-                        {
+                        let Some((since_created_at_ms, since_message_id)) = replay_cursor.clone() else {
+                            if sender
+                                .send(Message::Text(
+                                    "{\"event_type\":\"error\",\"message\":\"missed_messages_reconnect\"}"
+                                        .to_string(),
+                                ))
+                                .await
+                                .is_err()
+                            {
+                                return;
+                            }
+                            continue;
+                        };
+
+                        if assert_chat_stream_access(&state, &thread_id, &actor).await.is_err() {
+                            let _ = sender
+                                .send(Message::Close(Some(CloseFrame {
+                                    code: close_code::POLICY,
+                                    reason: "permission lost".into(),
+                                })))
+                                .await;
                             return;
+                        }
+
+                        let replay_messages = match fetch_replay_messages(
+                            &state,
+                            &actor,
+                            &thread_id,
+                            since_created_at_ms,
+                            since_message_id,
+                        )
+                        .await
+                        {
+                            Ok(messages) => messages,
+                            Err(_) => {
+                                if sender
+                                    .send(Message::Text(
+                                        "{\"event_type\":\"error\",\"message\":\"replay_failed\"}"
+                                            .to_string(),
+                                    ))
+                                    .await
+                                    .is_err()
+                                {
+                                    return;
+                                }
+                                continue;
+                            }
+                        };
+
+                        let mut replayed = false;
+                        for message in replay_messages {
+                            if !seen.insert(message.message_id.clone()) {
+                                continue;
+                            }
+                            replay_cursor = Some((message.created_at_ms, message.message_id.clone()));
+                            if sender.send(Message::Text(websocket_payload(&message))).await.is_err() {
+                                return;
+                            }
+                            replayed = true;
+                        }
+
+                        if !replayed {
+                            if sender
+                                .send(Message::Text(
+                                    "{\"event_type\":\"error\",\"message\":\"missed_messages_reconnect\"}"
+                                        .to_string(),
+                                ))
+                                .await
+                                .is_err()
+                            {
+                                return;
+                            }
                         }
                     }
                 }
