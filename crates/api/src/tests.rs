@@ -1431,3 +1431,290 @@ async fn discovery_notifications_endpoints() {
         1
     );
 }
+
+#[tokio::test]
+async fn edgepod_ep03_duplicate_detection_success() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "request_id": "req_ep03_success_01",
+        "correlation_id": "corr-ep03-success-01",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "member"
+        },
+        "trigger": "user_action",
+        "payload_version": "2026-02-14",
+        "seed_text": "Need help with neighborhood cleanup and logistics",
+        "media_hashes": ["h1", "h2"],
+        "location": { "lat": -6.2, "lng": 106.8 },
+        "radius_km": 2.5,
+        "scope": "community"
+    });
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/edge-pod/ai/03/duplicate-detection")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "req_ep03_success_01")
+        .body(Body::from(payload.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let envelope: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(
+        envelope.get("request_id"),
+        Some(&json!("req_ep03_success_01"))
+    );
+    assert_eq!(envelope.get("result_version"), Some(&json!("v0.2.0")));
+    assert_eq!(envelope.get("reason_code"), Some(&json!("OK")));
+    let output = envelope
+        .get("output")
+        .and_then(|value| value.as_object())
+        .expect("output");
+    assert!(
+        output
+            .get("matches")
+            .and_then(|value| value.as_array())
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn edgepod_ep05_gaming_risk_success_and_replay() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "request_id": "req_ep05_success_01",
+        "correlation_id": "corr-ep05-success-01",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "member"
+        },
+        "trigger": "timer",
+        "payload_version": "2026-02-14",
+        "query_users": ["user-a", "user-b", "user-c"],
+        "lookback_hours": 24,
+        "platform": "web",
+        "focus_metric": "posting_rate"
+    });
+
+    let make_request = || {
+        Request::builder()
+            .method("POST")
+            .uri("/v1/edge-pod/ai/05/gaming-risk")
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token}"))
+            .header("x-request-id", "req_ep05_success_01")
+            .body(Body::from(payload.to_string()))
+            .unwrap()
+    };
+
+    let first = app.clone().oneshot(make_request()).await.expect("response");
+    assert_eq!(first.status(), StatusCode::OK);
+    let first_body = to_bytes(first.into_body(), usize::MAX).await.expect("body");
+    let first_envelope: serde_json::Value = serde_json::from_slice(&first_body).expect("json");
+
+    let second = app.clone().oneshot(make_request()).await.expect("response");
+    assert_eq!(second.status(), StatusCode::OK);
+    let second_body = to_bytes(second.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let second_envelope: serde_json::Value = serde_json::from_slice(&second_body).expect("json");
+
+    assert_eq!(first_envelope, second_envelope);
+}
+
+#[tokio::test]
+async fn edgepod_ep08_sensitive_media_success() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "request_id": "req_ep08_success_01",
+        "correlation_id": "corr-ep08-success-01",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "member"
+        },
+        "trigger": "user_action",
+        "payload_version": "2026-02-14",
+        "media_urls": ["https://cdn.example.com/assets/example.jpg"],
+        "media_types": ["image/jpeg"],
+        "seed_id": "seed-01",
+        "author_id": "author-123",
+        "seed_text": "photo evidence for cleanup"
+    });
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/api/v1/edge-pod/ai/08/sensitive-media")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "req_ep08_success_01")
+        .body(Body::from(payload.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let envelope: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(envelope.get("reason_code"), Some(&json!("OK")));
+    assert!(
+        envelope
+            .get("output")
+            .and_then(|value| value.get("overall_safety"))
+            .and_then(|value| value.as_str())
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn edgepod_ep09_credit_recommendation_success_and_fallback() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let success_payload = json!({
+        "request_id": "req_ep09_success_01",
+        "correlation_id": "corr-ep09-success-01",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "member"
+        },
+        "trigger": "timer",
+        "payload_version": "2026-02-14",
+        "user_id": "user-123",
+        "timeline_events": [{"event":"contrib-submitted"}],
+        "skill_profile": ["ar_site", "media"]
+    });
+
+    let success_request = Request::builder()
+        .method("POST")
+        .uri("/v1/edge-pod/ai/09/credit-recommendation")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "req_ep09_success_01")
+        .body(Body::from(success_payload.to_string()))
+        .unwrap();
+    let success_response = app
+        .clone()
+        .oneshot(success_request)
+        .await
+        .expect("response");
+    assert_eq!(success_response.status(), StatusCode::OK);
+    let success_body = to_bytes(success_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let success_envelope: serde_json::Value = serde_json::from_slice(&success_body).expect("json");
+    assert_eq!(success_envelope.get("reason_code"), Some(&json!("OK")));
+    assert!(
+        success_envelope
+            .get("output")
+            .and_then(|value| value.get("dispute_window"))
+            .is_some()
+    );
+
+    let fallback_payload = json!({
+        "request_id": "req_ep09_fallback_01",
+        "correlation_id": "corr-ep09-fallback-01",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "member"
+        },
+        "trigger": "timer",
+        "payload_version": "2026-02-14",
+        "user_id": "fallback-user",
+        "timeline_events": [{"event":"contrib-submitted"}],
+        "skill_profile": ["ar_site", "media"]
+    });
+
+    let fallback_request = Request::builder()
+        .method("POST")
+        .uri("/v1/edge-pod/ai/09/credit-recommendation")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "req_ep09_fallback_01")
+        .body(Body::from(fallback_payload.to_string()))
+        .unwrap();
+    let fallback_response = app
+        .clone()
+        .oneshot(fallback_request)
+        .await
+        .expect("response");
+    assert_eq!(fallback_response.status(), StatusCode::OK);
+    let fallback_body = to_bytes(fallback_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let fallback_envelope: serde_json::Value =
+        serde_json::from_slice(&fallback_body).expect("json");
+    assert_eq!(
+        fallback_envelope.get("reason_code"),
+        Some(&json!("MODEL_UNAVAILABLE"))
+    );
+    assert!(
+        fallback_envelope
+            .get("actor_context")
+            .and_then(|context| context.get("endpoint"))
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn edgepod_ep11_siaga_evaluate_success() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "request_id": "req_ep11_success_01",
+        "correlation_id": "corr-ep11-success-01",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "admin"
+        },
+        "trigger": "webhook",
+        "payload_version": "2026-02-14",
+        "text": "Sudden flood near the village road after rain",
+        "location": { "lat": -6.2, "lng": 106.8 },
+        "reported_urgency": "high",
+        "community_scope": "rw-01",
+        "current_track": "resolve"
+    });
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/edge-pod/ai/siaga/evaluate")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "req_ep11_success_01")
+        .body(Body::from(payload.to_string()))
+        .unwrap();
+
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let envelope: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(envelope.get("result_version"), Some(&json!("v0.2.0")));
+    let output = envelope
+        .get("output")
+        .and_then(|value| value.as_object())
+        .expect("output");
+    assert!(output.get("severity").is_some());
+    assert!(output.get("responder_payload").is_some());
+}

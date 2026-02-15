@@ -64,7 +64,8 @@ Out of scope:
 - `PR-01` to `PR-11`: DONE
 - `PR-12`: DONE
 - `PR-13`: DONE
-- `PR-14` to `PR-15`: NOT STARTED
+- `PR-14`: DONE
+- `PR-15`: NOT STARTED
 
 ## Detailed PR Plan
 
@@ -380,7 +381,7 @@ Exit criteria:
 ## PR-14 — Edge-Pod Integrations (`EP-03`, `EP-05`, `EP-08`, `EP-09`, `EP-11`)
 
 Status:
-- NOT STARTED (2026-02-15)
+- DONE (2026-02-15)
 
 Goal:
 - Integrate AI endpoint contracts with safe fallback semantics.

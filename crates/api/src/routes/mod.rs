@@ -59,6 +59,8 @@ use tokio::time::interval;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use validator::Validate;
 
+mod edgepod;
+
 use crate::middleware::AuthContext;
 use crate::{error::ApiError, middleware as app_middleware, state::AppState, validation};
 
@@ -185,12 +187,56 @@ pub fn router(state: AppState) -> Router {
             "/v1/chat/threads/:thread_id/read-cursor",
             get(get_chat_read_cursor).post(mark_chat_read_cursor),
         )
+        .route(
+            "/v1/edge-pod/ai/03/duplicate-detection",
+            post(edgepod::edgepod_duplicate_detection),
+        )
+        .route(
+            "/v1/edge-pod/ai/05/gaming-risk",
+            post(edgepod::edgepod_gaming_risk),
+        )
+        .route(
+            "/v1/edge-pod/ai/08/sensitive-media",
+            post(edgepod::edgepod_sensitive_media),
+        )
+        .route(
+            "/v1/edge-pod/ai/09/credit-recommendation",
+            post(edgepod::edgepod_credit_recommendation),
+        )
+        .route(
+            "/v1/edge-pod/ai/siaga/evaluate",
+            post(edgepod::edgepod_siaga_evaluate),
+        )
+        .route_layer(middleware::from_fn(app_middleware::require_auth_middleware));
+
+    let api_edgepod_routes = Router::new()
+        .route(
+            "/api/v1/edge-pod/ai/03/duplicate-detection",
+            post(edgepod::edgepod_duplicate_detection),
+        )
+        .route(
+            "/api/v1/edge-pod/ai/05/gaming-risk",
+            post(edgepod::edgepod_gaming_risk),
+        )
+        .route(
+            "/api/v1/edge-pod/ai/08/sensitive-media",
+            post(edgepod::edgepod_sensitive_media),
+        )
+        .route(
+            "/api/v1/edge-pod/ai/09/credit-recommendation",
+            post(edgepod::edgepod_credit_recommendation),
+        )
+        .route(
+            "/api/v1/edge-pod/ai/siaga/evaluate",
+            post(edgepod::edgepod_siaga_evaluate),
+        )
         .route_layer(middleware::from_fn(app_middleware::require_auth_middleware));
 
     let mut app = Router::new()
         .route("/health", get(health))
         .route("/v1/echo", post(echo))
         .merge(protected)
+        .merge(api_edgepod_routes)
         .layer(app_middleware::timeout_layer())
         .layer(app_middleware::trace_layer())
         .layer(app_middleware::set_request_id_layer())
