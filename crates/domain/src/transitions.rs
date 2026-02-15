@@ -65,6 +65,7 @@ pub struct TransitionGateSnapshot {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct TrackStateTransition {
+    pub track: String,
     pub transition_id: String,
     pub entity_id: String,
     pub request_id: String,
@@ -80,6 +81,7 @@ pub struct TrackStateTransition {
 
 #[derive(Clone)]
 pub struct TrackTransitionInput {
+    pub track: String,
     pub entity_id: String,
     pub from_stage: String,
     pub to_stage: String,
@@ -113,14 +115,6 @@ impl TrackTransitionService {
     ) -> DomainResult<TrackStateTransition> {
         let input = validate_transition_command(input, &token_role)?;
 
-        if let Some(existing) = self
-            .repository
-            .get_by_request_id(&input.entity_id, &input.request_id)
-            .await?
-        {
-            return Ok(existing);
-        }
-
         let happened_at_ms = input.occurred_at_ms.unwrap_or_else(now_ms);
         let request_ts_ms = input.request_ts_ms.unwrap_or_else(now_ms);
         let transition_id = crate::util::uuid_v7_without_dashes();
@@ -137,6 +131,7 @@ impl TrackTransitionService {
             metadata: input.gate_metadata,
         };
         let transition = TrackStateTransition {
+            track: input.track,
             transition_id,
             entity_id: input.entity_id,
             request_id: input.request_id,
@@ -150,7 +145,32 @@ impl TrackTransitionService {
             gate,
         };
 
-        self.repository.create(&transition).await
+        match self.repository.create(&transition).await {
+            Ok(transition) => Ok(transition),
+            Err(DomainError::Conflict) => self
+                .repository
+                .get_by_request_id(&transition.entity_id, &transition.request_id)
+                .await?
+                .ok_or(DomainError::Conflict),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub async fn list_by_entity(&self, entity_id: &str) -> DomainResult<Vec<TrackStateTransition>> {
+        self.repository.list_by_entity(entity_id).await
+    }
+
+    pub async fn get_by_transition_id(
+        &self,
+        transition_id: &str,
+    ) -> DomainResult<Option<TrackStateTransition>> {
+        self.repository.get_by_transition_id(transition_id).await
+    }
+
+    pub async fn active_stage(&self, entity_id: &str) -> DomainResult<Option<String>> {
+        let mut transitions = self.repository.list_by_entity(entity_id).await?;
+        let active_stage = transitions.pop().map(|transition| transition.to_stage);
+        Ok(active_stage)
     }
 }
 
@@ -158,16 +178,22 @@ fn validate_transition_command(
     input: TrackTransitionInput,
     token_role: &Role,
 ) -> DomainResult<TrackTransitionInput> {
+    let input = sanitize_transition_input(input)?;
+    validate_track(&input.track)?;
     validate_stage_change(&input.from_stage, &input.to_stage)?;
+    validate_gate_prerequisites(&input.from_stage, &input.to_stage, &input)?;
     validate_gate_and_mechanism(&input)?;
-    validate_actor_matrix(
-        token_role,
-        &input.transition_action,
-        &input.mechanism,
-        &input.track_roles,
-    )?;
+    validate_trigger_mechanism(token_role, &input.transition_type, &input.mechanism)?;
+    validate_actor_matrix(token_role, &input.transition_action, &input.track_roles)?;
 
     Ok(input)
+}
+
+fn validate_track(track: &str) -> DomainResult<()> {
+    if track.trim().is_empty() {
+        return Err(DomainError::Validation("track is required".into()));
+    }
+    Ok(())
 }
 
 fn validate_stage_change(from_stage: &str, to_stage: &str) -> DomainResult<()> {
@@ -186,25 +212,119 @@ fn validate_stage_change(from_stage: &str, to_stage: &str) -> DomainResult<()> {
     Ok(())
 }
 
+fn sanitize_transition_input(
+    mut input: TrackTransitionInput,
+) -> DomainResult<TrackTransitionInput> {
+    input.track = input.track.trim().to_string();
+    input.entity_id = input.entity_id.trim().to_string();
+    input.from_stage = input.from_stage.trim().to_string();
+    input.to_stage = input.to_stage.trim().to_string();
+    input.gate_status = input.gate_status.trim().to_string();
+
+    if input.track.is_empty()
+        || input.entity_id.is_empty()
+        || input.from_stage.is_empty()
+        || input.to_stage.is_empty()
+        || input.gate_status.is_empty()
+    {
+        return Err(DomainError::Validation(
+            "transition fields cannot be empty".into(),
+        ));
+    }
+
+    Ok(input)
+}
+
 fn validate_gate_and_mechanism(input: &TrackTransitionInput) -> DomainResult<()> {
+    if input.transition_type != input.mechanism {
+        return Err(DomainError::Validation(
+            "transition_type and mechanism must match".into(),
+        ));
+    }
     if input.gate_status.trim().is_empty() {
         return Err(DomainError::Validation("gate.status is required".into()));
     }
     Ok(())
 }
 
-fn validate_actor_matrix(
+fn validate_trigger_mechanism(
     token_role: &Role,
-    action: &TransitionAction,
+    transition_type: &TransitionMechanism,
     mechanism: &TransitionMechanism,
-    track_roles: &[TrackRole],
 ) -> DomainResult<()> {
-    if token_role == &Role::System && *mechanism != TransitionMechanism::Timer {
+    if token_role == &Role::System {
+        if *transition_type != TransitionMechanism::Timer
+            || *mechanism != TransitionMechanism::Timer
+        {
+            return Err(DomainError::Validation(
+                "system role is only allowed for timer transitions".into(),
+            ));
+        }
+        return Ok(());
+    }
+
+    if *mechanism != TransitionMechanism::UserAction {
         return Err(DomainError::Validation(
-            "system role is only allowed for timer-close transitions".into(),
+            "non-system role must use user_action mechanism".into(),
         ));
     }
 
+    if *transition_type != TransitionMechanism::UserAction {
+        return Err(DomainError::Validation(
+            "non-system role must use user_action transition type".into(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_gate_prerequisites(
+    from_stage: &str,
+    to_stage: &str,
+    input: &TrackTransitionInput,
+) -> DomainResult<()> {
+    let from_stage = from_stage.trim().to_ascii_lowercase();
+    let to_stage = to_stage.trim().to_ascii_lowercase();
+
+    match (from_stage.as_str(), to_stage.as_str()) {
+        ("garap", "periksa") => {
+            let has_por_refs = input
+                .gate_metadata
+                .as_ref()
+                .and_then(|value| value.get("por_refs_ready"))
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            if !has_por_refs {
+                return Err(DomainError::Validation(
+                    "garap -> periksa requires gate_metadata.por_refs_ready=true".into(),
+                ));
+            }
+        }
+        ("periksa", "tuntas") => {
+            let has_challenge_window = input
+                .gate_metadata
+                .as_ref()
+                .and_then(|value| value.get("challenge_window_configured"))
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            if !has_challenge_window {
+                return Err(DomainError::Validation(
+                    "periksa -> tuntas requires gate_metadata.challenge_window_configured=true"
+                        .into(),
+                ));
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn validate_actor_matrix(
+    token_role: &Role,
+    action: &TransitionAction,
+    track_roles: &[TrackRole],
+) -> DomainResult<()> {
     if token_role == &Role::System {
         return Ok(());
     }
@@ -335,6 +455,7 @@ mod tests {
         let repo = Arc::new(MockTransitionRepository::default());
         let service = TrackTransitionService::new(repo.clone());
         let command = TrackTransitionInput {
+            track: "resolve".to_string(),
             entity_id: "track-1".to_string(),
             from_stage: "garap".to_string(),
             to_stage: "periksa".to_string(),
@@ -345,7 +466,9 @@ mod tests {
             correlation_id: "corr-1".to_string(),
             track_roles: vec![TrackRole::Participant],
             gate_status: "open".to_string(),
-            gate_metadata: None,
+            gate_metadata: Some(serde_json::json!({
+                "por_refs_ready": true
+            })),
             occurred_at_ms: Some(1),
             request_ts_ms: Some(1),
         };
@@ -368,6 +491,54 @@ mod tests {
         assert_eq!(first.entity_id, second.entity_id);
     }
 
+    #[tokio::test]
+    async fn timeline_ordering_is_deterministic() {
+        let repo = Arc::new(MockTransitionRepository::default());
+        let service = TrackTransitionService::new(repo);
+        let actor = ActorIdentity {
+            user_id: "u-1".to_string(),
+            username: "alice".to_string(),
+        };
+        let base = TrackTransitionInput {
+            track: "resolve".to_string(),
+            entity_id: "entity-1".to_string(),
+            from_stage: "garap".to_string(),
+            to_stage: "periksa".to_string(),
+            transition_action: TransitionAction::Object,
+            transition_type: TransitionMechanism::UserAction,
+            mechanism: TransitionMechanism::UserAction,
+            request_id: "req-newer".to_string(),
+            correlation_id: "corr-1".to_string(),
+            track_roles: vec![TrackRole::Participant],
+            gate_status: "open".to_string(),
+            gate_metadata: Some(serde_json::json!({
+                "por_refs_ready": true
+            })),
+            occurred_at_ms: Some(2_000),
+            request_ts_ms: Some(2_000),
+        };
+        let earlier = TrackTransitionInput {
+            request_id: "req-earlier".to_string(),
+            occurred_at_ms: Some(1_000),
+            ..base.clone()
+        };
+        let later = base.clone();
+
+        service
+            .track_state_transition(actor.clone(), Role::User, earlier)
+            .await
+            .expect("earlier transition");
+        service
+            .track_state_transition(actor, Role::User, later)
+            .await
+            .expect("later transition");
+
+        let timeline = service.list_by_entity("entity-1").await.expect("timeline");
+        assert_eq!(timeline.len(), 2);
+        assert_eq!(timeline[0].occurred_at_ms, 1_000);
+        assert_eq!(timeline[1].occurred_at_ms, 2_000);
+    }
+
     #[test]
     fn role_matrix_allows_expected_roles() {
         let candidate = [TrackRole::Author, TrackRole::Participant];
@@ -378,16 +549,51 @@ mod tests {
 
     #[test]
     fn role_matrix_blocks_empty_roles() {
-        let err = validate_actor_matrix(
+        let err = validate_actor_matrix(&Role::User, &TransitionAction::Object, &[]).unwrap_err();
+        assert!(matches!(
+            err,
+            DomainError::Validation(msg) if msg == "actor track role is required for transition action"
+        ));
+    }
+
+    #[test]
+    fn transition_type_must_match_mechanism() {
+        let err = validate_gate_and_mechanism(&TrackTransitionInput {
+            track: "resolve".to_string(),
+            entity_id: "track-1".to_string(),
+            from_stage: "garap".to_string(),
+            to_stage: "periksa".to_string(),
+            transition_action: TransitionAction::Object,
+            transition_type: TransitionMechanism::UserAction,
+            mechanism: TransitionMechanism::Timer,
+            request_id: "req-2".to_string(),
+            correlation_id: "corr-2".to_string(),
+            track_roles: vec![TrackRole::Author],
+            gate_status: "open".to_string(),
+            gate_metadata: Some(serde_json::json!({
+                "por_refs_ready": true
+            })),
+            occurred_at_ms: None,
+            request_ts_ms: None,
+        })
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            DomainError::Validation(msg) if msg == "transition_type and mechanism must match"
+        ));
+    }
+
+    #[test]
+    fn non_system_roles_cannot_use_timer_mechanism() {
+        let err = validate_trigger_mechanism(
             &Role::User,
-            &TransitionAction::Object,
             &TransitionMechanism::UserAction,
-            &[],
+            &TransitionMechanism::Timer,
         )
         .unwrap_err();
         assert!(matches!(
             err,
-            DomainError::Validation(msg) if msg == "actor track role is required for transition action"
+            DomainError::Validation(msg) if msg == "non-system role must use user_action mechanism"
         ));
     }
 }

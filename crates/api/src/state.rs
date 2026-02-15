@@ -27,7 +27,6 @@ pub struct AppState {
     pub contribution_repo: Arc<dyn ContributionRepository>,
     pub evidence_repo: Arc<dyn EvidenceRepository>,
     pub vouch_repo: Arc<dyn VouchRepository>,
-    #[allow(dead_code)]
     pub transition_repo: Arc<dyn TrackTransitionRepository>,
 }
 

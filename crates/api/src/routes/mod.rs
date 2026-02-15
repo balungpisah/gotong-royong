@@ -9,12 +9,17 @@ use axum::{
     routing::{get, post},
 };
 use gotong_domain::{
+    auth::TrackRole,
     contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
     error::DomainError,
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
     idempotency::BeginOutcome,
     identity::ActorIdentity,
     ports::idempotency::{IdempotencyKey, IdempotencyResponse},
+    transitions::{
+        TrackStateTransition, TrackTransitionInput, TrackTransitionService, TransitionAction,
+        TransitionMechanism,
+    },
     vouches::{Vouch, VouchCreate, VouchService, VouchWeightHint},
 };
 use serde::{Deserialize, Serialize};
@@ -39,6 +44,16 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/evidence", post(submit_evidence))
         .route("/v1/evidence/:evidence_id", get(get_evidence))
         .route("/v1/vouches", post(submit_vouch).get(list_vouches))
+        .route("/v1/transitions", post(create_transition))
+        .route(
+            "/v1/transitions/:entity_id/timeline",
+            get(list_transition_timeline),
+        )
+        .route(
+            "/v1/transitions/:entity_id/active",
+            get(get_active_transition_stage),
+        )
+        .route("/v1/transitions/:transition_id", get(get_transition_by_id))
         .route_layer(middleware::from_fn(app_middleware::require_auth_middleware));
 
     let mut app = Router::new()
@@ -349,6 +364,29 @@ struct CreateVouchRequest {
     pub message: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Validate)]
+struct CreateTransitionRequest {
+    #[validate(length(min = 1, max = 128))]
+    pub track: String,
+    #[validate(length(min = 1, max = 128))]
+    pub entity_id: String,
+    #[validate(length(min = 1, max = 128))]
+    pub from_stage: String,
+    #[validate(length(min = 1, max = 128))]
+    pub to_stage: String,
+    pub transition_action: TransitionAction,
+    pub transition_type: TransitionMechanism,
+    pub mechanism: TransitionMechanism,
+    pub track_roles: Vec<TrackRole>,
+    #[validate(length(min = 1, max = 128))]
+    pub gate_status: String,
+    pub gate_metadata: Option<Value>,
+    #[serde(default)]
+    pub occurred_at_ms: Option<i64>,
+    #[serde(default)]
+    pub request_ts_ms: Option<i64>,
+}
+
 #[derive(Debug, Deserialize)]
 struct ListVouchesQuery {
     pub vouchee_id: Option<String>,
@@ -437,6 +475,119 @@ async fn list_vouches(
     };
 
     Ok(Json(response))
+}
+
+async fn create_transition(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateTransitionRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let token_role = auth.role.clone();
+
+    let key = IdempotencyKey::new(
+        "transition_create",
+        format!("{}:{}", actor.user_id, payload.entity_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = TrackTransitionService::new(state.transition_repo.clone());
+            let input = TrackTransitionInput {
+                track: payload.track,
+                entity_id: payload.entity_id,
+                from_stage: payload.from_stage,
+                to_stage: payload.to_stage,
+                transition_action: payload.transition_action,
+                transition_type: payload.transition_type,
+                mechanism: payload.mechanism,
+                request_id,
+                correlation_id,
+                track_roles: payload.track_roles,
+                gate_status: payload.gate_status,
+                gate_metadata: payload.gate_metadata,
+                occurred_at_ms: payload.occurred_at_ms,
+                request_ts_ms: payload.request_ts_ms,
+            };
+
+            let transition = service
+                .track_state_transition(actor, token_role, input)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(&transition).map_err(|_| ApiError::Internal)?,
+            };
+
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn list_transition_timeline(
+    State(state): State<AppState>,
+    Path(entity_id): Path<String>,
+) -> Result<Json<Vec<TrackStateTransition>>, ApiError> {
+    let service = TrackTransitionService::new(state.transition_repo.clone());
+    let transitions = service
+        .list_by_entity(&entity_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(transitions))
+}
+
+#[derive(Serialize)]
+struct ActiveTransitionResponse {
+    pub entity_id: String,
+    pub active_stage: Option<String>,
+}
+
+async fn get_active_transition_stage(
+    State(state): State<AppState>,
+    Path(entity_id): Path<String>,
+) -> Result<Json<ActiveTransitionResponse>, ApiError> {
+    let service = TrackTransitionService::new(state.transition_repo.clone());
+    let active_stage = service
+        .active_stage(&entity_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(ActiveTransitionResponse {
+        entity_id,
+        active_stage,
+    }))
+}
+
+async fn get_transition_by_id(
+    State(state): State<AppState>,
+    Path(transition_id): Path<String>,
+) -> Result<Json<TrackStateTransition>, ApiError> {
+    let service = TrackTransitionService::new(state.transition_repo.clone());
+    let transition = service
+        .get_by_transition_id(&transition_id)
+        .await
+        .map_err(map_domain_error)?;
+    let transition = transition.ok_or(ApiError::NotFound)?;
+    Ok(Json(transition))
 }
 
 fn actor_identity(auth: &AuthContext) -> Result<ActorIdentity, ApiError> {

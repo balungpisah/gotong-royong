@@ -44,12 +44,12 @@ Status: READY FOR BACKEND DESIGN/HANDOFF
      2. scheduler emits closure/reject event with same `transition_id`
      3. `gate.status` transitions to applied/rejected only once at gate close
      4. retries with same `(entity_id, request_id)` are replay-safe
-  - PR-07 acceptance test hooks:
-    - replay test: same `(entity_id, request_id)` returns canonical repeat transition
-    - ordering test: timeline ordering by deterministic sort keys (`occurred_at_ms`, `transition_id`)
-    - append-only invariants: no update/delete mutation API in service/repo surface
-    - role matrix test: `propose/object/vote` matrix validation against `author/pic/participant/saksi`
-    - projection order test: timeline query is monotonic and stable under repeated reads
+ - PR-07 acceptance test hooks:
+    - [x] replay test: same `(entity_id, request_id)` returns canonical repeat transition
+    - [x] ordering test: timeline ordering by deterministic sort keys (`occurred_at_ms`, `transition_id`)
+    - [x] append-only invariants: no update/delete mutation API in service/repo surface (interface only exposes create/list/get/get_by_id)
+    - [x] role matrix test: `propose/object/vote` matrix validation against `author/pic/participant/saksi`
+    - [x] projection order test: timeline query is monotonic and stable under repeated reads
 
 2. Ticket `BE-002`: Track transition state projections
    - Scope: `UI-03` + history audit

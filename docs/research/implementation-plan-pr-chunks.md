@@ -62,7 +62,8 @@ Out of scope:
 ## PR Lock State
 
 - `PR-01` to `PR-06`: DONE
-- `PR-07` to `PR-15`: NOT STARTED
+- `PR-07`: IN PROGRESS
+- `PR-08` to `PR-15`: NOT STARTED
 
 ## Detailed PR Plan
 
@@ -198,11 +199,12 @@ Exit criteria:
 ## PR-07 — Track Transition Engine (`BE-001`, `BE-002`)
 
 Status:
-- NOT STARTED (2026-02-15)
+- IN PROGRESS (2026-02-15)
 
-Implementation gap note (now remedied):
+Implementation progress note:
 - PR-07 domain, ports, and repository scaffolding is added in `crates/domain/src/transitions.rs`, `crates/domain/src/ports/transitions.rs`, and `crates/infra/src/repositories/mod.rs`.
 - AppState transition repository wiring is available in `crates/api/src/state.rs`.
+- API transition endpoints are in-progress for create/timeline/active/get-by-id coverage.
 
 Goal:
 - Implement canonical governance transition write/read model.

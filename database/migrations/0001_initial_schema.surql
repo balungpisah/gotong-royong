@@ -48,6 +48,7 @@ DEFINE FIELD transition_id ON TABLE track_state_transition TYPE string;
 DEFINE FIELD entity_id ON TABLE track_state_transition TYPE string;
 DEFINE FIELD request_id ON TABLE track_state_transition TYPE string;
 DEFINE FIELD correlation_id ON TABLE track_state_transition TYPE string;
+DEFINE FIELD track ON TABLE track_state_transition TYPE string;
 DEFINE FIELD from_stage ON TABLE track_state_transition TYPE string;
 DEFINE FIELD to_stage ON TABLE track_state_transition TYPE string;
 DEFINE FIELD transition_type ON TABLE track_state_transition TYPE string;

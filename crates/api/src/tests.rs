@@ -48,13 +48,17 @@ fn test_config() -> AppConfig {
 }
 
 fn test_token(secret: &str) -> String {
+    test_token_with_role(secret, "user")
+}
+
+fn test_token_with_role(secret: &str, role: &str) -> String {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("time")
         .as_secs();
     let claims = Claims {
         sub: "user-123".to_string(),
-        role: "user".to_string(),
+        role: role.to_string(),
         exp: (now + 3600) as usize,
     };
     encode(
@@ -206,6 +210,243 @@ async fn contribution_evidence_vouch_flow() {
         .unwrap();
     let response = app.oneshot(vouch_list_request).await.expect("response");
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn track_transition_end_to_end() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let first_request = json!({
+        "track": "resolve",
+        "entity_id": "entity-100",
+        "from_stage": "garap",
+        "to_stage": "periksa",
+        "transition_action": "object",
+        "transition_type": "user_action",
+        "mechanism": "user_action",
+        "track_roles": ["participant"],
+        "gate_status": "open",
+        "gate_metadata": {
+            "por_refs_ready": true
+        },
+        "occurred_at_ms": 1000
+    });
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/transitions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "t-req-1")
+        .body(Body::from(first_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let first_transition: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let first_transition_id = first_transition
+        .get("transition_id")
+        .and_then(|value| value.as_str())
+        .expect("transition_id")
+        .to_string();
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/transitions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "t-req-1")
+        .body(Body::from(first_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let second_transition: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(
+        first_transition_id,
+        second_transition
+            .get("transition_id")
+            .and_then(|value| value.as_str())
+            .expect("transition_id")
+    );
+
+    let timeline_request = Request::builder()
+        .method("GET")
+        .uri("/v1/transitions/entity-100/timeline")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(timeline_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let timeline: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
+    assert_eq!(timeline.len(), 1);
+    assert_eq!(
+        timeline[0].get("transition_id"),
+        Some(&json!(first_transition_id))
+    );
+
+    let active_request = Request::builder()
+        .method("GET")
+        .uri("/v1/transitions/entity-100/active")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(active_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let active: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(active.get("active_stage"), Some(&json!("periksa")));
+
+    let get_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/transitions/{}", first_transition_id))
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(get_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let transition_by_id: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(
+        transition_by_id.get("transition_id"),
+        Some(&json!(first_transition_id))
+    );
+}
+
+#[tokio::test]
+async fn track_transition_request_id_is_entity_scoped() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let request_payload = |entity_id: &str| {
+        json!({
+            "track": "resolve",
+            "entity_id": entity_id,
+            "from_stage": "garap",
+            "to_stage": "periksa",
+            "transition_action": "object",
+            "transition_type": "user_action",
+            "mechanism": "user_action",
+            "track_roles": ["participant"],
+            "gate_status": "open",
+            "gate_metadata": {
+                "por_refs_ready": true
+            },
+            "occurred_at_ms": 1000
+        })
+    };
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/transitions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "scoped-req-1")
+        .body(Body::from(request_payload("entity-scope-a").to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let first_transition: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let first_transition_id = first_transition
+        .get("transition_id")
+        .and_then(|value| value.as_str())
+        .expect("transition_id")
+        .to_string();
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/transitions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "scoped-req-1")
+        .body(Body::from(request_payload("entity-scope-b").to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let second_transition: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let second_transition_id = second_transition
+        .get("transition_id")
+        .and_then(|value| value.as_str())
+        .expect("transition_id")
+        .to_string();
+
+    assert_ne!(first_transition_id, second_transition_id);
+}
+
+#[tokio::test]
+async fn track_transition_validates_gate_and_role_matrix() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let bad_gate_request = json!({
+        "track": "resolve",
+        "entity_id": "entity-bad-1",
+        "from_stage": "garap",
+        "to_stage": "periksa",
+        "transition_action": "object",
+        "transition_type": "user_action",
+        "mechanism": "user_action",
+        "track_roles": ["participant"],
+        "gate_status": "open",
+        "gate_metadata": {
+            "por_refs_ready": false
+        }
+    });
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/transitions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "bad-1")
+        .body(Body::from(bad_gate_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let bad_role_request = json!({
+        "track": "resolve",
+        "entity_id": "entity-bad-2",
+        "from_stage": "garap",
+        "to_stage": "periksa",
+        "transition_action": "propose",
+        "transition_type": "user_action",
+        "mechanism": "user_action",
+        "track_roles": ["participant"],
+        "gate_status": "open",
+        "gate_metadata": {
+            "por_refs_ready": true
+        }
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/transitions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "bad-2")
+        .body(Body::from(bad_role_request.to_string()))
+        .unwrap();
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
