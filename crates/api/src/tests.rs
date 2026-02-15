@@ -2,10 +2,12 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
+use axum::body::to_bytes;
 use axum::http::{Request, StatusCode};
 use gotong_domain::idempotency::InMemoryIdempotencyStore;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::Serialize;
+use serde_json::json;
 use tower_util::ServiceExt;
 
 use crate::routes;
@@ -31,6 +33,11 @@ fn test_config() -> AppConfig {
         surreal_pass: "root".to_string(),
         redis_url: "redis://127.0.0.1:6379".to_string(),
         jwt_secret: "test-secret".to_string(),
+        s3_endpoint: "http://127.0.0.1:9000".to_string(),
+        s3_bucket: "gotong-royong-evidence-test".to_string(),
+        s3_region: "us-east-1".to_string(),
+        s3_access_key: "test-access-key".to_string(),
+        s3_secret_key: "test-secret-key".to_string(),
         worker_queue_prefix: "gotong:jobs".to_string(),
         worker_poll_interval_ms: 1000,
         worker_promote_batch: 10,
@@ -62,6 +69,142 @@ fn test_app() -> axum::Router {
     let store = InMemoryIdempotencyStore::new("test");
     let state = AppState::with_idempotency_store(config, Arc::new(store));
     routes::router(state)
+}
+
+#[tokio::test]
+async fn contribution_evidence_vouch_flow() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let contribution_request = json!({
+        "contribution_type": "task_completion",
+        "title": "Test task",
+        "description": "Completed integration test task",
+        "skill_ids": ["skill-1", "skill-2"],
+        "metadata": {
+            "source": "unit-test"
+        }
+    });
+
+    let create_contribution_response = Request::builder()
+        .method("POST")
+        .uri("/v1/contributions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token.clone()))
+        .header("x-request-id", "flow-req-1")
+        .body(Body::from(contribution_request.to_string()))
+        .unwrap();
+
+    let response = app
+        .clone()
+        .oneshot(create_contribution_response)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let contribution: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let contribution_id = contribution
+        .get("contribution_id")
+        .and_then(|value| value.as_str())
+        .expect("contribution_id")
+        .to_string();
+
+    let contribution_list_request = Request::builder()
+        .method("GET")
+        .uri("/v1/contributions?author_id=user-123")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(contribution_list_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let contributions: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let is_in_list = contributions
+        .as_array()
+        .expect("array")
+        .iter()
+        .any(|item| item.get("contribution_id") == Some(&json!(contribution_id)));
+    assert!(is_in_list);
+
+    let evidence_request = json!({
+        "contribution_id": contribution_id,
+        "evidence_type": "photo_with_timestamp",
+        "evidence_data": {
+            "notes": "worked"
+        },
+        "proof": {
+            "timestamp": "2026-02-14T01:00:00Z",
+            "media_hash": "abcd1234abcd1234abcd1234abcd1234"
+        }
+    });
+    let evidence_response = Request::builder()
+        .method("POST")
+        .uri("/v1/evidence")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token.clone()))
+        .header("x-request-id", "flow-req-2")
+        .body(Body::from(evidence_request.to_string()))
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(evidence_response)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let evidence_body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let evidence: serde_json::Value = serde_json::from_slice(&evidence_body).expect("json");
+    let evidence_id = evidence
+        .get("evidence_id")
+        .and_then(|value| value.as_str())
+        .expect("evidence_id");
+    let evidence_get_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/evidence/{}", evidence_id))
+        .header("authorization", format!("Bearer {}", token.clone()))
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(evidence_get_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let vouch_request = json!({
+        "vouchee_id": "user-456",
+        "message": "Great contribution",
+        "skill_id": "skill-1"
+    });
+    let response = Request::builder()
+        .method("POST")
+        .uri("/v1/vouches")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token.clone()))
+        .header("x-request-id", "flow-req-3")
+        .body(Body::from(vouch_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(response).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let vouch_list_request = Request::builder()
+        .method("GET")
+        .uri("/v1/vouches?vouchee_id=user-456")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(vouch_list_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]

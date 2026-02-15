@@ -3,3 +3,4 @@ pub mod db;
 pub mod idempotency;
 pub mod jobs;
 pub mod logging;
+pub mod repositories;

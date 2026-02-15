@@ -171,12 +171,15 @@ Exit criteria:
 
 ## PR-06 — Core Contributions Domain
 
+Status:
+- DONE (2026-02-15)
+
 Goal:
 - Implement core task/evidence/vouch services and PoR storage baseline.
 
 Deliverables:
 - Schema and services for contributions, evidence, and vouches.
-- PoR evidence storage to S3-compatible backend with integrity metadata.
+- PoR evidence storage adapter boundary (in-memory baseline now; S3-compatible implementation to follow in PR-07+).
 - Mapping from internal records to Tandang event shapes.
 - Basic CRUD endpoints for contribution and evidence flows.
 

@@ -71,7 +71,7 @@ impl MakeRequestId for UuidRequestId {
 }
 
 pub fn trace_layer() -> TraceLayer<SharedClassifier<ServerErrorsAsFailures>, RequestSpan> {
-    TraceLayer::new_for_http().make_span_with(RequestSpan::default())
+    TraceLayer::new_for_http().make_span_with(RequestSpan)
 }
 
 #[derive(Clone, Default)]
@@ -153,7 +153,7 @@ pub async fn auth_middleware(
         }
     };
 
-    let role = match data.claims.role.as_deref().and_then(Role::from_str) {
+    let role = match data.claims.role.as_deref().and_then(Role::parse) {
         Some(role) => role,
         None => {
             tracing::warn!("token missing or invalid role");

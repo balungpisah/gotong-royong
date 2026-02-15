@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -11,15 +12,8 @@ pub enum Role {
 }
 
 impl Role {
-    pub fn from_str(value: &str) -> Option<Self> {
-        match value {
-            "anonymous" | "guest" => Some(Role::Anonymous),
-            "user" => Some(Role::User),
-            "moderator" => Some(Role::Moderator),
-            "admin" => Some(Role::Admin),
-            "system" => Some(Role::System),
-            _ => None,
-        }
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::from_str(value).ok()
     }
 
     pub fn as_str(&self) -> &'static str {
@@ -38,5 +32,20 @@ impl Role {
 
     pub fn is_admin(&self) -> bool {
         matches!(self, Role::Admin | Role::System)
+    }
+}
+
+impl FromStr for Role {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "anonymous" | "guest" => Ok(Role::Anonymous),
+            "user" => Ok(Role::User),
+            "moderator" => Ok(Role::Moderator),
+            "admin" => Ok(Role::Admin),
+            "system" => Ok(Role::System),
+            _ => Err("unknown role"),
+        }
     }
 }

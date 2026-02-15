@@ -1,23 +1,44 @@
+use std::collections::HashMap;
+
+use axum::extract::{Extension, Path, Query, State};
 use axum::{
     Json, Router,
-    extract::State,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     middleware,
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use gotong_domain::{
+    contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
+    error::DomainError,
+    evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
+    idempotency::BeginOutcome,
+    identity::ActorIdentity,
+    ports::idempotency::{IdempotencyKey, IdempotencyResponse},
+    vouches::{Vouch, VouchCreate, VouchService, VouchWeightHint},
+};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Value, json};
 use validator::Validate;
 
-use gotong_domain::idempotency::BeginOutcome;
-use gotong_domain::ports::idempotency::{IdempotencyKey, IdempotencyResponse};
-
+use crate::middleware::AuthContext;
 use crate::{error::ApiError, middleware as app_middleware, state::AppState, validation};
 
 pub fn router(state: AppState) -> Router {
     let protected = Router::new()
         .route("/v1/idempotent-echo", post(idempotent_echo))
+        .route(
+            "/v1/contributions",
+            post(create_contribution).get(list_contributions),
+        )
+        .route("/v1/contributions/:contribution_id", get(get_contribution))
+        .route(
+            "/v1/contributions/:contribution_id/evidence",
+            get(list_evidence_by_contribution),
+        )
+        .route("/v1/evidence", post(submit_evidence))
+        .route("/v1/evidence/:evidence_id", get(get_evidence))
+        .route("/v1/vouches", post(submit_vouch).get(list_vouches))
         .route_layer(middleware::from_fn(app_middleware::require_auth_middleware));
 
     let mut app = Router::new()
@@ -35,10 +56,6 @@ pub fn router(state: AppState) -> Router {
         .layer(middleware::from_fn(
             app_middleware::correlation_id_middleware,
         ));
-
-    if !state.config.app_env.eq_ignore_ascii_case("test") {
-        app = app.layer(app_middleware::rate_limit_layer());
-    }
 
     if !state.config.app_env.eq_ignore_ascii_case("test") {
         app = app.layer(app_middleware::rate_limit_layer());
@@ -90,15 +107,11 @@ struct IdempotentEchoRequest {
 
 async fn idempotent_echo(
     State(state): State<AppState>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
     Json(payload): Json<IdempotentEchoRequest>,
 ) -> Result<Response, ApiError> {
     validation::validate(&payload)?;
-    let request_id = headers
-        .get("x-request-id")
-        .and_then(|value| value.to_str().ok())
-        .ok_or_else(|| ApiError::Validation("missing request id".into()))?
-        .to_string();
+    let request_id = request_id_from_headers(&headers)?;
     let key = IdempotencyKey::new("echo", payload.entity_id.clone(), request_id);
 
     let outcome = state.idempotency.begin(&key).await.map_err(|err| {
@@ -124,6 +137,338 @@ async fn idempotent_echo(
                 })?;
             Ok(to_response(response))
         }
+    }
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateContributionRequest {
+    pub contribution_type: ContributionType,
+    #[validate(length(min = 1, max = 200))]
+    pub title: String,
+    pub description: Option<String>,
+    pub evidence_url: Option<String>,
+    pub skill_ids: Vec<String>,
+    pub metadata: Option<HashMap<String, Value>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ContributionListQuery {
+    pub author_id: Option<String>,
+}
+
+async fn create_contribution(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateContributionRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "contribution_create",
+        actor.user_id.clone(),
+        request_id.clone(),
+    );
+
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = ContributionService::new(state.contribution_repo.clone());
+            let input = ContributionCreate {
+                contribution_type: payload.contribution_type,
+                title: payload.title,
+                description: payload.description,
+                evidence_url: payload.evidence_url,
+                skill_ids: payload.skill_ids,
+                metadata: payload.metadata,
+            };
+
+            let contribution = service
+                .create(actor, request_id, correlation_id, input)
+                .await
+                .map_err(map_domain_error)?;
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(&contribution).map_err(|_| ApiError::Internal)?,
+            };
+
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn list_contributions(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<ContributionListQuery>,
+) -> Result<Json<Vec<Contribution>>, ApiError> {
+    let author_id = query.author_id.unwrap_or_else(|| {
+        actor_identity(&auth)
+            .map(|actor| actor.user_id)
+            .unwrap_or_default()
+    });
+
+    if author_id.is_empty() {
+        return Err(ApiError::Validation("author_id is required".into()));
+    }
+
+    let service = ContributionService::new(state.contribution_repo.clone());
+    let contributions = service
+        .list_by_author(&author_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(contributions))
+}
+
+async fn get_contribution(
+    State(state): State<AppState>,
+    Path(contribution_id): Path<String>,
+) -> Result<Json<Contribution>, ApiError> {
+    let service = ContributionService::new(state.contribution_repo.clone());
+    let contribution = service
+        .get(&contribution_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(contribution))
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateEvidenceRequest {
+    #[validate(length(min = 1, max = 128))]
+    contribution_id: String,
+    pub evidence_type: EvidenceType,
+    pub evidence_data: Value,
+    pub proof: Value,
+}
+
+async fn submit_evidence(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateEvidenceRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new("evidence_submit", actor.user_id.clone(), request_id.clone());
+
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = EvidenceService::new(state.evidence_repo.clone());
+            let input = EvidenceCreate {
+                contribution_id: payload.contribution_id,
+                evidence_type: payload.evidence_type,
+                evidence_data: payload.evidence_data,
+                proof: payload.proof,
+            };
+
+            let evidence = service
+                .submit(actor, request_id, correlation_id, input)
+                .await
+                .map_err(map_domain_error)?;
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(&evidence).map_err(|_| ApiError::Internal)?,
+            };
+
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn get_evidence(
+    State(state): State<AppState>,
+    Path(evidence_id): Path<String>,
+) -> Result<Json<Evidence>, ApiError> {
+    let service = EvidenceService::new(state.evidence_repo.clone());
+    let evidence = service.get(&evidence_id).await.map_err(map_domain_error)?;
+    Ok(Json(evidence))
+}
+
+async fn list_evidence_by_contribution(
+    State(state): State<AppState>,
+    Path(contribution_id): Path<String>,
+) -> Result<Json<Vec<Evidence>>, ApiError> {
+    let service = EvidenceService::new(state.evidence_repo.clone());
+    let evidences = service
+        .list_by_contribution(&contribution_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(evidences))
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateVouchRequest {
+    #[validate(length(min = 1, max = 128))]
+    vouchee_id: String,
+    pub skill_id: Option<String>,
+    pub weight_hint: Option<VouchWeightHint>,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ListVouchesQuery {
+    pub vouchee_id: Option<String>,
+    pub voucher_id: Option<String>,
+}
+
+async fn submit_vouch(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateVouchRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new("vouch_submit", actor.user_id.clone(), request_id.clone());
+
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = VouchService::new(state.vouch_repo.clone());
+            let input = VouchCreate {
+                vouchee_id: payload.vouchee_id,
+                skill_id: payload.skill_id,
+                weight_hint: payload.weight_hint,
+                message: payload.message,
+            };
+
+            let vouch = service
+                .submit(actor, request_id, correlation_id, input)
+                .await
+                .map_err(map_domain_error)?;
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(&vouch).map_err(|_| ApiError::Internal)?,
+            };
+
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn list_vouches(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<ListVouchesQuery>,
+) -> Result<Json<Vec<Vouch>>, ApiError> {
+    let service = VouchService::new(state.vouch_repo.clone());
+
+    let response = match (query.vouchee_id, query.voucher_id) {
+        (Some(vouchee), None) => service
+            .list_by_vouchee(&vouchee)
+            .await
+            .map_err(map_domain_error)?,
+        (None, Some(voucher)) => service
+            .list_by_voucher(&voucher)
+            .await
+            .map_err(map_domain_error)?,
+        (None, None) => service
+            .list_by_voucher(&actor_identity(&auth)?.user_id)
+            .await
+            .map_err(map_domain_error)?,
+        (Some(_), Some(_)) => {
+            return Err(ApiError::Validation(
+                "provide only one of vouchee_id or voucher_id".into(),
+            ));
+        }
+    };
+
+    Ok(Json(response))
+}
+
+fn actor_identity(auth: &AuthContext) -> Result<ActorIdentity, ApiError> {
+    let user_id = auth
+        .user_id
+        .as_ref()
+        .filter(|user_id| !user_id.trim().is_empty())
+        .ok_or(ApiError::Unauthorized)?;
+    Ok(ActorIdentity {
+        user_id: user_id.to_string(),
+        username: user_id.to_string(),
+    })
+}
+
+fn request_id_from_headers(headers: &HeaderMap) -> Result<String, ApiError> {
+    headers
+        .get("x-request-id")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.is_empty())
+        .map(std::string::ToString::to_string)
+        .ok_or_else(|| ApiError::Validation("missing request id".into()))
+}
+
+fn correlation_id_from_headers(headers: &HeaderMap) -> Result<String, ApiError> {
+    headers
+        .get(app_middleware::CORRELATION_ID_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.is_empty())
+        .map(std::string::ToString::to_string)
+        .ok_or_else(|| ApiError::Validation("missing correlation id".into()))
+}
+
+fn map_domain_error(err: DomainError) -> ApiError {
+    match err {
+        DomainError::Validation(message) => ApiError::Validation(message),
+        DomainError::NotFound => ApiError::NotFound,
+        DomainError::Conflict => ApiError::Conflict,
     }
 }
 

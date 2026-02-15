@@ -12,6 +12,11 @@ pub struct AppConfig {
     pub surreal_pass: String,
     pub redis_url: String,
     pub jwt_secret: String,
+    pub s3_endpoint: String,
+    pub s3_bucket: String,
+    pub s3_region: String,
+    pub s3_access_key: String,
+    pub s3_secret_key: String,
     pub worker_queue_prefix: String,
     pub worker_poll_interval_ms: u64,
     pub worker_promote_batch: usize,
@@ -33,6 +38,11 @@ impl AppConfig {
             .set_default("surreal_pass", "root")?
             .set_default("redis_url", "redis://127.0.0.1:6379")?
             .set_default("jwt_secret", "dev-secret")?
+            .set_default("s3_endpoint", "http://127.0.0.1:9000")?
+            .set_default("s3_bucket", "gotong-royong-evidence-dev")?
+            .set_default("s3_region", "us-east-1")?
+            .set_default("s3_access_key", "minioadmin")?
+            .set_default("s3_secret_key", "minioadmin")?
             .set_default("worker_queue_prefix", "gotong:jobs")?
             .set_default("worker_poll_interval_ms", 1000)?
             .set_default("worker_promote_batch", 50)?
