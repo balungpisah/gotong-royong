@@ -1001,6 +1001,10 @@ async fn get_chat_read_cursor(
 ) -> Result<Json<ChatReadCursor>, ApiError> {
     let actor = actor_identity(&auth)?;
     let service = ChatService::new(state.chat_repo.clone());
+    service
+        .assert_actor_is_member(&actor, &thread_id)
+        .await
+        .map_err(map_domain_error)?;
     let cursor = service
         .get_read_cursor(&actor, &thread_id)
         .await

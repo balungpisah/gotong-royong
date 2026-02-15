@@ -1511,7 +1511,8 @@ impl ChatRepositoryPort for SurrealChatRepository {
             let mut response = client
                 .query(
                     "SELECT * FROM chat_member \
-                     WHERE thread_id = $thread_id AND user_id = $user_id LIMIT 1",
+                     WHERE thread_id = $thread_id AND user_id = $user_id AND left_at IS NONE \
+                     ORDER BY joined_at DESC LIMIT 1",
                 )
                 .bind(("thread_id", thread_id))
                 .bind(("user_id", user_id))
@@ -1546,7 +1547,25 @@ impl ChatRepositoryPort for SurrealChatRepository {
             Err(err) => return Box::pin(async move { Err(err) }),
         };
         let client = self.client.clone();
+        let request_id = message.request_id.clone();
+        let thread_id = message.thread_id.clone();
         Box::pin(async move {
+            let mut existing = client
+                .query(
+                    "SELECT * FROM chat_message WHERE thread_id = $thread_id AND request_id = $request_id LIMIT 1",
+                )
+                .bind(("thread_id", thread_id.clone()))
+                .bind(("request_id", request_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let existing_rows: Vec<Value> = existing
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut existing_messages = Self::decode_message_row(existing_rows)?;
+            if let Some(existing_message) = existing_messages.pop() {
+                return Ok(existing_message);
+            }
+
             let payload = to_value(payload)
                 .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
             let mut response = client

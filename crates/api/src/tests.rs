@@ -48,16 +48,16 @@ fn test_config() -> AppConfig {
 }
 
 fn test_token(secret: &str) -> String {
-    test_token_with_role(secret, "user")
+    test_token_with_identity(secret, "user", "user-123")
 }
 
-fn test_token_with_role(secret: &str, role: &str) -> String {
+fn test_token_with_identity(secret: &str, role: &str, sub: &str) -> String {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("time")
         .as_secs();
     let claims = Claims {
-        sub: "user-123".to_string(),
+        sub: sub.to_string(),
         role: role.to_string(),
         exp: (now + 3600) as usize,
     };
@@ -733,4 +733,44 @@ async fn chat_thread_and_message_flow() {
             .iter()
             .any(|member| member.get("user_id") == Some(&json!("user-123")))
     );
+}
+
+#[tokio::test]
+async fn chat_read_cursor_is_member_only() {
+    let app = test_app();
+    let owner_token = test_token("test-secret");
+    let outsider_token = test_token_with_identity("test-secret", "user", "user-456");
+
+    let thread_request = json!({
+        "scope_id": "scope-private-chat",
+        "privacy_level": "private",
+    });
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/threads")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", owner_token))
+        .header("x-request-id", "chat-priv-1")
+        .header("x-correlation-id", "corr-chat-priv-1")
+        .body(Body::from(thread_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(create_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let thread: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let thread_id = thread
+        .get("thread_id")
+        .and_then(|value| value.as_str())
+        .expect("thread_id");
+
+    let read_cursor_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/chat/threads/{thread_id}/read-cursor"))
+        .header("authorization", format!("Bearer {}", outsider_token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(read_cursor_request).await.expect("response");
+    assert_ne!(response.status(), StatusCode::OK);
 }
