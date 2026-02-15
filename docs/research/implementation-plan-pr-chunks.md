@@ -150,6 +150,9 @@ Exit criteria:
 
 ## PR-05 — Worker Runtime + Scheduling Baseline
 
+Status:
+- DONE (2026-02-15)
+
 Goal:
 - Provide background job runtime for timers, retries, and digests.
 

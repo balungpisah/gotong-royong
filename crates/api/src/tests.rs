@@ -31,6 +31,11 @@ fn test_config() -> AppConfig {
         surreal_pass: "root".to_string(),
         redis_url: "redis://127.0.0.1:6379".to_string(),
         jwt_secret: "test-secret".to_string(),
+        worker_queue_prefix: "gotong:jobs".to_string(),
+        worker_poll_interval_ms: 1000,
+        worker_promote_batch: 10,
+        worker_backoff_base_ms: 1000,
+        worker_backoff_max_ms: 60000,
     }
 }
 

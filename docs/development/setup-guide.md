@@ -64,6 +64,13 @@ S3_REGION=us-east-1
 # Auth
 JWT_SECRET=dev_jwt_secret_32_chars_minimum
 GOTONG_ROYONG_WEBHOOK_SECRET=dev_webhook_secret_32_chars_minimum
+
+# Worker
+WORKER_QUEUE_PREFIX=gotong:jobs
+WORKER_POLL_INTERVAL_MS=1000
+WORKER_PROMOTE_BATCH=50
+WORKER_BACKOFF_BASE_MS=1000
+WORKER_BACKOFF_MAX_MS=60000
 ```
 
 ## Quick Start

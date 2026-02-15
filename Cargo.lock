@@ -633,9 +633,13 @@ name = "gotong-worker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "gotong-domain",
  "gotong-infra",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

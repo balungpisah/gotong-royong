@@ -12,6 +12,11 @@ pub struct AppConfig {
     pub surreal_pass: String,
     pub redis_url: String,
     pub jwt_secret: String,
+    pub worker_queue_prefix: String,
+    pub worker_poll_interval_ms: u64,
+    pub worker_promote_batch: usize,
+    pub worker_backoff_base_ms: u64,
+    pub worker_backoff_max_ms: u64,
 }
 
 impl AppConfig {
@@ -28,6 +33,11 @@ impl AppConfig {
             .set_default("surreal_pass", "root")?
             .set_default("redis_url", "redis://127.0.0.1:6379")?
             .set_default("jwt_secret", "dev-secret")?
+            .set_default("worker_queue_prefix", "gotong:jobs")?
+            .set_default("worker_poll_interval_ms", 1000)?
+            .set_default("worker_promote_batch", 50)?
+            .set_default("worker_backoff_base_ms", 1000)?
+            .set_default("worker_backoff_max_ms", 60000)?
             .add_source(config::Environment::default().separator("__"))
             .build()?;
         cfg.try_deserialize()
