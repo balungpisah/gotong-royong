@@ -319,6 +319,16 @@ fn parse_moderation_auto_release_payload(
             "invalid moderation auto-release payload: scheduled_ms must be non-negative"
         ));
     }
+    if payload.content_id.trim().is_empty() {
+        return Err(anyhow::anyhow!(
+            "invalid moderation auto-release payload: content_id is required"
+        ));
+    }
+    if payload.hold_decision_request_id.trim().is_empty() {
+        return Err(anyhow::anyhow!(
+            "invalid moderation auto-release payload: hold_decision_request_id is required"
+        ));
+    }
     if payload.request_id.trim().is_empty() {
         return Err(anyhow::anyhow!(
             "invalid moderation auto-release payload: request_id is required"

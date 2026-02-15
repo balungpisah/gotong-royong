@@ -521,36 +521,34 @@ impl ModerationService {
             .await?
             .ok_or(DomainError::NotFound)?;
 
+        if current.request_id != input.hold_decision_request_id {
+            return Ok(ModerationApplyResult {
+                content: current.clone(),
+                decision: build_auto_release_noop_decision(
+                    &current,
+                    &actor,
+                    &token_role,
+                    &input,
+                    request_ts_ms,
+                    "auto_release_stale_request",
+                    "auto release skipped because hold decision id does not match latest decision",
+                ),
+                schedule_auto_release: false,
+            });
+        }
+
         if current.moderation_status != ModerationStatus::UnderReview {
             return Ok(ModerationApplyResult {
                 content: current.clone(),
-                decision: ModerationDecision {
-                    decision_id: format!(
-                        "noop:{}:{}",
-                        input.request_id, input.hold_decision_request_id
-                    ),
-                    content_id: current.content_id,
-                    content_type: current.content_type.clone(),
-                    moderation_status: current.moderation_status.clone(),
-                    moderation_action: current.moderation_action.clone(),
-                    reason_code: Some("auto_release_not_applicable".to_string()),
-                    confidence: current.confidence,
-                    decided_at_ms: request_ts_ms,
-                    actor: ModerationActorSnapshot::new(
-                        actor,
-                        &token_role,
-                        input.request_id.clone(),
-                        input.correlation_id.clone(),
-                        request_ts_ms,
-                    ),
-                    hold_expires_at_ms: current.hold_expires_at_ms,
-                    auto_release_if_no_action: current.auto_release_if_no_action,
-                    appeal_window_until_ms: current.appeal_window_until_ms,
-                    reasoning: Some("auto_release_not_applicable".to_string()),
-                    violations: current.violations.clone(),
-                    request_id: input.request_id,
-                    correlation_id: input.correlation_id,
-                },
+                decision: build_auto_release_noop_decision(
+                    &current,
+                    &actor,
+                    &token_role,
+                    &input,
+                    request_ts_ms,
+                    "auto_release_not_applicable",
+                    "auto release skipped because content is not under review",
+                ),
                 schedule_auto_release: false,
             });
         }
@@ -558,33 +556,15 @@ impl ModerationService {
         if !current.auto_release_if_no_action {
             return Ok(ModerationApplyResult {
                 content: current.clone(),
-                decision: ModerationDecision {
-                    decision_id: format!(
-                        "noop:{}:{}",
-                        input.request_id, input.hold_decision_request_id
-                    ),
-                    content_id: current.content_id,
-                    content_type: current.content_type.clone(),
-                    moderation_status: current.moderation_status.clone(),
-                    moderation_action: current.moderation_action.clone(),
-                    reason_code: Some("auto_release_disabled".to_string()),
-                    confidence: current.confidence,
-                    decided_at_ms: request_ts_ms,
-                    actor: ModerationActorSnapshot::new(
-                        actor,
-                        &token_role,
-                        input.request_id.clone(),
-                        input.correlation_id.clone(),
-                        request_ts_ms,
-                    ),
-                    hold_expires_at_ms: current.hold_expires_at_ms,
-                    auto_release_if_no_action: false,
-                    appeal_window_until_ms: current.appeal_window_until_ms,
-                    reasoning: Some("auto_release_disabled".to_string()),
-                    violations: vec![],
-                    request_id: input.request_id,
-                    correlation_id: input.correlation_id,
-                },
+                decision: build_auto_release_noop_decision(
+                    &current,
+                    &actor,
+                    &token_role,
+                    &input,
+                    request_ts_ms,
+                    "auto_release_disabled",
+                    "auto release disabled for current moderation decision",
+                ),
                 schedule_auto_release: false,
             });
         }
@@ -745,6 +725,44 @@ fn ensure_auto_release_role(token_role: &Role) -> DomainResult<()> {
     Err(DomainError::Forbidden(
         "auto release requires admin/system role".into(),
     ))
+}
+
+fn build_auto_release_noop_decision(
+    current: &ContentModeration,
+    actor: &ActorIdentity,
+    token_role: &Role,
+    input: &ModerationAutoReleaseCommand,
+    decided_at_ms: i64,
+    reason_code: &str,
+    reasoning: &str,
+) -> ModerationDecision {
+    ModerationDecision {
+        decision_id: format!(
+            "noop:{}:{}",
+            input.request_id, input.hold_decision_request_id
+        ),
+        content_id: current.content_id.clone(),
+        content_type: current.content_type.clone(),
+        moderation_status: current.moderation_status.clone(),
+        moderation_action: current.moderation_action.clone(),
+        reason_code: Some(reason_code.to_string()),
+        confidence: current.confidence,
+        decided_at_ms,
+        actor: ModerationActorSnapshot::new(
+            actor.clone(),
+            token_role,
+            input.request_id.clone(),
+            input.correlation_id.clone(),
+            decided_at_ms,
+        ),
+        hold_expires_at_ms: current.hold_expires_at_ms,
+        auto_release_if_no_action: current.auto_release_if_no_action,
+        appeal_window_until_ms: current.appeal_window_until_ms,
+        reasoning: Some(reasoning.to_string()),
+        violations: current.violations.clone(),
+        request_id: input.request_id.clone(),
+        correlation_id: input.correlation_id.clone(),
+    }
 }
 
 #[cfg(test)]
@@ -961,6 +979,83 @@ mod tests {
             .await
             .expect_err("validation");
         assert!(matches!(err, DomainError::Validation(_)));
+    }
+
+    #[tokio::test]
+    async fn moderation_auto_release_stale_request_is_noop() {
+        let repository = Arc::new(MockModerationRepository::default());
+        let service = ModerationService::new(repository.clone());
+        let actor = actor_identity();
+
+        let hold_base = ModerationApplyCommand {
+            content_id: "content-4".to_string(),
+            content_type: Some("text".to_string()),
+            author_id: Some("user-4".to_string()),
+            author_username: Some("alice".to_string()),
+            moderation_status: ModerationStatus::UnderReview,
+            moderation_action: ModerationAction::HoldForReview,
+            reason_code: Some("policy_hint".to_string()),
+            confidence: 0.9,
+            hold_duration_minutes: Some(5),
+            auto_release_if_no_action: true,
+            appeal_window_minutes: Some(7),
+            reasoning: Some("initial hold".to_string()),
+            violations: vec![],
+            request_id: "req-4-v1".to_string(),
+            correlation_id: "corr-4-v1".to_string(),
+            request_ts_ms: Some(1_000),
+        };
+        service
+            .upsert_moderation_decision(actor.clone(), Role::Moderator, hold_base.clone())
+            .await
+            .expect("initial hold");
+
+        let second_hold = ModerationApplyCommand {
+            request_id: "req-4-v2".to_string(),
+            correlation_id: "corr-4-v2".to_string(),
+            hold_duration_minutes: Some(120),
+            request_ts_ms: Some(2_000),
+            ..hold_base
+        };
+        service
+            .upsert_moderation_decision(actor.clone(), Role::Moderator, second_hold)
+            .await
+            .expect("override hold");
+
+        let stale_job = ModerationAutoReleaseCommand {
+            content_id: "content-4".to_string(),
+            hold_decision_request_id: "req-4-v1".to_string(),
+            request_id: "auto-stale-req".to_string(),
+            correlation_id: "auto-stale-corr".to_string(),
+            scheduled_ms: 10_000,
+            request_ts_ms: Some(80_000),
+        };
+        let result = service
+            .apply_auto_release(actor, Role::System, stale_job)
+            .await
+            .expect("stale auto release");
+
+        assert_eq!(
+            result.decision.reason_code.as_deref(),
+            Some("auto_release_stale_request")
+        );
+        assert_eq!(
+            result.decision.reasoning.as_deref(),
+            Some("auto release skipped because hold decision id does not match latest decision")
+        );
+        assert!(matches!(
+            result.content.moderation_status,
+            ModerationStatus::UnderReview
+        ));
+        assert!(!result.schedule_auto_release);
+        assert_eq!(result.content.request_id, "req-4-v2");
+        assert!(
+            repository
+                .get_decision_by_request("content-4", "auto-stale-req")
+                .await
+                .expect("decision replay")
+                .is_none()
+        );
     }
 
     #[tokio::test]
