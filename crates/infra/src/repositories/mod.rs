@@ -1081,6 +1081,79 @@ impl SurrealVaultRepository {
         let mut entries = Self::map_entry_rows(vec![row])?;
         Ok(entries.pop())
     }
+
+    async fn get_by_actor_request_from_store(
+        client: &Surreal<Client>,
+        actor_id: &str,
+        request_id: &str,
+    ) -> DomainResult<Option<VaultEntry>> {
+        let mut response = client
+            .query(
+                "SELECT * FROM vault_entry \
+                 WHERE author_id = $author_id AND request_id = $request_id LIMIT 1",
+            )
+            .bind(("author_id", actor_id.to_string()))
+            .bind(("request_id", request_id.to_string()))
+            .await
+            .map_err(Self::map_surreal_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let mut entries = Self::map_entry_rows(vec![row])?;
+        Ok(entries.pop())
+    }
+
+    async fn get_by_entry_from_store(
+        client: &Surreal<Client>,
+        vault_entry_id: &str,
+    ) -> DomainResult<Option<VaultEntry>> {
+        let mut response = client
+            .query("SELECT * FROM vault_entry WHERE vault_entry_id = $vault_entry_id LIMIT 1")
+            .bind(("vault_entry_id", vault_entry_id.to_string()))
+            .await
+            .map_err(Self::map_surreal_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let mut entries = Self::map_entry_rows(vec![row])?;
+        Ok(entries.pop())
+    }
+
+    async fn resolve_entry_id_from_actor_request(
+        client: &Surreal<Client>,
+        actor_id: &str,
+        request_id: &str,
+    ) -> DomainResult<Option<String>> {
+        let mut response = client
+            .query(
+                "SELECT vault_entry_id, actor FROM vault_timeline_event \
+                 WHERE request_id = $request_id AND event_type = $event_type \
+                 ORDER BY occurred_at ASC, event_id ASC",
+            )
+            .bind(("request_id", request_id.to_string()))
+            .bind(("event_type", "witness_drafted"))
+            .await
+            .map_err(Self::map_surreal_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        for row in rows {
+            let row =
+                serde_json::from_value::<SurrealVaultTimelineRequestRow>(row).map_err(|err| {
+                    DomainError::Validation(format!("invalid vault timeline row: {err}"))
+                })?;
+            if row.actor.user_id == actor_id {
+                return Ok(Some(row.vault_entry_id));
+            }
+        }
+        Ok(None)
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -1137,6 +1210,12 @@ struct SurrealVaultTimelineRow {
     metadata: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Deserialize)]
+struct SurrealVaultTimelineRequestRow {
+    vault_entry_id: String,
+    actor: VaultActorSnapshot,
+}
+
 #[derive(Debug, Serialize)]
 struct SurrealVaultTimelineCreateRow {
     event_id: String,
@@ -1170,28 +1249,26 @@ impl VaultRepository for SurrealVaultRepository {
         let author_id = entry.author_id.clone();
         let request_id = event.request_id.clone();
         Box::pin(async move {
+            if let Some(existing_entry_id) =
+                Self::resolve_entry_id_from_actor_request(&client, &author_id, &request_id).await?
+            {
+                if let Some(existing_entry) =
+                    Self::get_by_entry_from_store(&client, &existing_entry_id).await?
+                {
+                    return Ok(existing_entry);
+                }
+            }
+            if let Some(existing_entry) =
+                Self::get_by_actor_request_from_store(&client, &author_id, &request_id).await?
+            {
+                return Ok(existing_entry);
+            }
+
             let payload = to_value(payload)
                 .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
             let event_payload = to_value(event_payload).map_err(|err| {
                 DomainError::Validation(format!("invalid timeline payload: {err}"))
             })?;
-
-            let mut existing_entry_response = client
-                .query("SELECT * FROM vault_entry WHERE author_id = $author_id AND request_id = $request_id LIMIT 1")
-                .bind(("author_id", author_id.clone()))
-                .bind(("request_id", request_id.clone()))
-                .await
-                .map_err(Self::map_surreal_error)?;
-            let existing_entry_rows: Vec<Value> = existing_entry_response
-                .take(0)
-                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            if let Some(row) = existing_entry_rows.into_iter().next() {
-                let mut entries = Self::map_entry_rows(vec![row])?;
-                let existing_entry = entries.pop().ok_or_else(|| {
-                    DomainError::Validation("existing entry is malformed".to_string())
-                })?;
-                return Ok(existing_entry);
-            }
 
             let mut response = client
                 .query("CREATE type::thing('vault_entry', $vault_entry_id) CONTENT $payload")
@@ -1435,23 +1512,13 @@ impl VaultRepository for SurrealVaultRepository {
         let request_id = request_id.to_string();
         let client = self.client.clone();
         Box::pin(async move {
-            let mut response = client
-                .query(
-                    "SELECT * FROM vault_entry \
-                     WHERE author_id = $author_id AND request_id = $request_id LIMIT 1",
-                )
-                .bind(("author_id", actor_id))
-                .bind(("request_id", request_id))
-                .await
-                .map_err(Self::map_surreal_error)?;
-            let mut rows: Vec<Value> = response
-                .take(0)
-                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            let Some(row) = rows.pop() else {
-                return Ok(None);
+            let Some(vault_entry_id) =
+                Self::resolve_entry_id_from_actor_request(&client, &actor_id, &request_id).await?
+            else {
+                return Self::get_by_actor_request_from_store(&client, &actor_id, &request_id)
+                    .await;
             };
-            let mut entries = Self::map_entry_rows(vec![row])?;
-            Ok(entries.pop())
+            Self::get_by_entry_from_store(&client, &vault_entry_id).await
         })
     }
 
