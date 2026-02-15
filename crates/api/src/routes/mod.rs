@@ -10,6 +10,10 @@ use axum::{
 };
 use gotong_domain::{
     auth::TrackRole,
+    chat::{
+        ChatMember, ChatMessage, ChatReadCursor, ChatService, ChatThread, ChatThreadCreate,
+        SendMessageInput, build_message_catchup,
+    },
     contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
     error::DomainError,
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
@@ -56,6 +60,28 @@ pub fn router(state: AppState) -> Router {
             get(get_active_transition_stage),
         )
         .route("/v1/transitions/:transition_id", get(get_transition_by_id))
+        .route(
+            "/v1/chat/threads",
+            post(create_chat_thread).get(list_chat_threads),
+        )
+        .route(
+            "/v1/chat/threads/:thread_id/members",
+            get(list_chat_members),
+        )
+        .route("/v1/chat/threads/:thread_id/join", post(join_chat_thread))
+        .route("/v1/chat/threads/:thread_id/leave", post(leave_chat_thread))
+        .route(
+            "/v1/chat/threads/:thread_id/messages",
+            get(list_chat_messages),
+        )
+        .route(
+            "/v1/chat/threads/:thread_id/messages/send",
+            post(send_chat_message),
+        )
+        .route(
+            "/v1/chat/threads/:thread_id/read-cursor",
+            get(get_chat_read_cursor).post(mark_chat_read_cursor),
+        )
         .route_layer(middleware::from_fn(app_middleware::require_auth_middleware));
 
     let mut app = Router::new()
@@ -628,6 +654,358 @@ async fn get_transition_by_id(
         .map_err(map_domain_error)?;
     let transition = transition.ok_or(ApiError::NotFound)?;
     Ok(Json(transition))
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatThreadsQuery {
+    scope_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatMessagesQuery {
+    since_created_at_ms: Option<i64>,
+    since_message_id: Option<String>,
+    limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateChatThreadRequest {
+    #[validate(length(min = 1, max = 128))]
+    scope_id: String,
+    #[validate(length(min = 1, max = 16))]
+    privacy_level: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct SendChatMessageRequest {
+    #[validate(length(min = 1, max = 2_000))]
+    body: String,
+    #[serde(default)]
+    attachments: Vec<Value>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct MarkChatReadCursorRequest {
+    #[validate(length(min = 1, max = 128))]
+    message_id: String,
+}
+
+async fn create_chat_thread(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateChatThreadRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let key = IdempotencyKey::new(
+        "chat_thread_create",
+        actor.user_id.clone(),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = ChatService::new(state.chat_repo.clone());
+            let input = ChatThreadCreate {
+                scope_id: payload.scope_id,
+                privacy_level: payload.privacy_level,
+            };
+            let thread = service
+                .create_thread(&actor, request_id, correlation_id, input)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(&thread).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn list_chat_threads(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<ChatThreadsQuery>,
+) -> Result<Json<Vec<ChatThread>>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = ChatService::new(state.chat_repo.clone());
+    let threads = if let Some(scope_id) = query.scope_id {
+        service
+            .list_threads_by_scope(&actor, &scope_id)
+            .await
+            .map_err(map_domain_error)?
+    } else {
+        service
+            .list_threads_by_user(&actor)
+            .await
+            .map_err(map_domain_error)?
+    };
+    Ok(Json(threads))
+}
+
+async fn join_chat_thread(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let _ = correlation_id;
+    let key = IdempotencyKey::new(
+        "chat_thread_join",
+        format!("{}:{thread_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = ChatService::new(state.chat_repo.clone());
+            let member = service
+                .join_thread(&actor, &thread_id)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&member).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn leave_chat_thread(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let _ = correlation_id;
+    let key = IdempotencyKey::new(
+        "chat_thread_leave",
+        format!("{}:{thread_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = ChatService::new(state.chat_repo.clone());
+            let member = service
+                .leave_thread(&actor, &thread_id)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&member).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn list_chat_members(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(thread_id): Path<String>,
+) -> Result<Json<Vec<ChatMember>>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = ChatService::new(state.chat_repo.clone());
+    service
+        .assert_actor_is_member(&actor, &thread_id)
+        .await
+        .map_err(map_domain_error)?;
+    let members = service
+        .list_members(&thread_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(members))
+}
+
+async fn list_chat_messages(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(thread_id): Path<String>,
+    Query(query): Query<ChatMessagesQuery>,
+) -> Result<Json<Vec<ChatMessage>>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = ChatService::new(state.chat_repo.clone());
+    let cursor = build_message_catchup(
+        query.limit,
+        query.since_created_at_ms,
+        query.since_message_id,
+    );
+    let messages = service
+        .list_messages(&thread_id, &actor, cursor)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(messages))
+}
+
+async fn send_chat_message(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<SendChatMessageRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let key = IdempotencyKey::new(
+        "chat_message_send",
+        format!("{}:{thread_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = ChatService::new(state.chat_repo.clone());
+            let input = SendMessageInput {
+                thread_id,
+                body: payload.body,
+                attachments: payload.attachments,
+                request_id,
+                correlation_id,
+                occurred_at_ms: None,
+            };
+            let message = service
+                .send_message(&actor, input)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(&message).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn mark_chat_read_cursor(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<MarkChatReadCursorRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let _ = correlation_id;
+    let key = IdempotencyKey::new(
+        "chat_mark_read",
+        format!("{}:{thread_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = ChatService::new(state.chat_repo.clone());
+            let cursor = service
+                .mark_read(&actor, &thread_id, payload.message_id)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&cursor).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn get_chat_read_cursor(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<ChatReadCursor>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = ChatService::new(state.chat_repo.clone());
+    let cursor = service
+        .get_read_cursor(&actor, &thread_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(cursor))
 }
 
 fn actor_identity(auth: &AuthContext) -> Result<ActorIdentity, ApiError> {

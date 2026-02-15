@@ -27,6 +27,8 @@ DEFINE FIELD message_id ON TABLE chat_message TYPE string;
 DEFINE FIELD author_id ON TABLE chat_message TYPE string;
 DEFINE FIELD body ON TABLE chat_message TYPE string;
 DEFINE FIELD attachments ON TABLE chat_message TYPE array;
+DEFINE FIELD request_id ON TABLE chat_message TYPE string;
+DEFINE FIELD correlation_id ON TABLE chat_message TYPE string;
 DEFINE FIELD created_at ON TABLE chat_message TYPE datetime;
 DEFINE FIELD edited_at ON TABLE chat_message TYPE datetime;
 DEFINE FIELD deleted_at ON TABLE chat_message TYPE datetime;

@@ -569,3 +569,168 @@ async fn protected_route_rejects_invalid_token() {
     let response = app.oneshot(request).await.expect("response");
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn chat_thread_and_message_flow() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let thread_request = json!({
+        "scope_id": "scope-chat",
+        "privacy_level": "public",
+    });
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/threads")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "chat-req-1")
+        .header("x-correlation-id", "corr-chat-1")
+        .body(Body::from(thread_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(create_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let thread: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let thread_id = thread
+        .get("thread_id")
+        .and_then(|value| value.as_str())
+        .expect("thread_id")
+        .to_string();
+    assert_eq!(thread.get("scope_id"), Some(&json!("scope-chat")));
+
+    let replay_request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/threads")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "chat-req-1")
+        .header("x-correlation-id", "corr-chat-1b")
+        .body(Body::from(thread_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(replay_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let replay_thread: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(
+        thread_id,
+        replay_thread
+            .get("thread_id")
+            .and_then(|value| value.as_str())
+            .expect("thread_id")
+    );
+
+    let list_request = Request::builder()
+        .method("GET")
+        .uri("/v1/chat/threads")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(list_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let list: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
+    assert!(
+        list.iter()
+            .any(|item| item.get("thread_id") == Some(&json!(thread_id)))
+    );
+
+    let message_request = json!({
+        "body": "hello world",
+        "attachments": [],
+    });
+    let send_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/chat/threads/{thread_id}/messages/send"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "chat-msg-1")
+        .body(Body::from(message_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(send_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let message: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let message_id = message
+        .get("message_id")
+        .and_then(|value| value.as_str())
+        .expect("message_id")
+        .to_string();
+
+    let list_messages_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/chat/threads/{thread_id}/messages"))
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(list_messages_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let messages: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].get("message_id"), Some(&json!(message_id)));
+
+    let mark_cursor_request = json!({
+        "message_id": message_id,
+    });
+    let mark_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/chat/threads/{thread_id}/read-cursor"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-request-id", "chat-cursor-1")
+        .body(Body::from(mark_cursor_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(mark_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let read_cursor_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/chat/threads/{thread_id}/read-cursor"))
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(read_cursor_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let cursor: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(cursor.get("last_read_message_id"), Some(&json!(message_id)));
+
+    let members_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/chat/threads/{thread_id}/members"))
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(members_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let members: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
+    assert!(
+        members
+            .iter()
+            .any(|member| member.get("user_id") == Some(&json!("user-123")))
+    );
+}

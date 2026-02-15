@@ -12,5 +12,8 @@ ON TABLE chat_read_cursor FIELDS user_id, thread_id;
 DEFINE INDEX uniq_delivery_request
 ON TABLE chat_delivery_event FIELDS thread_id, request_id UNIQUE;
 
+DEFINE INDEX uniq_message_request
+ON TABLE chat_message FIELDS thread_id, request_id UNIQUE;
+
 DEFINE INDEX uniq_transition_request
 ON TABLE track_state_transition FIELDS entity_id, request_id UNIQUE;

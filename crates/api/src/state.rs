@@ -3,16 +3,17 @@ use std::sync::Arc;
 use gotong_domain::idempotency::{IdempotencyConfig, IdempotencyService};
 use gotong_domain::ports::idempotency::IdempotencyStore;
 use gotong_domain::ports::{
-    contributions::ContributionRepository, evidence::EvidenceRepository, jobs::JobQueue,
-    transitions::TrackTransitionRepository, vouches::VouchRepository,
+    chat::ChatRepository, contributions::ContributionRepository, evidence::EvidenceRepository,
+    jobs::JobQueue, transitions::TrackTransitionRepository, vouches::VouchRepository,
 };
 use gotong_infra::config::AppConfig;
 use gotong_infra::db::DbConfig;
 use gotong_infra::idempotency::RedisIdempotencyStore;
 use gotong_infra::jobs::RedisJobQueue;
 use gotong_infra::repositories::{
-    InMemoryContributionRepository, InMemoryEvidenceRepository, InMemoryTrackTransitionRepository,
-    InMemoryVouchRepository, SurrealTrackTransitionRepository,
+    InMemoryChatRepository, InMemoryContributionRepository, InMemoryEvidenceRepository,
+    InMemoryTrackTransitionRepository, InMemoryVouchRepository, SurrealChatRepository,
+    SurrealTrackTransitionRepository,
 };
 
 type RepositoryBundle = (
@@ -20,6 +21,7 @@ type RepositoryBundle = (
     Arc<dyn EvidenceRepository>,
     Arc<dyn VouchRepository>,
     Arc<dyn TrackTransitionRepository>,
+    Arc<dyn ChatRepository>,
 );
 type TransitionJobQueue = Option<Arc<dyn JobQueue>>;
 
@@ -31,13 +33,14 @@ pub struct AppState {
     pub evidence_repo: Arc<dyn EvidenceRepository>,
     pub vouch_repo: Arc<dyn VouchRepository>,
     pub transition_repo: Arc<dyn TrackTransitionRepository>,
+    pub chat_repo: Arc<dyn ChatRepository>,
     pub transition_job_queue: TransitionJobQueue,
 }
 
 impl AppState {
     pub async fn new(config: AppConfig) -> anyhow::Result<Self> {
         let store = RedisIdempotencyStore::connect(&config.redis_url).await?;
-        let (contribution_repo, evidence_repo, vouch_repo, transition_repo) =
+        let (contribution_repo, evidence_repo, vouch_repo, transition_repo, chat_repo) =
             repositories_for_config(&config).await?;
         let transition_job_queue = transition_job_queue_for_config(&config).await?;
         let idempotency = IdempotencyService::new(Arc::new(store), IdempotencyConfig::default());
@@ -48,13 +51,15 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            chat_repo,
             transition_job_queue,
         })
     }
 
     #[allow(dead_code)]
     pub fn with_idempotency_store(config: AppConfig, store: Arc<dyn IdempotencyStore>) -> Self {
-        let (contribution_repo, evidence_repo, vouch_repo, transition_repo) = memory_repositories();
+        let (contribution_repo, evidence_repo, vouch_repo, transition_repo, chat_repo) =
+            memory_repositories();
         Self {
             config,
             idempotency: IdempotencyService::new(store, IdempotencyConfig::default()),
@@ -62,6 +67,7 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            chat_repo,
             transition_job_queue: None,
         }
     }
@@ -74,6 +80,7 @@ impl AppState {
         evidence_repo: Arc<dyn EvidenceRepository>,
         vouch_repo: Arc<dyn VouchRepository>,
         transition_repo: Arc<dyn TrackTransitionRepository>,
+        chat_repo: Arc<dyn ChatRepository>,
     ) -> Self {
         let idempotency = IdempotencyService::new(store, IdempotencyConfig::default());
         Self {
@@ -83,6 +90,7 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            chat_repo,
             transition_job_queue: None,
         }
     }
@@ -102,11 +110,13 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
         "surreal" | "surrealdb" | "tikv" => {
             let db_config = DbConfig::from_app_config(config);
             let transition_repo = SurrealTrackTransitionRepository::new(&db_config).await?;
+            let chat_repo = SurrealChatRepository::new(&db_config).await?;
             Ok((
                 Arc::new(InMemoryContributionRepository::new()),
                 Arc::new(InMemoryEvidenceRepository::new()),
                 Arc::new(InMemoryVouchRepository::new()),
                 Arc::new(transition_repo),
+                Arc::new(chat_repo),
             ))
         }
         _ => anyhow::bail!("unsupported DATA_BACKEND '{}'", config.data_backend),
@@ -119,6 +129,7 @@ fn memory_repositories() -> RepositoryBundle {
         Arc::new(InMemoryEvidenceRepository::new()),
         Arc::new(InMemoryVouchRepository::new()),
         Arc::new(InMemoryTrackTransitionRepository::new()),
+        Arc::new(InMemoryChatRepository::new()),
     )
 }
 
