@@ -14,9 +14,9 @@ DEFINE FIELD correlation_id ON TABLE webhook_outbox_event TYPE string;
 DEFINE FIELD status ON TABLE webhook_outbox_event TYPE string;
 DEFINE FIELD attempts ON TABLE webhook_outbox_event TYPE number;
 DEFINE FIELD max_attempts ON TABLE webhook_outbox_event TYPE number;
-DEFINE FIELD next_attempt_at ON TABLE webhook_outbox_event TYPE option datetime;
-DEFINE FIELD last_status_code ON TABLE webhook_outbox_event TYPE option number;
-DEFINE FIELD last_error ON TABLE webhook_outbox_event TYPE option string;
+DEFINE FIELD next_attempt_at ON TABLE webhook_outbox_event TYPE option<datetime>;
+DEFINE FIELD last_status_code ON TABLE webhook_outbox_event TYPE option<number>;
+DEFINE FIELD last_error ON TABLE webhook_outbox_event TYPE option<string>;
 DEFINE FIELD created_at ON TABLE webhook_outbox_event TYPE datetime;
 DEFINE FIELD updated_at ON TABLE webhook_outbox_event TYPE datetime;
 
@@ -24,12 +24,12 @@ DEFINE FIELD log_id ON TABLE webhook_delivery_log TYPE string;
 DEFINE FIELD event_id ON TABLE webhook_delivery_log TYPE string;
 DEFINE FIELD attempt ON TABLE webhook_delivery_log TYPE number;
 DEFINE FIELD outcome ON TABLE webhook_delivery_log TYPE string;
-DEFINE FIELD status_code ON TABLE webhook_delivery_log TYPE option number;
+DEFINE FIELD status_code ON TABLE webhook_delivery_log TYPE option<number>;
 DEFINE FIELD request_id ON TABLE webhook_delivery_log TYPE string;
 DEFINE FIELD correlation_id ON TABLE webhook_delivery_log TYPE string;
 DEFINE FIELD request_body_sha256 ON TABLE webhook_delivery_log TYPE string;
-DEFINE FIELD response_body_sha256 ON TABLE webhook_delivery_log TYPE option string;
-DEFINE FIELD error_message ON TABLE webhook_delivery_log TYPE option string;
+DEFINE FIELD response_body_sha256 ON TABLE webhook_delivery_log TYPE option<string>;
+DEFINE FIELD error_message ON TABLE webhook_delivery_log TYPE option<string>;
 DEFINE FIELD created_at ON TABLE webhook_delivery_log TYPE datetime;
 
 DEFINE INDEX uniq_outbox_event_id

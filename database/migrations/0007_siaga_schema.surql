@@ -19,7 +19,7 @@ DEFINE FIELD updated_at ON TABLE siaga_broadcast TYPE datetime;
 DEFINE FIELD request_id ON TABLE siaga_broadcast TYPE string;
 DEFINE FIELD correlation_id ON TABLE siaga_broadcast TYPE string;
 DEFINE FIELD responders ON TABLE siaga_broadcast TYPE array;
-DEFINE FIELD closure ON TABLE siaga_broadcast TYPE option object;
+DEFINE FIELD closure ON TABLE siaga_broadcast TYPE option<object>;
 
 DEFINE FIELD siaga_id ON TABLE siaga_timeline_event TYPE string;
 DEFINE FIELD event_id ON TABLE siaga_timeline_event TYPE string;
@@ -28,7 +28,7 @@ DEFINE FIELD actor ON TABLE siaga_timeline_event TYPE object;
 DEFINE FIELD request_id ON TABLE siaga_timeline_event TYPE string;
 DEFINE FIELD correlation_id ON TABLE siaga_timeline_event TYPE string;
 DEFINE FIELD occurred_at ON TABLE siaga_timeline_event TYPE datetime;
-DEFINE FIELD metadata ON TABLE siaga_timeline_event TYPE option object;
+DEFINE FIELD metadata ON TABLE siaga_timeline_event TYPE option<object>;
 
 DEFINE INDEX uniq_siaga_broadcast_id
 ON TABLE siaga_broadcast FIELDS siaga_id UNIQUE;

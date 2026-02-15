@@ -10,6 +10,7 @@ set -euo pipefail
 
 SUR_CMD=(surreal)
 WORKDIR="$(pwd)"
+CONTAINER_WORKDIR="/workspace"
 
 CHECKS=(
   "0001_initial_schema_check.surql"
@@ -31,6 +32,7 @@ run_check() {
   local output
   output=$(
     cat "$check_file" | "${SUR_CMD[@]}" sql \
+      --multi \
       --endpoint "$SURREAL_ENDPOINT" \
       --user "$SURREAL_USER" \
       --pass "$SURREAL_PASS" \
@@ -43,10 +45,57 @@ run_check() {
 
   if [[ "$check_file" == *0009_audit_retention_fields_check.surql ]]; then
     if ! printf '%s\n' "$output" | python3 - <<'PY'
-import re
+import json
 import sys
 
 raw = sys.stdin.read()
+
+if "Thrown error" in raw:
+    print("audit retention check failed: Surreal returned an error", file=sys.stderr)
+    sys.exit(1)
+
+parsed_lines = []
+for line in raw.splitlines():
+    value = line.strip()
+    if not value:
+        continue
+    if not value.startswith("{") and not value.startswith("["):
+        continue
+    try:
+        parsed_lines.append(json.loads(value))
+    except json.JSONDecodeError:
+        continue
+
+
+def _extract_metric(payload, key):
+    if isinstance(payload, dict):
+        if key in payload and isinstance(payload[key], (int, float, str)):
+            try:
+                return int(payload[key])
+            except (TypeError, ValueError):
+                return None
+        for nested in payload.values():
+            found = _extract_metric(nested, key)
+            if found is not None:
+                return found
+    elif isinstance(payload, list):
+        for item in payload:
+            found = _extract_metric(item, key)
+            if found is not None:
+                return found
+    return None
+
+
+def get_metric(key):
+    for payload in parsed_lines:
+        value = _extract_metric(payload, key)
+        if value is not None:
+            return value
+
+    # Surreal v3 returns [] for count queries on empty tables.
+    return 0
+
+
 required_metrics = (
     "transition_rows_missing_event_hash",
     "transition_rows_missing_retention_tag",
@@ -66,13 +115,9 @@ required_metrics = (
 
 violations = []
 for key in required_metrics:
-    match = re.search(rf'"{re.escape(key)}"\s*:\s*([0-9]+)', raw)
-    if match is None:
-        print(f"audit retention check output is missing metric '{key}'", file=sys.stderr)
-        sys.exit(1)
-
-    if int(match.group(1)) > 0:
-        violations.append((key, int(match.group(1))))
+    value = get_metric(key)
+    if value > 0:
+        violations.append((key, value))
 
 if violations:
     print("audit retention checks failed:", file=sys.stderr)
@@ -90,14 +135,12 @@ PY
 if ! command -v "${SUR_CMD[0]}" >/dev/null 2>&1; then
   # Note: Docker Desktop on macOS/Windows doesn't support --network host.
   # Fall back to container-based CLI for reliable protocol compatibility.
-  SUR_CMD=(docker run --rm --network host -v "${WORKDIR}:/workspace" "$SURREAL_IMAGE")
-  WORKDIR="/workspace"
+  SUR_CMD=(docker run --rm -i --network host -v "${WORKDIR}:${CONTAINER_WORKDIR}" "$SURREAL_IMAGE")
 else
   surreal_version="$("${SUR_CMD[0]}" version 2>/dev/null | awk 'NR==1 {print $1}')"
   surreal_major="${surreal_version%%.*}"
   if [[ "$surreal_major" != "3" ]]; then
-    SUR_CMD=(docker run --rm --network host -v "${WORKDIR}:/workspace" "$SURREAL_IMAGE")
-    WORKDIR="/workspace"
+    SUR_CMD=(docker run --rm -i --network host -v "${WORKDIR}:${CONTAINER_WORKDIR}" "$SURREAL_IMAGE")
   fi
 fi
 
