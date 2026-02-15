@@ -1,9 +1,6 @@
-use std::future::Future;
-use std::pin::Pin;
-
 use thiserror::Error;
 
-pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+use super::BoxFuture;
 
 #[derive(Debug, Error)]
 pub enum DbError {

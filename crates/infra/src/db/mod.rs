@@ -1,4 +1,5 @@
-use gotong_domain::ports::db::{BoxFuture, DbAdapter, DbError};
+use gotong_domain::ports::BoxFuture;
+use gotong_domain::ports::db::{DbAdapter, DbError};
 
 use crate::config::AppConfig;
 

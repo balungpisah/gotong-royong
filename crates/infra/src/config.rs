@@ -10,6 +10,7 @@ pub struct AppConfig {
     pub surreal_db: String,
     pub surreal_user: String,
     pub surreal_pass: String,
+    pub redis_url: String,
 }
 
 impl AppConfig {
@@ -24,6 +25,7 @@ impl AppConfig {
             .set_default("surreal_db", "chat")?
             .set_default("surreal_user", "root")?
             .set_default("surreal_pass", "root")?
+            .set_default("redis_url", "redis://127.0.0.1:6379")?
             .add_source(config::Environment::default().separator("__"))
             .build()?;
         cfg.try_deserialize()

@@ -108,6 +108,9 @@ Exit criteria:
 
 ## PR-03 — Idempotency Core (`BE-011`)
 
+Status:
+- DONE (2026-02-15)
+
 Goal:
 - Make write paths replay-safe and deterministic before feature services.
 

@@ -14,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
     let config = AppConfig::load()?;
     init_tracing(&config)?;
 
-    let state = state::AppState::new(config.clone());
+    let state = state::AppState::new(config.clone()).await?;
     let app = routes::router(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));

@@ -25,6 +25,7 @@ thiserror = "1"
 tokio = { version = "1", features = ["full"] }
 tower_governor = "0.4"
 governor = "0.6"
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
 tower = { version = "0.4", features = ["limit"] }
 tower-http = { version = "0.5", features = ["trace", "request-id", "timeout", "cors"] }
 tracing = "0.1"
