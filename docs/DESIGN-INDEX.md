@@ -7,6 +7,7 @@
 3. **Then:** [DESIGN-DNA-v0.1.md](./design/specs/DESIGN-DNA-v0.1.md)
 4. **Then:** [AI-SPEC-v0.2.md](./design/specs/AI-SPEC-v0.2.md)
 5. **Then:** [UI-UX-SPEC-v0.5.md](./design/specs/UI-UX-SPEC-v0.5.md)
+6. **Then:** [ADAPTIVE-PATH-SPEC-v0.1.md](./design/specs/ADAPTIVE-PATH-SPEC-v0.1.md)
 
 ## Canonical Files
 
@@ -19,6 +20,7 @@
 - [DESIGN-DNA-v0.1.md](./design/specs/DESIGN-DNA-v0.1.md)
 - [AI-SPEC-v0.2.md](./design/specs/AI-SPEC-v0.2.md)
 - [UI-UX-SPEC-v0.5.md](./design/specs/UI-UX-SPEC-v0.5.md)
+- [ADAPTIVE-PATH-SPEC-v0.1.md](./design/specs/ADAPTIVE-PATH-SPEC-v0.1.md)
 - [design/specs README](./design/specs/README.md)
 - [AI modules](./design/specs/ai-spec/)
 - [DNA modules](./design/specs/design-dna/)

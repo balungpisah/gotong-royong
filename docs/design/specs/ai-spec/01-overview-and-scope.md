@@ -2,6 +2,8 @@
 
 # Gotong Royong — AI Layer Specification v0.2
 
+> **Note (2026-02-15):** Entry flow assumptions in AI-00/AI-01 that rely on fixed track lifecycles are superseded for new experiences by `docs/design/specs/ADAPTIVE-PATH-SPEC-v0.1.md`. Legacy track classification remains as optional metadata only.
+
 ## Changelog from v0.1
 
 - **Added AI-00 (Conversational Triage)** — new entry-point touch point for guided witness story collection
@@ -39,4 +41,3 @@ Gotong Royong's AI layer comprises **10 AI touch points** spanning the full life
 - **UI integration:** Detailed screen layouts remain in UI-UX-SPEC v0.5; this document references them
 
 ---
-

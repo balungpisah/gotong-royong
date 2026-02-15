@@ -5,6 +5,7 @@ The large spec files are split into themed sub-documents to reduce merge conflic
 - `DESIGN-DNA-v0.1.md` (modular index)
 - `AI-SPEC-v0.2.md` (modular index)
 - `UI-UX-SPEC-v0.5.md` (modular index)
+- `ADAPTIVE-PATH-SPEC-v0.1.md` (focused spec, supersedes fixed path choices)
 
 ## Module Folders
 

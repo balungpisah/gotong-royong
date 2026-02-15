@@ -2,6 +2,8 @@
 
 ## 2. Track Architecture
 
+> **Note (2026-02-15):** Fixed track lifecycles are superseded for new experiences by `docs/design/specs/ADAPTIVE-PATH-SPEC-v0.1.md`. Tracks remain as optional hints and legacy views, while adaptive phase timelines are the default path.
+
 Every entity starts as a signal — a testimony, idea, question, good news, or proposal. AI-00 conversational triage classifies the seed type and suggests a track; confirmation is implicit unless challenged during Bahas. Five tracks represent five fundamentally different journeys:
 
 | Track | Indonesian | Spirit | Seed Type | Energy |
@@ -29,4 +31,3 @@ Track changes are allowed at any stage via governed proposal + vote (1.5x quorum
 **Musyawarah (Decide Together):** 6 states (Usul → Bahas → Putuskan → Jalankan → Tinjau → Tuntas). Unique components: Position board (options + support bars + supporter chips), vote panel (system-authoritative, quorum bar, timer, anonymous + immutable notice), Ketetapan formal document, Tinjau review panel (time-trigger).
 
 ---
-
