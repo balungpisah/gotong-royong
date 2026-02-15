@@ -27,6 +27,7 @@ fn test_config() -> AppConfig {
         port: 0,
         log_level: "info".to_string(),
         surreal_endpoint: "ws://127.0.0.1:8000".to_string(),
+        data_backend: "memory".to_string(),
         surreal_ns: "gotong".to_string(),
         surreal_db: "chat".to_string(),
         surreal_user: "root".to_string(),

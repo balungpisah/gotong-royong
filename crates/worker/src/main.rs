@@ -4,7 +4,7 @@ use gotong_domain::jobs::{backoff_ms, now_ms};
 use gotong_domain::ports::jobs::{JobEnvelope, JobQueue, JobQueueError, JobType};
 use gotong_infra::{config::AppConfig, jobs::RedisJobQueue, logging::init_tracing};
 use serde_json::json;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 #[tokio::main]
@@ -54,10 +54,22 @@ impl Worker {
 
     async fn run(&self) -> Result<(), JobQueueError> {
         loop {
-            let moved = self
+            let moved = match self
                 .queue
                 .requeue_processing(self.config.worker_promote_batch)
-                .await?;
+                .await
+            {
+                Ok(moved) => moved,
+                Err(err) => {
+                    warn!(
+                        error = %err,
+                        "failed to requeue processing jobs, retrying shortly"
+                    );
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+            };
+
             if moved == 0 {
                 break;
             }
@@ -65,22 +77,40 @@ impl Worker {
 
         loop {
             let now = now_ms();
-            let _ = self
+            if let Err(err) = self
                 .queue
                 .promote_due(now, self.config.worker_promote_batch)
-                .await?;
+                .await
+            {
+                warn!(error = %err, "failed to promote due jobs, continuing");
+            }
 
-            match self.queue.dequeue(Duration::from_secs(2)).await? {
-                Some(job) => {
+            match self.queue.dequeue(Duration::from_secs(2)).await {
+                Ok(Some(job)) => {
                     if let Err(err) = handle_job(&job).await {
-                        self.handle_failure(job, err).await?;
-                    } else {
-                        self.queue.ack(&job.job_id).await?;
+                        let job_id = job.job_id.clone();
+                        if let Err(handle_err) = self.handle_failure(job, err).await {
+                            warn!(
+                                error = %handle_err,
+                                job_id = %job_id,
+                                "failed to handle job failure path"
+                            );
+                        }
+                    } else if let Err(err) = self.queue.ack(&job.job_id).await {
+                        warn!(
+                            error = %err,
+                            job_id = %job.job_id,
+                            "failed to acknowledge successful job"
+                        );
                     }
                 }
-                None => {
+                Ok(None) => {
                     tokio::time::sleep(Duration::from_millis(self.config.worker_poll_interval_ms))
                         .await;
+                }
+                Err(err) => {
+                    warn!(error = %err, "failed to dequeue job, retrying shortly");
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
         }

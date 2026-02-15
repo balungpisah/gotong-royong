@@ -1,5 +1,9 @@
 use gotong_domain::ports::BoxFuture;
 use gotong_domain::ports::db::{DbAdapter, DbError};
+use std::time::Duration;
+use tokio::net::TcpStream;
+use tokio::time::timeout;
+use url::Url;
 
 use crate::config::AppConfig;
 
@@ -45,7 +49,50 @@ impl DbAdapter for SurrealAdapter {
     }
 
     fn health_check(&self) -> BoxFuture<'_, Result<(), DbError>> {
-        // TODO: implement a real DB health check once the Surreal SDK is wired in.
-        Box::pin(async { Ok(()) })
+        let endpoint = self.config.endpoint.clone();
+        let ns = self.config.namespace.clone();
+        let db = self.config.database.clone();
+
+        Box::pin(async move {
+            let address = parse_socket_address(&endpoint)?;
+            let connect = timeout(Duration::from_secs(2), TcpStream::connect(address))
+                .await
+                .map_err(|_| {
+                    DbError::Unavailable("surreal endpoint connect timed out".to_string())
+                })?;
+            connect.map_err(|err| {
+                DbError::Unavailable(format!("surreal endpoint connect failed: {err}"))
+            })?;
+
+            tracing::debug!(
+                endpoint,
+                namespace = ns,
+                database = db,
+                "surreal health check succeeded"
+            );
+            Ok(())
+        })
     }
+}
+
+fn parse_socket_address(endpoint: &str) -> Result<String, DbError> {
+    let normalized = if endpoint.contains("://") {
+        endpoint.to_string()
+    } else {
+        format!("ws://{endpoint}")
+    };
+    let parsed = Url::parse(&normalized).map_err(|err| {
+        DbError::Unavailable(format!("invalid surreal endpoint '{endpoint}': {err}"))
+    })?;
+
+    let scheme = parsed.scheme();
+    let host = parsed.host_str().ok_or_else(|| {
+        DbError::Unavailable(format!("missing surreal host in endpoint '{endpoint}'"))
+    })?;
+    let port = parsed.port_or_known_default().unwrap_or(match scheme {
+        "wss" | "https" => 443,
+        "http" | "ws" => 8000,
+        _ => 8000,
+    });
+    Ok(format!("{host}:{port}"))
 }

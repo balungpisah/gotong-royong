@@ -6,6 +6,7 @@ pub struct AppConfig {
     pub port: u16,
     pub log_level: String,
     pub surreal_endpoint: String,
+    pub data_backend: String,
     pub surreal_ns: String,
     pub surreal_db: String,
     pub surreal_user: String,
@@ -32,6 +33,7 @@ impl AppConfig {
             .set_default("port", 3000)?
             .set_default("log_level", "info")?
             .set_default("surreal_endpoint", "ws://127.0.0.1:8000")?
+            .set_default("data_backend", "memory")?
             .set_default("surreal_ns", "gotong")?
             .set_default("surreal_db", "chat")?
             .set_default("surreal_user", "root")?
