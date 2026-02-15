@@ -1,5 +1,6 @@
 mod error;
 mod middleware;
+mod observability;
 mod routes;
 mod state;
 mod validation;
@@ -13,6 +14,7 @@ use tracing::info;
 async fn main() -> anyhow::Result<()> {
     let config = AppConfig::load()?;
     init_tracing(&config)?;
+    observability::init_metrics()?;
 
     let state = state::AppState::new(config.clone()).await?;
     let app = routes::router(state);

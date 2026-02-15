@@ -1,5 +1,6 @@
 use axum::{
     body::Body,
+    extract::MatchedPath,
     extract::State,
     http::{HeaderMap, HeaderName, HeaderValue, Request, header},
     middleware::Next,
@@ -25,6 +26,7 @@ use uuid::Uuid;
 use gotong_domain::auth::Role;
 
 use crate::error::ApiError;
+use crate::observability;
 use crate::state::AppState;
 
 pub const CORRELATION_ID_HEADER: &str = "x-correlation-id";
@@ -206,6 +208,20 @@ pub async fn correlation_id_middleware(mut req: Request<Body>, next: Next) -> Re
     if let Ok(value) = HeaderValue::from_str(&correlation_id) {
         response.headers_mut().insert(header_name, value);
     }
+    response
+}
+
+pub async fn metrics_layer(req: Request<Body>, next: Next) -> Response {
+    let start = std::time::Instant::now();
+    let method = req.method().as_str().to_string();
+    let route = req
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|matched| matched.as_str().to_string())
+        .unwrap_or_else(|| req.uri().path().to_string());
+    let response = next.run(req).await;
+    let status = response.status();
+    observability::register_http_request(&method, &route, status, start.elapsed());
     response
 }
 

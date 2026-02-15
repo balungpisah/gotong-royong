@@ -3,6 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
 use axum::body::to_bytes;
+use axum::http::header::CONTENT_TYPE;
 use axum::http::{Request, StatusCode};
 use gotong_domain::discovery::{
     DiscoveryService, FEED_SOURCE_CONTRIBUTION, FeedIngestInput, FeedListQuery, NOTIF_TYPE_SYSTEM,
@@ -15,6 +16,7 @@ use serde::Serialize;
 use serde_json::json;
 use tower_util::ServiceExt;
 
+use crate::observability;
 use crate::routes;
 use crate::state::AppState;
 use gotong_infra::config::AppConfig;
@@ -1874,4 +1876,47 @@ async fn edgepod_ep11_siaga_evaluate_success() {
         .expect("output");
     assert!(output.get("severity").is_some());
     assert!(output.get("responder_payload").is_some());
+}
+
+#[tokio::test]
+async fn metrics_endpoint_is_exposed() {
+    observability::init_metrics().expect("init metrics");
+    let app = test_app();
+
+    let health_request = Request::builder()
+        .method("GET")
+        .uri("/health")
+        .body(Body::empty())
+        .unwrap();
+    let health_response = app
+        .clone()
+        .oneshot(health_request)
+        .await
+        .expect("response");
+    assert_eq!(health_response.status(), StatusCode::OK);
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/metrics")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(
+        response
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.contains("text/plain"))
+    );
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let body = String::from_utf8(body.to_vec()).expect("metrics body");
+    assert!(!body.trim().is_empty());
+    assert!(
+        body.contains("gotong_api_http_requests_total")
+            || body.contains("gotong_api_http_request_duration_seconds")
+    );
 }

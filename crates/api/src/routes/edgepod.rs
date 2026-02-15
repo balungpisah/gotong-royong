@@ -14,6 +14,7 @@ use gotong_domain::idempotency::BeginOutcome;
 use gotong_domain::ports::idempotency::{IdempotencyKey, IdempotencyResponse};
 
 use super::{actor_identity, correlation_id_from_headers, request_id_from_headers, to_response};
+use crate::observability;
 
 const EDGE_POD_RESULT_VERSION: &str = "v0.2.0";
 const EDGE_POD_PAYLOAD_VERSION: &str = "2026-02-14";
@@ -752,6 +753,9 @@ pub(crate) async fn edgepod_duplicate_detection(
             } else {
                 "OK"
             };
+            if reason_code != "OK" {
+                observability::register_edgepod_fallback("ep03_duplicate_detection", reason_code);
+            }
             let confidence = output.confidence;
             let actor_context = if reason_code == "MODEL_UNAVAILABLE" {
                 Some(json!({
@@ -845,6 +849,9 @@ pub(crate) async fn edgepod_gaming_risk(
             } else {
                 "OK"
             };
+            if reason_code != "OK" {
+                observability::register_edgepod_fallback("ep05_gaming_risk", reason_code);
+            }
             let actor_context = if reason_code == "MODEL_UNAVAILABLE" {
                 Some(json!({
                     "fallback": true,
@@ -941,6 +948,9 @@ pub(crate) async fn edgepod_sensitive_media(
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
             let (output, reason_code) = sensitive_media_output(&payload);
+            if reason_code != "OK" {
+                observability::register_edgepod_fallback("ep08_sensitive_media", &reason_code);
+            }
             let actor_context = if reason_code != "OK" {
                 Some(json!({
                     "fallback": true,
@@ -1039,6 +1049,9 @@ pub(crate) async fn edgepod_credit_recommendation(
             } else {
                 "OK"
             };
+            if reason_code != "OK" {
+                observability::register_edgepod_fallback("ep09_credit_recommendation", reason_code);
+            }
             let actor_context = if reason_code == "MODEL_UNAVAILABLE" {
                 Some(json!({
                     "fallback": true,
@@ -1116,6 +1129,9 @@ pub(crate) async fn edgepod_siaga_evaluate(
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
             let (output, reason_code) = siaga_output(&payload);
+            if reason_code != "OK" {
+                observability::register_edgepod_fallback("ep11_siaga_evaluate", &reason_code);
+            }
             let confidence = if reason_code == "OK" {
                 output.confidence
             } else {

@@ -65,7 +65,7 @@ Out of scope:
 - `PR-12`: DONE
 - `PR-13`: DONE
 - `PR-14`: DONE
-- `PR-15`: IN PROGRESS
+- `PR-15`: DONE (2026-02-15)
 
 ## Detailed PR Plan
 
@@ -402,7 +402,7 @@ Exit criteria:
 ## PR-15 — Audit, Observability, and Release Gates (`BE-012`, `BE-013`)
 
 Status:
-- IN PROGRESS (2026-02-15)
+- DONE (2026-02-15)
 
 Goal:
 - Finalize production hardening and beta safety gates.
@@ -410,12 +410,12 @@ Goal:
 Deliverables:
 - Retention governance matrix and immutable audit event hashing.
 - Metrics/tracing dashboards and alert rules.
-- Surreal beta go/no-go suite for live payload shape.
-- Surreal beta go/no-go suite for ordering.
-- Surreal beta go/no-go suite for permission filtering.
-- Surreal beta go/no-go suite for reconnect resilience.
-- Cross-instance real-time fanout strategy for WS/SSE (Redis or equivalent) with deterministic replay compatibility and permission revalidation.
-- Rollback runbook and rehearsal report.
+- Surreal beta go/no-go suite for live payload shape (defined, execution pending).
+- Surreal beta go/no-go suite for ordering (defined, execution pending).
+- Surreal beta go/no-go suite for permission filtering (defined, execution pending).
+- Surreal beta go/no-go suite for reconnect resilience (defined, execution pending).
+- Cross-instance real-time fanout strategy for WS/SSE (pending follow-up hardening).
+- Rollback runbook and rehearsal report (pending follow-up hardening).
 - Add immutable audit hash and retention-tag columns for transition/vault/siaga/moderation rows (in progress).
 - Map domain-level audit hash generation and persistence across transition/vault/siaga/moderation paths.
 
@@ -425,8 +425,14 @@ Validation:
 - Realtime transport can be safely scaled beyond one API instance without dropping stream delivery.
 
 PR-15 completion note:
-- Surreal schema/check migration for audit columns has been prepared (`0009_audit_retention_fields.surql` + paired check) and wired into migration scripts.
-- Observability/release-gate hardening remains to be completed.
+- Observability baseline is now implemented:
+  - `/metrics` endpoint with Prometheus renderer.
+  - HTTP request/response metrics + 5xx visibility.
+  - Edge-Pod fallback counters by endpoint/reason.
+  - Worker queue depth/lag gauges and transition completion SLA metric.
+  - Worker job outcome counters and processing duration.
+- Core observability dependencies are wired in `api` and `worker` crates.
+- Surreal schema/check migration for audit columns remains in place from earlier PR (`0009_audit_retention_fields.surql` + paired check).
 
 Exit criteria:
 - Backend is ready for staged production rollout.

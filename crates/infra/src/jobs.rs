@@ -16,6 +16,14 @@ pub struct RedisJobQueue {
     payload_key: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct JobQueueMetricsSnapshot {
+    pub ready: u64,
+    pub delayed: u64,
+    pub processing: u64,
+    pub oldest_delayed_ms: Option<i64>,
+}
+
 impl RedisJobQueue {
     pub async fn connect(redis_url: &str) -> Result<Self, JobQueueError> {
         Self::connect_with_prefix(redis_url, DEFAULT_PREFIX).await
@@ -89,6 +97,44 @@ impl RedisJobQueue {
             .await
             .map_err(|err| JobQueueError::Operation(err.to_string()))?;
         Ok(())
+    }
+
+    pub async fn metrics_snapshot(&self) -> Result<JobQueueMetricsSnapshot, JobQueueError> {
+        let mut conn = self.manager.clone();
+        let ready: u64 = conn
+            .llen(&self.ready_key)
+            .await
+            .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+        let delayed: u64 = conn
+            .zcard(&self.delayed_key)
+            .await
+            .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+        let processing: u64 = conn
+            .llen(&self.processing_key)
+            .await
+            .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+
+        let oldest_delayed_ms: Option<i64> = if delayed == 0 {
+            None
+        } else {
+            let mut conn = self.manager.clone();
+            let result: Vec<(String, f64)> = redis::cmd("ZRANGE")
+                .arg(&self.delayed_key)
+                .arg(0)
+                .arg(0)
+                .arg("WITHSCORES")
+                .query_async(&mut conn)
+                .await
+                .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+            result.into_iter().next().map(|(_, score)| score as i64)
+        };
+
+        Ok(JobQueueMetricsSnapshot {
+            ready,
+            delayed,
+            processing,
+            oldest_delayed_ms,
+        })
     }
 }
 

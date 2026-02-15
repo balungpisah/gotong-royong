@@ -22,7 +22,7 @@ use gotong_domain::{
 use gotong_infra::{
     config::AppConfig,
     db::DbConfig,
-    jobs::RedisJobQueue,
+    jobs::{JobQueueMetricsSnapshot, RedisJobQueue},
     logging::init_tracing,
     repositories::{
         SurrealModerationRepository, SurrealTrackTransitionRepository,
@@ -36,11 +36,13 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 type HmacSha256 = Hmac<Sha256>;
+mod observability;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = AppConfig::load()?;
     init_tracing(&config)?;
+    observability::init_metrics()?;
 
     let queue =
         RedisJobQueue::connect_with_prefix(&config.redis_url, config.worker_queue_prefix.clone())
@@ -141,7 +143,9 @@ impl Worker {
             }
         }
 
+        self.emit_queue_metrics().await;
         loop {
+            self.emit_queue_metrics().await;
             let now = now_ms();
             if let Err(err) = self
                 .queue
@@ -153,6 +157,8 @@ impl Worker {
 
             match self.queue.dequeue(Duration::from_secs(2)).await {
                 Ok(Some(job)) => {
+                    let started_at = now_ms();
+                    let job_type_label = job_type_label(&job.job_type);
                     if let Err(err) = handle_job(
                         &self.config,
                         &job,
@@ -162,6 +168,7 @@ impl Worker {
                     )
                     .await
                     {
+                        let duration_ms = now_ms() - started_at;
                         let job_id = job.job_id.clone();
                         if let Err(handle_err) = self.handle_failure(job, err).await {
                             warn!(
@@ -170,11 +177,27 @@ impl Worker {
                                 "failed to handle job failure path"
                             );
                         }
+                        observability::register_job_processed(
+                            job_type_label,
+                            "failed_processing",
+                            duration_ms as f64,
+                        );
                     } else if let Err(err) = self.queue.ack(&job.job_id).await {
                         warn!(
                             error = %err,
                             job_id = %job.job_id,
                             "failed to acknowledge successful job"
+                        );
+                        observability::register_job_processed(
+                            job_type_label,
+                            "failed_ack",
+                            (now_ms() - started_at) as f64,
+                        );
+                    } else {
+                        observability::register_job_processed(
+                            job_type_label,
+                            "success",
+                            (now_ms() - started_at) as f64,
                         );
                     }
                 }
@@ -186,6 +209,24 @@ impl Worker {
                     warn!(error = %err, "failed to dequeue job, retrying shortly");
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
+            }
+        }
+    }
+
+    async fn emit_queue_metrics(&self) {
+        match self.queue.metrics_snapshot().await {
+            Ok(JobQueueMetricsSnapshot {
+                ready,
+                delayed,
+                processing,
+                oldest_delayed_ms,
+            }) => {
+                observability::set_queue_depth_gauge(ready, delayed, processing);
+                let lag_ms = oldest_delayed_ms.map_or(0, |score_ms| now_ms() - score_ms);
+                observability::set_queue_lag_ms(lag_ms);
+            }
+            Err(err) => {
+                warn!(error = %err, "failed to collect queue metrics snapshot");
             }
         }
     }
@@ -286,6 +327,7 @@ async fn handle_job(
             service
                 .track_state_transition(actor, Role::System, input)
                 .await?;
+            observability::observe_transition_completion_lag_ms(now_ms() - payload.closes_at_ms);
         }
         JobType::ModerationAutoRelease => {
             let Some(repo) = moderation_repo else {
@@ -342,6 +384,15 @@ fn parse_transition_close_payload(job: &JobEnvelope) -> anyhow::Result<Transitio
     }
 
     Ok(payload)
+}
+
+fn job_type_label(job_type: &JobType) -> &'static str {
+    match job_type {
+        JobType::TransitionClose => "transition_close",
+        JobType::ModerationAutoRelease => "moderation_auto_release",
+        JobType::WebhookRetry => "webhook_retry",
+        JobType::DigestSend => "digest_send",
+    }
 }
 
 fn parse_moderation_auto_release_payload(

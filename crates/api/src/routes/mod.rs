@@ -7,7 +7,7 @@ use axum::extract::{Extension, Path, Query, State};
 use axum::{
     Json, Router,
     extract::ws::close_code,
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     middleware,
     response::sse::{Event, KeepAlive, Sse},
     response::{IntoResponse, Response},
@@ -62,7 +62,9 @@ use validator::Validate;
 mod edgepod;
 
 use crate::middleware::AuthContext;
-use crate::{error::ApiError, middleware as app_middleware, state::AppState, validation};
+use crate::{
+    error::ApiError, middleware as app_middleware, observability, state::AppState, validation,
+};
 
 pub fn router(state: AppState) -> Router {
     let protected = Router::new()
@@ -234,9 +236,11 @@ pub fn router(state: AppState) -> Router {
 
     let mut app = Router::new()
         .route("/health", get(health))
+        .route("/metrics", get(metrics))
         .route("/v1/echo", post(echo))
         .merge(protected)
         .merge(api_edgepod_routes)
+        .layer(middleware::from_fn(app_middleware::metrics_layer))
         .layer(app_middleware::timeout_layer())
         .layer(app_middleware::trace_layer())
         .layer(app_middleware::set_request_id_layer())
@@ -269,6 +273,21 @@ async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
         version: env!("CARGO_PKG_VERSION"),
         environment: state.config.app_env.clone(),
     })
+}
+
+async fn metrics() -> Response {
+    let Some(body) = observability::render_metrics() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let mut response = (StatusCode::OK, body).into_response();
+    response.headers_mut().insert(
+        CONTENT_TYPE,
+        "text/plain; version=0.0.4; charset=utf-8"
+            .parse()
+            .expect("valid content type"),
+    );
+    response
 }
 
 #[derive(Debug, Deserialize, Validate)]
