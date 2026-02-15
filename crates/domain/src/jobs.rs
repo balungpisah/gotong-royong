@@ -50,7 +50,7 @@ pub fn new_job(
         payload,
         request_id,
         correlation_id,
-        attempt: 0,
+        attempt: 1,
         max_attempts: defaults.max_attempts,
         run_at_ms: now,
         created_at_ms: now,

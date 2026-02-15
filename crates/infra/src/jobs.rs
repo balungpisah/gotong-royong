@@ -11,6 +11,8 @@ pub struct RedisJobQueue {
     manager: ConnectionManager,
     ready_key: String,
     delayed_key: String,
+    processing_key: String,
+    payload_key: String,
 }
 
 impl RedisJobQueue {
@@ -32,6 +34,8 @@ impl RedisJobQueue {
             manager,
             ready_key: format!("{prefix}:ready"),
             delayed_key: format!("{prefix}:delayed"),
+            processing_key: format!("{prefix}:processing"),
+            payload_key: format!("{prefix}:payloads"),
         })
     }
 
@@ -55,19 +59,28 @@ impl JobQueue for RedisJobQueue {
         };
         let ready_key = self.ready_key.clone();
         let delayed_key = self.delayed_key.clone();
+        let payload_key = self.payload_key.clone();
         let run_at_ms = job.run_at_ms;
+        let job_id = job.job_id.clone();
         Box::pin(async move {
             let mut conn = self.manager.clone();
+            let _: i64 = redis::cmd("HSET")
+                .arg(&payload_key)
+                .arg(&job_id)
+                .arg(payload)
+                .query_async(&mut conn)
+                .await
+                .map_err(|err| JobQueueError::Operation(err.to_string()))?;
             if run_at_ms <= gotong_domain::jobs::now_ms() {
                 let _: i64 = conn
-                    .rpush(ready_key, payload)
+                    .rpush(ready_key, job_id)
                     .await
                     .map_err(|err| JobQueueError::Operation(err.to_string()))?;
             } else {
                 let _: i64 = redis::cmd("ZADD")
                     .arg(&delayed_key)
                     .arg(run_at_ms)
-                    .arg(payload)
+                    .arg(job_id)
                     .query_async(&mut conn)
                     .await
                     .map_err(|err| JobQueueError::Operation(err.to_string()))?;
@@ -81,19 +94,65 @@ impl JobQueue for RedisJobQueue {
         timeout: Duration,
     ) -> gotong_domain::ports::BoxFuture<'_, Result<Option<JobEnvelope>, JobQueueError>> {
         let ready_key = self.ready_key.clone();
+        let processing_key = self.processing_key.clone();
+        let payload_key = self.payload_key.clone();
         let timeout_secs = timeout.as_secs() as usize;
         Box::pin(async move {
             let mut conn = self.manager.clone();
-            let result: Option<(String, String)> = redis::cmd("BRPOP")
+            let result: Option<String> = redis::cmd("BRPOPLPUSH")
                 .arg(&ready_key)
+                .arg(&processing_key)
                 .arg(timeout_secs)
                 .query_async(&mut conn)
                 .await
                 .map_err(|err| JobQueueError::Operation(err.to_string()))?;
             match result {
-                Some((_key, payload)) => Ok(Some(Self::deserialize(&payload)?)),
+                Some(job_id) => {
+                    let payload: Option<String> = redis::cmd("HGET")
+                        .arg(&payload_key)
+                        .arg(&job_id)
+                        .query_async(&mut conn)
+                        .await
+                        .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+                    let Some(payload) = payload else {
+                        let _: i64 = redis::cmd("LREM")
+                            .arg(&processing_key)
+                            .arg(1)
+                            .arg(&job_id)
+                            .query_async(&mut conn)
+                            .await
+                            .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+                        return Err(JobQueueError::Operation(format!(
+                            "missing payload for job_id {job_id}"
+                        )));
+                    };
+                    Ok(Some(Self::deserialize(&payload)?))
+                }
                 None => Ok(None),
             }
+        })
+    }
+
+    fn ack(&self, job_id: &str) -> gotong_domain::ports::BoxFuture<'_, Result<(), JobQueueError>> {
+        let processing_key = self.processing_key.clone();
+        let payload_key = self.payload_key.clone();
+        let job_id = job_id.to_string();
+        Box::pin(async move {
+            let mut conn = self.manager.clone();
+            let _: i64 = redis::cmd("LREM")
+                .arg(&processing_key)
+                .arg(1)
+                .arg(&job_id)
+                .query_async(&mut conn)
+                .await
+                .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+            let _: i64 = redis::cmd("HDEL")
+                .arg(&payload_key)
+                .arg(&job_id)
+                .query_async(&mut conn)
+                .await
+                .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+            Ok(())
         })
     }
 
@@ -114,26 +173,64 @@ impl JobQueue for RedisJobQueue {
                     .query_async(&mut conn)
                     .await
                     .map_err(|err| JobQueueError::Operation(err.to_string()))?;
-                let Some((payload, score)) = result.into_iter().next() else {
+                let Some((job_id, score)) = result.into_iter().next() else {
                     break;
                 };
                 if score as i64 > now_ms {
                     let _: i64 = redis::cmd("ZADD")
                         .arg(&delayed_key)
                         .arg(score)
-                        .arg(payload)
+                        .arg(job_id)
                         .query_async(&mut conn)
                         .await
                         .map_err(|err| JobQueueError::Operation(err.to_string()))?;
                     break;
                 }
                 let _: i64 = conn
-                    .lpush(&ready_key, payload)
+                    .lpush(&ready_key, job_id)
                     .await
                     .map_err(|err| JobQueueError::Operation(err.to_string()))?;
                 moved += 1;
             }
             Ok(moved)
+        })
+    }
+
+    fn requeue_processing(
+        &self,
+        limit: usize,
+    ) -> gotong_domain::ports::BoxFuture<'_, Result<usize, JobQueueError>> {
+        let processing_key = self.processing_key.clone();
+        let ready_key = self.ready_key.clone();
+        Box::pin(async move {
+            if limit == 0 {
+                return Ok(0);
+            }
+            let mut conn = self.manager.clone();
+            let job_ids: Vec<String> = redis::cmd("LRANGE")
+                .arg(&processing_key)
+                .arg(0)
+                .arg((limit.saturating_sub(1)) as i64)
+                .query_async(&mut conn)
+                .await
+                .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+            if job_ids.is_empty() {
+                return Ok(0);
+            }
+            let _: i64 = redis::cmd("RPUSH")
+                .arg(&ready_key)
+                .arg(job_ids.clone())
+                .query_async(&mut conn)
+                .await
+                .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+            let _: String = redis::cmd("LTRIM")
+                .arg(&processing_key)
+                .arg(job_ids.len() as i64)
+                .arg(-1)
+                .query_async(&mut conn)
+                .await
+                .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+            Ok(job_ids.len())
         })
     }
 }

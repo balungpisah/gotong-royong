@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
             payload: json!({ "note": "sample job" }),
             request_id: format!("job:sample:{}", Uuid::now_v7()),
             correlation_id: format!("corr:{}", Uuid::now_v7()),
-            attempt: 0,
+            attempt: 1,
             max_attempts: 5,
             run_at_ms: now_ms(),
             created_at_ms: now_ms(),
@@ -54,6 +54,16 @@ impl Worker {
 
     async fn run(&self) -> Result<(), JobQueueError> {
         loop {
+            let moved = self
+                .queue
+                .requeue_processing(self.config.worker_promote_batch)
+                .await?;
+            if moved == 0 {
+                break;
+            }
+        }
+
+        loop {
             let now = now_ms();
             let _ = self
                 .queue
@@ -64,6 +74,8 @@ impl Worker {
                 Some(job) => {
                     if let Err(err) = handle_job(&job).await {
                         self.handle_failure(job, err).await?;
+                    } else {
+                        self.queue.ack(&job.job_id).await?;
                     }
                 }
                 None => {
@@ -79,8 +91,8 @@ impl Worker {
         mut job: JobEnvelope,
         err: anyhow::Error,
     ) -> Result<(), JobQueueError> {
-        let next_attempt = job.next_attempt();
-        if next_attempt > job.max_attempts {
+        self.queue.ack(&job.job_id).await?;
+        if job.attempt >= job.max_attempts {
             error!(
                 job_id = %job.job_id,
                 attempt = job.attempt,
@@ -92,10 +104,10 @@ impl Worker {
 
         let delay = backoff_ms(
             self.config.worker_backoff_base_ms,
-            next_attempt,
+            job.attempt,
             self.config.worker_backoff_max_ms,
         );
-        job.attempt = next_attempt;
+        job.attempt = job.attempt.saturating_add(1);
         job.run_at_ms = now_ms() + delay as i64;
         self.queue.enqueue(&job).await?;
 

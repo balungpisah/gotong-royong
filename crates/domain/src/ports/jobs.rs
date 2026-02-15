@@ -53,6 +53,8 @@ pub trait JobQueue: Send + Sync {
         &self,
         timeout: Duration,
     ) -> BoxFuture<'_, Result<Option<JobEnvelope>, JobQueueError>>;
+    fn ack(&self, job_id: &str) -> BoxFuture<'_, Result<(), JobQueueError>>;
     fn promote_due(&self, now_ms: i64, limit: usize)
     -> BoxFuture<'_, Result<usize, JobQueueError>>;
+    fn requeue_processing(&self, limit: usize) -> BoxFuture<'_, Result<usize, JobQueueError>>;
 }
