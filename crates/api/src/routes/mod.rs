@@ -13,9 +13,11 @@ use gotong_domain::{
     contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
     error::DomainError,
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
-    idempotency::BeginOutcome,
+    idempotency::{BeginOutcome, timer_request_id},
     identity::ActorIdentity,
+    jobs::{TransitionClosePayload, new_job},
     ports::idempotency::{IdempotencyKey, IdempotencyResponse},
+    ports::jobs::JobType,
     transitions::{
         TrackStateTransition, TrackTransitionInput, TrackTransitionService, TransitionAction,
         TransitionMechanism,
@@ -385,6 +387,8 @@ struct CreateTransitionRequest {
     pub occurred_at_ms: Option<i64>,
     #[serde(default)]
     pub request_ts_ms: Option<i64>,
+    #[serde(default)]
+    pub closes_at_ms: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -504,6 +508,7 @@ async fn create_transition(
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
             let service = TrackTransitionService::new(state.transition_repo.clone());
+            let closes_at_ms = payload.closes_at_ms;
             let input = TrackTransitionInput {
                 track: payload.track,
                 entity_id: payload.entity_id,
@@ -519,12 +524,47 @@ async fn create_transition(
                 gate_metadata: payload.gate_metadata,
                 occurred_at_ms: payload.occurred_at_ms,
                 request_ts_ms: payload.request_ts_ms,
+                closes_at_ms,
             };
-
             let transition = service
                 .track_state_transition(actor, token_role, input)
                 .await
                 .map_err(map_domain_error)?;
+
+            if transition.transition_type == TransitionMechanism::Timer {
+                let closes_at_ms = closes_at_ms.ok_or(ApiError::Internal)?;
+                let close_request_id = timer_request_id(&transition.transition_id, closes_at_ms);
+                let close_payload = TransitionClosePayload {
+                    transition_id: transition.transition_id.clone(),
+                    entity_id: transition.entity_id.clone(),
+                    track: transition.track.clone(),
+                    from_stage: transition.from_stage.clone(),
+                    to_stage: transition.to_stage.clone(),
+                    closes_at_ms,
+                    request_id: close_request_id.clone(),
+                    request_ts_ms: transition.occurred_at_ms,
+                    correlation_id: transition.correlation_id.clone(),
+                    gate_status: "applied".to_string(),
+                    gate_metadata: transition.gate.metadata.clone(),
+                };
+                let job = new_job(
+                    transition.transition_id.clone(),
+                    JobType::TransitionClose,
+                    serde_json::to_value(&close_payload).map_err(|_| ApiError::Internal)?,
+                    close_request_id,
+                    transition.correlation_id.clone(),
+                    gotong_domain::jobs::JobDefaults::default(),
+                )
+                .with_run_at(closes_at_ms);
+
+                if let Some(queue) = state.transition_job_queue.as_ref() {
+                    queue.enqueue(&job).await.map_err(|err| {
+                        tracing::error!(error = %err, "failed to enqueue transition close job");
+                        ApiError::Internal
+                    })?;
+                }
+            }
+
             let response = IdempotencyResponse {
                 status_code: StatusCode::CREATED.as_u16(),
                 body: serde_json::to_value(&transition).map_err(|_| ApiError::Internal)?,

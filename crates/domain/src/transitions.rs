@@ -95,6 +95,7 @@ pub struct TrackTransitionInput {
     pub gate_metadata: Option<serde_json::Value>,
     pub occurred_at_ms: Option<i64>,
     pub request_ts_ms: Option<i64>,
+    pub closes_at_ms: Option<i64>,
 }
 
 #[derive(Clone)]
@@ -244,6 +245,19 @@ fn validate_gate_and_mechanism(input: &TrackTransitionInput) -> DomainResult<()>
     if input.gate_status.trim().is_empty() {
         return Err(DomainError::Validation("gate.status is required".into()));
     }
+
+    if input.transition_type == TransitionMechanism::Timer {
+        if input.closes_at_ms.is_none() {
+            return Err(DomainError::Validation(
+                "closes_at_ms is required for timer transitions".into(),
+            ));
+        }
+    } else if input.closes_at_ms.is_some() {
+        return Err(DomainError::Validation(
+            "closes_at_ms is only valid for timer transitions".into(),
+        ));
+    }
+
     Ok(())
 }
 
@@ -471,6 +485,7 @@ mod tests {
             })),
             occurred_at_ms: Some(1),
             request_ts_ms: Some(1),
+            closes_at_ms: None,
         };
 
         let actor = ActorIdentity {
@@ -516,6 +531,7 @@ mod tests {
             })),
             occurred_at_ms: Some(2_000),
             request_ts_ms: Some(2_000),
+            closes_at_ms: None,
         };
         let earlier = TrackTransitionInput {
             request_id: "req-earlier".to_string(),
@@ -575,6 +591,7 @@ mod tests {
             })),
             occurred_at_ms: None,
             request_ts_ms: None,
+            closes_at_ms: None,
         })
         .unwrap_err();
         assert!(matches!(

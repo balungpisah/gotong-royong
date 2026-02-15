@@ -1,8 +1,20 @@
+use std::sync::Arc;
 use std::time::Duration;
 
-use gotong_domain::jobs::{backoff_ms, now_ms};
-use gotong_domain::ports::jobs::{JobEnvelope, JobQueue, JobQueueError, JobType};
-use gotong_infra::{config::AppConfig, jobs::RedisJobQueue, logging::init_tracing};
+use gotong_domain::ports::jobs::{JobQueue, JobQueueError, JobType};
+use gotong_domain::{
+    auth::Role,
+    identity::ActorIdentity,
+    jobs::{TransitionClosePayload, backoff_ms, now_ms},
+    ports::{jobs::JobEnvelope, transitions::TrackTransitionRepository},
+    transitions::{
+        TrackTransitionInput, TrackTransitionService, TransitionAction, TransitionMechanism,
+    },
+};
+use gotong_infra::{
+    config::AppConfig, db::DbConfig, jobs::RedisJobQueue, logging::init_tracing,
+    repositories::SurrealTrackTransitionRepository,
+};
 use serde_json::json;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -35,7 +47,15 @@ async fn main() -> anyhow::Result<()> {
         info!(job_id = %sample.job_id, "enqueued sample job");
     }
 
-    let worker = Worker::new(queue, config);
+    let mut transition_repo = None;
+    let backend = config.data_backend.trim().to_ascii_lowercase();
+    if matches!(backend.as_str(), "surreal" | "surrealdb" | "tikv") {
+        let db_config = DbConfig::from_app_config(&config);
+        let repository = SurrealTrackTransitionRepository::new(&db_config).await?;
+        transition_repo = Some(Arc::new(repository) as Arc<dyn TrackTransitionRepository>);
+    }
+
+    let worker = Worker::new(queue, config, transition_repo);
     info!("worker starting");
     worker.run().await?;
 
@@ -45,11 +65,20 @@ async fn main() -> anyhow::Result<()> {
 struct Worker {
     queue: RedisJobQueue,
     config: AppConfig,
+    transition_repo: Option<Arc<dyn TrackTransitionRepository>>,
 }
 
 impl Worker {
-    fn new(queue: RedisJobQueue, config: AppConfig) -> Self {
-        Self { queue, config }
+    fn new(
+        queue: RedisJobQueue,
+        config: AppConfig,
+        transition_repo: Option<Arc<dyn TrackTransitionRepository>>,
+    ) -> Self {
+        Self {
+            queue,
+            config,
+            transition_repo,
+        }
     }
 
     async fn run(&self) -> Result<(), JobQueueError> {
@@ -87,7 +116,7 @@ impl Worker {
 
             match self.queue.dequeue(Duration::from_secs(2)).await {
                 Ok(Some(job)) => {
-                    if let Err(err) = handle_job(&job).await {
+                    if let Err(err) = handle_job(&job, self.transition_repo.as_ref()).await {
                         let job_id = job.job_id.clone();
                         if let Err(handle_err) = self.handle_failure(job, err).await {
                             warn!(
@@ -142,7 +171,7 @@ impl Worker {
         if let Err(enqueue_err) = self.queue.enqueue(&job).await {
             warn!(
                 job_id = %job.job_id,
-                attempt = job.attempt,
+                attempt = %job.attempt,
                 error = %enqueue_err,
                 "failed to enqueue retry job; attempting to move processing job back to ready queue"
             );
@@ -169,10 +198,46 @@ impl Worker {
     }
 }
 
-async fn handle_job(job: &JobEnvelope) -> anyhow::Result<()> {
+async fn handle_job(
+    job: &JobEnvelope,
+    transition_repo: Option<&Arc<dyn TrackTransitionRepository>>,
+) -> anyhow::Result<()> {
     match job.job_type {
         JobType::TransitionClose => {
-            info!(job_id = %job.job_id, "handling transition close (stub)");
+            let Some(repo) = transition_repo else {
+                warn!(
+                    job_id = %job.job_id,
+                    "skipping transition close job: transition repository is unavailable"
+                );
+                return Ok(());
+            };
+            let payload = parse_transition_close_payload(job)?;
+
+            let actor = ActorIdentity {
+                user_id: "system".to_string(),
+                username: "system".to_string(),
+            };
+            let service = TrackTransitionService::new(repo.clone());
+            let input = TrackTransitionInput {
+                track: payload.track,
+                entity_id: payload.entity_id,
+                from_stage: payload.from_stage,
+                to_stage: payload.to_stage,
+                transition_action: TransitionAction::Object,
+                transition_type: TransitionMechanism::Timer,
+                mechanism: TransitionMechanism::Timer,
+                request_id: payload.request_id,
+                correlation_id: payload.correlation_id,
+                track_roles: vec![],
+                gate_status: payload.gate_status,
+                gate_metadata: payload.gate_metadata,
+                occurred_at_ms: Some(payload.closes_at_ms),
+                request_ts_ms: Some(payload.request_ts_ms),
+                closes_at_ms: Some(payload.closes_at_ms),
+            };
+            service
+                .track_state_transition(actor, Role::System, input)
+                .await?;
         }
         JobType::ModerationAutoRelease => {
             info!(job_id = %job.job_id, "handling moderation auto-release (stub)");
@@ -184,5 +249,19 @@ async fn handle_job(job: &JobEnvelope) -> anyhow::Result<()> {
             info!(job_id = %job.job_id, "handling digest send (stub)");
         }
     }
+
     Ok(())
+}
+
+fn parse_transition_close_payload(job: &JobEnvelope) -> anyhow::Result<TransitionClosePayload> {
+    let payload: TransitionClosePayload = serde_json::from_value(job.payload.clone())
+        .map_err(|err| anyhow::anyhow!("invalid transition close payload: {err}"))?;
+
+    if payload.closes_at_ms < 0 {
+        return Err(anyhow::anyhow!(
+            "invalid close payload: closes_at_ms must be non-negative"
+        ));
+    }
+
+    Ok(payload)
 }

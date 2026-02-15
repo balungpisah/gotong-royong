@@ -3,14 +3,16 @@ use std::sync::Arc;
 use gotong_domain::idempotency::{IdempotencyConfig, IdempotencyService};
 use gotong_domain::ports::idempotency::IdempotencyStore;
 use gotong_domain::ports::{
-    contributions::ContributionRepository, evidence::EvidenceRepository,
+    contributions::ContributionRepository, evidence::EvidenceRepository, jobs::JobQueue,
     transitions::TrackTransitionRepository, vouches::VouchRepository,
 };
 use gotong_infra::config::AppConfig;
+use gotong_infra::db::DbConfig;
 use gotong_infra::idempotency::RedisIdempotencyStore;
+use gotong_infra::jobs::RedisJobQueue;
 use gotong_infra::repositories::{
     InMemoryContributionRepository, InMemoryEvidenceRepository, InMemoryTrackTransitionRepository,
-    InMemoryVouchRepository,
+    InMemoryVouchRepository, SurrealTrackTransitionRepository,
 };
 
 type RepositoryBundle = (
@@ -19,6 +21,7 @@ type RepositoryBundle = (
     Arc<dyn VouchRepository>,
     Arc<dyn TrackTransitionRepository>,
 );
+type TransitionJobQueue = Option<Arc<dyn JobQueue>>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -28,13 +31,15 @@ pub struct AppState {
     pub evidence_repo: Arc<dyn EvidenceRepository>,
     pub vouch_repo: Arc<dyn VouchRepository>,
     pub transition_repo: Arc<dyn TrackTransitionRepository>,
+    pub transition_job_queue: TransitionJobQueue,
 }
 
 impl AppState {
     pub async fn new(config: AppConfig) -> anyhow::Result<Self> {
         let store = RedisIdempotencyStore::connect(&config.redis_url).await?;
         let (contribution_repo, evidence_repo, vouch_repo, transition_repo) =
-            repositories_for_config(&config)?;
+            repositories_for_config(&config).await?;
+        let transition_job_queue = transition_job_queue_for_config(&config).await?;
         let idempotency = IdempotencyService::new(Arc::new(store), IdempotencyConfig::default());
         Ok(Self {
             config,
@@ -43,20 +48,21 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            transition_job_queue,
         })
     }
 
     #[allow(dead_code)]
     pub fn with_idempotency_store(config: AppConfig, store: Arc<dyn IdempotencyStore>) -> Self {
-        let idempotency = IdempotencyService::new(store, IdempotencyConfig::default());
         let (contribution_repo, evidence_repo, vouch_repo, transition_repo) = memory_repositories();
         Self {
             config,
-            idempotency,
+            idempotency: IdempotencyService::new(store, IdempotencyConfig::default()),
             contribution_repo,
             evidence_repo,
             vouch_repo,
             transition_repo,
+            transition_job_queue: None,
         }
     }
 
@@ -77,11 +83,12 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            transition_job_queue: None,
         }
     }
 }
 
-fn repositories_for_config(config: &AppConfig) -> anyhow::Result<RepositoryBundle> {
+async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<RepositoryBundle> {
     let backend = config.data_backend.trim().to_ascii_lowercase();
     match backend.as_str() {
         "memory" | "mem" | "in-memory" | "in_memory" => {
@@ -93,9 +100,14 @@ fn repositories_for_config(config: &AppConfig) -> anyhow::Result<RepositoryBundl
             Ok(memory_repositories())
         }
         "surreal" | "surrealdb" | "tikv" => {
-            anyhow::bail!(
-                "surreal-backed repositories are planned but not wired in this PR. set DATA_BACKEND=memory for local/test"
-            );
+            let db_config = DbConfig::from_app_config(config);
+            let transition_repo = SurrealTrackTransitionRepository::new(&db_config).await?;
+            Ok((
+                Arc::new(InMemoryContributionRepository::new()),
+                Arc::new(InMemoryEvidenceRepository::new()),
+                Arc::new(InMemoryVouchRepository::new()),
+                Arc::new(transition_repo),
+            ))
         }
         _ => anyhow::bail!("unsupported DATA_BACKEND '{}'", config.data_backend),
     }
@@ -108,6 +120,27 @@ fn memory_repositories() -> RepositoryBundle {
         Arc::new(InMemoryVouchRepository::new()),
         Arc::new(InMemoryTrackTransitionRepository::new()),
     )
+}
+
+async fn transition_job_queue_for_config(config: &AppConfig) -> anyhow::Result<TransitionJobQueue> {
+    if config.app_env.eq_ignore_ascii_case("test") {
+        return Ok(None);
+    }
+
+    let backend = config.data_backend.trim().to_ascii_lowercase();
+    if matches!(
+        backend.as_str(),
+        "surreal" | "surrealdb" | "tikv" | "memory" | "mem" | "in-memory" | "in_memory"
+    ) {
+        let queue = RedisJobQueue::connect_with_prefix(
+            &config.redis_url,
+            config.worker_queue_prefix.clone(),
+        )
+        .await?;
+        return Ok(Some(Arc::new(queue)));
+    }
+
+    anyhow::bail!("unsupported DATA_BACKEND '{}'", config.data_backend)
 }
 
 #[cfg(test)]
@@ -140,23 +173,23 @@ mod tests {
         }
     }
 
-    #[test]
-    fn memory_backend_rejected_in_production() {
+    #[tokio::test]
+    async fn memory_backend_rejected_in_production() {
         let config = app_config("production", "memory");
-        assert!(repositories_for_config(&config).is_err());
+        assert!(repositories_for_config(&config).await.is_err());
     }
 
-    #[test]
-    fn unknown_backend_is_rejected() {
+    #[tokio::test]
+    async fn unknown_backend_is_rejected() {
         let config = app_config("development", "nonsense");
-        assert!(repositories_for_config(&config).is_err());
+        assert!(repositories_for_config(&config).await.is_err());
     }
 
-    #[test]
-    fn memory_backend_allows_local_and_test() {
+    #[tokio::test]
+    async fn memory_backend_allows_local_and_test() {
         let dev_config = app_config("development", "memory");
         let test_config = app_config("test", "memory");
-        assert!(repositories_for_config(&dev_config).is_ok());
-        assert!(repositories_for_config(&test_config).is_ok());
+        assert!(repositories_for_config(&dev_config).await.is_ok());
+        assert!(repositories_for_config(&test_config).await.is_ok());
     }
 }

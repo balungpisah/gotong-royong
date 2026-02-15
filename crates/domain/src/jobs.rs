@@ -8,6 +8,31 @@ pub struct JobPayload {
     pub data: serde_json::Value,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct TransitionClosePayload {
+    pub transition_id: String,
+    pub entity_id: String,
+    pub track: String,
+    pub from_stage: String,
+    pub to_stage: String,
+    pub closes_at_ms: i64,
+    pub request_id: String,
+    pub request_ts_ms: i64,
+    pub correlation_id: String,
+    pub gate_status: String,
+    pub gate_metadata: Option<serde_json::Value>,
+}
+
+impl TransitionClosePayload {
+    pub fn request_id(&self) -> String {
+        self.request_id.clone()
+    }
+
+    pub fn is_due(&self, now_ms: i64) -> bool {
+        now_ms >= self.closes_at_ms
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct JobDefaults {
     pub max_attempts: u32,
