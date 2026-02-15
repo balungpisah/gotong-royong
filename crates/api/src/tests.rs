@@ -1888,11 +1888,7 @@ async fn metrics_endpoint_is_exposed() {
         .uri("/health")
         .body(Body::empty())
         .unwrap();
-    let health_response = app
-        .clone()
-        .oneshot(health_request)
-        .await
-        .expect("response");
+    let health_response = app.clone().oneshot(health_request).await.expect("response");
     assert_eq!(health_response.status(), StatusCode::OK);
 
     let request = Request::builder()
