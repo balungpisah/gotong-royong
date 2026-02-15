@@ -8,6 +8,7 @@ pub mod identity;
 pub mod jobs;
 pub mod moderation;
 pub mod ports;
+pub mod siaga;
 pub mod transitions;
 pub mod util;
 pub mod vault;

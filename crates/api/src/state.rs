@@ -6,8 +6,8 @@ use gotong_domain::idempotency::{IdempotencyConfig, IdempotencyService};
 use gotong_domain::ports::idempotency::IdempotencyStore;
 use gotong_domain::ports::{
     chat::ChatRepository, contributions::ContributionRepository, evidence::EvidenceRepository,
-    jobs::JobQueue, transitions::TrackTransitionRepository, vault::VaultRepository,
-    vouches::VouchRepository,
+    jobs::JobQueue, siaga::SiagaRepository, transitions::TrackTransitionRepository,
+    vault::VaultRepository, vouches::VouchRepository,
 };
 use gotong_infra::config::AppConfig;
 use gotong_infra::db::DbConfig;
@@ -15,9 +15,10 @@ use gotong_infra::idempotency::RedisIdempotencyStore;
 use gotong_infra::jobs::RedisJobQueue;
 use gotong_infra::repositories::{
     InMemoryChatRepository, InMemoryContributionRepository, InMemoryEvidenceRepository,
-    InMemoryModerationRepository, InMemoryTrackTransitionRepository, InMemoryVaultRepository,
-    InMemoryVouchRepository, SurrealChatRepository, SurrealModerationRepository,
-    SurrealTrackTransitionRepository, SurrealVaultRepository,
+    InMemoryModerationRepository, InMemorySiagaRepository, InMemoryTrackTransitionRepository,
+    InMemoryVaultRepository, InMemoryVouchRepository, SurrealChatRepository,
+    SurrealModerationRepository, SurrealSiagaRepository, SurrealTrackTransitionRepository,
+    SurrealVaultRepository,
 };
 use tokio::sync::{RwLock, broadcast};
 
@@ -29,6 +30,7 @@ type RepositoryBundle = (
     Arc<dyn VaultRepository>,
     Arc<dyn ChatRepository>,
     Arc<dyn gotong_domain::ports::moderation::ModerationRepository>,
+    Arc<dyn SiagaRepository>,
 );
 type TransitionJobQueue = Option<Arc<dyn JobQueue>>;
 
@@ -43,6 +45,8 @@ pub struct AppState {
     pub vault_repo: Arc<dyn VaultRepository>,
     pub chat_repo: Arc<dyn ChatRepository>,
     pub moderation_repo: Arc<dyn gotong_domain::ports::moderation::ModerationRepository>,
+    #[allow(dead_code)]
+    pub siaga_repo: Arc<dyn SiagaRepository>,
     pub chat_realtime: ChatRealtimeBus,
     pub transition_job_queue: TransitionJobQueue,
 }
@@ -95,6 +99,7 @@ impl AppState {
             vault_repo,
             chat_repo,
             moderation_repo,
+            siaga_repo,
         ) = repositories_for_config(&config).await?;
         let transition_job_queue = transition_job_queue_for_config(&config).await?;
         let idempotency = IdempotencyService::new(Arc::new(store), IdempotencyConfig::default());
@@ -108,6 +113,7 @@ impl AppState {
             vault_repo,
             chat_repo,
             moderation_repo,
+            siaga_repo,
             chat_realtime: ChatRealtimeBus::new(),
             transition_job_queue,
         })
@@ -123,6 +129,7 @@ impl AppState {
             vault_repo,
             chat_repo,
             moderation_repo,
+            siaga_repo,
         ) = memory_repositories();
         Self {
             config,
@@ -134,6 +141,7 @@ impl AppState {
             vault_repo,
             chat_repo,
             moderation_repo,
+            siaga_repo,
             chat_realtime: ChatRealtimeBus::new(),
             transition_job_queue: None,
         }
@@ -150,6 +158,7 @@ impl AppState {
         vault_repo: Arc<dyn VaultRepository>,
         chat_repo: Arc<dyn ChatRepository>,
         moderation_repo: Arc<dyn gotong_domain::ports::moderation::ModerationRepository>,
+        siaga_repo: Arc<dyn SiagaRepository>,
     ) -> Self {
         let idempotency = IdempotencyService::new(store, IdempotencyConfig::default());
         Self {
@@ -162,6 +171,7 @@ impl AppState {
             vault_repo,
             chat_repo,
             moderation_repo,
+            siaga_repo,
             chat_realtime: ChatRealtimeBus::new(),
             transition_job_queue: None,
         }
@@ -185,6 +195,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
             let vault_repo = SurrealVaultRepository::new(&db_config).await?;
             let chat_repo = SurrealChatRepository::new(&db_config).await?;
             let moderation_repo = SurrealModerationRepository::new(&db_config).await?;
+            let siaga_repo = SurrealSiagaRepository::new(&db_config).await?;
             Ok((
                 Arc::new(InMemoryContributionRepository::new()),
                 Arc::new(InMemoryEvidenceRepository::new()),
@@ -193,6 +204,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
                 Arc::new(vault_repo),
                 Arc::new(chat_repo),
                 Arc::new(moderation_repo),
+                Arc::new(siaga_repo),
             ))
         }
         _ => anyhow::bail!("unsupported DATA_BACKEND '{}'", config.data_backend),
@@ -208,6 +220,7 @@ fn memory_repositories() -> RepositoryBundle {
         Arc::new(InMemoryVaultRepository::new()),
         Arc::new(InMemoryChatRepository::new()),
         Arc::new(InMemoryModerationRepository::new()),
+        Arc::new(InMemorySiagaRepository::new()),
     )
 }
 

@@ -61,9 +61,9 @@ Out of scope:
 
 ## PR Lock State
 
-- `PR-01` to `PR-09`: DONE
-- `PR-10`: DONE
-- `PR-11` to `PR-15`: NOT STARTED
+- `PR-01` to `PR-10`: DONE
+- `PR-11`: DONE
+- `PR-12` to `PR-15`: NOT STARTED
 
 ## Detailed PR Plan
 
@@ -299,7 +299,7 @@ Exit criteria:
 ## PR-11 — Siaga Lifecycle (`BE-005`)
 
 Status:
-- NOT STARTED (2026-02-15)
+- DONE (2026-02-15)
 
 Goal:
 - Implement emergency broadcast flow and responder timeline model.
@@ -312,7 +312,14 @@ Deliverables:
 
 Validation:
 - Lifecycle transitions and timeline ordering tests pass.
-- Anonymization scheduler behavior validated.
+- In-memory and Surreal repositories are implemented for siaga lifecycle persistence.
+- Request replay semantics are handled on create/update/join/close flows at domain and repo level.
+- Idempotency hooks (`request_id` + `correlation_id`) are enforced in write paths and payload schema.
+
+Acceptance hooks:
+- Add migration: `database/migrations/0007_siaga_schema.surql` defines `siaga_broadcast` and `siaga_timeline_event`.
+- Domain service unit tests for create/update/close plus duplicate replay coverage.
+- Remediation tests for replay edge-cases: create replay after request-id drift and request-id reuse on update replay.
 
 Exit criteria:
 - `UI-08` lifecycle is complete and policy compliant.

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
 use crate::db::DbConfig;
@@ -18,9 +18,14 @@ use gotong_domain::ports::chat::ChatRepository as ChatRepositoryPort;
 use gotong_domain::ports::contributions::ContributionRepository;
 use gotong_domain::ports::evidence::EvidenceRepository;
 use gotong_domain::ports::moderation::ModerationRepository;
+use gotong_domain::ports::siaga::SiagaRepository;
 use gotong_domain::ports::transitions::TrackTransitionRepository;
 use gotong_domain::ports::vault::VaultRepository;
 use gotong_domain::ports::vouches::VouchRepository;
+use gotong_domain::siaga::{
+    SiagaActorSnapshot, SiagaBroadcast, SiagaClosure, SiagaResponder, SiagaState,
+    SiagaTimelineEvent, SiagaTimelineEventType,
+};
 use gotong_domain::transitions::TrackStateTransition;
 use gotong_domain::transitions::{
     TransitionActorSnapshot, TransitionGateSnapshot, TransitionMechanism,
@@ -1550,6 +1555,835 @@ impl VaultRepository for SurrealVaultRepository {
         Box::pin(async move {
             Self::get_by_request_from_store(&client, &vault_entry_id, &request_id).await
         })
+    }
+}
+
+#[derive(Default)]
+pub struct InMemorySiagaRepository {
+    by_id: Arc<RwLock<HashMap<String, SiagaBroadcast>>>,
+    by_actor_request: Arc<RwLock<HashMap<(String, String), String>>>,
+    by_request: Arc<RwLock<HashMap<(String, String), String>>>,
+    timeline: Arc<RwLock<HashMap<String, VecDeque<SiagaTimelineEvent>>>>,
+}
+
+impl InMemorySiagaRepository {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn actor_request_key(actor_id: &str, request_id: &str) -> (String, String) {
+        (actor_id.to_string(), request_id.to_string())
+    }
+
+    fn broadcast_request_key(siaga_id: &str, request_id: &str) -> (String, String) {
+        (siaga_id.to_string(), request_id.to_string())
+    }
+}
+
+impl SiagaRepository for InMemorySiagaRepository {
+    fn create_broadcast(
+        &self,
+        broadcast: &SiagaBroadcast,
+        event: &SiagaTimelineEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<SiagaBroadcast>> {
+        let broadcast = broadcast.clone();
+        let event = event.clone();
+        let by_id = self.by_id.clone();
+        let by_actor_request = self.by_actor_request.clone();
+        let by_request = self.by_request.clone();
+        let timeline = self.timeline.clone();
+        Box::pin(async move {
+            if let Some(existing_id) = by_actor_request
+                .read()
+                .await
+                .get(&Self::actor_request_key(
+                    &broadcast.author_id,
+                    &event.request_id,
+                ))
+                .cloned()
+            {
+                let by_id = by_id.read().await;
+                return by_id
+                    .get(&existing_id)
+                    .cloned()
+                    .ok_or(DomainError::Conflict);
+            }
+
+            if by_id.read().await.contains_key(&broadcast.siaga_id) {
+                return Err(DomainError::Conflict);
+            }
+
+            by_id
+                .write()
+                .await
+                .insert(broadcast.siaga_id.clone(), broadcast.clone());
+            by_actor_request.write().await.insert(
+                Self::actor_request_key(&broadcast.author_id, &event.request_id),
+                broadcast.siaga_id.clone(),
+            );
+            by_request.write().await.insert(
+                Self::broadcast_request_key(&broadcast.siaga_id, &event.request_id),
+                broadcast.siaga_id.clone(),
+            );
+            timeline
+                .write()
+                .await
+                .entry(broadcast.siaga_id.clone())
+                .or_default()
+                .push_back(event);
+            Ok(broadcast)
+        })
+    }
+
+    fn update_broadcast(
+        &self,
+        broadcast: &SiagaBroadcast,
+        event: &SiagaTimelineEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<SiagaBroadcast>> {
+        let broadcast = broadcast.clone();
+        let event = event.clone();
+        let by_id = self.by_id.clone();
+        let by_request = self.by_request.clone();
+        let timeline = self.timeline.clone();
+        Box::pin(async move {
+            let request_key = Self::broadcast_request_key(&broadcast.siaga_id, &event.request_id);
+            if by_request.read().await.contains_key(&request_key) {
+                let by_id = by_id.read().await;
+                return by_id
+                    .get(&broadcast.siaga_id)
+                    .cloned()
+                    .ok_or(DomainError::Conflict);
+            }
+
+            if !by_id.read().await.contains_key(&broadcast.siaga_id) {
+                return Err(DomainError::NotFound);
+            }
+
+            by_id
+                .write()
+                .await
+                .insert(broadcast.siaga_id.clone(), broadcast.clone());
+            by_request
+                .write()
+                .await
+                .insert(request_key, broadcast.siaga_id.clone());
+            timeline
+                .write()
+                .await
+                .entry(broadcast.siaga_id.clone())
+                .or_default()
+                .push_back(event);
+            Ok(broadcast)
+        })
+    }
+
+    fn get_broadcast(
+        &self,
+        siaga_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<SiagaBroadcast>>> {
+        let siaga_id = siaga_id.to_string();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let by_id = by_id.read().await;
+            Ok(by_id.get(&siaga_id).cloned())
+        })
+    }
+
+    fn list_by_scope(
+        &self,
+        scope_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<SiagaBroadcast>>> {
+        let scope_id = scope_id.to_string();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let mut broadcasts: Vec<_> = by_id
+                .read()
+                .await
+                .values()
+                .filter(|broadcast| broadcast.scope_id == scope_id)
+                .cloned()
+                .collect();
+            broadcasts.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.siaga_id.cmp(&left.siaga_id))
+            });
+            Ok(broadcasts)
+        })
+    }
+
+    fn list_timeline(
+        &self,
+        siaga_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<SiagaTimelineEvent>>> {
+        let siaga_id = siaga_id.to_string();
+        let timeline = self.timeline.clone();
+        Box::pin(async move {
+            let mut events = timeline
+                .read()
+                .await
+                .get(&siaga_id)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .collect::<Vec<_>>();
+            events.sort_by(|left, right| {
+                left.occurred_at_ms
+                    .cmp(&right.occurred_at_ms)
+                    .then_with(|| left.event_id.cmp(&right.event_id))
+            });
+            Ok(events)
+        })
+    }
+
+    fn get_by_actor_request(
+        &self,
+        actor_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<SiagaBroadcast>>> {
+        let actor_id = actor_id.to_string();
+        let request_id = request_id.to_string();
+        let by_actor_request = self.by_actor_request.clone();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let by_actor_request = by_actor_request.read().await;
+            let Some(siaga_id) =
+                by_actor_request.get(&Self::actor_request_key(&actor_id, &request_id))
+            else {
+                return Ok(None);
+            };
+            Ok(by_id.read().await.get(siaga_id).cloned())
+        })
+    }
+
+    fn get_by_request(
+        &self,
+        siaga_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<SiagaBroadcast>>> {
+        let siaga_id = siaga_id.to_string();
+        let request_id = request_id.to_string();
+        let by_request = self.by_request.clone();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let by_request = by_request.read().await;
+            let Some(stored_id) = by_request.get(&(siaga_id.clone(), request_id)) else {
+                return Ok(None);
+            };
+            Ok(by_id.read().await.get(stored_id).cloned())
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealSiagaRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealSiagaRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn parse_datetime_ms(value: &str) -> DomainResult<i64> {
+        let datetime = OffsetDateTime::parse(value, &Rfc3339)
+            .map_err(|err| DomainError::Validation(format!("invalid datetime: {err}")))?;
+        Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn state_to_string(value: &SiagaState) -> &'static str {
+        match value {
+            SiagaState::Draft => "draft",
+            SiagaState::Active => "active",
+            SiagaState::Resolved => "resolved",
+            SiagaState::Cancelled => "cancelled",
+        }
+    }
+
+    fn parse_state(value: &str) -> DomainResult<SiagaState> {
+        match value {
+            "draft" => Ok(SiagaState::Draft),
+            "active" => Ok(SiagaState::Active),
+            "resolved" => Ok(SiagaState::Resolved),
+            "cancelled" => Ok(SiagaState::Cancelled),
+            _ => Err(DomainError::Validation(format!(
+                "invalid siaga state '{value}'"
+            ))),
+        }
+    }
+
+    fn parse_event_type(value: &str) -> DomainResult<SiagaTimelineEventType> {
+        match value {
+            "siaga_broadcast_created" => Ok(SiagaTimelineEventType::SiagaBroadcastCreated),
+            "siaga_broadcast_activated" => Ok(SiagaTimelineEventType::SiagaBroadcastActivated),
+            "siaga_broadcast_updated" => Ok(SiagaTimelineEventType::SiagaBroadcastUpdated),
+            "siaga_responder_joined" => Ok(SiagaTimelineEventType::SiagaResponderJoined),
+            "siaga_responder_updated" => Ok(SiagaTimelineEventType::SiagaResponderUpdated),
+            "siaga_broadcast_closed" => Ok(SiagaTimelineEventType::SiagaBroadcastClosed),
+            "siaga_broadcast_cancelled" => Ok(SiagaTimelineEventType::SiagaBroadcastCancelled),
+            _ => Err(DomainError::Validation(format!(
+                "invalid siaga timeline event '{value}'"
+            ))),
+        }
+    }
+
+    fn event_type_to_string(value: &SiagaTimelineEventType) -> &'static str {
+        match value {
+            SiagaTimelineEventType::SiagaBroadcastCreated => "siaga_broadcast_created",
+            SiagaTimelineEventType::SiagaBroadcastActivated => "siaga_broadcast_activated",
+            SiagaTimelineEventType::SiagaBroadcastUpdated => "siaga_broadcast_updated",
+            SiagaTimelineEventType::SiagaResponderJoined => "siaga_responder_joined",
+            SiagaTimelineEventType::SiagaResponderUpdated => "siaga_responder_updated",
+            SiagaTimelineEventType::SiagaBroadcastClosed => "siaga_broadcast_closed",
+            SiagaTimelineEventType::SiagaBroadcastCancelled => "siaga_broadcast_cancelled",
+        }
+    }
+
+    fn map_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+
+    fn map_row_to_broadcast(row: SurrealSiagaBroadcastRow) -> DomainResult<SiagaBroadcast> {
+        Ok(SiagaBroadcast {
+            siaga_id: row.siaga_id,
+            scope_id: row.scope_id,
+            author_id: row.author_id,
+            author_username: row.author_username,
+            emergency_type: row.emergency_type,
+            severity: row.severity,
+            location: row.location,
+            title: row.title,
+            text: row.text,
+            state: Self::parse_state(&row.state)?,
+            created_at_ms: Self::parse_datetime_ms(&row.created_at)?,
+            updated_at_ms: Self::parse_datetime_ms(&row.updated_at)?,
+            request_id: row.request_id,
+            correlation_id: row.correlation_id,
+            responders: row.responders,
+            closure: row.closure,
+        })
+    }
+
+    fn map_broadcast_rows(rows: Vec<Value>) -> DomainResult<Vec<SiagaBroadcast>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealSiagaBroadcastRow>(row)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid siaga broadcast row: {err}"))
+                    })
+                    .and_then(Self::map_row_to_broadcast)
+            })
+            .collect()
+    }
+
+    fn map_timeline_row(row: SurrealSiagaTimelineRow) -> DomainResult<SiagaTimelineEvent> {
+        let occurred_at_ms = Self::parse_datetime_ms(&row.occurred_at)?;
+        Ok(SiagaTimelineEvent {
+            event_id: row.event_id,
+            siaga_id: row.siaga_id,
+            event_type: Self::parse_event_type(&row.event_type)?,
+            actor: row.actor,
+            request_id: row.request_id,
+            correlation_id: row.correlation_id,
+            occurred_at_ms,
+            metadata: row.metadata,
+        })
+    }
+
+    fn map_timeline_rows(rows: Vec<Value>) -> DomainResult<Vec<SiagaTimelineEvent>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealSiagaTimelineRow>(row)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid siaga timeline row: {err}"))
+                    })
+                    .and_then(Self::map_timeline_row)
+            })
+            .collect()
+    }
+
+    fn broadcast_payload_to_store(
+        broadcast: &SiagaBroadcast,
+    ) -> DomainResult<SurrealSiagaBroadcastCreateRow> {
+        let created_at =
+            OffsetDateTime::from_unix_timestamp_nanos(broadcast.created_at_ms as i128 * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid created_at_ms: {err}")))?;
+        let updated_at =
+            OffsetDateTime::from_unix_timestamp_nanos(broadcast.updated_at_ms as i128 * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid updated_at_ms: {err}")))?;
+        Ok(SurrealSiagaBroadcastCreateRow {
+            siaga_id: broadcast.siaga_id.clone(),
+            scope_id: broadcast.scope_id.clone(),
+            author_id: broadcast.author_id.clone(),
+            author_username: broadcast.author_username.clone(),
+            emergency_type: broadcast.emergency_type.clone(),
+            severity: broadcast.severity as i64,
+            location: broadcast.location.clone(),
+            title: broadcast.title.clone(),
+            text: broadcast.text.clone(),
+            state: Self::state_to_string(&broadcast.state).to_string(),
+            created_at: created_at
+                .format(&Rfc3339)
+                .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
+            updated_at: updated_at
+                .format(&Rfc3339)
+                .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
+            request_id: broadcast.request_id.clone(),
+            correlation_id: broadcast.correlation_id.clone(),
+            responders: broadcast.responders.clone(),
+            closure: broadcast.closure.clone(),
+        })
+    }
+
+    fn timeline_payload_to_store(
+        event: &SiagaTimelineEvent,
+    ) -> DomainResult<SurrealSiagaTimelineCreateRow> {
+        let occurred_at =
+            OffsetDateTime::from_unix_timestamp_nanos(event.occurred_at_ms as i128 * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid occurred_at_ms: {err}")))?;
+        Ok(SurrealSiagaTimelineCreateRow {
+            siaga_id: event.siaga_id.clone(),
+            event_id: event.event_id.clone(),
+            event_type: Self::event_type_to_string(&event.event_type).to_string(),
+            actor: event.actor.clone(),
+            request_id: event.request_id.clone(),
+            correlation_id: event.correlation_id.clone(),
+            occurred_at: occurred_at
+                .format(&Rfc3339)
+                .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
+            metadata: event.metadata.clone(),
+        })
+    }
+
+    async fn get_from_broadcast_id(
+        client: &Surreal<Client>,
+        siaga_id: &str,
+    ) -> DomainResult<Option<SiagaBroadcast>> {
+        let mut response = client
+            .query("SELECT * FROM siaga_broadcast WHERE siaga_id = $siaga_id LIMIT 1")
+            .bind(("siaga_id", siaga_id.to_string()))
+            .await
+            .map_err(Self::map_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        let mut broadcasts = Self::map_broadcast_rows(rows)?;
+        Ok(broadcasts.pop())
+    }
+
+    async fn get_from_timeline_request(
+        client: &Surreal<Client>,
+        siaga_id: &str,
+        request_id: &str,
+    ) -> DomainResult<Option<SiagaBroadcast>> {
+        let mut response = client
+            .query(
+                "SELECT * FROM siaga_timeline_event \
+                 WHERE siaga_id = $siaga_id AND request_id = $request_id LIMIT 1",
+            )
+            .bind(("siaga_id", siaga_id.to_string()))
+            .bind(("request_id", request_id.to_string()))
+            .await
+            .map_err(Self::map_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        if rows.is_empty() {
+            return Ok(None);
+        }
+        Self::get_from_broadcast_id(client, siaga_id).await
+    }
+
+    async fn resolve_broadcast_id_from_actor_request(
+        client: &Surreal<Client>,
+        actor_id: &str,
+        request_id: &str,
+    ) -> DomainResult<Option<String>> {
+        let mut response = client
+            .query(
+                "SELECT siaga_id FROM siaga_timeline_event \
+                 WHERE event_type = $event_type \
+                 AND request_id = $request_id \
+                 AND actor.user_id = $actor_id \
+                 ORDER BY occurred_at ASC, event_id ASC",
+            )
+            .bind(("event_type", "siaga_broadcast_created"))
+            .bind(("request_id", request_id.to_string()))
+            .bind(("actor_id", actor_id.to_string()))
+            .await
+            .map_err(Self::map_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let row = serde_json::from_value::<SurrealSiagaTimelineRequestRow>(row)
+            .map_err(|err| DomainError::Validation(format!("invalid siaga timeline row: {err}")))?;
+        Ok(Some(row.siaga_id))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SurrealSiagaBroadcastCreateRow {
+    siaga_id: String,
+    scope_id: String,
+    author_id: String,
+    author_username: String,
+    emergency_type: String,
+    severity: i64,
+    location: String,
+    title: String,
+    text: String,
+    state: String,
+    created_at: String,
+    updated_at: String,
+    request_id: String,
+    correlation_id: String,
+    responders: Vec<SiagaResponder>,
+    closure: Option<SiagaClosure>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealSiagaBroadcastRow {
+    siaga_id: String,
+    scope_id: String,
+    author_id: String,
+    author_username: String,
+    emergency_type: String,
+    severity: u8,
+    location: String,
+    title: String,
+    text: String,
+    state: String,
+    created_at: String,
+    updated_at: String,
+    request_id: String,
+    correlation_id: String,
+    responders: Vec<SiagaResponder>,
+    closure: Option<SiagaClosure>,
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealSiagaTimelineCreateRow {
+    siaga_id: String,
+    event_id: String,
+    event_type: String,
+    actor: SiagaActorSnapshot,
+    request_id: String,
+    correlation_id: String,
+    #[allow(dead_code)]
+    #[serde(rename = "occurred_at")]
+    occurred_at: String,
+    metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealSiagaTimelineRow {
+    event_id: String,
+    siaga_id: String,
+    event_type: String,
+    actor: SiagaActorSnapshot,
+    request_id: String,
+    correlation_id: String,
+    occurred_at: String,
+    metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealSiagaTimelineRequestRow {
+    siaga_id: String,
+}
+
+impl SurrealSiagaRepository {
+    async fn build_actor_request_query(
+        client: &Surreal<Client>,
+        actor_id: &str,
+        request_id: &str,
+    ) -> DomainResult<Option<SiagaBroadcast>> {
+        let request_id = request_id.to_string();
+        let actor_id = actor_id.to_string();
+
+        let Some(siaga_id) =
+            Self::resolve_broadcast_id_from_actor_request(client, &actor_id, &request_id).await?
+        else {
+            return Ok(None);
+        };
+
+        Self::get_broadcast_from_store(client, &siaga_id).await
+    }
+
+    async fn get_broadcast_from_store(
+        client: &Surreal<Client>,
+        siaga_id: &str,
+    ) -> DomainResult<Option<SiagaBroadcast>> {
+        let mut response = client
+            .query("SELECT * FROM siaga_broadcast WHERE siaga_id = $siaga_id LIMIT 1")
+            .bind(("siaga_id", siaga_id.to_string()))
+            .await
+            .map_err(Self::map_error)?;
+        let mut rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        let Some(row) = rows.pop() else {
+            return Ok(None);
+        };
+        let row = serde_json::from_value::<SurrealSiagaBroadcastRow>(row).map_err(|err| {
+            DomainError::Validation(format!("invalid siaga broadcast row: {err}"))
+        })?;
+        Ok(Some(Self::map_row_to_broadcast(row)?))
+    }
+}
+
+impl SiagaRepository for SurrealSiagaRepository {
+    fn create_broadcast(
+        &self,
+        broadcast: &SiagaBroadcast,
+        event: &SiagaTimelineEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<SiagaBroadcast>> {
+        let broadcast = broadcast.clone();
+        let event = event.clone();
+        let payload = match Self::broadcast_payload_to_store(&broadcast) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let event_payload = match Self::timeline_payload_to_store(&event) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let client = self.client.clone();
+        let siaga_id = broadcast.siaga_id.clone();
+        let author_id = broadcast.author_id.clone();
+        let request_id = event.request_id.clone();
+        Box::pin(async move {
+            if let Some(existing) =
+                Self::build_actor_request_query(&client, &author_id, &request_id).await?
+            {
+                if let Some(existing) =
+                    Self::get_broadcast_from_store(&client, &existing.siaga_id).await?
+                {
+                    return Ok(existing);
+                }
+            }
+
+            let payload = to_value(payload).map_err(|err| {
+                DomainError::Validation(format!("invalid siaga broadcast payload: {err}"))
+            })?;
+            let event_payload = to_value(event_payload).map_err(|err| {
+                DomainError::Validation(format!("invalid siaga timeline payload: {err}"))
+            })?;
+
+            let mut response = client
+                .query("CREATE type::thing('siaga_broadcast', $siaga_id) CONTENT $payload")
+                .bind(("siaga_id", siaga_id.clone()))
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let Some(row) = rows.into_iter().next() else {
+                return Err(DomainError::Validation(
+                    "create returned no row".to_string(),
+                ));
+            };
+            let created = serde_json::from_value::<SurrealSiagaBroadcastRow>(row)
+                .map_err(|err| DomainError::Validation(format!("invalid create response: {err}")))
+                .and_then(Self::map_row_to_broadcast)?;
+
+            let mut timeline_response = match client
+                .query(
+                    "CREATE type::thing('siaga_timeline_event', $event_id) CONTENT $event_payload",
+                )
+                .bind(("event_id", event.event_id.clone()))
+                .bind(("event_payload", event_payload))
+                .await
+            {
+                Ok(response) => response,
+                Err(err) => {
+                    let _ = client
+                        .query("DELETE siaga_broadcast WHERE siaga_id = $siaga_id")
+                        .bind(("siaga_id", siaga_id.clone()))
+                        .await;
+                    return Err(Self::map_error(err));
+                }
+            };
+            let _rows: Vec<Value> = timeline_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Ok(created)
+        })
+    }
+
+    fn update_broadcast(
+        &self,
+        broadcast: &SiagaBroadcast,
+        event: &SiagaTimelineEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<SiagaBroadcast>> {
+        let broadcast = broadcast.clone();
+        let event = event.clone();
+        let payload = match Self::broadcast_payload_to_store(&broadcast) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let event_payload = match Self::timeline_payload_to_store(&event) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let client = self.client.clone();
+        let siaga_id = broadcast.siaga_id.clone();
+        Box::pin(async move {
+            if let Some(existing) =
+                Self::get_from_timeline_request(&client, &siaga_id, &event.request_id).await?
+            {
+                return Ok(existing);
+            }
+
+            if let None = Self::get_broadcast_from_store(&client, &siaga_id).await? {
+                return Err(DomainError::NotFound);
+            }
+
+            let payload = to_value(payload).map_err(|err| {
+                DomainError::Validation(format!("invalid siaga broadcast payload: {err}"))
+            })?;
+            let event_payload = to_value(event_payload).map_err(|err| {
+                DomainError::Validation(format!("invalid siaga timeline payload: {err}"))
+            })?;
+
+            let mut response = client
+                .query("UPDATE type::thing('siaga_broadcast', $siaga_id) CONTENT $payload")
+                .bind(("siaga_id", siaga_id.clone()))
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let updated_row = rows.into_iter().next().ok_or_else(|| {
+                DomainError::Validation("update returned no siaga row".to_string())
+            })?;
+            let updated = serde_json::from_value::<SurrealSiagaBroadcastRow>(updated_row)
+                .map_err(|err| DomainError::Validation(format!("invalid siaga row: {err}")))
+                .and_then(Self::map_row_to_broadcast)?;
+
+            let mut timeline_response = client
+                .query(
+                    "CREATE type::thing('siaga_timeline_event', $event_id) CONTENT $event_payload",
+                )
+                .bind(("event_id", event.event_id.clone()))
+                .bind(("event_payload", event_payload))
+                .await
+                .map_err(Self::map_error)?;
+            let _rows: Vec<Value> = timeline_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Ok(updated)
+        })
+    }
+
+    fn get_broadcast(
+        &self,
+        siaga_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<SiagaBroadcast>>> {
+        let siaga_id = siaga_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move { Self::get_broadcast_from_store(&client, &siaga_id).await })
+    }
+
+    fn list_by_scope(
+        &self,
+        scope_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<SiagaBroadcast>>> {
+        let scope_id = scope_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query("SELECT * FROM siaga_broadcast WHERE scope_id = $scope_id ORDER BY created_at DESC")
+                .bind(("scope_id", scope_id))
+                .await
+                .map_err(Self::map_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut broadcasts = Self::map_broadcast_rows(rows)?;
+            broadcasts.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.siaga_id.cmp(&left.siaga_id))
+            });
+            Ok(broadcasts)
+        })
+    }
+
+    fn list_timeline(
+        &self,
+        siaga_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<SiagaTimelineEvent>>> {
+        let siaga_id = siaga_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM siaga_timeline_event \
+                     WHERE siaga_id = $siaga_id \
+                     ORDER BY occurred_at ASC, event_id ASC",
+                )
+                .bind(("siaga_id", siaga_id))
+                .await
+                .map_err(Self::map_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Self::map_timeline_rows(rows)
+        })
+    }
+
+    fn get_by_actor_request(
+        &self,
+        actor_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<SiagaBroadcast>>> {
+        let actor_id = actor_id.to_string();
+        let request_id = request_id.to_string();
+        let client = self.client.clone();
+        Box::pin(
+            async move { Self::build_actor_request_query(&client, &actor_id, &request_id).await },
+        )
+    }
+
+    fn get_by_request(
+        &self,
+        siaga_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<SiagaBroadcast>>> {
+        let siaga_id = siaga_id.to_string();
+        let request_id = request_id.to_string();
+        let client = self.client.clone();
+        Box::pin(
+            async move { Self::get_from_timeline_request(&client, &siaga_id, &request_id).await },
+        )
     }
 }
 
