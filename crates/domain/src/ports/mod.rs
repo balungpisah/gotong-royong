@@ -11,4 +11,5 @@ pub mod idempotency;
 pub mod jobs;
 pub mod moderation;
 pub mod transitions;
+pub mod vault;
 pub mod vouches;

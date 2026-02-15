@@ -10,6 +10,7 @@ pub mod moderation;
 pub mod ports;
 pub mod transitions;
 pub mod util;
+pub mod vault;
 pub mod vouches;
 
 pub type DomainResult<T> = Result<T, error::DomainError>;

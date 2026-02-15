@@ -61,10 +61,9 @@ Out of scope:
 
 ## PR Lock State
 
-- `PR-01` to `PR-06`: DONE
-- `PR-07`: DONE
-- `PR-08`: DONE
-- `PR-09`: DONE, `PR-10` to `PR-15`: NOT STARTED
+- `PR-01` to `PR-09`: DONE
+- `PR-10`: DONE
+- `PR-11` to `PR-15`: NOT STARTED
 
 ## Detailed PR Plan
 
@@ -279,7 +278,7 @@ Exit criteria:
 ## PR-10 — Vault Lifecycle (`BE-006`, `BE-007`)
 
 Status:
-- NOT STARTED (2026-02-15)
+- DONE (2026-02-15)
 
 Goal:
 - Implement witness vault persistence and lifecycle events.

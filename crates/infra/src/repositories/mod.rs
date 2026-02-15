@@ -19,10 +19,14 @@ use gotong_domain::ports::contributions::ContributionRepository;
 use gotong_domain::ports::evidence::EvidenceRepository;
 use gotong_domain::ports::moderation::ModerationRepository;
 use gotong_domain::ports::transitions::TrackTransitionRepository;
+use gotong_domain::ports::vault::VaultRepository;
 use gotong_domain::ports::vouches::VouchRepository;
 use gotong_domain::transitions::TrackStateTransition;
 use gotong_domain::transitions::{
     TransitionActorSnapshot, TransitionGateSnapshot, TransitionMechanism,
+};
+use gotong_domain::vault::{
+    VaultActorSnapshot, VaultEntry, VaultState, VaultTimelineEvent, VaultTimelineEventType,
 };
 use gotong_domain::vouches::Vouch;
 use serde::{Deserialize, Serialize};
@@ -613,6 +617,854 @@ impl TrackTransitionRepository for SurrealTrackTransitionRepository {
                 .take(0)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             Self::decode_transition_rows(rows)
+        })
+    }
+}
+
+#[derive(Default)]
+pub struct InMemoryVaultRepository {
+    entries: Arc<RwLock<HashMap<String, VaultEntry>>>,
+    by_actor_request: Arc<RwLock<HashMap<(String, String), String>>>,
+    by_entry_request: Arc<RwLock<HashMap<(String, String), String>>>,
+    timeline: Arc<RwLock<HashMap<String, Vec<VaultTimelineEvent>>>>,
+}
+
+impl InMemoryVaultRepository {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn actor_request_key(actor_id: &str, request_id: &str) -> (String, String) {
+        (actor_id.to_string(), request_id.to_string())
+    }
+
+    fn entry_request_key(vault_entry_id: &str, request_id: &str) -> (String, String) {
+        (vault_entry_id.to_string(), request_id.to_string())
+    }
+}
+
+impl VaultRepository for InMemoryVaultRepository {
+    fn create_entry(
+        &self,
+        entry: &VaultEntry,
+        event: &VaultTimelineEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<VaultEntry>> {
+        let entry = entry.clone();
+        let event = event.clone();
+        let entries = self.entries.clone();
+        let by_actor_request = self.by_actor_request.clone();
+        let by_entry_request = self.by_entry_request.clone();
+        let timeline = self.timeline.clone();
+        Box::pin(async move {
+            let actor_key = Self::actor_request_key(&entry.author_id, &event.request_id);
+            if by_actor_request.read().await.contains_key(&actor_key) {
+                return Err(DomainError::Conflict);
+            }
+            let mut entries = entries.write().await;
+            if entries.contains_key(&entry.vault_entry_id) {
+                return Err(DomainError::Conflict);
+            }
+            entries.insert(entry.vault_entry_id.clone(), entry.clone());
+            by_actor_request
+                .write()
+                .await
+                .insert(actor_key, entry.vault_entry_id.clone());
+            by_entry_request.write().await.insert(
+                Self::entry_request_key(&entry.vault_entry_id, &event.request_id),
+                entry.vault_entry_id.clone(),
+            );
+            timeline
+                .write()
+                .await
+                .entry(entry.vault_entry_id.clone())
+                .or_default()
+                .push(event);
+            Ok(entry)
+        })
+    }
+
+    fn update_entry(
+        &self,
+        entry: &VaultEntry,
+        event: &VaultTimelineEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<VaultEntry>> {
+        let entry = entry.clone();
+        let event = event.clone();
+        let entries = self.entries.clone();
+        let by_entry_request = self.by_entry_request.clone();
+        let timeline = self.timeline.clone();
+        Box::pin(async move {
+            let entry_request_key =
+                Self::entry_request_key(&entry.vault_entry_id, &event.request_id);
+            if by_entry_request
+                .read()
+                .await
+                .contains_key(&entry_request_key)
+            {
+                let entries = entries.read().await;
+                return entries
+                    .get(&entry.vault_entry_id)
+                    .cloned()
+                    .ok_or(DomainError::Conflict);
+            }
+            let mut entries = entries.write().await;
+            if !entries.contains_key(&entry.vault_entry_id) {
+                return Err(DomainError::NotFound);
+            }
+            entries.insert(entry.vault_entry_id.clone(), entry.clone());
+            by_entry_request
+                .write()
+                .await
+                .insert(entry_request_key, entry.vault_entry_id.clone());
+            timeline
+                .write()
+                .await
+                .entry(entry.vault_entry_id.clone())
+                .or_default()
+                .push(event);
+            Ok(entry)
+        })
+    }
+
+    fn delete_entry(
+        &self,
+        vault_entry_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<bool>> {
+        let vault_entry_id = vault_entry_id.to_string();
+        let entries = self.entries.clone();
+        let by_actor_request = self.by_actor_request.clone();
+        let by_entry_request = self.by_entry_request.clone();
+        let timeline = self.timeline.clone();
+        Box::pin(async move {
+            let removed = entries.write().await.remove(&vault_entry_id).is_some();
+            if !removed {
+                return Ok(false);
+            }
+            by_actor_request
+                .write()
+                .await
+                .retain(|_, existing_entry_id| existing_entry_id != &vault_entry_id);
+            by_entry_request
+                .write()
+                .await
+                .retain(|_, existing_entry_id| existing_entry_id != &vault_entry_id);
+            timeline.write().await.remove(&vault_entry_id);
+            Ok(true)
+        })
+    }
+
+    fn get_entry(
+        &self,
+        vault_entry_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<VaultEntry>>> {
+        let vault_entry_id = vault_entry_id.to_string();
+        let entries = self.entries.clone();
+        Box::pin(async move {
+            let entries = entries.read().await;
+            Ok(entries.get(&vault_entry_id).cloned())
+        })
+    }
+
+    fn list_by_author(
+        &self,
+        author_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<VaultEntry>>> {
+        let author_id = author_id.to_string();
+        let entries = self.entries.clone();
+        Box::pin(async move {
+            let mut by_author: Vec<VaultEntry> = entries
+                .read()
+                .await
+                .values()
+                .filter(|entry| entry.author_id == author_id)
+                .cloned()
+                .collect();
+            by_author.sort_by(|a, b| {
+                b.created_at_ms
+                    .cmp(&a.created_at_ms)
+                    .then_with(|| b.vault_entry_id.cmp(&a.vault_entry_id))
+            });
+            Ok(by_author)
+        })
+    }
+
+    fn list_timeline(
+        &self,
+        vault_entry_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<VaultTimelineEvent>>> {
+        let vault_entry_id = vault_entry_id.to_string();
+        let timeline = self.timeline.clone();
+        Box::pin(async move {
+            let mut events = timeline
+                .read()
+                .await
+                .get(&vault_entry_id)
+                .cloned()
+                .unwrap_or_default();
+            events.sort_by(|left, right| {
+                left.occurred_at_ms
+                    .cmp(&right.occurred_at_ms)
+                    .then_with(|| left.event_id.cmp(&right.event_id))
+            });
+            Ok(events)
+        })
+    }
+
+    fn get_by_actor_request(
+        &self,
+        actor_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<VaultEntry>>> {
+        let actor_id = actor_id.to_string();
+        let request_id = request_id.to_string();
+        let by_actor_request = self.by_actor_request.clone();
+        let entries = self.entries.clone();
+        Box::pin(async move {
+            let key = Self::actor_request_key(&actor_id, &request_id);
+            let Some(vault_entry_id) = by_actor_request.read().await.get(&key) else {
+                return Ok(None);
+            };
+            Ok(entries.read().await.get(vault_entry_id).cloned())
+        })
+    }
+
+    fn get_by_request(
+        &self,
+        vault_entry_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<VaultEntry>>> {
+        let vault_entry_id = vault_entry_id.to_string();
+        let request_id = request_id.to_string();
+        let by_entry_request = self.by_entry_request.clone();
+        let entries = self.entries.clone();
+        Box::pin(async move {
+            let key = Self::entry_request_key(&vault_entry_id, &request_id);
+            let Some(vault_entry_id) = by_entry_request.read().await.get(&key) else {
+                return Ok(None);
+            };
+            Ok(entries.read().await.get(vault_entry_id).cloned())
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealVaultRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealVaultRepository {
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn parse_datetime_ms(value: &str) -> DomainResult<i64> {
+        let datetime = OffsetDateTime::parse(value, &Rfc3339)
+            .map_err(|err| DomainError::Validation(format!("invalid datetime: {err}")))?;
+        Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn parse_state(value: &str) -> DomainResult<VaultState> {
+        match value {
+            "draft" => Ok(VaultState::Draft),
+            "sealed" => Ok(VaultState::Sealed),
+            "published" => Ok(VaultState::Published),
+            "revoked" => Ok(VaultState::Revoked),
+            "expired" => Ok(VaultState::Expired),
+            other => Err(DomainError::Validation(format!(
+                "invalid vault state '{other}'"
+            ))),
+        }
+    }
+
+    fn state_to_string(value: &VaultState) -> &'static str {
+        match value {
+            VaultState::Draft => "draft",
+            VaultState::Sealed => "sealed",
+            VaultState::Published => "published",
+            VaultState::Revoked => "revoked",
+            VaultState::Expired => "expired",
+        }
+    }
+
+    fn parse_event_type(value: &str) -> DomainResult<VaultTimelineEventType> {
+        match value {
+            "witness_drafted" => Ok(VaultTimelineEventType::WitnessDrafted),
+            "witness_sealed" => Ok(VaultTimelineEventType::WitnessSealed),
+            "witness_trustee_added" => Ok(VaultTimelineEventType::WitnessTrusteeAdded),
+            "witness_trustee_removed" => Ok(VaultTimelineEventType::WitnessTrusteeRemoved),
+            "witness_published" => Ok(VaultTimelineEventType::WitnessPublished),
+            "witness_revoked" => Ok(VaultTimelineEventType::WitnessRevoked),
+            "witness_expired" => Ok(VaultTimelineEventType::WitnessExpired),
+            other => Err(DomainError::Validation(format!(
+                "invalid vault event type '{other}'"
+            ))),
+        }
+    }
+
+    fn event_type_to_string(value: &VaultTimelineEventType) -> &'static str {
+        match value {
+            VaultTimelineEventType::WitnessDrafted => "witness_drafted",
+            VaultTimelineEventType::WitnessSealed => "witness_sealed",
+            VaultTimelineEventType::WitnessTrusteeAdded => "witness_trustee_added",
+            VaultTimelineEventType::WitnessTrusteeRemoved => "witness_trustee_removed",
+            VaultTimelineEventType::WitnessPublished => "witness_published",
+            VaultTimelineEventType::WitnessRevoked => "witness_revoked",
+            VaultTimelineEventType::WitnessExpired => "witness_expired",
+        }
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+
+    fn map_entry_rows(rows: Vec<Value>) -> DomainResult<Vec<VaultEntry>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealVaultEntryRow>(row)
+                    .map_err(|err| DomainError::Validation(format!("invalid vault row: {err}")))
+                    .and_then(|row| {
+                        let created_at_ms = Self::parse_datetime_ms(&row.created_at)?;
+                        let updated_at_ms = Self::parse_datetime_ms(&row.updated_at)?;
+                        let sealed_at_ms = match row.sealed_at {
+                            Some(value) => Some(Self::parse_datetime_ms(&value)?),
+                            None => None,
+                        };
+                        Ok(VaultEntry {
+                            vault_entry_id: row.vault_entry_id,
+                            author_id: row.author_id,
+                            author_username: row.author_username,
+                            state: Self::parse_state(&row.state)?,
+                            created_at_ms,
+                            updated_at_ms,
+                            sealed_at_ms,
+                            sealed_hash: row.sealed_hash,
+                            encryption_key_id: row.encryption_key_id,
+                            attachment_refs: row.attachment_refs,
+                            wali: row.wali,
+                            payload: row.payload,
+                            publish_target: row.publish_target,
+                            retention_policy: row.retention_policy,
+                            audit: row.audit,
+                            request_id: row.request_id,
+                            correlation_id: row.correlation_id,
+                        })
+                    })
+            })
+            .collect()
+    }
+
+    fn map_timeline_rows(rows: Vec<Value>) -> DomainResult<Vec<VaultTimelineEvent>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealVaultTimelineRow>(row)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid vault timeline row: {err}"))
+                    })
+                    .and_then(|row| {
+                        let occurred_at_ms = Self::parse_datetime_ms(&row.occurred_at)?;
+                        Ok(VaultTimelineEvent {
+                            event_id: row.event_id,
+                            vault_entry_id: row.vault_entry_id,
+                            event_type: Self::parse_event_type(&row.event_type)?,
+                            actor: row.actor,
+                            request_id: row.request_id,
+                            correlation_id: row.correlation_id,
+                            occurred_at_ms,
+                            metadata: row.metadata,
+                        })
+                    })
+            })
+            .collect()
+    }
+
+    fn to_entry_payload(entry: &VaultEntry) -> DomainResult<SurrealVaultEntryCreateRow> {
+        let created_at =
+            OffsetDateTime::from_unix_timestamp_nanos((entry.created_at_ms as i128) * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid created_at_ms: {err}")))?;
+        let updated_at =
+            OffsetDateTime::from_unix_timestamp_nanos((entry.updated_at_ms as i128) * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid updated_at_ms: {err}")))?;
+        let sealed_at = entry.sealed_at_ms.map(|sealed_at_ms| {
+            OffsetDateTime::from_unix_timestamp_nanos((sealed_at_ms as i128) * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid sealed_at_ms: {err}")))
+                .map(|datetime| {
+                    datetime
+                        .format(&Rfc3339)
+                        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
+                })
+        });
+        Ok(SurrealVaultEntryCreateRow {
+            vault_entry_id: entry.vault_entry_id.clone(),
+            author_id: entry.author_id.clone(),
+            author_username: entry.author_username.clone(),
+            state: Self::state_to_string(&entry.state).to_string(),
+            created_at: created_at
+                .format(&Rfc3339)
+                .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
+            updated_at: updated_at
+                .format(&Rfc3339)
+                .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
+            sealed_at,
+            sealed_hash: entry.sealed_hash.clone(),
+            encryption_key_id: entry.encryption_key_id.clone(),
+            attachment_refs: entry.attachment_refs.clone(),
+            wali: entry.wali.clone(),
+            payload: entry.payload.clone(),
+            publish_target: entry.publish_target.clone(),
+            retention_policy: entry.retention_policy.clone(),
+            audit: entry.audit.clone(),
+            request_id: entry.request_id.clone(),
+            correlation_id: entry.correlation_id.clone(),
+        })
+    }
+
+    fn to_timeline_payload(
+        event: &VaultTimelineEvent,
+    ) -> DomainResult<SurrealVaultTimelineCreateRow> {
+        let occurred_at =
+            OffsetDateTime::from_unix_timestamp_nanos((event.occurred_at_ms as i128) * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid occurred_at_ms: {err}")))?;
+        Ok(SurrealVaultTimelineCreateRow {
+            vault_entry_id: event.vault_entry_id.clone(),
+            event_id: event.event_id.clone(),
+            event_type: Self::event_type_to_string(&event.event_type).to_string(),
+            actor: event.actor.clone(),
+            request_id: event.request_id.clone(),
+            correlation_id: event.correlation_id.clone(),
+            occurred_at: occurred_at
+                .format(&Rfc3339)
+                .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
+            metadata: event.metadata.clone(),
+        })
+    }
+
+    async fn get_by_request_from_store(
+        client: &Surreal<Client>,
+        vault_entry_id: &str,
+        request_id: &str,
+    ) -> DomainResult<Option<VaultEntry>> {
+        let mut response = client
+            .query(
+                "SELECT * FROM vault_entry \
+                 WHERE vault_entry_id = $vault_entry_id AND request_id = $request_id LIMIT 1",
+            )
+            .bind(("vault_entry_id", vault_entry_id.to_string()))
+            .bind(("request_id", request_id.to_string()))
+            .await
+            .map_err(Self::map_surreal_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let mut entries = Self::map_entry_rows(vec![row])?;
+        Ok(entries.pop())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealVaultEntryRow {
+    vault_entry_id: String,
+    author_id: String,
+    author_username: String,
+    state: String,
+    created_at: String,
+    updated_at: String,
+    sealed_at: Option<String>,
+    sealed_hash: Option<String>,
+    encryption_key_id: Option<String>,
+    attachment_refs: Vec<String>,
+    wali: Vec<String>,
+    payload: Option<serde_json::Value>,
+    publish_target: Option<String>,
+    retention_policy: Option<serde_json::Value>,
+    audit: Option<serde_json::Value>,
+    request_id: String,
+    correlation_id: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealVaultEntryCreateRow {
+    vault_entry_id: String,
+    author_id: String,
+    author_username: String,
+    state: String,
+    created_at: String,
+    updated_at: String,
+    sealed_at: Option<String>,
+    sealed_hash: Option<String>,
+    encryption_key_id: Option<String>,
+    attachment_refs: Vec<String>,
+    wali: Vec<String>,
+    payload: Option<serde_json::Value>,
+    publish_target: Option<String>,
+    retention_policy: Option<serde_json::Value>,
+    audit: Option<serde_json::Value>,
+    request_id: String,
+    correlation_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealVaultTimelineRow {
+    event_id: String,
+    vault_entry_id: String,
+    event_type: String,
+    actor: VaultActorSnapshot,
+    request_id: String,
+    correlation_id: String,
+    occurred_at: String,
+    metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealVaultTimelineCreateRow {
+    event_id: String,
+    vault_entry_id: String,
+    event_type: String,
+    actor: VaultActorSnapshot,
+    request_id: String,
+    correlation_id: String,
+    #[allow(dead_code)]
+    #[serde(rename = "occurred_at")]
+    occurred_at: String,
+    metadata: Option<serde_json::Value>,
+}
+
+impl VaultRepository for SurrealVaultRepository {
+    fn create_entry(
+        &self,
+        entry: &VaultEntry,
+        event: &VaultTimelineEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<VaultEntry>> {
+        let payload = match Self::to_entry_payload(entry) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let event_payload = match Self::to_timeline_payload(event) {
+            Ok(event_payload) => event_payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let vault_entry_id = entry.vault_entry_id.clone();
+        let client = self.client.clone();
+        let author_id = entry.author_id.clone();
+        let request_id = event.request_id.clone();
+        Box::pin(async move {
+            let payload = to_value(payload)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let event_payload = to_value(event_payload).map_err(|err| {
+                DomainError::Validation(format!("invalid timeline payload: {err}"))
+            })?;
+
+            let mut existing_entry_response = client
+                .query("SELECT * FROM vault_entry WHERE author_id = $author_id AND request_id = $request_id LIMIT 1")
+                .bind(("author_id", author_id.clone()))
+                .bind(("request_id", request_id.clone()))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let existing_entry_rows: Vec<Value> = existing_entry_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            if let Some(row) = existing_entry_rows.into_iter().next() {
+                let mut entries = Self::map_entry_rows(vec![row])?;
+                let existing_entry = entries.pop().ok_or_else(|| {
+                    DomainError::Validation("existing entry is malformed".to_string())
+                })?;
+                return Ok(existing_entry);
+            }
+
+            let mut response = client
+                .query("CREATE type::thing('vault_entry', $vault_entry_id) CONTENT $payload")
+                .bind(("payload", payload))
+                .bind(("vault_entry_id", vault_entry_id.clone()))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let row = rows
+                .into_iter()
+                .next()
+                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))?;
+            let mut entries = Self::map_entry_rows(vec![row])?;
+            let created = entries.pop().ok_or_else(|| {
+                DomainError::Validation("create returned malformed row".to_string())
+            })?;
+
+            let timeline_result = client
+                .query(
+                    "CREATE type::thing('vault_timeline_event', $event_id) CONTENT $event_payload",
+                )
+                .bind(("event_id", event.event_id.clone()))
+                .bind(("event_payload", event_payload))
+                .await;
+            if let Err(err) = timeline_result {
+                let _ = client
+                    .query("DELETE vault_entry WHERE vault_entry_id = $vault_entry_id")
+                    .bind(("vault_entry_id", vault_entry_id.clone()))
+                    .await;
+                return Err(Self::map_surreal_error(err));
+            }
+            Ok(created)
+        })
+    }
+
+    fn update_entry(
+        &self,
+        entry: &VaultEntry,
+        event: &VaultTimelineEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<VaultEntry>> {
+        let payload = match Self::to_entry_payload(entry) {
+            Ok(payload) => payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let event_payload = match Self::to_timeline_payload(event) {
+            Ok(event_payload) => event_payload,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let client = self.client.clone();
+        let vault_entry_id = entry.vault_entry_id.clone();
+        let request_id = event.request_id.clone();
+        Box::pin(async move {
+            let payload = to_value(payload)
+                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let event_payload = to_value(event_payload).map_err(|err| {
+                DomainError::Validation(format!("invalid timeline payload: {err}"))
+            })?;
+
+            let mut existing_by_request = client
+                .query(
+                    "SELECT * FROM vault_entry WHERE vault_entry_id = $vault_entry_id AND request_id = $request_id LIMIT 1",
+                )
+                .bind(("vault_entry_id", vault_entry_id.clone()))
+                .bind(("request_id", request_id.clone()))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let existing_by_request_rows: Vec<Value> = existing_by_request
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            if let Some(row) = existing_by_request_rows.into_iter().next() {
+                let mut entries = Self::map_entry_rows(vec![row])?;
+                return entries.pop().ok_or_else(|| {
+                    DomainError::Validation("existing entry is malformed".to_string())
+                });
+            }
+
+            let mut existing_entry = client
+                .query("SELECT * FROM vault_entry WHERE vault_entry_id = $vault_entry_id LIMIT 1")
+                .bind(("vault_entry_id", vault_entry_id.clone()))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let mut existing_entry_rows: Vec<Value> = existing_entry
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            if existing_entry_rows.pop().is_none() {
+                return Err(DomainError::NotFound);
+            }
+
+            let mut response = client
+                .query("UPDATE type::thing('vault_entry', $vault_entry_id) CONTENT $payload")
+                .bind(("vault_entry_id", vault_entry_id.clone()))
+                .bind(("payload", payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let row = rows
+                .into_iter()
+                .next()
+                .ok_or_else(|| DomainError::Validation("update returned no row".to_string()))?;
+            let mut entries = Self::map_entry_rows(vec![row])?;
+            let updated = entries.pop().ok_or_else(|| {
+                DomainError::Validation("update returned malformed row".to_string())
+            })?;
+
+            let mut timeline_response = client
+                .query(
+                    "CREATE type::thing('vault_timeline_event', $event_id) CONTENT $event_payload",
+                )
+                .bind(("event_id", event.event_id.clone()))
+                .bind(("event_payload", event_payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            timeline_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Ok(updated)
+        })
+    }
+
+    fn delete_entry(
+        &self,
+        vault_entry_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<bool>> {
+        let vault_entry_id = vault_entry_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query("DELETE vault_entry WHERE vault_entry_id = $vault_entry_id")
+                .bind(("vault_entry_id", vault_entry_id.clone()))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let removed = if rows.is_empty() {
+                false
+            } else {
+                rows.into_iter().next().is_some()
+            };
+            let _ = client
+                .query("DELETE vault_timeline_event WHERE vault_entry_id = $vault_entry_id")
+                .bind(("vault_entry_id", vault_entry_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            Ok(removed)
+        })
+    }
+
+    fn get_entry(
+        &self,
+        vault_entry_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<VaultEntry>>> {
+        let vault_entry_id = vault_entry_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query("SELECT * FROM vault_entry WHERE vault_entry_id = $vault_entry_id LIMIT 1")
+                .bind(("vault_entry_id", vault_entry_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let mut rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let Some(row) = rows.pop() else {
+                return Ok(None);
+            };
+            let mut entries = Self::map_entry_rows(vec![row])?;
+            Ok(entries.pop())
+        })
+    }
+
+    fn list_by_author(
+        &self,
+        author_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<VaultEntry>>> {
+        let author_id = author_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM vault_entry \
+                     WHERE author_id = $author_id \
+                     ORDER BY created_at DESC, vault_entry_id ASC",
+                )
+                .bind(("author_id", author_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut entries = Self::map_entry_rows(rows)?;
+            entries.sort_by(|left, right| {
+                right
+                    .created_at_ms
+                    .cmp(&left.created_at_ms)
+                    .then_with(|| right.vault_entry_id.cmp(&left.vault_entry_id))
+            });
+            Ok(entries)
+        })
+    }
+
+    fn list_timeline(
+        &self,
+        vault_entry_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<VaultTimelineEvent>>> {
+        let vault_entry_id = vault_entry_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM vault_timeline_event \
+                     WHERE vault_entry_id = $vault_entry_id \
+                     ORDER BY occurred_at ASC, event_id ASC",
+                )
+                .bind(("vault_entry_id", vault_entry_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut events = Self::map_timeline_rows(rows)?;
+            events.sort_by(|left, right| {
+                left.occurred_at_ms
+                    .cmp(&right.occurred_at_ms)
+                    .then_with(|| left.event_id.cmp(&right.event_id))
+            });
+            Ok(events)
+        })
+    }
+
+    fn get_by_actor_request(
+        &self,
+        actor_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<VaultEntry>>> {
+        let actor_id = actor_id.to_string();
+        let request_id = request_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT * FROM vault_entry \
+                     WHERE author_id = $author_id AND request_id = $request_id LIMIT 1",
+                )
+                .bind(("author_id", actor_id))
+                .bind(("request_id", request_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let mut rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let Some(row) = rows.pop() else {
+                return Ok(None);
+            };
+            let mut entries = Self::map_entry_rows(vec![row])?;
+            Ok(entries.pop())
+        })
+    }
+
+    fn get_by_request(
+        &self,
+        vault_entry_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<VaultEntry>>> {
+        let vault_entry_id = vault_entry_id.to_string();
+        let request_id = request_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            Self::get_by_request_from_store(&client, &vault_entry_id, &request_id).await
         })
     }
 }

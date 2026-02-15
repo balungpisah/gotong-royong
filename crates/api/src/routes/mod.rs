@@ -35,6 +35,10 @@ use gotong_domain::{
         TrackStateTransition, TrackTransitionInput, TrackTransitionService, TransitionAction,
         TransitionMechanism,
     },
+    vault::{
+        AddTrustee, CreateVaultDraft, ExpireVault, PublishVault, RemoveTrustee, SealVault,
+        UpdateVaultDraft, VaultEntry, VaultService, VaultTimelineEvent,
+    },
     vouches::{Vouch, VouchCreate, VouchService, VouchWeightHint},
 };
 use serde::{Deserialize, Serialize};
@@ -72,6 +76,40 @@ pub fn router(state: AppState) -> Router {
             get(get_active_transition_stage),
         )
         .route("/v1/transitions/:transition_id", get(get_transition_by_id))
+        .route("/v1/vaults", post(create_vault_draft).get(list_vaults))
+        .route(
+            "/v1/vaults/:vault_entry_id",
+            get(get_vault_entry).delete(delete_vault_draft),
+        )
+        .route(
+            "/v1/vaults/:vault_entry_id/update",
+            post(update_vault_entry),
+        )
+        .route("/v1/vaults/:vault_entry_id/seal", post(seal_vault_entry))
+        .route(
+            "/v1/vaults/:vault_entry_id/publish",
+            post(publish_vault_entry),
+        )
+        .route(
+            "/v1/vaults/:vault_entry_id/revoke",
+            post(revoke_vault_entry),
+        )
+        .route(
+            "/v1/vaults/:vault_entry_id/expire",
+            post(expire_vault_entry),
+        )
+        .route(
+            "/v1/vaults/:vault_entry_id/timeline",
+            get(list_vault_timeline),
+        )
+        .route(
+            "/v1/vaults/:vault_entry_id/trustees",
+            get(list_vault_trustees).post(add_vault_trustee),
+        )
+        .route(
+            "/v1/vaults/:vault_entry_id/trustees/:wali_id",
+            delete(remove_vault_trustee),
+        )
         .route("/v1/moderations", post(apply_moderation))
         .route(
             "/v1/moderations/review-queue",
@@ -211,6 +249,51 @@ async fn idempotent_echo(
             Ok(to_response(response))
         }
     }
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateVaultDraftRequest {
+    pub payload: Option<Value>,
+    pub attachment_refs: Vec<String>,
+    pub wali: Vec<String>,
+    pub publish_target: Option<String>,
+    pub retention_policy: Option<Value>,
+    pub audit: Option<Value>,
+    pub request_ts_ms: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct UpdateVaultDraftRequest {
+    pub payload: Option<Value>,
+    pub attachment_refs: Option<Vec<String>>,
+    pub publish_target: Option<String>,
+    pub retention_policy: Option<Value>,
+    pub audit: Option<Value>,
+    pub request_ts_ms: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct SealVaultRequest {
+    pub sealed_hash: String,
+    pub encryption_key_id: Option<String>,
+    pub sealed_payload: Option<Value>,
+    pub publish_target: Option<String>,
+    pub retention_policy: Option<Value>,
+    pub audit: Option<Value>,
+    pub sealed_at_ms: Option<i64>,
+    pub request_ts_ms: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct SimpleVaultIdempotentRequest {
+    pub request_ts_ms: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct AddVaultTrusteeRequest {
+    #[validate(length(min = 1, max = 128))]
+    wali_id: String,
+    pub request_ts_ms: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -864,6 +947,560 @@ async fn get_transition_by_id(
         .map_err(map_domain_error)?;
     let transition = transition.ok_or(ApiError::NotFound)?;
     Ok(Json(transition))
+}
+
+async fn create_vault_draft(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateVaultDraftRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "vault_draft_create",
+        actor.user_id.clone(),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = VaultService::new(state.vault_repo.clone());
+            let command = CreateVaultDraft {
+                payload: payload.payload,
+                attachment_refs: payload.attachment_refs,
+                wali: payload.wali,
+                publish_target: payload.publish_target,
+                retention_policy: payload.retention_policy,
+                audit: payload.audit,
+                request_id: request_id.clone(),
+                correlation_id: correlation_id.clone(),
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let draft = service
+                .create_draft(actor, &role, command)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(&draft).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn list_vaults(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<Vec<VaultEntry>>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = VaultService::new(state.vault_repo.clone());
+    let vaults = service
+        .list_by_author(actor)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(vaults))
+}
+
+async fn get_vault_entry(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+) -> Result<Json<VaultEntry>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = VaultService::new(state.vault_repo.clone());
+    let entry = service
+        .get(&vault_entry_id)
+        .await
+        .map_err(map_domain_error)?;
+    if !is_vault_visible_to_actor(&actor, &entry) {
+        return Err(ApiError::Forbidden);
+    }
+    Ok(Json(entry))
+}
+
+async fn delete_vault_draft(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new("vault_draft_delete", actor.user_id.clone(), request_id);
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = VaultService::new(state.vault_repo.clone());
+            let deleted = service
+                .delete_draft(actor, &vault_entry_id)
+                .await
+                .map_err(map_domain_error)?;
+            if !deleted {
+                return Err(ApiError::NotFound);
+            }
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(serde_json::json!({
+                    "vault_entry_id": vault_entry_id,
+                    "deleted": true,
+                }))
+                .map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn update_vault_entry(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+    Json(payload): Json<UpdateVaultDraftRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let key = IdempotencyKey::new(
+        "vault_draft_update",
+        format!("{}:{vault_entry_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = VaultService::new(state.vault_repo.clone());
+            let command = UpdateVaultDraft {
+                payload: payload.payload,
+                attachment_refs: payload.attachment_refs,
+                publish_target: payload.publish_target,
+                retention_policy: payload.retention_policy,
+                audit: payload.audit,
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let entry = service
+                .update_draft(actor, &role, &vault_entry_id, command)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&entry).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn seal_vault_entry(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+    Json(payload): Json<SealVaultRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let key = IdempotencyKey::new(
+        "vault_entry_seal",
+        format!("{}:{vault_entry_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = VaultService::new(state.vault_repo.clone());
+            let command = SealVault {
+                sealed_hash: payload.sealed_hash,
+                encryption_key_id: payload.encryption_key_id,
+                sealed_payload: payload.sealed_payload,
+                publish_target: payload.publish_target,
+                retention_policy: payload.retention_policy,
+                audit: payload.audit,
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+                sealed_at_ms: payload.sealed_at_ms,
+            };
+            let entry = service
+                .seal(actor, &role, &vault_entry_id, command)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&entry).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn publish_vault_entry(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+    Json(payload): Json<SimpleVaultIdempotentRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "vault_entry_publish",
+        format!("{}:{vault_entry_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            validation::validate(&payload)?;
+            let service = VaultService::new(state.vault_repo.clone());
+            let command = PublishVault {
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let entry = service
+                .publish(actor, &role, &vault_entry_id, command)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&entry).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn revoke_vault_entry(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+    Json(payload): Json<SimpleVaultIdempotentRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "vault_entry_revoke",
+        format!("{}:{vault_entry_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            validation::validate(&payload)?;
+            let service = VaultService::new(state.vault_repo.clone());
+            let command = RevokeVault {
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let entry = service
+                .revoke(actor, &role, &vault_entry_id, command)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&entry).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn expire_vault_entry(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+    Json(payload): Json<SimpleVaultIdempotentRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "vault_entry_expire",
+        format!("{}:{vault_entry_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            validation::validate(&payload)?;
+            let service = VaultService::new(state.vault_repo.clone());
+            let command = ExpireVault {
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let entry = service
+                .expire(actor, &role, &vault_entry_id, command)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&entry).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn list_vault_timeline(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+) -> Result<Json<Vec<VaultTimelineEvent>>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = VaultService::new(state.vault_repo.clone());
+    let timeline = service
+        .list_timeline(&vault_entry_id, actor)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(timeline))
+}
+
+async fn list_vault_trustees(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+) -> Result<Json<Vec<String>>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = VaultService::new(state.vault_repo.clone());
+    let entry = service
+        .get(&vault_entry_id)
+        .await
+        .map_err(map_domain_error)?;
+    if !is_vault_visible_to_actor(&actor, &entry) {
+        return Err(ApiError::Forbidden);
+    }
+    Ok(Json(entry.wali))
+}
+
+async fn add_vault_trustee(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Path(vault_entry_id): Path<String>,
+    Json(payload): Json<AddVaultTrusteeRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let key = IdempotencyKey::new(
+        "vault_trustee_add",
+        format!("{}:{vault_entry_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = VaultService::new(state.vault_repo.clone());
+            let command = AddTrustee {
+                wali_id: payload.wali_id,
+                request_id,
+                correlation_id,
+                request_ts_ms: payload.request_ts_ms,
+            };
+            let entry = service
+                .add_trustee(actor, &role, &vault_entry_id, command)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&entry).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn remove_vault_trustee(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Path((vault_entry_id, wali_id)): Path<(String, String)>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let role = auth.role;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let key = IdempotencyKey::new(
+        "vault_trustee_remove",
+        format!("{}:{vault_entry_id}", actor.user_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let service = VaultService::new(state.vault_repo.clone());
+            let command = RemoveTrustee {
+                wali_id,
+                request_id,
+                correlation_id,
+                request_ts_ms: None,
+            };
+            let entry = service
+                .remove_trustee(actor, &role, &vault_entry_id, command)
+                .await
+                .map_err(map_domain_error)?;
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(&entry).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+fn is_vault_visible_to_actor(actor: &ActorIdentity, entry: &VaultEntry) -> bool {
+    entry.author_id == actor.user_id || entry.wali.iter().any(|wali_id| wali_id == &actor.user_id)
 }
 
 #[derive(Debug, Deserialize)]

@@ -6,7 +6,8 @@ use gotong_domain::idempotency::{IdempotencyConfig, IdempotencyService};
 use gotong_domain::ports::idempotency::IdempotencyStore;
 use gotong_domain::ports::{
     chat::ChatRepository, contributions::ContributionRepository, evidence::EvidenceRepository,
-    jobs::JobQueue, transitions::TrackTransitionRepository, vouches::VouchRepository,
+    jobs::JobQueue, transitions::TrackTransitionRepository, vault::VaultRepository,
+    vouches::VouchRepository,
 };
 use gotong_infra::config::AppConfig;
 use gotong_infra::db::DbConfig;
@@ -14,8 +15,9 @@ use gotong_infra::idempotency::RedisIdempotencyStore;
 use gotong_infra::jobs::RedisJobQueue;
 use gotong_infra::repositories::{
     InMemoryChatRepository, InMemoryContributionRepository, InMemoryEvidenceRepository,
-    InMemoryModerationRepository, InMemoryTrackTransitionRepository, InMemoryVouchRepository,
-    SurrealChatRepository, SurrealModerationRepository, SurrealTrackTransitionRepository,
+    InMemoryModerationRepository, InMemoryTrackTransitionRepository, InMemoryVaultRepository,
+    InMemoryVouchRepository, SurrealChatRepository, SurrealModerationRepository,
+    SurrealTrackTransitionRepository, SurrealVaultRepository,
 };
 use tokio::sync::{RwLock, broadcast};
 
@@ -24,6 +26,7 @@ type RepositoryBundle = (
     Arc<dyn EvidenceRepository>,
     Arc<dyn VouchRepository>,
     Arc<dyn TrackTransitionRepository>,
+    Arc<dyn VaultRepository>,
     Arc<dyn ChatRepository>,
     Arc<dyn gotong_domain::ports::moderation::ModerationRepository>,
 );
@@ -37,6 +40,7 @@ pub struct AppState {
     pub evidence_repo: Arc<dyn EvidenceRepository>,
     pub vouch_repo: Arc<dyn VouchRepository>,
     pub transition_repo: Arc<dyn TrackTransitionRepository>,
+    pub vault_repo: Arc<dyn VaultRepository>,
     pub chat_repo: Arc<dyn ChatRepository>,
     pub moderation_repo: Arc<dyn gotong_domain::ports::moderation::ModerationRepository>,
     pub chat_realtime: ChatRealtimeBus,
@@ -88,6 +92,7 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            vault_repo,
             chat_repo,
             moderation_repo,
         ) = repositories_for_config(&config).await?;
@@ -100,6 +105,7 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            vault_repo,
             chat_repo,
             moderation_repo,
             chat_realtime: ChatRealtimeBus::new(),
@@ -114,6 +120,7 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            vault_repo,
             chat_repo,
             moderation_repo,
         ) = memory_repositories();
@@ -124,6 +131,7 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            vault_repo,
             chat_repo,
             moderation_repo,
             chat_realtime: ChatRealtimeBus::new(),
@@ -139,6 +147,7 @@ impl AppState {
         evidence_repo: Arc<dyn EvidenceRepository>,
         vouch_repo: Arc<dyn VouchRepository>,
         transition_repo: Arc<dyn TrackTransitionRepository>,
+        vault_repo: Arc<dyn VaultRepository>,
         chat_repo: Arc<dyn ChatRepository>,
         moderation_repo: Arc<dyn gotong_domain::ports::moderation::ModerationRepository>,
     ) -> Self {
@@ -150,6 +159,7 @@ impl AppState {
             evidence_repo,
             vouch_repo,
             transition_repo,
+            vault_repo,
             chat_repo,
             moderation_repo,
             chat_realtime: ChatRealtimeBus::new(),
@@ -172,6 +182,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
         "surreal" | "surrealdb" | "tikv" => {
             let db_config = DbConfig::from_app_config(config);
             let transition_repo = SurrealTrackTransitionRepository::new(&db_config).await?;
+            let vault_repo = SurrealVaultRepository::new(&db_config).await?;
             let chat_repo = SurrealChatRepository::new(&db_config).await?;
             let moderation_repo = SurrealModerationRepository::new(&db_config).await?;
             Ok((
@@ -179,6 +190,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
                 Arc::new(InMemoryEvidenceRepository::new()),
                 Arc::new(InMemoryVouchRepository::new()),
                 Arc::new(transition_repo),
+                Arc::new(vault_repo),
                 Arc::new(chat_repo),
                 Arc::new(moderation_repo),
             ))
@@ -193,6 +205,7 @@ fn memory_repositories() -> RepositoryBundle {
         Arc::new(InMemoryEvidenceRepository::new()),
         Arc::new(InMemoryVouchRepository::new()),
         Arc::new(InMemoryTrackTransitionRepository::new()),
+        Arc::new(InMemoryVaultRepository::new()),
         Arc::new(InMemoryChatRepository::new()),
         Arc::new(InMemoryModerationRepository::new()),
     )

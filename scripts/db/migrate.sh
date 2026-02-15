@@ -49,3 +49,11 @@ fi
   --namespace "$SURREAL_NS" \
   --database "$SURREAL_DB" \
   "$WORKDIR/database/migrations/0004_moderation_schema.surql"
+
+"${SUR_CMD[@]}" import \
+  --endpoint "$SURREAL_ENDPOINT" \
+  --user "$SURREAL_USER" \
+  --pass "$SURREAL_PASS" \
+  --namespace "$SURREAL_NS" \
+  --database "$SURREAL_DB" \
+  "$WORKDIR/database/migrations/0006_vault_schema.surql"

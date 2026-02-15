@@ -11,6 +11,8 @@ This file tracks the migration ordering and execution state for the SurrealDB sc
 1. `0001_initial_schema.surql`
 2. `0002_chat_indexes.surql`
 3. `0003_permissions_private_channels.surql` (reserved for PR-04)
+4. `0004_moderation_schema.surql`
+5. `0006_vault_schema.surql`
 
 ## Notes
 
