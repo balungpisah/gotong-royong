@@ -30,18 +30,26 @@ Status: READY FOR BACKEND DESIGN/HANDOFF
         - `propose`: `author` or `pic`, with `system` allowed only for timer close apply
         - `object`: `participant|saksi|author|pic` with participant objection forcing vote window
         - `vote`: `author|saksi|participant|pic` with snapshot of eligibility at gate open
-    6. enforce gated prerequisites:
+     6. enforce gated prerequisites:
         - Garap → Periksa requires PoR refs
         - Periksa → Tuntas requires challenge window gate config
-    7. snapshot actor context at command time into immutable transition metadata (`actor_snapshot`):
+     7. snapshot actor context at command time into immutable transition metadata (`actor_snapshot`):
         - actor user id, username, token role, and membership context (`author|pic|participant|saksi` snapshot)
         - request provenance (`request_id`, `correlation_id`, `request_ts_ms`)
-    8. enforce role/gate decisions in one atomic command path (no split across eventual-consistency transitions)
+     8. enforce role/gate decisions in one atomic command path (no split across eventual-consistency transitions)
+     9. baseline migration prerequisite: `track_state_transition` + `uniq_transition_request` already exists in
+        `database/migrations/0001_initial_schema.surql` and `database/migrations/0002_chat_indexes.surql`
    - Acceptance:
      1. replayed transitions return original canonical transition record
      2. scheduler emits closure/reject event with same `transition_id`
      3. `gate.status` transitions to applied/rejected only once at gate close
      4. retries with same `(entity_id, request_id)` are replay-safe
+  - PR-07 acceptance test hooks:
+    - replay test: same `(entity_id, request_id)` returns canonical repeat transition
+    - ordering test: timeline ordering by deterministic sort keys (`occurred_at_ms`, `transition_id`)
+    - append-only invariants: no update/delete mutation API in service/repo surface
+    - role matrix test: `propose/object/vote` matrix validation against `author/pic/participant/saksi`
+    - projection order test: timeline query is monotonic and stable under repeated reads
 
 2. Ticket `BE-002`: Track transition state projections
    - Scope: `UI-03` + history audit

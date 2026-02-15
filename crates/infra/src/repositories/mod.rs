@@ -7,7 +7,9 @@ use gotong_domain::error::DomainError;
 use gotong_domain::evidence::Evidence;
 use gotong_domain::ports::contributions::ContributionRepository;
 use gotong_domain::ports::evidence::EvidenceRepository;
+use gotong_domain::ports::transitions::TrackTransitionRepository;
 use gotong_domain::ports::vouches::VouchRepository;
+use gotong_domain::transitions::TrackStateTransition;
 use gotong_domain::vouches::Vouch;
 
 use tokio::sync::RwLock;
@@ -240,6 +242,103 @@ impl VouchRepository for InMemoryVouchRepository {
                     .then_with(|| b.vouch_id.cmp(&a.vouch_id))
             });
             Ok(vouches)
+        })
+    }
+}
+
+#[derive(Default)]
+pub struct InMemoryTrackTransitionRepository {
+    transitions: Arc<RwLock<HashMap<String, TrackStateTransition>>>,
+    by_request: Arc<RwLock<HashMap<String, String>>>,
+}
+
+impl InMemoryTrackTransitionRepository {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl InMemoryTrackTransitionRepository {
+    fn request_key(entity_id: &str, request_id: &str) -> String {
+        format!("{entity_id}:{request_id}")
+    }
+}
+
+impl TrackTransitionRepository for InMemoryTrackTransitionRepository {
+    fn create(
+        &self,
+        transition: &TrackStateTransition,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<TrackStateTransition>> {
+        let transition = transition.clone();
+        let transitions = self.transitions.clone();
+        let by_request = self.by_request.clone();
+        Box::pin(async move {
+            let mut transition_map = transitions.write().await;
+            if transition_map.contains_key(&transition.transition_id) {
+                return Err(DomainError::Conflict);
+            }
+
+            let request_key = Self::request_key(&transition.entity_id, &transition.request_id);
+            let mut request_map = by_request.write().await;
+            if request_map.contains_key(&request_key) {
+                return Err(DomainError::Conflict);
+            }
+
+            request_map.insert(request_key, transition.transition_id.clone());
+            transition_map.insert(transition.transition_id.clone(), transition.clone());
+            Ok(transition)
+        })
+    }
+
+    fn get_by_request_id(
+        &self,
+        entity_id: &str,
+        request_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<TrackStateTransition>>> {
+        let request_key = Self::request_key(entity_id, request_id);
+        let transitions = self.transitions.clone();
+        let by_request = self.by_request.clone();
+        Box::pin(async move {
+            let request_map = by_request.read().await;
+            let Some(transition_id) = request_map.get(&request_key) else {
+                return Ok(None);
+            };
+            let transitions = transitions.read().await;
+            Ok(transitions.get(transition_id).cloned())
+        })
+    }
+
+    fn get_by_transition_id(
+        &self,
+        transition_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<TrackStateTransition>>> {
+        let transition_id = transition_id.to_string();
+        let transitions = self.transitions.clone();
+        Box::pin(async move {
+            let transitions = transitions.read().await;
+            Ok(transitions.get(&transition_id).cloned())
+        })
+    }
+
+    fn list_by_entity(
+        &self,
+        entity_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<TrackStateTransition>>> {
+        let entity_id = entity_id.to_string();
+        let transitions = self.transitions.clone();
+        Box::pin(async move {
+            let transitions = transitions.read().await;
+            let mut list: Vec<_> = transitions
+                .values()
+                .filter(|transition| transition.entity_id == entity_id)
+                .cloned()
+                .collect();
+            list.sort_by(|left, right| {
+                left.occurred_at_ms
+                    .cmp(&right.occurred_at_ms)
+                    .then_with(|| left.transition_id.cmp(&right.transition_id))
+            });
+            Ok(list)
         })
     }
 }

@@ -59,6 +59,11 @@ Out of scope:
 | PR-14 | Edge-Pod Integrations | `EP-03`, `EP-05`, `EP-08`, `EP-09`, `EP-11` | PR-03, PR-07, PR-09, PR-12 |
 | PR-15 | Audit + Observability + Release Gates | `BE-012`, `BE-013` | PR-14 |
 
+## PR Lock State
+
+- `PR-01` to `PR-06`: DONE
+- `PR-07` to `PR-15`: NOT STARTED
+
 ## Detailed PR Plan
 
 ## PR-01 — Foundation Bootstrap
@@ -192,6 +197,13 @@ Exit criteria:
 
 ## PR-07 — Track Transition Engine (`BE-001`, `BE-002`)
 
+Status:
+- NOT STARTED (2026-02-15)
+
+Implementation gap note (now remedied):
+- PR-07 domain, ports, and repository scaffolding is added in `crates/domain/src/transitions.rs`, `crates/domain/src/ports/transitions.rs`, and `crates/infra/src/repositories/mod.rs`.
+- AppState transition repository wiring is available in `crates/api/src/state.rs`.
+
 Goal:
 - Implement canonical governance transition write/read model.
 
@@ -216,6 +228,9 @@ Exit criteria:
 
 ## PR-08 — Realtime Chat Core
 
+Status:
+- NOT STARTED (2026-02-15)
+
 Goal:
 - Deliver chat baseline with stable ordering and reconnect semantics.
 
@@ -235,6 +250,9 @@ Exit criteria:
 
 ## PR-09 — Moderation Services (`BE-003`, `BE-004`)
 
+Status:
+- NOT STARTED (2026-02-15)
+
 Goal:
 - Implement moderation source-of-truth and enforceable policy runtime.
 
@@ -251,6 +269,9 @@ Exit criteria:
 - `UI-07` moderation behavior is complete and auditable.
 
 ## PR-10 — Vault Lifecycle (`BE-006`, `BE-007`)
+
+Status:
+- NOT STARTED (2026-02-15)
 
 Goal:
 - Implement witness vault persistence and lifecycle events.
@@ -270,6 +291,9 @@ Exit criteria:
 
 ## PR-11 — Siaga Lifecycle (`BE-005`)
 
+Status:
+- NOT STARTED (2026-02-15)
+
 Goal:
 - Implement emergency broadcast flow and responder timeline model.
 
@@ -288,6 +312,9 @@ Exit criteria:
 
 ## PR-12 — Feed/Search/Notifications (`BE-008`, `BE-009`, `BE-010`)
 
+Status:
+- NOT STARTED (2026-02-15)
+
 Goal:
 - Deliver derived read services for user-facing activity surfaces.
 
@@ -304,6 +331,9 @@ Exit criteria:
 - `UI-10`, `UI-11`, and `UI-12` contracts are functional.
 
 ## PR-13 — Markov Webhook Integration + Outbox
+
+Status:
+- NOT STARTED (2026-02-15)
 
 Goal:
 - Implement outbound-only webhook publishing to Markov/Tandang with replay-safe delivery.
@@ -328,6 +358,9 @@ Exit criteria:
 
 ## PR-14 — Edge-Pod Integrations (`EP-03`, `EP-05`, `EP-08`, `EP-09`, `EP-11`)
 
+Status:
+- NOT STARTED (2026-02-15)
+
 Goal:
 - Integrate AI endpoint contracts with safe fallback semantics.
 
@@ -345,6 +378,9 @@ Exit criteria:
 - Edge-Pod integrations are contract-complete and operationally safe.
 
 ## PR-15 — Audit, Observability, and Release Gates (`BE-012`, `BE-013`)
+
+Status:
+- NOT STARTED (2026-02-15)
 
 Goal:
 - Finalize production hardening and beta safety gates.

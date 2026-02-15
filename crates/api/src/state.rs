@@ -3,18 +3,21 @@ use std::sync::Arc;
 use gotong_domain::idempotency::{IdempotencyConfig, IdempotencyService};
 use gotong_domain::ports::idempotency::IdempotencyStore;
 use gotong_domain::ports::{
-    contributions::ContributionRepository, evidence::EvidenceRepository, vouches::VouchRepository,
+    contributions::ContributionRepository, evidence::EvidenceRepository,
+    transitions::TrackTransitionRepository, vouches::VouchRepository,
 };
 use gotong_infra::config::AppConfig;
 use gotong_infra::idempotency::RedisIdempotencyStore;
 use gotong_infra::repositories::{
-    InMemoryContributionRepository, InMemoryEvidenceRepository, InMemoryVouchRepository,
+    InMemoryContributionRepository, InMemoryEvidenceRepository, InMemoryTrackTransitionRepository,
+    InMemoryVouchRepository,
 };
 
 type RepositoryBundle = (
     Arc<dyn ContributionRepository>,
     Arc<dyn EvidenceRepository>,
     Arc<dyn VouchRepository>,
+    Arc<dyn TrackTransitionRepository>,
 );
 
 #[derive(Clone)]
@@ -24,12 +27,15 @@ pub struct AppState {
     pub contribution_repo: Arc<dyn ContributionRepository>,
     pub evidence_repo: Arc<dyn EvidenceRepository>,
     pub vouch_repo: Arc<dyn VouchRepository>,
+    #[allow(dead_code)]
+    pub transition_repo: Arc<dyn TrackTransitionRepository>,
 }
 
 impl AppState {
     pub async fn new(config: AppConfig) -> anyhow::Result<Self> {
         let store = RedisIdempotencyStore::connect(&config.redis_url).await?;
-        let (contribution_repo, evidence_repo, vouch_repo) = repositories_for_config(&config)?;
+        let (contribution_repo, evidence_repo, vouch_repo, transition_repo) =
+            repositories_for_config(&config)?;
         let idempotency = IdempotencyService::new(Arc::new(store), IdempotencyConfig::default());
         Ok(Self {
             config,
@@ -37,19 +43,21 @@ impl AppState {
             contribution_repo,
             evidence_repo,
             vouch_repo,
+            transition_repo,
         })
     }
 
     #[allow(dead_code)]
     pub fn with_idempotency_store(config: AppConfig, store: Arc<dyn IdempotencyStore>) -> Self {
         let idempotency = IdempotencyService::new(store, IdempotencyConfig::default());
-        let (contribution_repo, evidence_repo, vouch_repo) = memory_repositories();
+        let (contribution_repo, evidence_repo, vouch_repo, transition_repo) = memory_repositories();
         Self {
             config,
             idempotency,
             contribution_repo,
             evidence_repo,
             vouch_repo,
+            transition_repo,
         }
     }
 
@@ -60,6 +68,7 @@ impl AppState {
         contribution_repo: Arc<dyn ContributionRepository>,
         evidence_repo: Arc<dyn EvidenceRepository>,
         vouch_repo: Arc<dyn VouchRepository>,
+        transition_repo: Arc<dyn TrackTransitionRepository>,
     ) -> Self {
         let idempotency = IdempotencyService::new(store, IdempotencyConfig::default());
         Self {
@@ -68,6 +77,7 @@ impl AppState {
             contribution_repo,
             evidence_repo,
             vouch_repo,
+            transition_repo,
         }
     }
 }
@@ -97,6 +107,7 @@ fn memory_repositories() -> RepositoryBundle {
         Arc::new(InMemoryContributionRepository::new()),
         Arc::new(InMemoryEvidenceRepository::new()),
         Arc::new(InMemoryVouchRepository::new()),
+        Arc::new(InMemoryTrackTransitionRepository::new()),
     )
 }
 

@@ -8,4 +8,5 @@ pub mod db;
 pub mod evidence;
 pub mod idempotency;
 pub mod jobs;
+pub mod transitions;
 pub mod vouches;
