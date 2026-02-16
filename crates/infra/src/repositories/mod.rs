@@ -2025,14 +2025,19 @@ impl TrackTransitionRepository for SurrealTrackTransitionRepository {
 }
 
 #[derive(Default)]
+struct InMemoryAdaptivePathState {
+    plans: HashMap<String, AdaptivePathPlan>,
+    plan_by_entity: HashMap<String, String>,
+    plan_by_entity_request: HashMap<(String, String), String>,
+    events_by_plan: HashMap<String, Vec<AdaptivePathEvent>>,
+    event_by_request: HashMap<String, (String, String)>,
+    suggestions: HashMap<String, AdaptivePathSuggestion>,
+    suggestion_by_plan_request: HashMap<(String, String), String>,
+}
+
+#[derive(Default)]
 pub struct InMemoryAdaptivePathRepository {
-    plans: Arc<RwLock<HashMap<String, AdaptivePathPlan>>>,
-    plan_by_entity: Arc<RwLock<HashMap<String, String>>>,
-    plan_by_entity_request: Arc<RwLock<HashMap<(String, String), String>>>,
-    events_by_plan: Arc<RwLock<HashMap<String, Vec<AdaptivePathEvent>>>>,
-    event_by_request: Arc<RwLock<HashMap<String, (String, String)>>>,
-    suggestions: Arc<RwLock<HashMap<String, AdaptivePathSuggestion>>>,
-    suggestion_by_plan_request: Arc<RwLock<HashMap<(String, String), String>>>,
+    state: Arc<RwLock<InMemoryAdaptivePathState>>,
 }
 
 impl InMemoryAdaptivePathRepository {
@@ -2055,34 +2060,28 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         plan: &AdaptivePathPlan,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
         let plan = plan.clone();
-        let plans = self.plans.clone();
-        let plan_by_entity = self.plan_by_entity.clone();
-        let plan_by_entity_request = self.plan_by_entity_request.clone();
+        let state = self.state.clone();
         Box::pin(async move {
+            let mut state = state.write().await;
             let request_key = Self::plan_request_key(&plan.entity_id, &plan.request_id);
-            if plan_by_entity_request
-                .read()
-                .await
-                .contains_key(&request_key)
-            {
+            if state.plan_by_entity_request.contains_key(&request_key) {
                 return Err(DomainError::Conflict);
             }
 
-            let mut plan_map = plans.write().await;
-            if plan_map.contains_key(&plan.plan_id) {
+            if state.plans.contains_key(&plan.plan_id) {
                 return Err(DomainError::Conflict);
             }
 
-            let mut by_entity = plan_by_entity.write().await;
-            if by_entity.contains_key(&plan.entity_id) {
+            if state.plan_by_entity.contains_key(&plan.entity_id) {
                 return Err(DomainError::Conflict);
             }
-            by_entity.insert(plan.entity_id.clone(), plan.plan_id.clone());
-            plan_by_entity_request
-                .write()
-                .await
+            state
+                .plan_by_entity
+                .insert(plan.entity_id.clone(), plan.plan_id.clone());
+            state
+                .plan_by_entity_request
                 .insert(request_key, plan.plan_id.clone());
-            plan_map.insert(plan.plan_id.clone(), plan.clone());
+            state.plans.insert(plan.plan_id.clone(), plan.clone());
             Ok(plan)
         })
     }
@@ -2092,10 +2091,10 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         plan_id: &str,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
         let plan_id = plan_id.to_string();
-        let plans = self.plans.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            let plans = plans.read().await;
-            Ok(plans.get(&plan_id).cloned())
+            let state = state.read().await;
+            Ok(state.plans.get(&plan_id).cloned())
         })
     }
 
@@ -2104,15 +2103,13 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         entity_id: &str,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
         let entity_id = entity_id.to_string();
-        let plans = self.plans.clone();
-        let plan_by_entity = self.plan_by_entity.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            let by_entity = plan_by_entity.read().await;
-            let Some(plan_id) = by_entity.get(&entity_id) else {
+            let state = state.read().await;
+            let Some(plan_id) = state.plan_by_entity.get(&entity_id) else {
                 return Ok(None);
             };
-            let plans = plans.read().await;
-            Ok(plans.get(plan_id).cloned())
+            Ok(state.plans.get(plan_id).cloned())
         })
     }
 
@@ -2122,15 +2119,13 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         request_id: &str,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
         let key = Self::plan_request_key(entity_id, request_id);
-        let plans = self.plans.clone();
-        let plan_by_entity_request = self.plan_by_entity_request.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            let by_request = plan_by_entity_request.read().await;
-            let Some(plan_id) = by_request.get(&key) else {
+            let state = state.read().await;
+            let Some(plan_id) = state.plan_by_entity_request.get(&key) else {
                 return Ok(None);
             };
-            let plans = plans.read().await;
-            Ok(plans.get(plan_id).cloned())
+            Ok(state.plans.get(plan_id).cloned())
         })
     }
 
@@ -2139,29 +2134,26 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         plan: &AdaptivePathPlan,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
         let plan = plan.clone();
-        let plans = self.plans.clone();
-        let plan_by_entity_request = self.plan_by_entity_request.clone();
+        let state = self.state.clone();
         Box::pin(async move {
+            let mut state = state.write().await;
             let request_key = Self::plan_request_key(&plan.entity_id, &plan.request_id);
-            if let Some(existing_plan_id) = plan_by_entity_request.read().await.get(&request_key) {
-                let plans = plans.read().await;
-                if let Some(existing) = plans.get(existing_plan_id) {
+            if let Some(existing_plan_id) = state.plan_by_entity_request.get(&request_key) {
+                if let Some(existing) = state.plans.get(existing_plan_id) {
                     return Ok(existing.clone());
                 }
                 return Err(DomainError::Conflict);
             }
 
-            let mut plans = plans.write().await;
-            let Some(current) = plans.get(&plan.plan_id) else {
+            let Some(current) = state.plans.get(&plan.plan_id) else {
                 return Err(DomainError::NotFound);
             };
             if plan.version <= current.version {
                 return Err(DomainError::Conflict);
             }
-            plans.insert(plan.plan_id.clone(), plan.clone());
-            plan_by_entity_request
-                .write()
-                .await
+            state.plans.insert(plan.plan_id.clone(), plan.clone());
+            state
+                .plan_by_entity_request
                 .insert(request_key, plan.plan_id.clone());
             Ok(plan)
         })
@@ -2172,24 +2164,22 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         event: &AdaptivePathEvent,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathEvent>> {
         let event = event.clone();
-        let events_by_plan = self.events_by_plan.clone();
-        let event_by_request = self.event_by_request.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            if event_by_request
-                .read()
-                .await
-                .contains_key(&event.request_id)
-            {
+            let mut state = state.write().await;
+            if state.event_by_request.contains_key(&event.request_id) {
                 return Err(DomainError::Conflict);
             }
 
-            let mut event_rows = events_by_plan.write().await;
-            let rows = event_rows.entry(event.plan_id.clone()).or_default();
+            let rows = state
+                .events_by_plan
+                .entry(event.plan_id.clone())
+                .or_default();
             if rows.iter().any(|row| row.event_id == event.event_id) {
                 return Err(DomainError::Conflict);
             }
             rows.push(event.clone());
-            event_by_request.write().await.insert(
+            state.event_by_request.insert(
                 event.request_id.clone(),
                 (event.plan_id.clone(), event.event_id.clone()),
             );
@@ -2202,11 +2192,11 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         plan_id: &str,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathEvent>>> {
         let plan_id = plan_id.to_string();
-        let events_by_plan = self.events_by_plan.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            let mut rows = events_by_plan
-                .read()
-                .await
+            let state = state.read().await;
+            let mut rows = state
+                .events_by_plan
                 .get(&plan_id)
                 .cloned()
                 .unwrap_or_default();
@@ -2224,15 +2214,13 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         request_id: &str,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathEvent>>> {
         let request_id = request_id.to_string();
-        let events_by_plan = self.events_by_plan.clone();
-        let event_by_request = self.event_by_request.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            let by_request = event_by_request.read().await;
-            let Some((plan_id, event_id)) = by_request.get(&request_id) else {
+            let state = state.read().await;
+            let Some((plan_id, event_id)) = state.event_by_request.get(&request_id) else {
                 return Ok(None);
             };
-            let rows = events_by_plan.read().await;
-            let Some(events) = rows.get(plan_id) else {
+            let Some(events) = state.events_by_plan.get(plan_id) else {
                 return Ok(None);
             };
             Ok(events
@@ -2247,26 +2235,22 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         suggestion: &AdaptivePathSuggestion,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathSuggestion>> {
         let suggestion = suggestion.clone();
-        let suggestions = self.suggestions.clone();
-        let suggestion_by_plan_request = self.suggestion_by_plan_request.clone();
+        let state = self.state.clone();
         Box::pin(async move {
+            let mut state = state.write().await;
             let request_key =
                 Self::suggestion_request_key(&suggestion.plan_id, &suggestion.request_id);
-            if suggestion_by_plan_request
-                .read()
-                .await
-                .contains_key(&request_key)
-            {
+            if state.suggestion_by_plan_request.contains_key(&request_key) {
                 return Err(DomainError::Conflict);
             }
-            let mut suggestions = suggestions.write().await;
-            if suggestions.contains_key(&suggestion.suggestion_id) {
+            if state.suggestions.contains_key(&suggestion.suggestion_id) {
                 return Err(DomainError::Conflict);
             }
-            suggestions.insert(suggestion.suggestion_id.clone(), suggestion.clone());
-            suggestion_by_plan_request
-                .write()
-                .await
+            state
+                .suggestions
+                .insert(suggestion.suggestion_id.clone(), suggestion.clone());
+            state
+                .suggestion_by_plan_request
                 .insert(request_key, suggestion.suggestion_id.clone());
             Ok(suggestion)
         })
@@ -2277,11 +2261,11 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         plan_id: &str,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathSuggestion>>> {
         let plan_id = plan_id.to_string();
-        let suggestions = self.suggestions.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            let mut rows: Vec<_> = suggestions
-                .read()
-                .await
+            let state = state.read().await;
+            let mut rows: Vec<_> = state
+                .suggestions
                 .values()
                 .filter(|suggestion| suggestion.plan_id == plan_id)
                 .cloned()
@@ -2301,10 +2285,10 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         suggestion_id: &str,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathSuggestion>>> {
         let suggestion_id = suggestion_id.to_string();
-        let suggestions = self.suggestions.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            let suggestions = suggestions.read().await;
-            Ok(suggestions.get(&suggestion_id).cloned())
+            let state = state.read().await;
+            Ok(state.suggestions.get(&suggestion_id).cloned())
         })
     }
 
@@ -2314,15 +2298,13 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         request_id: &str,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathSuggestion>>> {
         let key = Self::suggestion_request_key(plan_id, request_id);
-        let suggestions = self.suggestions.clone();
-        let suggestion_by_plan_request = self.suggestion_by_plan_request.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            let by_request = suggestion_by_plan_request.read().await;
-            let Some(suggestion_id) = by_request.get(&key) else {
+            let state = state.read().await;
+            let Some(suggestion_id) = state.suggestion_by_plan_request.get(&key) else {
                 return Ok(None);
             };
-            let suggestions = suggestions.read().await;
-            Ok(suggestions.get(suggestion_id).cloned())
+            Ok(state.suggestions.get(suggestion_id).cloned())
         })
     }
 
@@ -2332,10 +2314,11 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         status: SuggestionDecisionStatus,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathSuggestion>> {
         let suggestion_id = suggestion_id.to_string();
-        let suggestions = self.suggestions.clone();
+        let state = self.state.clone();
         Box::pin(async move {
-            let mut suggestions = suggestions.write().await;
-            let suggestion = suggestions
+            let mut state = state.write().await;
+            let suggestion = state
+                .suggestions
                 .get_mut(&suggestion_id)
                 .ok_or(DomainError::NotFound)?;
             suggestion.status = status;
