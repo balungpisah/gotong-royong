@@ -39,15 +39,20 @@ run_migration() {
   local migration_path="$WORKDIR/database/migrations/$migration_file"
   local output
 
-  output=$(
+  if ! output=$(
     cat "$migration_path" | "${SUR_CMD[@]}" sql \
       --multi \
       --endpoint "$CLI_ENDPOINT" \
       --user "$SURREAL_USER" \
       --pass "$SURREAL_PASS" \
       --namespace "$SURREAL_NS" \
-      --database "$SURREAL_DB"
-  )
+      --database "$SURREAL_DB" \
+      2>&1
+  ); then
+    echo "$output"
+    echo "migration failed for $migration_file: unable to execute Surreal SQL against $CLI_ENDPOINT" >&2
+    return 1
+  fi
 
   echo "$output"
 

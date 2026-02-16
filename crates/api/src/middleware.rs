@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
 use tower_governor::GovernorLayer;
-use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::governor::{GovernorConfig, GovernorConfigBuilder};
 use tower_governor::key_extractor::PeerIpKeyExtractor;
 use tower_http::classify::{ServerErrorsAsFailures, SharedClassifier};
 use tower_http::request_id::{
@@ -121,7 +121,12 @@ pub fn rate_limit_layer() -> RateLimitLayer {
         .per_second(100)
         .burst_size(200)
         .finish()
-        .expect("rate limit config");
+        .unwrap_or_else(|| {
+            tracing::error!(
+                "rate limit config builder produced invalid values; using conservative default"
+            );
+            GovernorConfig::default()
+        });
     GovernorLayer {
         config: Arc::new(config),
     }

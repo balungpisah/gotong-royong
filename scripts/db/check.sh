@@ -53,7 +53,7 @@ run_check() {
   local check_file="$1"
 
   local output
-  output=$(
+  if ! output=$(
     cat "$check_file" | "${SUR_CMD[@]}" sql \
       --multi \
       --endpoint "$CLI_ENDPOINT" \
@@ -61,8 +61,13 @@ run_check() {
       --pass "$SURREAL_PASS" \
       --namespace "$SURREAL_NS" \
       --database "$SURREAL_DB" \
-      --json
-  )
+      --json \
+      2>&1
+  ); then
+    echo "$output"
+    echo "$check_file failed: unable to execute Surreal SQL against $CLI_ENDPOINT" >&2
+    return 1
+  fi
 
   echo "$output"
 

@@ -7,7 +7,10 @@ use axum::extract::{Extension, Path, Query, State};
 use axum::{
     Json, Router,
     extract::ws::close_code,
-    http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
+    http::{
+        HeaderMap, StatusCode,
+        header::{CONTENT_TYPE, HeaderValue},
+    },
     middleware,
     response::sse::{Event, KeepAlive, Sse},
     response::{IntoResponse, Response},
@@ -319,9 +322,7 @@ async fn metrics() -> Response {
     let mut response = (StatusCode::OK, body).into_response();
     response.headers_mut().insert(
         CONTENT_TYPE,
-        "text/plain; version=0.0.4; charset=utf-8"
-            .parse()
-            .expect("valid content type"),
+        HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"),
     );
     response
 }
