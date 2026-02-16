@@ -25,34 +25,31 @@ use gotong_domain::{
         CreateAdaptivePathInput, SuggestAdaptivePathInput, SuggestionReviewInput,
         UpdateAdaptivePathInput,
     },
-    auth::TrackRole,
     chat::{
         ChatMember, ChatMessage, ChatReadCursor, ChatService, ChatThread, ChatThreadCreate,
         MessageCatchup, SendMessageInput, build_message_catchup,
     },
     contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
     discovery::{
-        DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_TRANSITION, FEED_SOURCE_VOUCH,
-        FeedIngestInput, FeedListQuery, InAppNotification, NotificationListQuery, PagedFeed,
-        PagedNotifications, SearchListQuery, SearchPage, WeeklyDigest,
+        DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_VOUCH, FeedIngestInput,
+        FeedListQuery, InAppNotification, NotificationListQuery, PagedFeed, PagedNotifications,
+        SearchListQuery, SearchPage, WeeklyDigest,
     },
     error::DomainError,
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
-    idempotency::{BeginOutcome, timer_request_id},
+    idempotency::BeginOutcome,
     identity::ActorIdentity,
-    jobs::{
-        JobDefaults, ModerationAutoReleasePayload, TransitionClosePayload, WebhookRetryPayload,
-        new_job,
-    },
+    jobs::{JobDefaults, ModerationAutoReleasePayload, WebhookRetryPayload, new_job},
+    mode::Mode,
     moderation::{
         ContentModeration, ModerationApplyCommand, ModerationDecision, ModerationService,
     },
+    ontology::{
+        ActionType, OntologyConcept, OntologyEdgeKind, OntologyNoteCreate, OntologyTripleCreate,
+    },
     ports::idempotency::{IdempotencyKey, IdempotencyResponse},
     ports::jobs::JobType,
-    transitions::{
-        TrackStateTransition, TrackTransitionInput, TrackTransitionService, TransitionAction,
-        TransitionMechanism,
-    },
+    ranking::wilson_score,
     vault::{
         AddTrustee, CreateVaultDraft, ExpireVault, PublishVault, RemoveTrustee, RevokeVault,
         SealVault, UpdateVaultDraft, VaultEntry, VaultService, VaultTimelineEvent,
@@ -91,16 +88,6 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/evidence", post(submit_evidence))
         .route("/v1/evidence/:evidence_id", get(get_evidence))
         .route("/v1/vouches", post(submit_vouch).get(list_vouches))
-        .route("/v1/transitions", post(create_transition))
-        .route(
-            "/v1/transitions/:entity_id/timeline",
-            get(list_transition_timeline),
-        )
-        .route(
-            "/v1/transitions/:entity_id/active",
-            get(get_active_transition_stage),
-        )
-        .route("/v1/transitions/:transition_id", get(get_transition_by_id))
         .route("/v1/adaptive-path/plans", post(create_adaptive_path_plan))
         .route(
             "/v1/adaptive-path/plans/:plan_id",
@@ -172,6 +159,36 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/moderations/:content_id", get(get_moderation_view))
         .route("/v1/feed", get(list_discovery_feed))
         .route("/v1/search", get(list_discovery_search))
+        .route("/v1/ontology/concepts", post(upsert_ontology_concept))
+        .route(
+            "/v1/ontology/concepts/:qid",
+            get(get_ontology_concept_by_qid),
+        )
+        .route(
+            "/v1/ontology/concepts/:concept_id/broader/:broader_id",
+            post(add_ontology_broader_edge),
+        )
+        .route(
+            "/v1/ontology/concepts/:concept_id/hierarchy",
+            get(list_ontology_hierarchy),
+        )
+        .route("/v1/ontology/feed", post(create_ontology_feed))
+        .route(
+            "/v1/ontology/notes/:note_id/vouches",
+            post(vouch_ontology_note),
+        )
+        .route(
+            "/v1/ontology/notes/:note_id/challenges",
+            post(challenge_ontology_note),
+        )
+        .route(
+            "/v1/ontology/notes/:note_id/feedback",
+            get(get_ontology_note_feedback),
+        )
+        .route(
+            "/v1/ontology/notes/:note_id/ranked",
+            get(get_ontology_note_ranking),
+        )
         .route(
             "/v1/notifications/weekly-digest",
             get(discovery_weekly_digest),
@@ -389,6 +406,350 @@ async fn idempotent_echo(
 }
 
 #[derive(Debug, Deserialize, Validate)]
+struct UpsertOntologyConceptRequest {
+    pub concept_id: Option<String>,
+    #[validate(length(min = 1, max = 128))]
+    pub qid: String,
+    pub label_id: Option<String>,
+    pub label_en: Option<String>,
+    pub verified: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateOntologyFeedRequest {
+    pub note_id: Option<String>,
+    #[validate(length(min = 1, max = 2_000))]
+    pub content: String,
+    #[validate(length(min = 1, max = 128))]
+    pub community_id: String,
+    #[validate(length(min = 1, max = 32))]
+    pub temporal_class: String,
+    pub ttl_expires_ms: Option<i64>,
+    pub ai_readable: Option<bool>,
+    pub rahasia_level: Option<i64>,
+    pub confidence: Option<f64>,
+    pub triples: Option<Vec<CreateOntologyFeedTripleRequest>>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateOntologyFeedTripleRequest {
+    pub edge: OntologyEdgeKind,
+    pub from_id: Option<String>,
+    #[validate(length(min = 1, max = 256))]
+    pub to_id: String,
+    pub predicate: Option<String>,
+    pub metadata: Option<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OntologyFeedbackRequest {
+    pub metadata: Option<Value>,
+}
+
+#[derive(Debug, Serialize)]
+struct OntologyFeedbackResponse {
+    note_id: String,
+    vouch_count: usize,
+    challenge_count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct OntologyRankingResponse {
+    note_id: String,
+    vouch_count: usize,
+    challenge_count: usize,
+    score: f64,
+}
+
+fn normalize_ontology_temporal_class(value: &str) -> Result<String, ApiError> {
+    let normalized = value.trim().to_ascii_lowercase();
+    if matches!(normalized.as_str(), "ephemeral" | "periodic" | "persistent") {
+        Ok(normalized)
+    } else {
+        Err(ApiError::Validation(
+            "temporal_class must be one of: ephemeral, periodic, persistent".to_string(),
+        ))
+    }
+}
+
+fn validate_ontology_action_predicate(
+    edge: &OntologyEdgeKind,
+    predicate: Option<&str>,
+) -> Result<(), ApiError> {
+    if *edge != OntologyEdgeKind::HasAction {
+        return Ok(());
+    }
+    let Some(predicate) = predicate.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Err(ApiError::Validation(
+            "predicate is required when edge is HasAction".to_string(),
+        ));
+    };
+    if !predicate.starts_with("schema:") {
+        return Err(ApiError::Validation(
+            "HasAction predicate must start with 'schema:'".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_ontology_feed(payload: &CreateOntologyFeedRequest) -> Result<String, ApiError> {
+    let temporal_class = normalize_ontology_temporal_class(&payload.temporal_class)?;
+    if temporal_class == "ephemeral" && payload.ttl_expires_ms.is_none() {
+        return Err(ApiError::Validation(
+            "ttl_expires_ms is required for temporal_class=ephemeral".to_string(),
+        ));
+    }
+    if payload.ttl_expires_ms.is_some_and(|value| value <= 0) {
+        return Err(ApiError::Validation(
+            "ttl_expires_ms must be a positive epoch milliseconds value".to_string(),
+        ));
+    }
+    if !(0..=3).contains(&payload.rahasia_level.unwrap_or(0)) {
+        return Err(ApiError::Validation(
+            "rahasia_level must be between 0 and 3".to_string(),
+        ));
+    }
+    if !(0.0..=1.0).contains(&payload.confidence.unwrap_or(0.5)) {
+        return Err(ApiError::Validation(
+            "confidence must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+    if let Some(triples) = &payload.triples {
+        for triple in triples {
+            validate_ontology_action_predicate(&triple.edge, triple.predicate.as_deref())?;
+        }
+    }
+    Ok(temporal_class)
+}
+
+async fn upsert_ontology_concept(
+    State(state): State<AppState>,
+    Json(payload): Json<UpsertOntologyConceptRequest>,
+) -> Result<(StatusCode, Json<OntologyConcept>), ApiError> {
+    validation::validate(&payload)?;
+    let concept = OntologyConcept {
+        concept_id: payload.concept_id.unwrap_or_else(|| payload.qid.clone()),
+        qid: payload.qid,
+        label_id: payload.label_id,
+        label_en: payload.label_en,
+        verified: payload.verified.unwrap_or(false),
+    };
+    let concept = state
+        .ontology_repo
+        .upsert_concept(&concept)
+        .await
+        .map_err(map_domain_error)?;
+    Ok((StatusCode::CREATED, Json(concept)))
+}
+
+async fn get_ontology_concept_by_qid(
+    State(state): State<AppState>,
+    Path(qid): Path<String>,
+) -> Result<Json<OntologyConcept>, ApiError> {
+    let concept = state
+        .ontology_repo
+        .get_concept_by_qid(&qid)
+        .await
+        .map_err(map_domain_error)?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(concept))
+}
+
+async fn add_ontology_broader_edge(
+    State(state): State<AppState>,
+    Path((concept_id, broader_id)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .ontology_repo
+        .add_broader_edge(&concept_id, &broader_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_ontology_hierarchy(
+    State(state): State<AppState>,
+    Path(concept_id): Path<String>,
+) -> Result<Json<Vec<OntologyConcept>>, ApiError> {
+    let concepts = state
+        .ontology_repo
+        .list_broader_concepts(&concept_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(concepts))
+}
+
+async fn create_ontology_feed(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateOntologyFeedRequest>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    validation::validate(&payload)?;
+    let temporal_class = validate_ontology_feed(&payload)?;
+    let actor = actor_identity(&auth)?;
+
+    let created_note = state
+        .ontology_repo
+        .create_note(&OntologyNoteCreate {
+            note_id: payload.note_id,
+            content: payload.content,
+            author_id: actor.user_id,
+            community_id: payload.community_id,
+            temporal_class,
+            ttl_expires_ms: payload.ttl_expires_ms,
+            ai_readable: payload.ai_readable.unwrap_or(true),
+            rahasia_level: payload.rahasia_level.unwrap_or(0),
+            confidence: payload.confidence.unwrap_or(0.5),
+        })
+        .await
+        .map_err(map_domain_error)?;
+
+    let triples = payload
+        .triples
+        .unwrap_or_default()
+        .into_iter()
+        .map(|triple| {
+            validate_ontology_action_predicate(&triple.edge, triple.predicate.as_deref())?;
+            Ok(OntologyTripleCreate {
+                edge: triple.edge,
+                from_id: triple
+                    .from_id
+                    .unwrap_or_else(|| format!("note:{}", created_note.note_id)),
+                to_id: triple.to_id,
+                predicate: triple.predicate,
+                metadata: triple.metadata,
+            })
+        })
+        .collect::<Result<Vec<_>, ApiError>>()?;
+
+    if !triples.is_empty() {
+        state
+            .ontology_repo
+            .write_triples(&triples)
+            .await
+            .map_err(map_domain_error)?;
+    }
+
+    let feedback = state
+        .ontology_repo
+        .note_feedback_counts(&created_note.note_id)
+        .await
+        .map_err(map_domain_error)?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({
+            "note": created_note,
+            "triple_count": triples.len(),
+            "feedback": feedback,
+        })),
+    ))
+}
+
+async fn vouch_ontology_note(
+    State(state): State<AppState>,
+    Path(note_id): Path<String>,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<OntologyFeedbackRequest>,
+) -> Result<(StatusCode, Json<OntologyFeedbackResponse>), ApiError> {
+    let actor = actor_identity(&auth)?;
+    state
+        .ontology_repo
+        .write_triples(&[OntologyTripleCreate {
+            edge: OntologyEdgeKind::Vouches,
+            from_id: format!("warga:{}", actor.user_id),
+            to_id: format!("note:{note_id}"),
+            predicate: None,
+            metadata: payload.metadata,
+        }])
+        .await
+        .map_err(map_domain_error)?;
+
+    let counts = state
+        .ontology_repo
+        .note_feedback_counts(&note_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok((
+        StatusCode::CREATED,
+        Json(OntologyFeedbackResponse {
+            note_id,
+            vouch_count: counts.vouch_count,
+            challenge_count: counts.challenge_count,
+        }),
+    ))
+}
+
+async fn challenge_ontology_note(
+    State(state): State<AppState>,
+    Path(note_id): Path<String>,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<OntologyFeedbackRequest>,
+) -> Result<(StatusCode, Json<OntologyFeedbackResponse>), ApiError> {
+    let actor = actor_identity(&auth)?;
+    state
+        .ontology_repo
+        .write_triples(&[OntologyTripleCreate {
+            edge: OntologyEdgeKind::Challenges,
+            from_id: format!("warga:{}", actor.user_id),
+            to_id: format!("note:{note_id}"),
+            predicate: None,
+            metadata: payload.metadata,
+        }])
+        .await
+        .map_err(map_domain_error)?;
+
+    let counts = state
+        .ontology_repo
+        .note_feedback_counts(&note_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok((
+        StatusCode::CREATED,
+        Json(OntologyFeedbackResponse {
+            note_id,
+            vouch_count: counts.vouch_count,
+            challenge_count: counts.challenge_count,
+        }),
+    ))
+}
+
+async fn get_ontology_note_feedback(
+    State(state): State<AppState>,
+    Path(note_id): Path<String>,
+) -> Result<Json<OntologyFeedbackResponse>, ApiError> {
+    let counts = state
+        .ontology_repo
+        .note_feedback_counts(&note_id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(OntologyFeedbackResponse {
+        note_id,
+        vouch_count: counts.vouch_count,
+        challenge_count: counts.challenge_count,
+    }))
+}
+
+async fn get_ontology_note_ranking(
+    State(state): State<AppState>,
+    Path(note_id): Path<String>,
+) -> Result<Json<OntologyRankingResponse>, ApiError> {
+    let counts = state
+        .ontology_repo
+        .note_feedback_counts(&note_id)
+        .await
+        .map_err(map_domain_error)?;
+    let total_feedback = counts.vouch_count + counts.challenge_count;
+    let score = wilson_score(counts.vouch_count as u64, total_feedback as u64);
+    Ok(Json(OntologyRankingResponse {
+        note_id,
+        vouch_count: counts.vouch_count,
+        challenge_count: counts.challenge_count,
+        score,
+    }))
+}
+
+#[derive(Debug, Deserialize, Validate)]
 struct CreateVaultDraftRequest {
     pub payload: Option<Value>,
     pub attachment_refs: Vec<String>,
@@ -435,6 +796,7 @@ struct AddVaultTrusteeRequest {
 
 #[derive(Debug, Deserialize, Validate)]
 struct CreateContributionRequest {
+    pub mode: Mode,
     pub contribution_type: ContributionType,
     #[validate(length(min = 1, max = 200))]
     pub title: String,
@@ -477,6 +839,7 @@ async fn create_contribution(
         BeginOutcome::Started => {
             let service = ContributionService::new(state.contribution_repo.clone());
             let input = ContributionCreate {
+                mode: payload.mode,
                 contribution_type: payload.contribution_type,
                 title: payload.title,
                 description: payload.description,
@@ -566,8 +929,6 @@ struct FeedListQueryParams {
     pub cursor: Option<String>,
     pub limit: Option<usize>,
     pub scope_id: Option<String>,
-    pub track: Option<String>,
-    pub stage: Option<String>,
     pub privacy_level: Option<String>,
     pub from_ms: Option<i64>,
     pub to_ms: Option<i64>,
@@ -581,8 +942,6 @@ struct SearchListQueryParams {
     pub cursor: Option<String>,
     pub limit: Option<usize>,
     pub scope_id: Option<String>,
-    pub track: Option<String>,
-    pub stage: Option<String>,
     pub privacy_level: Option<String>,
     pub from_ms: Option<i64>,
     pub to_ms: Option<i64>,
@@ -620,8 +979,6 @@ async fn list_discovery_feed(
         cursor: query.cursor,
         limit: query.limit,
         scope_id: query.scope_id,
-        track: query.track,
-        stage: query.stage,
         privacy_level: query.privacy_level,
         from_ms: query.from_ms,
         to_ms: query.to_ms,
@@ -651,8 +1008,6 @@ async fn list_discovery_search(
         cursor: query.cursor,
         limit: query.limit,
         scope_id: query.scope_id,
-        track: query.track,
-        stage: query.stage,
         privacy_level: query.privacy_level,
         from_ms: query.from_ms,
         to_ms: query.to_ms,
@@ -852,31 +1207,6 @@ struct CreateVouchRequest {
     pub message: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
-struct CreateTransitionRequest {
-    #[validate(length(min = 1, max = 128))]
-    pub track: String,
-    #[validate(length(min = 1, max = 128))]
-    pub entity_id: String,
-    #[validate(length(min = 1, max = 128))]
-    pub from_stage: String,
-    #[validate(length(min = 1, max = 128))]
-    pub to_stage: String,
-    pub transition_action: TransitionAction,
-    pub transition_type: TransitionMechanism,
-    pub mechanism: TransitionMechanism,
-    pub track_roles: Vec<TrackRole>,
-    #[validate(length(min = 1, max = 128))]
-    pub gate_status: String,
-    pub gate_metadata: Option<Value>,
-    #[serde(default)]
-    pub occurred_at_ms: Option<i64>,
-    #[serde(default)]
-    pub request_ts_ms: Option<i64>,
-    #[serde(default)]
-    pub closes_at_ms: Option<i64>,
-}
-
 #[derive(Debug, Deserialize)]
 struct AdaptivePathCheckpointDraftRequest {
     pub checkpoint_id: Option<String>,
@@ -910,8 +1240,7 @@ struct AdaptivePathBranchDraftRequest {
 struct AdaptivePathPayloadDraftRequest {
     pub title: String,
     pub summary: Option<String>,
-    pub track_hint: Option<String>,
-    pub seed_hint: Option<String>,
+    pub action_type: ActionType,
     pub branches: Vec<AdaptivePathBranchDraftRequest>,
 }
 
@@ -1113,10 +1442,7 @@ async fn enqueue_webhook_outbox_event(
             return Err(ApiError::Internal);
         }
     };
-    let queue = state
-        .transition_job_queue
-        .as_ref()
-        .ok_or(ApiError::Internal)?;
+    let queue = state.job_queue.as_ref().ok_or(ApiError::Internal)?;
     let job_payload = serde_json::to_value(WebhookRetryPayload {
         event_id: event.event_id.clone(),
     })
@@ -1329,7 +1655,7 @@ async fn apply_moderation(
                 )
                 .with_run_at(hold_expires_at_ms);
 
-                if let Some(queue) = state.transition_job_queue.as_ref() {
+                if let Some(queue) = state.job_queue.as_ref() {
                     queue.enqueue(&job).await.map_err(|err| {
                         tracing::error!(error = %err, "failed to enqueue moderation auto-release job");
                         ApiError::Internal
@@ -1394,162 +1720,6 @@ async fn list_moderation_review_queue(
         .await
         .map_err(map_domain_error)?;
     Ok(Json(queue))
-}
-
-async fn create_transition(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    Extension(auth): Extension<AuthContext>,
-    Json(payload): Json<CreateTransitionRequest>,
-) -> Result<Response, ApiError> {
-    validation::validate(&payload)?;
-    let actor = actor_identity(&auth)?;
-    let request_id = request_id_from_headers(&headers)?;
-    let correlation_id = correlation_id_from_headers(&headers)?;
-    let token_role = auth.role.clone();
-
-    let key = IdempotencyKey::new(
-        "transition_create",
-        format!("{}:{}", actor.user_id, payload.entity_id),
-        request_id.clone(),
-    );
-    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
-        tracing::error!(error = %err, "idempotency begin failed");
-        ApiError::Internal
-    })?;
-
-    match outcome {
-        BeginOutcome::Replay(response) => Ok(to_response(response)),
-        BeginOutcome::InProgress => Err(ApiError::Conflict),
-        BeginOutcome::Started => {
-            let service = TrackTransitionService::new(state.transition_repo.clone());
-            let closes_at_ms = payload.closes_at_ms;
-            let input = TrackTransitionInput {
-                track: payload.track,
-                entity_id: payload.entity_id,
-                from_stage: payload.from_stage,
-                to_stage: payload.to_stage,
-                transition_action: payload.transition_action,
-                transition_type: payload.transition_type,
-                mechanism: payload.mechanism,
-                request_id: request_id.clone(),
-                correlation_id: correlation_id.clone(),
-                track_roles: payload.track_roles,
-                gate_status: payload.gate_status,
-                gate_metadata: payload.gate_metadata,
-                occurred_at_ms: payload.occurred_at_ms,
-                request_ts_ms: payload.request_ts_ms,
-                closes_at_ms,
-            };
-            let transition = service
-                .track_state_transition(actor.clone(), token_role, input)
-                .await
-                .map_err(map_domain_error)?;
-            ingest_discovery_transition_feed(
-                &state,
-                &transition,
-                request_id.to_string(),
-                correlation_id.to_string(),
-            )
-            .await?;
-
-            if transition.transition_type == TransitionMechanism::Timer {
-                let closes_at_ms = closes_at_ms.ok_or(ApiError::Internal)?;
-                let close_request_id = timer_request_id(&transition.transition_id, closes_at_ms);
-                let close_payload = TransitionClosePayload {
-                    transition_id: transition.transition_id.clone(),
-                    entity_id: transition.entity_id.clone(),
-                    track: transition.track.clone(),
-                    from_stage: transition.from_stage.clone(),
-                    to_stage: transition.to_stage.clone(),
-                    closes_at_ms,
-                    request_id: close_request_id.clone(),
-                    request_ts_ms: transition.occurred_at_ms,
-                    correlation_id: transition.correlation_id.clone(),
-                    gate_status: "applied".to_string(),
-                    gate_metadata: transition.gate.metadata.clone(),
-                };
-                let job = new_job(
-                    transition.transition_id.clone(),
-                    JobType::TransitionClose,
-                    serde_json::to_value(&close_payload).map_err(|_| ApiError::Internal)?,
-                    close_request_id,
-                    transition.correlation_id.clone(),
-                    gotong_domain::jobs::JobDefaults::default(),
-                )
-                .with_run_at(closes_at_ms);
-
-                if let Some(queue) = state.transition_job_queue.as_ref() {
-                    queue.enqueue(&job).await.map_err(|err| {
-                        tracing::error!(error = %err, "failed to enqueue transition close job");
-                        ApiError::Internal
-                    })?;
-                }
-            }
-
-            let response = IdempotencyResponse {
-                status_code: StatusCode::CREATED.as_u16(),
-                body: serde_json::to_value(&transition).map_err(|_| ApiError::Internal)?,
-            };
-
-            state
-                .idempotency
-                .complete(&key, response.clone())
-                .await
-                .map_err(|err| {
-                    tracing::error!(error = %err, "idempotency complete failed");
-                    ApiError::Internal
-                })?;
-
-            Ok(to_response(response))
-        }
-    }
-}
-
-async fn list_transition_timeline(
-    State(state): State<AppState>,
-    Path(entity_id): Path<String>,
-) -> Result<Json<Vec<TrackStateTransition>>, ApiError> {
-    let service = TrackTransitionService::new(state.transition_repo.clone());
-    let transitions = service
-        .list_by_entity(&entity_id)
-        .await
-        .map_err(map_domain_error)?;
-    Ok(Json(transitions))
-}
-
-#[derive(Serialize)]
-struct ActiveTransitionResponse {
-    pub entity_id: String,
-    pub active_stage: Option<String>,
-}
-
-async fn get_active_transition_stage(
-    State(state): State<AppState>,
-    Path(entity_id): Path<String>,
-) -> Result<Json<ActiveTransitionResponse>, ApiError> {
-    let service = TrackTransitionService::new(state.transition_repo.clone());
-    let active_stage = service
-        .active_stage(&entity_id)
-        .await
-        .map_err(map_domain_error)?;
-    Ok(Json(ActiveTransitionResponse {
-        entity_id,
-        active_stage,
-    }))
-}
-
-async fn get_transition_by_id(
-    State(state): State<AppState>,
-    Path(transition_id): Path<String>,
-) -> Result<Json<TrackStateTransition>, ApiError> {
-    let service = TrackTransitionService::new(state.transition_repo.clone());
-    let transition = service
-        .get_by_transition_id(&transition_id)
-        .await
-        .map_err(map_domain_error)?;
-    let transition = transition.ok_or(ApiError::NotFound)?;
-    Ok(Json(transition))
 }
 
 async fn create_adaptive_path_plan(
@@ -2459,8 +2629,6 @@ async fn ingest_discovery_contribution_feed(
         actor: actor.clone(),
         title: contribution.title.clone(),
         summary: contribution.description.clone(),
-        track: None,
-        stage: None,
         scope_id: None,
         privacy_level: Some("public".to_string()),
         occurred_at_ms: Some(contribution.created_at_ms),
@@ -2492,8 +2660,6 @@ async fn ingest_discovery_vouch_feed(
         actor: actor.clone(),
         title: format!("Vouch for {}", vouch.vouchee_id),
         summary,
-        track: None,
-        stage: None,
         scope_id: None,
         privacy_level: Some("public".to_string()),
         occurred_at_ms: Some(vouch.created_at_ms),
@@ -2506,52 +2672,6 @@ async fn ingest_discovery_vouch_feed(
             "skill_id": vouch.skill_id,
             "weight_hint": vouch.weight_hint,
             "message": vouch.message,
-        })),
-    };
-    service.ingest_feed(input).await.map_err(map_domain_error)?;
-    Ok(())
-}
-
-async fn ingest_discovery_transition_feed(
-    state: &AppState,
-    transition: &TrackStateTransition,
-    request_id: String,
-    correlation_id: String,
-) -> Result<(), ApiError> {
-    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
-    let actor = ActorIdentity {
-        user_id: transition.actor.user_id.clone(),
-        username: transition.actor.username.clone(),
-    };
-    let input = FeedIngestInput {
-        source_type: FEED_SOURCE_TRANSITION.to_string(),
-        source_id: transition.transition_id.clone(),
-        actor,
-        title: format!(
-            "{} moved {} → {}",
-            transition.entity_id, transition.from_stage, transition.to_stage
-        ),
-        summary: Some(format!(
-            "Track {} transition by {}",
-            transition.track, transition.actor.user_id
-        )),
-        track: Some(transition.track.clone()),
-        stage: Some(transition.to_stage.clone()),
-        scope_id: None,
-        privacy_level: Some("public".to_string()),
-        occurred_at_ms: Some(transition.occurred_at_ms),
-        request_id,
-        correlation_id,
-        request_ts_ms: Some(transition.occurred_at_ms),
-        participant_ids: vec![
-            transition.actor.user_id.clone(),
-            transition.entity_id.clone(),
-        ],
-        payload: Some(serde_json::json!({
-            "track": transition.track,
-            "from_stage": transition.from_stage,
-            "to_stage": transition.to_stage,
-            "gate_status": transition.gate.status,
         })),
     };
     service.ingest_feed(input).await.map_err(map_domain_error)?;
@@ -3310,8 +3430,7 @@ fn into_adaptive_path_payload_draft(
     AdaptivePathPlanPayloadDraft {
         title: payload.title,
         summary: payload.summary,
-        track_hint: payload.track_hint,
-        seed_hint: payload.seed_hint,
+        action_type: payload.action_type,
         branches: payload
             .branches
             .into_iter()

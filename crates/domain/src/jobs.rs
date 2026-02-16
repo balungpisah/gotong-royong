@@ -9,21 +9,6 @@ pub struct JobPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct TransitionClosePayload {
-    pub transition_id: String,
-    pub entity_id: String,
-    pub track: String,
-    pub from_stage: String,
-    pub to_stage: String,
-    pub closes_at_ms: i64,
-    pub request_id: String,
-    pub request_ts_ms: i64,
-    pub correlation_id: String,
-    pub gate_status: String,
-    pub gate_metadata: Option<serde_json::Value>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ModerationAutoReleasePayload {
     pub content_id: String,
     pub hold_decision_request_id: String,
@@ -38,14 +23,16 @@ pub struct WebhookRetryPayload {
     pub event_id: String,
 }
 
-impl TransitionClosePayload {
-    pub fn request_id(&self) -> String {
-        self.request_id.clone()
-    }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct TTLCleanupPayload {
+    pub scheduled_ms: i64,
+    pub cutoff_ms: i64,
+}
 
-    pub fn is_due(&self, now_ms: i64) -> bool {
-        now_ms >= self.closes_at_ms
-    }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ConceptVerificationPayload {
+    pub qid: String,
+    pub scheduled_ms: i64,
 }
 
 #[derive(Clone, Debug)]

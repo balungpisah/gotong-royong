@@ -2,18 +2,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gotong_domain::ports::jobs::{JobQueue, JobQueueError, JobType};
+use gotong_domain::ports::ontology::OntologyRepository;
 use gotong_domain::ports::webhook::WebhookOutboxRepository;
 use gotong_domain::{
     auth::Role,
     identity::ActorIdentity,
-    jobs::{TransitionClosePayload, backoff_ms, now_ms},
+    jobs::{ConceptVerificationPayload, TTLCleanupPayload, backoff_ms, now_ms},
     moderation::{ModerationAutoReleaseCommand, ModerationService},
-    ports::{
-        jobs::JobEnvelope, moderation::ModerationRepository, transitions::TrackTransitionRepository,
-    },
-    transitions::{
-        TrackTransitionInput, TrackTransitionService, TransitionAction, TransitionMechanism,
-    },
+    ontology::OntologyConcept,
+    ports::{jobs::JobEnvelope, moderation::ModerationRepository},
     webhook::{
         WebhookDeliveryLog, WebhookDeliveryResult, WebhookOutboxEvent, WebhookOutboxStatus,
         WebhookOutboxUpdate,
@@ -25,8 +22,7 @@ use gotong_infra::{
     jobs::{JobQueueMetricsSnapshot, RedisJobQueue},
     logging::init_tracing,
     repositories::{
-        SurrealModerationRepository, SurrealTrackTransitionRepository,
-        SurrealWebhookOutboxRepository,
+        SurrealModerationRepository, SurrealOntologyRepository, SurrealWebhookOutboxRepository,
     },
 };
 use hmac::{Hmac, Mac};
@@ -67,16 +63,16 @@ async fn main() -> anyhow::Result<()> {
         info!(job_id = %sample.job_id, "enqueued sample job");
     }
 
-    let mut transition_repo = None;
     let mut moderation_repo = None;
+    let mut ontology_repo = None;
     let mut webhook_outbox_repo = None;
     let backend = config.data_backend.trim().to_ascii_lowercase();
     if matches!(backend.as_str(), "surreal" | "surrealdb" | "tikv") {
         let db_config = DbConfig::from_app_config(&config);
-        let repository = SurrealTrackTransitionRepository::new(&db_config).await?;
-        transition_repo = Some(Arc::new(repository) as Arc<dyn TrackTransitionRepository>);
         let moderation_repository = SurrealModerationRepository::new(&db_config).await?;
         moderation_repo = Some(Arc::new(moderation_repository) as Arc<dyn ModerationRepository>);
+        let ontology_repository = SurrealOntologyRepository::new(&db_config).await?;
+        ontology_repo = Some(Arc::new(ontology_repository) as Arc<dyn OntologyRepository>);
         let webhook_repository = SurrealWebhookOutboxRepository::new(&db_config).await?;
         webhook_outbox_repo =
             Some(Arc::new(webhook_repository) as Arc<dyn WebhookOutboxRepository>);
@@ -85,8 +81,8 @@ async fn main() -> anyhow::Result<()> {
     let worker = Worker::new(
         queue,
         config,
-        transition_repo,
         moderation_repo,
+        ontology_repo,
         webhook_outbox_repo,
     );
     info!("worker starting");
@@ -98,8 +94,8 @@ async fn main() -> anyhow::Result<()> {
 struct Worker {
     queue: RedisJobQueue,
     config: AppConfig,
-    transition_repo: Option<Arc<dyn TrackTransitionRepository>>,
     moderation_repo: Option<Arc<dyn ModerationRepository>>,
+    ontology_repo: Option<Arc<dyn OntologyRepository>>,
     webhook_outbox_repo: Option<Arc<dyn WebhookOutboxRepository>>,
 }
 
@@ -107,15 +103,15 @@ impl Worker {
     fn new(
         queue: RedisJobQueue,
         config: AppConfig,
-        transition_repo: Option<Arc<dyn TrackTransitionRepository>>,
         moderation_repo: Option<Arc<dyn ModerationRepository>>,
+        ontology_repo: Option<Arc<dyn OntologyRepository>>,
         webhook_outbox_repo: Option<Arc<dyn WebhookOutboxRepository>>,
     ) -> Self {
         Self {
             queue,
             config,
-            transition_repo,
             moderation_repo,
+            ontology_repo,
             webhook_outbox_repo,
         }
     }
@@ -144,6 +140,8 @@ impl Worker {
         }
 
         self.emit_queue_metrics().await;
+        let mut next_ttl_cleanup_at_ms = 0_i64;
+        let mut next_concept_verification_at_ms = 0_i64;
         loop {
             self.emit_queue_metrics().await;
             let now = now_ms();
@@ -155,6 +153,13 @@ impl Worker {
                 warn!(error = %err, "failed to promote due jobs, continuing");
             }
 
+            self.enqueue_periodic_jobs(
+                now,
+                &mut next_ttl_cleanup_at_ms,
+                &mut next_concept_verification_at_ms,
+            )
+            .await;
+
             match self.queue.dequeue(Duration::from_secs(2)).await {
                 Ok(Some(job)) => {
                     let started_at = now_ms();
@@ -162,8 +167,8 @@ impl Worker {
                     if let Err(err) = handle_job(
                         &self.config,
                         &job,
-                        self.transition_repo.as_ref(),
                         self.moderation_repo.as_ref(),
+                        self.ontology_repo.as_ref(),
                         self.webhook_outbox_repo.as_ref(),
                     )
                     .await
@@ -231,6 +236,92 @@ impl Worker {
         }
     }
 
+    async fn enqueue_periodic_jobs(
+        &self,
+        now: i64,
+        next_ttl_cleanup_at_ms: &mut i64,
+        next_concept_verification_at_ms: &mut i64,
+    ) {
+        let ttl_interval_ms = self.config.worker_ttl_cleanup_interval_ms.max(60_000);
+        if now >= *next_ttl_cleanup_at_ms {
+            let slot_start_ms = periodic_slot_start_ms(now, ttl_interval_ms);
+            let job_id = format!("system:ttl_cleanup:{slot_start_ms}");
+            let payload = TTLCleanupPayload {
+                scheduled_ms: now,
+                cutoff_ms: now,
+            };
+            self.enqueue_periodic_job(
+                JobType::TTLCleanup,
+                job_id,
+                json!(payload),
+                now,
+                1,
+                "ttl_cleanup",
+            )
+            .await;
+            *next_ttl_cleanup_at_ms = slot_start_ms + ttl_interval_ms as i64;
+        }
+
+        let concept_interval_ms = self
+            .config
+            .worker_concept_verification_interval_ms
+            .max(60_000);
+        if now >= *next_concept_verification_at_ms {
+            let slot_start_ms = periodic_slot_start_ms(now, concept_interval_ms);
+            let job_id = format!("system:concept_verification:{slot_start_ms}");
+            let payload = ConceptVerificationPayload {
+                qid: "Q2095".to_string(),
+                scheduled_ms: now,
+            };
+            self.enqueue_periodic_job(
+                JobType::ConceptVerification,
+                job_id,
+                json!(payload),
+                now,
+                1,
+                "concept_verification",
+            )
+            .await;
+            *next_concept_verification_at_ms = slot_start_ms + concept_interval_ms as i64;
+        }
+    }
+
+    async fn enqueue_periodic_job(
+        &self,
+        job_type: JobType,
+        job_id: String,
+        payload: serde_json::Value,
+        now: i64,
+        max_attempts: u32,
+        job_type_label: &str,
+    ) {
+        let envelope = JobEnvelope {
+            job_id: job_id.clone(),
+            job_type,
+            payload,
+            request_id: job_id.clone(),
+            correlation_id: format!("corr:{job_id}"),
+            attempt: 1,
+            max_attempts,
+            run_at_ms: now,
+            created_at_ms: now,
+        };
+
+        match self.queue.enqueue(&envelope).await {
+            Ok(()) => {
+                info!(job_id = %job_id, job_type = %job_type_label, "enqueued periodic job");
+            }
+            Err(err) => {
+                warn!(
+                    error = %err,
+                    job_id = %job_id,
+                    job_type = %job_type_label,
+                    "failed to enqueue periodic job"
+                );
+            }
+        }
+    }
+
     async fn handle_failure(
         &self,
         mut job: JobEnvelope,
@@ -287,48 +378,11 @@ impl Worker {
 async fn handle_job(
     config: &AppConfig,
     job: &JobEnvelope,
-    transition_repo: Option<&Arc<dyn TrackTransitionRepository>>,
     moderation_repo: Option<&Arc<dyn ModerationRepository>>,
+    ontology_repo: Option<&Arc<dyn OntologyRepository>>,
     webhook_outbox_repo: Option<&Arc<dyn WebhookOutboxRepository>>,
 ) -> anyhow::Result<()> {
     match job.job_type {
-        JobType::TransitionClose => {
-            let Some(repo) = transition_repo else {
-                warn!(
-                    job_id = %job.job_id,
-                    "skipping transition close job: transition repository is unavailable"
-                );
-                return Ok(());
-            };
-            let payload = parse_transition_close_payload(job)?;
-
-            let actor = ActorIdentity {
-                user_id: "system".to_string(),
-                username: "system".to_string(),
-            };
-            let service = TrackTransitionService::new(repo.clone());
-            let input = TrackTransitionInput {
-                track: payload.track,
-                entity_id: payload.entity_id,
-                from_stage: payload.from_stage,
-                to_stage: payload.to_stage,
-                transition_action: TransitionAction::Object,
-                transition_type: TransitionMechanism::Timer,
-                mechanism: TransitionMechanism::Timer,
-                request_id: payload.request_id,
-                correlation_id: payload.correlation_id,
-                track_roles: vec![],
-                gate_status: payload.gate_status,
-                gate_metadata: payload.gate_metadata,
-                occurred_at_ms: Some(payload.closes_at_ms),
-                request_ts_ms: Some(payload.request_ts_ms),
-                closes_at_ms: Some(payload.closes_at_ms),
-            };
-            service
-                .track_state_transition(actor, Role::System, input)
-                .await?;
-            observability::observe_transition_completion_lag_ms(now_ms() - payload.closes_at_ms);
-        }
         JobType::ModerationAutoRelease => {
             let Some(repo) = moderation_repo else {
                 warn!(
@@ -368,31 +422,33 @@ async fn handle_job(
         JobType::DigestSend => {
             info!(job_id = %job.job_id, "handling digest send (stub)");
         }
+        JobType::TTLCleanup => {
+            handle_ttl_cleanup(ontology_repo, job).await?;
+        }
+        JobType::ConceptVerification => {
+            handle_concept_verification(ontology_repo, job).await?;
+        }
     }
 
     Ok(())
 }
 
-fn parse_transition_close_payload(job: &JobEnvelope) -> anyhow::Result<TransitionClosePayload> {
-    let payload: TransitionClosePayload = serde_json::from_value(job.payload.clone())
-        .map_err(|err| anyhow::anyhow!("invalid transition close payload: {err}"))?;
-
-    if payload.closes_at_ms < 0 {
-        return Err(anyhow::anyhow!(
-            "invalid close payload: closes_at_ms must be non-negative"
-        ));
-    }
-
-    Ok(payload)
-}
-
 fn job_type_label(job_type: &JobType) -> &'static str {
     match job_type {
-        JobType::TransitionClose => "transition_close",
         JobType::ModerationAutoRelease => "moderation_auto_release",
         JobType::WebhookRetry => "webhook_retry",
         JobType::DigestSend => "digest_send",
+        JobType::TTLCleanup => "ttl_cleanup",
+        JobType::ConceptVerification => "concept_verification",
     }
+}
+
+fn periodic_slot_start_ms(now: i64, interval_ms: u64) -> i64 {
+    if interval_ms == 0 {
+        return now;
+    }
+    let interval = interval_ms as i64;
+    now - now.rem_euclid(interval)
 }
 
 fn parse_moderation_auto_release_payload(
@@ -422,6 +478,109 @@ fn parse_moderation_auto_release_payload(
         ));
     }
     Ok(payload)
+}
+
+fn parse_ttl_cleanup_payload(job: &JobEnvelope) -> anyhow::Result<TTLCleanupPayload> {
+    let payload: TTLCleanupPayload = serde_json::from_value(job.payload.clone())
+        .map_err(|err| anyhow::anyhow!("invalid ttl cleanup payload: {err}"))?;
+    if payload.scheduled_ms < 0 {
+        return Err(anyhow::anyhow!(
+            "invalid ttl cleanup payload: scheduled_ms must be non-negative"
+        ));
+    }
+    if payload.cutoff_ms < 0 {
+        return Err(anyhow::anyhow!(
+            "invalid ttl cleanup payload: cutoff_ms must be non-negative"
+        ));
+    }
+    Ok(payload)
+}
+
+fn parse_concept_verification_payload(
+    job: &JobEnvelope,
+) -> anyhow::Result<ConceptVerificationPayload> {
+    let payload: ConceptVerificationPayload = serde_json::from_value(job.payload.clone())
+        .map_err(|err| anyhow::anyhow!("invalid concept verification payload: {err}"))?;
+    if payload.scheduled_ms < 0 {
+        return Err(anyhow::anyhow!(
+            "invalid concept verification payload: scheduled_ms must be non-negative"
+        ));
+    }
+    if payload.qid.trim().is_empty() {
+        return Err(anyhow::anyhow!(
+            "invalid concept verification payload: qid is required"
+        ));
+    }
+    Ok(payload)
+}
+
+async fn handle_ttl_cleanup(
+    ontology_repo: Option<&Arc<dyn OntologyRepository>>,
+    job: &JobEnvelope,
+) -> anyhow::Result<()> {
+    let payload = parse_ttl_cleanup_payload(job)?;
+    let Some(repo) = ontology_repo else {
+        warn!(
+            job_id = %job.job_id,
+            "skipping ttl cleanup job: ontology repository is unavailable"
+        );
+        return Ok(());
+    };
+
+    let probe_note_id = format!("ttl_cleanup_probe_{}", payload.cutoff_ms);
+    let _ = repo
+        .note_feedback_counts(&probe_note_id)
+        .await
+        .map_err(|err| anyhow::anyhow!("ttl cleanup ontology probe failed: {err}"))?;
+    info!(
+        job_id = %job.job_id,
+        cutoff_ms = payload.cutoff_ms,
+        "handled ttl cleanup job"
+    );
+    Ok(())
+}
+
+async fn handle_concept_verification(
+    ontology_repo: Option<&Arc<dyn OntologyRepository>>,
+    job: &JobEnvelope,
+) -> anyhow::Result<()> {
+    let payload = parse_concept_verification_payload(job)?;
+    let Some(repo) = ontology_repo else {
+        warn!(
+            job_id = %job.job_id,
+            "skipping concept verification job: ontology repository is unavailable"
+        );
+        return Ok(());
+    };
+
+    let current = repo
+        .get_concept_by_qid(&payload.qid)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to fetch concept by qid: {err}"))?;
+    let concept = if let Some(mut concept) = current {
+        concept.verified = true;
+        if concept.concept_id.trim().is_empty() {
+            concept.concept_id = concept.qid.clone();
+        }
+        concept
+    } else {
+        OntologyConcept {
+            concept_id: payload.qid.clone(),
+            qid: payload.qid.clone(),
+            label_id: None,
+            label_en: None,
+            verified: true,
+        }
+    };
+    repo.upsert_concept(&concept)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to upsert verified concept: {err}"))?;
+    info!(
+        job_id = %job.job_id,
+        qid = %payload.qid,
+        "handled concept verification job"
+    );
+    Ok(())
 }
 
 #[derive(Debug)]

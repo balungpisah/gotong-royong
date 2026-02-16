@@ -13,8 +13,8 @@ use gotong_domain::ports::{
     discovery::{FeedRepository, NotificationRepository},
     evidence::EvidenceRepository,
     jobs::JobQueue,
+    ontology::OntologyRepository,
     siaga::SiagaRepository,
-    transitions::TrackTransitionRepository,
     vault::VaultRepository,
     vouches::VouchRepository,
     webhook::WebhookOutboxRepository,
@@ -27,12 +27,12 @@ use gotong_infra::jobs::RedisJobQueue;
 use gotong_infra::repositories::{
     InMemoryAdaptivePathRepository, InMemoryChatRepository, InMemoryContributionRepository,
     InMemoryDiscoveryFeedRepository, InMemoryDiscoveryNotificationRepository,
-    InMemoryEvidenceRepository, InMemoryModerationRepository, InMemorySiagaRepository,
-    InMemoryTrackTransitionRepository, InMemoryVaultRepository, InMemoryVouchRepository,
+    InMemoryEvidenceRepository, InMemoryModerationRepository, InMemoryOntologyRepository,
+    InMemorySiagaRepository, InMemoryVaultRepository, InMemoryVouchRepository,
     InMemoryWebhookOutboxRepository, SurrealAdaptivePathRepository, SurrealChatRepository,
     SurrealContributionRepository, SurrealDiscoveryFeedRepository,
     SurrealDiscoveryNotificationRepository, SurrealEvidenceRepository, SurrealModerationRepository,
-    SurrealSiagaRepository, SurrealTrackTransitionRepository, SurrealVaultRepository,
+    SurrealOntologyRepository, SurrealSiagaRepository, SurrealVaultRepository,
     SurrealVouchRepository, SurrealWebhookOutboxRepository,
 };
 use redis::Client;
@@ -45,16 +45,16 @@ type RepositoryBundle = (
     Arc<dyn ContributionRepository>,
     Arc<dyn EvidenceRepository>,
     Arc<dyn VouchRepository>,
-    Arc<dyn TrackTransitionRepository>,
     Arc<dyn VaultRepository>,
     Arc<dyn ChatRepository>,
     Arc<dyn gotong_domain::ports::moderation::ModerationRepository>,
+    Arc<dyn OntologyRepository>,
     Arc<dyn SiagaRepository>,
     Arc<dyn FeedRepository>,
     Arc<dyn NotificationRepository>,
     Arc<dyn WebhookOutboxRepository>,
 );
-type TransitionJobQueue = Option<Arc<dyn JobQueue>>;
+type SharedJobQueue = Option<Arc<dyn JobQueue>>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -64,17 +64,17 @@ pub struct AppState {
     pub contribution_repo: Arc<dyn ContributionRepository>,
     pub evidence_repo: Arc<dyn EvidenceRepository>,
     pub vouch_repo: Arc<dyn VouchRepository>,
-    pub transition_repo: Arc<dyn TrackTransitionRepository>,
     pub vault_repo: Arc<dyn VaultRepository>,
     pub chat_repo: Arc<dyn ChatRepository>,
     pub moderation_repo: Arc<dyn gotong_domain::ports::moderation::ModerationRepository>,
+    pub ontology_repo: Arc<dyn OntologyRepository>,
     #[allow(dead_code)]
     pub siaga_repo: Arc<dyn SiagaRepository>,
     pub feed_repo: Arc<dyn FeedRepository>,
     pub notification_repo: Arc<dyn NotificationRepository>,
     pub webhook_outbox_repo: Arc<dyn WebhookOutboxRepository>,
     pub chat_realtime: ChatRealtimeBus,
-    pub transition_job_queue: TransitionJobQueue,
+    pub job_queue: SharedJobQueue,
 }
 
 #[derive(Clone)]
@@ -401,16 +401,16 @@ impl AppState {
             contribution_repo,
             evidence_repo,
             vouch_repo,
-            transition_repo,
             vault_repo,
             chat_repo,
             moderation_repo,
+            ontology_repo,
             siaga_repo,
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
         ) = repositories_for_config(&config).await?;
-        let transition_job_queue = transition_job_queue_for_config(&config).await?;
+        let job_queue = job_queue_for_config(&config).await?;
         let idempotency = IdempotencyService::new(Arc::new(store), IdempotencyConfig::default());
         let chat_realtime = ChatRealtimeBus::new(&config);
         Ok(Self {
@@ -420,16 +420,16 @@ impl AppState {
             contribution_repo,
             evidence_repo,
             vouch_repo,
-            transition_repo,
             vault_repo,
             chat_repo,
             moderation_repo,
+            ontology_repo,
             siaga_repo,
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
             chat_realtime,
-            transition_job_queue,
+            job_queue,
         })
     }
 
@@ -440,10 +440,10 @@ impl AppState {
             contribution_repo,
             evidence_repo,
             vouch_repo,
-            transition_repo,
             vault_repo,
             chat_repo,
             moderation_repo,
+            ontology_repo,
             siaga_repo,
             feed_repo,
             notification_repo,
@@ -457,16 +457,16 @@ impl AppState {
             contribution_repo,
             evidence_repo,
             vouch_repo,
-            transition_repo,
             vault_repo,
             chat_repo,
             moderation_repo,
+            ontology_repo,
             siaga_repo,
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
             chat_realtime,
-            transition_job_queue: None,
+            job_queue: None,
         }
     }
 
@@ -479,10 +479,10 @@ impl AppState {
         contribution_repo: Arc<dyn ContributionRepository>,
         evidence_repo: Arc<dyn EvidenceRepository>,
         vouch_repo: Arc<dyn VouchRepository>,
-        transition_repo: Arc<dyn TrackTransitionRepository>,
         vault_repo: Arc<dyn VaultRepository>,
         chat_repo: Arc<dyn ChatRepository>,
         moderation_repo: Arc<dyn gotong_domain::ports::moderation::ModerationRepository>,
+        ontology_repo: Arc<dyn OntologyRepository>,
         siaga_repo: Arc<dyn SiagaRepository>,
         feed_repo: Arc<dyn FeedRepository>,
         notification_repo: Arc<dyn NotificationRepository>,
@@ -497,16 +497,16 @@ impl AppState {
             contribution_repo,
             evidence_repo,
             vouch_repo,
-            transition_repo,
             vault_repo,
             chat_repo,
             moderation_repo,
+            ontology_repo,
             siaga_repo,
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
             chat_realtime,
-            transition_job_queue: None,
+            job_queue: None,
         }
     }
 }
@@ -525,13 +525,13 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
         "surreal" | "surrealdb" | "tikv" => {
             let db_config = DbConfig::from_app_config(config);
             let adaptive_path_repo = SurrealAdaptivePathRepository::new(&db_config).await?;
-            let transition_repo = SurrealTrackTransitionRepository::new(&db_config).await?;
             let vault_repo = SurrealVaultRepository::new(&db_config).await?;
             let chat_repo = SurrealChatRepository::new(&db_config).await?;
             let contribution_repo = SurrealContributionRepository::new(&db_config).await?;
             let evidence_repo = SurrealEvidenceRepository::new(&db_config).await?;
             let vouch_repo = SurrealVouchRepository::new(&db_config).await?;
             let moderation_repo = SurrealModerationRepository::new(&db_config).await?;
+            let ontology_repo = SurrealOntologyRepository::new(&db_config).await?;
             let siaga_repo = SurrealSiagaRepository::new(&db_config).await?;
             let feed_repo = SurrealDiscoveryFeedRepository::new(&db_config).await?;
             let notification_repo = SurrealDiscoveryNotificationRepository::new(&db_config).await?;
@@ -541,10 +541,10 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
                 Arc::new(contribution_repo),
                 Arc::new(evidence_repo),
                 Arc::new(vouch_repo),
-                Arc::new(transition_repo),
                 Arc::new(vault_repo),
                 Arc::new(chat_repo),
                 Arc::new(moderation_repo),
+                Arc::new(ontology_repo),
                 Arc::new(siaga_repo),
                 Arc::new(feed_repo),
                 Arc::new(notification_repo),
@@ -561,10 +561,10 @@ fn memory_repositories() -> RepositoryBundle {
         Arc::new(InMemoryContributionRepository::new()),
         Arc::new(InMemoryEvidenceRepository::new()),
         Arc::new(InMemoryVouchRepository::new()),
-        Arc::new(InMemoryTrackTransitionRepository::new()),
         Arc::new(InMemoryVaultRepository::new()),
         Arc::new(InMemoryChatRepository::new()),
         Arc::new(InMemoryModerationRepository::new()),
+        Arc::new(InMemoryOntologyRepository::new()),
         Arc::new(InMemorySiagaRepository::new()),
         Arc::new(InMemoryDiscoveryFeedRepository::new()),
         Arc::new(InMemoryDiscoveryNotificationRepository::new()),
@@ -572,7 +572,7 @@ fn memory_repositories() -> RepositoryBundle {
     )
 }
 
-async fn transition_job_queue_for_config(config: &AppConfig) -> anyhow::Result<TransitionJobQueue> {
+async fn job_queue_for_config(config: &AppConfig) -> anyhow::Result<SharedJobQueue> {
     if config.app_env.eq_ignore_ascii_case("test") {
         return Ok(None);
     }
@@ -623,6 +623,8 @@ mod tests {
             worker_promote_batch: 10,
             worker_backoff_base_ms: 1000,
             worker_backoff_max_ms: 60000,
+            worker_ttl_cleanup_interval_ms: 3_600_000,
+            worker_concept_verification_interval_ms: 86_400_000,
             webhook_enabled: false,
             webhook_markov_url: "http://127.0.0.1:5000/webhook".to_string(),
             webhook_secret: "test-webhook-secret-32-chars-minimum".to_string(),

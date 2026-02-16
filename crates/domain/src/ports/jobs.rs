@@ -17,10 +17,11 @@ pub enum JobQueueError {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum JobType {
-    TransitionClose,
     ModerationAutoRelease,
     WebhookRetry,
     DigestSend,
+    TTLCleanup,
+    ConceptVerification,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

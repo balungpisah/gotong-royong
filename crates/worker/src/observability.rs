@@ -10,7 +10,6 @@ const QUEUE_READY_GAUGE: &str = "gotong_worker_queue_ready_total";
 const QUEUE_DELAYED_GAUGE: &str = "gotong_worker_queue_delayed_total";
 const QUEUE_PROCESSING_GAUGE: &str = "gotong_worker_queue_processing_total";
 const QUEUE_LAG_GAUGE: &str = "gotong_worker_queue_lag_ms";
-const TRANSITION_COMPLETION_HISTOGRAM: &str = "gotong_worker_transition_completion_lag_ms";
 
 static METRICS_HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
 
@@ -47,12 +46,4 @@ pub fn set_queue_depth_gauge(ready: u64, delayed: u64, processing: u64) {
 
 pub fn set_queue_lag_ms(lag_ms: i64) {
     gauge!(QUEUE_LAG_GAUGE).set(lag_ms.max(0) as f64);
-}
-
-pub fn observe_transition_completion_lag_ms(lag_ms: i64) {
-    histogram!(
-        TRANSITION_COMPLETION_HISTOGRAM,
-        "metric" => "transition_close"
-    )
-    .record(lag_ms.max(0) as f64);
 }

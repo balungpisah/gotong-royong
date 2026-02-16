@@ -6,6 +6,7 @@ use crate::DomainResult;
 use crate::error::DomainError;
 use crate::identity::ActorIdentity;
 use crate::jobs::now_ms;
+use crate::mode::Mode;
 use crate::ports::contributions::ContributionRepository;
 
 const MAX_TITLE_LENGTH: usize = 200;
@@ -30,6 +31,7 @@ pub struct Contribution {
     pub contribution_id: String,
     pub author_id: String,
     pub author_username: String,
+    pub mode: Mode,
     pub contribution_type: ContributionType,
     pub title: String,
     pub description: Option<String>,
@@ -44,6 +46,7 @@ pub struct Contribution {
 
 #[derive(Clone, Debug)]
 pub struct ContributionCreate {
+    pub mode: Mode,
     pub contribution_type: ContributionType,
     pub title: String,
     pub description: Option<String>,
@@ -70,6 +73,7 @@ impl ContributionService {
                 "username": contribution.author_username,
             },
             "subject": {
+                "mode": contribution.mode.as_str(),
                 "contribution_type": to_contribution_type_name(&contribution.contribution_type),
                 "title": contribution.title,
                 "description": contribution.description,
@@ -95,6 +99,7 @@ impl ContributionService {
             contribution_id: crate::util::uuid_v7_without_dashes(),
             author_id: actor.user_id,
             author_username: actor.username,
+            mode: payload.mode,
             contribution_type: payload.contribution_type,
             title: payload.title,
             description: payload.description,
@@ -193,6 +198,7 @@ fn validate_contribution_create(
     }
 
     Ok(ContributionCreate {
+        mode: input.mode.clone(),
         contribution_type: input.contribution_type.clone(),
         title: title.to_string(),
         description: input.description.clone(),
@@ -245,6 +251,7 @@ mod tests {
     #[test]
     fn validate_contribution_rejects_empty_title() {
         let result = validate_contribution_create(&ContributionCreate {
+            mode: Mode::Komunitas,
             contribution_type: ContributionType::TaskCompletion,
             title: "   ".to_string(),
             description: None,

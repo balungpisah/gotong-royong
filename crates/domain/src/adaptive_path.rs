@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 use crate::auth::Role;
 use crate::error::DomainError;
 use crate::identity::ActorIdentity;
+use crate::ontology::ActionType;
 use crate::{DomainResult, jobs::now_ms, ports::adaptive_path::AdaptivePathRepository};
 
 const MAX_TITLE_LEN: usize = 220;
 const MAX_SUMMARY_LEN: usize = 2_000;
-const MAX_HINT_LEN: usize = 1_000;
 const MAX_LABEL_LEN: usize = 180;
 const MAX_OBJECTIVE_LEN: usize = 1_000;
 const MAX_CHECKPOINT_LEN: usize = 320;
@@ -226,8 +226,7 @@ pub struct AdaptivePathBranch {
 pub struct AdaptivePathPlanPayload {
     pub title: String,
     pub summary: Option<String>,
-    pub track_hint: Option<String>,
-    pub seed_hint: Option<String>,
+    pub action_type: ActionType,
     pub branches: Vec<AdaptivePathBranch>,
 }
 
@@ -238,8 +237,7 @@ pub struct AdaptivePathPlan {
     pub version: PlanVersion,
     pub title: String,
     pub summary: Option<String>,
-    pub track_hint: Option<String>,
-    pub seed_hint: Option<String>,
+    pub action_type: ActionType,
     pub author_id: String,
     pub author_username: String,
     pub branches: Vec<AdaptivePathBranch>,
@@ -256,8 +254,7 @@ impl AdaptivePathPlan {
         AdaptivePathPlanPayload {
             title: self.title.clone(),
             summary: self.summary.clone(),
-            track_hint: self.track_hint.clone(),
-            seed_hint: self.seed_hint.clone(),
+            action_type: self.action_type.clone(),
             branches: self.branches.clone(),
         }
     }
@@ -332,8 +329,7 @@ pub struct AdaptivePathBranchDraftInput {
 pub struct AdaptivePathPlanPayloadDraft {
     pub title: String,
     pub summary: Option<String>,
-    pub track_hint: Option<String>,
-    pub seed_hint: Option<String>,
+    pub action_type: ActionType,
     pub branches: Vec<AdaptivePathBranchDraftInput>,
 }
 
@@ -803,8 +799,7 @@ fn build_plan(
         version,
         title: payload.title,
         summary: payload.summary,
-        track_hint: payload.track_hint,
-        seed_hint: payload.seed_hint,
+        action_type: payload.action_type,
         author_id,
         author_username,
         branches: payload.branches,
@@ -840,8 +835,7 @@ fn build_plan(
         version: plan.version,
         title: plan.title.clone(),
         summary: plan.summary.clone(),
-        track_hint: plan.track_hint.clone(),
-        seed_hint: plan.seed_hint.clone(),
+        action_type: plan.action_type.clone(),
         author_id: plan.author_id.clone(),
         branches: plan.branches.clone(),
         request_id: plan.request_id.clone(),
@@ -989,12 +983,6 @@ fn validate_plan_payload(payload: &AdaptivePathPlanPayload) -> DomainResult<()> 
     if let Some(value) = payload.summary.as_ref() {
         validate_text_len(value, MAX_SUMMARY_LEN, "summary")?;
     }
-    if let Some(value) = payload.track_hint.as_ref() {
-        validate_text_len(value, MAX_HINT_LEN, "track_hint")?;
-    }
-    if let Some(value) = payload.seed_hint.as_ref() {
-        validate_text_len(value, MAX_HINT_LEN, "seed_hint")?;
-    }
     if payload.branches.is_empty() {
         return Err(DomainError::Validation(
             "plan must contain at least one branch".into(),
@@ -1013,9 +1001,6 @@ fn validate_and_normalize_payload(
 ) -> DomainResult<AdaptivePathPlanPayload> {
     let title = normalize_text(&draft.title, MAX_TITLE_LEN, "title")?;
     let summary = normalize_optional_text(draft.summary.as_deref(), MAX_SUMMARY_LEN, "summary")?;
-    let track_hint =
-        normalize_optional_text(draft.track_hint.as_deref(), MAX_HINT_LEN, "track_hint")?;
-    let seed_hint = normalize_optional_text(draft.seed_hint.as_deref(), MAX_HINT_LEN, "seed_hint")?;
 
     if draft.branches.is_empty() {
         return Err(DomainError::Validation(
@@ -1166,8 +1151,7 @@ fn validate_and_normalize_payload(
     Ok(AdaptivePathPlanPayload {
         title,
         summary,
-        track_hint,
-        seed_hint,
+        action_type: draft.action_type.clone(),
         branches,
     })
 }
@@ -1544,8 +1528,7 @@ struct AdaptivePathPlanAuditPayload {
     version: PlanVersion,
     title: String,
     summary: Option<String>,
-    track_hint: Option<String>,
-    seed_hint: Option<String>,
+    action_type: ActionType,
     author_id: String,
     branches: Vec<AdaptivePathBranch>,
     request_id: String,
@@ -1896,8 +1879,7 @@ mod tests {
         AdaptivePathPlanPayloadDraft {
             title: "Plan title".to_string(),
             summary: Some("summary".to_string()),
-            track_hint: Some("track".to_string()),
-            seed_hint: Some("seed".to_string()),
+            action_type: ActionType::InformAction,
             branches: vec![AdaptivePathBranchDraftInput {
                 branch_id: Some("branch-main".to_string()),
                 label: "Main".to_string(),
