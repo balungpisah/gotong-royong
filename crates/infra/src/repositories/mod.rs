@@ -19,8 +19,8 @@ use gotong_domain::moderation::{
     ContentModeration, ModerationAction, ModerationActorSnapshot, ModerationDecision,
     ModerationStatus, ModerationViolation,
 };
-use gotong_domain::ports::chat::ChatRepository as ChatRepositoryPort;
 use gotong_domain::ports::adaptive_path::AdaptivePathRepository;
+use gotong_domain::ports::chat::ChatRepository as ChatRepositoryPort;
 use gotong_domain::ports::contributions::ContributionRepository;
 use gotong_domain::ports::discovery::{
     FeedRepository, FeedRepositoryQuery, FeedRepositorySearchQuery, NotificationRepository,
@@ -2050,7 +2050,10 @@ impl InMemoryAdaptivePathRepository {
 }
 
 impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
-    fn create_plan(&self, plan: &AdaptivePathPlan) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
+    fn create_plan(
+        &self,
+        plan: &AdaptivePathPlan,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
         let plan = plan.clone();
         let plans = self.plans.clone();
         let plan_by_entity = self.plan_by_entity.clone();
@@ -2084,7 +2087,10 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         })
     }
 
-    fn get_plan(&self, plan_id: &str) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
+    fn get_plan(
+        &self,
+        plan_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
         let plan_id = plan_id.to_string();
         let plans = self.plans.clone();
         Box::pin(async move {
@@ -2128,7 +2134,10 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         })
     }
 
-    fn update_plan(&self, plan: &AdaptivePathPlan) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
+    fn update_plan(
+        &self,
+        plan: &AdaptivePathPlan,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
         let plan = plan.clone();
         let plans = self.plans.clone();
         let plan_by_entity_request = self.plan_by_entity_request.clone();
@@ -2158,7 +2167,10 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         })
     }
 
-    fn create_event(&self, event: &AdaptivePathEvent) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathEvent>> {
+    fn create_event(
+        &self,
+        event: &AdaptivePathEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathEvent>> {
         let event = event.clone();
         let events_by_plan = self.events_by_plan.clone();
         let event_by_request = self.event_by_request.clone();
@@ -2185,7 +2197,10 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         })
     }
 
-    fn list_events(&self, plan_id: &str) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathEvent>>> {
+    fn list_events(
+        &self,
+        plan_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathEvent>>> {
         let plan_id = plan_id.to_string();
         let events_by_plan = self.events_by_plan.clone();
         Box::pin(async move {
@@ -2220,7 +2235,10 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
             let Some(events) = rows.get(plan_id) else {
                 return Ok(None);
             };
-            Ok(events.iter().find(|event| event.event_id == *event_id).cloned())
+            Ok(events
+                .iter()
+                .find(|event| event.event_id == *event_id)
+                .cloned())
         })
     }
 
@@ -2232,7 +2250,8 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
         let suggestions = self.suggestions.clone();
         let suggestion_by_plan_request = self.suggestion_by_plan_request.clone();
         Box::pin(async move {
-            let request_key = Self::suggestion_request_key(&suggestion.plan_id, &suggestion.request_id);
+            let request_key =
+                Self::suggestion_request_key(&suggestion.plan_id, &suggestion.request_id);
             if suggestion_by_plan_request
                 .read()
                 .await
@@ -2320,7 +2339,8 @@ impl AdaptivePathRepository for InMemoryAdaptivePathRepository {
                 .get_mut(&suggestion_id)
                 .ok_or(DomainError::NotFound)?;
             suggestion.status = status;
-            suggestion.updated_at_ms = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as i64;
+            suggestion.updated_at_ms =
+                (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as i64;
             Ok(suggestion.clone())
         })
     }
@@ -2378,16 +2398,18 @@ impl SurrealAdaptivePathRepository {
     {
         rows.into_iter()
             .map(|row| {
-                serde_json::from_value::<T>(row).map_err(|err| {
-                    DomainError::Validation(format!("invalid {context} row: {err}"))
-                })
+                serde_json::from_value::<T>(row)
+                    .map_err(|err| DomainError::Validation(format!("invalid {context} row: {err}")))
             })
             .collect()
     }
 }
 
 impl AdaptivePathRepository for SurrealAdaptivePathRepository {
-    fn create_plan(&self, plan: &AdaptivePathPlan) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
+    fn create_plan(
+        &self,
+        plan: &AdaptivePathPlan,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
         let client = self.client.clone();
         let plan = plan.clone();
         Box::pin(async move {
@@ -2406,7 +2428,10 @@ impl AdaptivePathRepository for SurrealAdaptivePathRepository {
         })
     }
 
-    fn get_plan(&self, plan_id: &str) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
+    fn get_plan(
+        &self,
+        plan_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
         let client = self.client.clone();
         let plan_id = plan_id.to_string();
         Box::pin(async move {
@@ -2472,7 +2497,10 @@ impl AdaptivePathRepository for SurrealAdaptivePathRepository {
         })
     }
 
-    fn update_plan(&self, plan: &AdaptivePathPlan) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
+    fn update_plan(
+        &self,
+        plan: &AdaptivePathPlan,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathPlan>> {
         let client = self.client.clone();
         let plan = plan.clone();
         Box::pin(async move {
@@ -2497,7 +2525,10 @@ impl AdaptivePathRepository for SurrealAdaptivePathRepository {
         })
     }
 
-    fn create_event(&self, event: &AdaptivePathEvent) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathEvent>> {
+    fn create_event(
+        &self,
+        event: &AdaptivePathEvent,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<AdaptivePathEvent>> {
         let client = self.client.clone();
         let event = event.clone();
         Box::pin(async move {
@@ -2516,7 +2547,10 @@ impl AdaptivePathRepository for SurrealAdaptivePathRepository {
         })
     }
 
-    fn list_events(&self, plan_id: &str) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathEvent>>> {
+    fn list_events(
+        &self,
+        plan_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<AdaptivePathEvent>>> {
         let client = self.client.clone();
         let plan_id = plan_id.to_string();
         Box::pin(async move {
@@ -2663,7 +2697,8 @@ impl AdaptivePathRepository for SurrealAdaptivePathRepository {
         Box::pin(async move {
             let status = to_value(&status)
                 .map_err(|err| DomainError::Validation(format!("invalid status value: {err}")))?;
-            let updated_at_ms = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as i64;
+            let updated_at_ms =
+                (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as i64;
             let mut response = client
                 .query(
                     "UPDATE plan_suggestion \

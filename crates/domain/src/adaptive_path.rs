@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{DomainResult, jobs::now_ms, ports::adaptive_path::AdaptivePathRepository};
 use crate::auth::Role;
 use crate::error::DomainError;
 use crate::identity::ActorIdentity;
+use crate::{DomainResult, jobs::now_ms, ports::adaptive_path::AdaptivePathRepository};
 
 const MAX_TITLE_LEN: usize = 220;
 const MAX_SUMMARY_LEN: usize = 2_000;
@@ -177,7 +177,10 @@ impl AdaptivePathActorSnapshot {
             user_id: actor.user_id.clone(),
             username: actor.username.clone(),
             token_role: token_role.as_str().to_string(),
-            editor_roles: editor_roles.iter().map(|role| role.as_str().to_string()).collect(),
+            editor_roles: editor_roles
+                .iter()
+                .map(|role| role.as_str().to_string())
+                .collect(),
             request_id: request_id.into(),
             correlation_id: correlation_id.into(),
             request_ts_ms,
@@ -492,7 +495,7 @@ impl AdaptivePathService {
             return Err(DomainError::Conflict);
         }
 
-        ensure_editor_can_modify(token_role, &editor_roles, actor, &plan.author_id)?;
+        ensure_editor_can_modify(token_role, &editor_roles)?;
 
         let normalized_payload = validate_and_normalize_payload(&input.payload)?;
         let payload = apply_editorial_locks(&plan.payload(), normalized_payload)?;
@@ -544,7 +547,7 @@ impl AdaptivePathService {
     ) -> DomainResult<AdaptivePathSuggestion> {
         let request_ts_ms = input.request_ts_ms.unwrap_or_else(now_ms);
         let editor_roles = dedupe_editor_roles(&input.editor_roles);
-        ensure_editor_can_modify(token_role, &editor_roles, actor, "")?;
+        ensure_editor_can_modify(token_role, &editor_roles)?;
 
         let plan = self
             .repository
@@ -628,7 +631,7 @@ impl AdaptivePathService {
             .await?
             .ok_or(DomainError::NotFound)?;
 
-        ensure_editor_can_modify(token_role, &editor_roles, actor, &plan.author_id)?;
+        ensure_editor_can_modify(token_role, &editor_roles)?;
         let updated_payload = enforce_locked_fields(&plan, suggestion.proposal.clone())?;
         let updated_plan = build_plan(
             &plan.entity_id,
@@ -660,7 +663,10 @@ impl AdaptivePathService {
             Ok(updated_plan) => {
                 let _ = self
                     .repository
-                    .update_suggestion_status(&suggestion.suggestion_id, SuggestionDecisionStatus::Accepted)
+                    .update_suggestion_status(
+                        &suggestion.suggestion_id,
+                        SuggestionDecisionStatus::Accepted,
+                    )
                     .await?;
                 let _ = self.repository.create_event(&event).await;
                 Ok(updated_plan)
@@ -700,7 +706,7 @@ impl AdaptivePathService {
             .get_plan(&suggestion.plan_id)
             .await?
             .ok_or(DomainError::NotFound)?;
-        ensure_editor_can_modify(token_role, &editor_roles, actor, &plan.author_id)?;
+        ensure_editor_can_modify(token_role, &editor_roles)?;
 
         let event = build_plan_event(
             &plan,
@@ -714,22 +720,23 @@ impl AdaptivePathService {
             plan.version,
             AdaptivePathEventType::SuggestionRejected,
         )?;
-        let _ = self.repository.create_event(&event).await;
-        self.repository
+        let suggestion = self
+            .repository
             .update_suggestion_status(&input.suggestion_id, SuggestionDecisionStatus::Rejected)
-            .await
+            .await?;
+        let _ = self.repository.create_event(&event).await;
+        Ok(suggestion)
     }
 }
 
-fn ensure_actor_can_initiate(
-    token_role: &Role,
-    actor: &ActorIdentity,
-) -> DomainResult<()> {
+fn ensure_actor_can_initiate(token_role: &Role, actor: &ActorIdentity) -> DomainResult<()> {
     if actor.user_id.trim().is_empty() {
         return Err(DomainError::Forbidden("actor identity is required".into()));
     }
     match token_role {
-        Role::Anonymous => Err(DomainError::Forbidden("anonymous token cannot modify plans".into())),
+        Role::Anonymous => Err(DomainError::Forbidden(
+            "anonymous token cannot modify plans".into(),
+        )),
         Role::User | Role::Moderator | Role::Admin | Role::System => Ok(()),
     }
 }
@@ -737,17 +744,15 @@ fn ensure_actor_can_initiate(
 fn ensure_editor_can_modify(
     token_role: &Role,
     editor_roles: &[AdaptivePathEditorRole],
-    actor: &ActorIdentity,
-    plan_author_id: &str,
 ) -> DomainResult<()> {
     if matches!(token_role, Role::Admin | Role::Moderator | Role::System) {
         return Ok(());
     }
 
-    if editor_roles.iter().any(AdaptivePathEditorRole::is_privileged) {
-        return Ok(());
-    }
-    if !actor.user_id.is_empty() && actor.user_id == plan_author_id {
+    if editor_roles
+        .iter()
+        .any(AdaptivePathEditorRole::is_privileged)
+    {
         return Ok(());
     }
 
@@ -816,7 +821,8 @@ fn build_plan(
         for phase in &mut branch.phases {
             phase.locked_fields = normalize_locked_fields(phase.locked_fields.clone());
             for checkpoint in &mut phase.checkpoints {
-                checkpoint.locked_fields = normalize_locked_fields(checkpoint.locked_fields.clone());
+                checkpoint.locked_fields =
+                    normalize_locked_fields(checkpoint.locked_fields.clone());
             }
         }
     }
@@ -955,23 +961,26 @@ fn build_suggestion_event(
     Ok(event)
 }
 
-fn apply_suggestion_hash(mut suggestion: AdaptivePathSuggestion) -> DomainResult<AdaptivePathSuggestion> {
-    suggestion.event_hash = adaptive_path_suggestion_audit_hash(&AdaptivePathSuggestionAuditPayload {
-        suggestion_id: suggestion.suggestion_id.clone(),
-        plan_id: suggestion.plan_id.clone(),
-        base_version: suggestion.base_version,
-        status: suggestion.status.as_str().to_string(),
-        created_by: suggestion.created_by.clone(),
-        created_by_role: suggestion.created_by_role.clone(),
-        rationale: suggestion.rationale.clone(),
-        model_id: suggestion.model_id.clone(),
-        prompt_version: suggestion.prompt_version.clone(),
-        request_id: suggestion.request_id.clone(),
-        correlation_id: suggestion.correlation_id.clone(),
-        created_at_ms: suggestion.created_at_ms,
-        updated_at_ms: suggestion.updated_at_ms,
-        retention_tag: suggestion.retention_tag.clone(),
-    })?;
+fn apply_suggestion_hash(
+    mut suggestion: AdaptivePathSuggestion,
+) -> DomainResult<AdaptivePathSuggestion> {
+    suggestion.event_hash =
+        adaptive_path_suggestion_audit_hash(&AdaptivePathSuggestionAuditPayload {
+            suggestion_id: suggestion.suggestion_id.clone(),
+            plan_id: suggestion.plan_id.clone(),
+            base_version: suggestion.base_version,
+            status: suggestion.status.as_str().to_string(),
+            created_by: suggestion.created_by.clone(),
+            created_by_role: suggestion.created_by_role.clone(),
+            rationale: suggestion.rationale.clone(),
+            model_id: suggestion.model_id.clone(),
+            prompt_version: suggestion.prompt_version.clone(),
+            request_id: suggestion.request_id.clone(),
+            correlation_id: suggestion.correlation_id.clone(),
+            created_at_ms: suggestion.created_at_ms,
+            updated_at_ms: suggestion.updated_at_ms,
+            retention_tag: suggestion.retention_tag.clone(),
+        })?;
     Ok(suggestion)
 }
 
@@ -987,7 +996,9 @@ fn validate_plan_payload(payload: &AdaptivePathPlanPayload) -> DomainResult<()> 
         validate_text_len(value, MAX_HINT_LEN, "seed_hint")?;
     }
     if payload.branches.is_empty() {
-        return Err(DomainError::Validation("plan must contain at least one branch".into()));
+        return Err(DomainError::Validation(
+            "plan must contain at least one branch".into(),
+        ));
     }
     if payload.branches.len() > MAX_BRANCHES {
         return Err(DomainError::Validation(format!(
@@ -1002,11 +1013,14 @@ fn validate_and_normalize_payload(
 ) -> DomainResult<AdaptivePathPlanPayload> {
     let title = normalize_text(&draft.title, MAX_TITLE_LEN, "title")?;
     let summary = normalize_optional_text(draft.summary.as_deref(), MAX_SUMMARY_LEN, "summary")?;
-    let track_hint = normalize_optional_text(draft.track_hint.as_deref(), MAX_HINT_LEN, "track_hint")?;
+    let track_hint =
+        normalize_optional_text(draft.track_hint.as_deref(), MAX_HINT_LEN, "track_hint")?;
     let seed_hint = normalize_optional_text(draft.seed_hint.as_deref(), MAX_HINT_LEN, "seed_hint")?;
 
     if draft.branches.is_empty() {
-        return Err(DomainError::Validation("at least one branch is required".into()));
+        return Err(DomainError::Validation(
+            "at least one branch is required".into(),
+        ));
     }
     if draft.branches.len() > MAX_BRANCHES {
         return Err(DomainError::Validation(format!(
@@ -1087,7 +1101,8 @@ fn validate_and_normalize_payload(
             }
 
             let phase_title = normalize_text(&phase_input.title, MAX_TITLE_LEN, "phase title")?;
-            let objective = normalize_text(&phase_input.objective, MAX_OBJECTIVE_LEN, "phase objective")?;
+            let objective =
+                normalize_text(&phase_input.objective, MAX_OBJECTIVE_LEN, "phase objective")?;
             let phase_checkpoints = create_phase_checkpoints(
                 phase_id.as_str(),
                 &phase_input.checkpoints,
@@ -1182,7 +1197,11 @@ fn create_phase_checkpoints(
                 "checkpoint order must be between 0 and 999".into(),
             ));
         }
-        let title = normalize_text(&checkpoint_input.title, MAX_CHECKPOINT_LEN, "checkpoint title")?;
+        let title = normalize_text(
+            &checkpoint_input.title,
+            MAX_CHECKPOINT_LEN,
+            "checkpoint title",
+        )?;
         rows.push(AdaptivePathCheckpoint {
             checkpoint_id: checkpoint_id.clone(),
             phase_id: phase_id.to_string(),
@@ -1297,7 +1316,10 @@ fn enforce_locked_fields(
     Ok(payload)
 }
 
-fn changed_branch_fields(before: &AdaptivePathBranch, after: &AdaptivePathBranch) -> Vec<&'static str> {
+fn changed_branch_fields(
+    before: &AdaptivePathBranch,
+    after: &AdaptivePathBranch,
+) -> Vec<&'static str> {
     let mut changed = Vec::new();
     if before.label != after.label {
         changed.push("label");
@@ -1311,7 +1333,10 @@ fn changed_branch_fields(before: &AdaptivePathBranch, after: &AdaptivePathBranch
     changed
 }
 
-fn changed_phase_fields(before: &AdaptivePathPhase, after: &AdaptivePathPhase) -> Vec<&'static str> {
+fn changed_phase_fields(
+    before: &AdaptivePathPhase,
+    after: &AdaptivePathPhase,
+) -> Vec<&'static str> {
     let mut changed = Vec::new();
     if before.title != after.title {
         changed.push("title");
@@ -1407,7 +1432,9 @@ fn map_checkpoints_by_id(
 fn normalize_non_empty_text(value: &str, field_name: &str) -> DomainResult<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err(DomainError::Validation(format!("{field_name} cannot be empty")));
+        return Err(DomainError::Validation(format!(
+            "{field_name} cannot be empty"
+        )));
     }
     Ok(trimmed.to_string())
 }
@@ -1562,8 +1589,8 @@ struct AdaptivePathSuggestionAuditPayload {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
     use crate::ports;
+    use std::sync::Arc;
     use tokio::sync::RwLock;
 
     #[derive(Default)]
@@ -1621,7 +1648,10 @@ mod tests {
             })
         }
 
-        fn get_plan(&self, plan_id: &str) -> ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
+        fn get_plan(
+            &self,
+            plan_id: &str,
+        ) -> ports::BoxFuture<'_, DomainResult<Option<AdaptivePathPlan>>> {
             let plan_id = plan_id.to_string();
             let plans = self.plans.clone();
             Box::pin(async move {
@@ -1701,10 +1731,16 @@ mod tests {
             Box::pin(async move {
                 let mut events = events.write().await;
                 let rows = events.entry(event.plan_id.clone()).or_default();
-                if rows.iter().any(|existing| existing.event_id == event.event_id) {
+                if rows
+                    .iter()
+                    .any(|existing| existing.event_id == event.event_id)
+                {
                     return Err(DomainError::Conflict);
                 }
-                if rows.iter().any(|existing| existing.request_id == event.request_id) {
+                if rows
+                    .iter()
+                    .any(|existing| existing.request_id == event.request_id)
+                {
                     return Err(DomainError::Conflict);
                 }
                 rows.push(event.clone());
@@ -1760,7 +1796,8 @@ mod tests {
             let suggestions = self.suggestions.clone();
             let suggestion_by_request = self.suggestion_by_request.clone();
             Box::pin(async move {
-                let request_key = Self::suggestion_request_key(&suggestion.plan_id, &suggestion.request_id);
+                let request_key =
+                    Self::suggestion_request_key(&suggestion.plan_id, &suggestion.request_id);
                 {
                     let by_request = suggestion_by_request.read().await;
                     if by_request.contains_key(&request_key) {
@@ -1794,14 +1831,15 @@ mod tests {
                     .filter(|suggestion| suggestion.plan_id == plan_id)
                     .cloned()
                     .collect();
-                values.sort_by(|left, right| {
-                    right.created_at_ms.cmp(&left.created_at_ms)
-                });
+                values.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
                 Ok(values)
             })
         }
 
-        fn get_suggestion(&self, suggestion_id: &str) -> ports::BoxFuture<'_, DomainResult<Option<AdaptivePathSuggestion>>> {
+        fn get_suggestion(
+            &self,
+            suggestion_id: &str,
+        ) -> ports::BoxFuture<'_, DomainResult<Option<AdaptivePathSuggestion>>> {
             let suggestions = self.suggestions.clone();
             let suggestion_id = suggestion_id.to_string();
             Box::pin(async move {
@@ -1955,16 +1993,18 @@ mod tests {
             .expect("update");
 
         assert_eq!(updated.version, 2);
-        assert!(updated
-            .payload()
-            .branches
-            .first()
-            .expect("branch")
-            .phases
-            .first()
-            .expect("phase")
-            .locked_fields
-            .contains(&"title".to_string()));
+        assert!(
+            updated
+                .payload()
+                .branches
+                .first()
+                .expect("branch")
+                .phases
+                .first()
+                .expect("phase")
+                .locked_fields
+                .contains(&"title".to_string())
+        );
     }
 
     #[tokio::test]

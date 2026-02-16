@@ -481,7 +481,7 @@ async fn track_transition_validates_gate_and_role_matrix() {
 #[tokio::test]
 async fn adaptive_path_plan_flow_works() {
     let app = test_app();
-    let token = test_token("test-secret");
+    let token = test_token_with_identity("test-secret", "admin", "admin-123");
 
     let create_payload = json!({
         "entity_id": "case-adaptive-1",
@@ -710,7 +710,11 @@ async fn adaptive_path_plan_flow_works() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .expect("request");
-    let response = app.clone().oneshot(suggestions_request).await.expect("response");
+    let response = app
+        .clone()
+        .oneshot(suggestions_request)
+        .await
+        .expect("response");
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_bytes(response.into_body(), usize::MAX)
         .await
@@ -718,6 +722,119 @@ async fn adaptive_path_plan_flow_works() {
     let suggestions: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
     assert_eq!(suggestions.len(), 1);
     assert_eq!(suggestions[0].get("status"), Some(&json!("accepted")));
+}
+
+#[tokio::test]
+async fn adaptive_path_user_cannot_spoof_privileged_editor_roles() {
+    let app = test_app();
+    let user_token = test_token("test-secret");
+
+    let create_payload = json!({
+        "entity_id": "case-adaptive-2",
+        "editor_roles": ["project_manager"],
+        "payload": {
+            "title": "Rencana awal",
+            "summary": "Ringkas",
+            "track_hint": "resolve",
+            "seed_hint": "issue",
+            "branches": [
+                {
+                    "branch_id": "main",
+                    "label": "Utama",
+                    "parent_checkpoint_id": null,
+                    "order": 0,
+                    "phases": [
+                        {
+                            "phase_id": "phase-1",
+                            "title": "Analisis",
+                            "objective": "Kumpulkan konteks",
+                            "status": "active",
+                            "order": 0,
+                            "source": "ai",
+                            "checkpoints": [
+                                {
+                                    "checkpoint_id": "checkpoint-1",
+                                    "title": "Validasi data",
+                                    "status": "open",
+                                    "order": 0,
+                                    "source": "ai"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/adaptive-path/plans")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {user_token}"))
+        .header("x-request-id", "adaptive-user-create-1")
+        .header("x-correlation-id", "adaptive-user-corr-1")
+        .body(Body::from(create_payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let created_plan: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let plan_id = created_plan
+        .get("plan_id")
+        .and_then(|value| value.as_str())
+        .expect("plan_id")
+        .to_string();
+
+    let update_payload = json!({
+        "expected_version": 1,
+        "editor_roles": ["project_manager"],
+        "payload": {
+            "title": "Rencana awal",
+            "summary": "Ringkas",
+            "track_hint": "resolve",
+            "seed_hint": "issue",
+            "branches": [
+                {
+                    "branch_id": "main",
+                    "label": "Utama",
+                    "parent_checkpoint_id": null,
+                    "order": 0,
+                    "phases": [
+                        {
+                            "phase_id": "phase-1",
+                            "title": "Analisis",
+                            "objective": "Kumpulkan konteks terbaru",
+                            "status": "active",
+                            "order": 0,
+                            "source": "human",
+                            "checkpoints": [
+                                {
+                                    "checkpoint_id": "checkpoint-1",
+                                    "title": "Validasi data",
+                                    "status": "open",
+                                    "order": 0,
+                                    "source": "ai"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/adaptive-path/plans/{plan_id}/update"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {user_token}"))
+        .header("x-request-id", "adaptive-user-update-1")
+        .header("x-correlation-id", "adaptive-user-corr-2")
+        .body(Body::from(update_payload.to_string()))
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]

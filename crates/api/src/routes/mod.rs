@@ -17,9 +17,10 @@ use futures_util::{SinkExt, StreamExt};
 use gotong_domain::{
     adaptive_path::{
         AdaptivePathBranchDraftInput, AdaptivePathCheckpointDraftInput, AdaptivePathEditorRole,
-        AdaptivePathEvent, AdaptivePathPhaseDraftInput, AdaptivePathPlan, AdaptivePathService,
-        AdaptivePathSuggestion, AdaptivePathPlanPayloadDraft, CreateAdaptivePathInput,
-        SuggestAdaptivePathInput, SuggestionReviewInput, UpdateAdaptivePathInput,
+        AdaptivePathEvent, AdaptivePathPhaseDraftInput, AdaptivePathPlan,
+        AdaptivePathPlanPayloadDraft, AdaptivePathService, AdaptivePathSuggestion,
+        CreateAdaptivePathInput, SuggestAdaptivePathInput, SuggestionReviewInput,
+        UpdateAdaptivePathInput,
     },
     auth::TrackRole,
     chat::{
@@ -98,7 +99,10 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/v1/transitions/:transition_id", get(get_transition_by_id))
         .route("/v1/adaptive-path/plans", post(create_adaptive_path_plan))
-        .route("/v1/adaptive-path/plans/:plan_id", get(get_adaptive_path_plan))
+        .route(
+            "/v1/adaptive-path/plans/:plan_id",
+            get(get_adaptive_path_plan),
+        )
         .route(
             "/v1/adaptive-path/entities/:entity_id/plan",
             get(get_adaptive_path_plan_by_entity),
@@ -915,8 +919,6 @@ struct CreateAdaptivePathPlanRequest {
     pub entity_id: String,
     pub payload: AdaptivePathPayloadDraftRequest,
     #[serde(default)]
-    pub editor_roles: Vec<AdaptivePathEditorRole>,
-    #[serde(default)]
     pub request_ts_ms: Option<i64>,
 }
 
@@ -924,8 +926,6 @@ struct CreateAdaptivePathPlanRequest {
 struct UpdateAdaptivePathPlanRequest {
     pub expected_version: u64,
     pub payload: AdaptivePathPayloadDraftRequest,
-    #[serde(default)]
-    pub editor_roles: Vec<AdaptivePathEditorRole>,
     #[serde(default)]
     pub request_ts_ms: Option<i64>,
 }
@@ -938,15 +938,11 @@ struct SuggestAdaptivePathPlanRequest {
     pub model_id: Option<String>,
     pub prompt_version: Option<String>,
     #[serde(default)]
-    pub editor_roles: Vec<AdaptivePathEditorRole>,
-    #[serde(default)]
     pub request_ts_ms: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ReviewAdaptivePathSuggestionRequest {
-    #[serde(default)]
-    pub editor_roles: Vec<AdaptivePathEditorRole>,
     #[serde(default)]
     pub request_ts_ms: Option<i64>,
 }
@@ -1563,6 +1559,7 @@ async fn create_adaptive_path_plan(
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
     let token_role = auth.role;
+    let editor_roles = trusted_editor_roles(&token_role);
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
 
@@ -1589,7 +1586,7 @@ async fn create_adaptive_path_plan(
             let input = CreateAdaptivePathInput {
                 entity_id,
                 payload: into_adaptive_path_payload_draft(payload.payload),
-                editor_roles: payload.editor_roles,
+                editor_roles,
                 request_id,
                 correlation_id,
                 request_ts_ms: payload.request_ts_ms,
@@ -1649,6 +1646,7 @@ async fn update_adaptive_path_plan(
     let token_role = auth.role;
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
+    let editor_roles = trusted_editor_roles(&token_role);
 
     let key = IdempotencyKey::new(
         "adaptive_path_update",
@@ -1669,7 +1667,7 @@ async fn update_adaptive_path_plan(
                 plan_id,
                 expected_version: payload.expected_version,
                 payload: into_adaptive_path_payload_draft(payload.payload),
-                editor_roles: payload.editor_roles,
+                editor_roles,
                 request_id,
                 correlation_id,
                 request_ts_ms: payload.request_ts_ms,
@@ -1706,6 +1704,7 @@ async fn propose_adaptive_path_suggestion(
     let token_role = auth.role;
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
+    let editor_roles = trusted_editor_roles(&token_role);
 
     let key = IdempotencyKey::new(
         "adaptive_path_suggest",
@@ -1729,7 +1728,7 @@ async fn propose_adaptive_path_suggestion(
                 rationale: payload.rationale,
                 model_id: payload.model_id,
                 prompt_version: payload.prompt_version,
-                editor_roles: payload.editor_roles,
+                editor_roles,
                 request_id,
                 correlation_id,
                 request_ts_ms: payload.request_ts_ms,
@@ -1766,6 +1765,7 @@ async fn accept_adaptive_path_suggestion(
     let token_role = auth.role;
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
+    let editor_roles = trusted_editor_roles(&token_role);
 
     let key = IdempotencyKey::new(
         "adaptive_path_accept",
@@ -1784,7 +1784,7 @@ async fn accept_adaptive_path_suggestion(
             let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
             let input = SuggestionReviewInput {
                 suggestion_id,
-                editor_roles: payload.editor_roles,
+                editor_roles,
                 request_id,
                 correlation_id,
                 request_ts_ms: payload.request_ts_ms,
@@ -1821,6 +1821,7 @@ async fn reject_adaptive_path_suggestion(
     let token_role = auth.role;
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
+    let editor_roles = trusted_editor_roles(&token_role);
 
     let key = IdempotencyKey::new(
         "adaptive_path_reject",
@@ -1839,7 +1840,7 @@ async fn reject_adaptive_path_suggestion(
             let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
             let input = SuggestionReviewInput {
                 suggestion_id,
-                editor_roles: payload.editor_roles,
+                editor_roles,
                 request_id,
                 correlation_id,
                 request_ts_ms: payload.request_ts_ms,
@@ -3343,6 +3344,16 @@ fn into_adaptive_path_payload_draft(
                     .collect(),
             })
             .collect(),
+    }
+}
+
+fn trusted_editor_roles(token_role: &gotong_domain::auth::Role) -> Vec<AdaptivePathEditorRole> {
+    match token_role {
+        gotong_domain::auth::Role::Admin
+        | gotong_domain::auth::Role::Moderator
+        | gotong_domain::auth::Role::System => vec![AdaptivePathEditorRole::ProjectManager],
+        gotong_domain::auth::Role::User => vec![AdaptivePathEditorRole::Author],
+        gotong_domain::auth::Role::Anonymous => Vec::new(),
     }
 }
 
