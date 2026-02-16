@@ -16,30 +16,30 @@ This document prepares the backend implementation by combining:
 
 ### Gotong Royong
 
-1. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/design/context/DESIGN-CONTEXT.md`
-2. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/architecture/system-overview.md`
-3. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/architecture/integration-architecture.md`
-4. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/design/specs/AI-SPEC-v0.2.md`
-5. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/design/specs/ai-spec/05-ai-01-classification.md`
-6. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/design/specs/ai-spec/15-model-selection.md`
-7. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/api/webhook-spec.md`
-8. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/api/event-payloads.md`
-9. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/api/authentication.md`
-10. `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/database/schema-requirements.md`
+1. `docs/design/context/DESIGN-CONTEXT.md`
+2. `docs/architecture/system-overview.md`
+3. `docs/architecture/integration-architecture.md`
+4. `docs/design/specs/AI-SPEC-v0.2.md`
+5. `docs/design/specs/ai-spec/05-ai-01-classification.md`
+6. `docs/design/specs/ai-spec/15-model-selection.md`
+7. `docs/api/webhook-spec.md`
+8. `docs/api/event-payloads.md`
+9. `docs/api/authentication.md`
+10. `docs/database/schema-requirements.md`
 
 ### Tandang (Markov Engine)
 
-1. `/Users/damarpanuluh/MERIDIAN-NEW/tandang/markov-engine/docs/GOTONG-ROYONG-INTEGRATION-GUIDE.md`
-2. `/Users/damarpanuluh/MERIDIAN-NEW/tandang/markov-engine/docs/API-PLATFORMS.md`
-3. `/Users/damarpanuluh/MERIDIAN-NEW/tandang/markov-engine/crates/api/src/routes/platforms.rs`
-4. `/Users/damarpanuluh/MERIDIAN-NEW/tandang/markov-engine/crates/domain/src/platform/adapter.rs`
+1. `[tandang]docs/GOTONG-ROYONG-INTEGRATION-GUIDE.md`
+2. `[tandang]docs/API-PLATFORMS.md`
+3. `[tandang]crates/api/src/routes/platforms.rs`
+4. `[tandang]crates/domain/src/platform/adapter.rs`
 
 ### Edge-Pod (AI conventions)
 
-1. `/Users/damarpanuluh/MERIDIAN-NEW/edge-pod/docs/prompts/11-project-conventions.md`
-2. `/Users/damarpanuluh/MERIDIAN-NEW/edge-pod/docs/prompts/14-prompt-versioning.md`
-3. `/Users/damarpanuluh/MERIDIAN-NEW/edge-pod/crates/edge-pod-llm/src/prompt/typed_output.rs`
-4. `/Users/damarpanuluh/MERIDIAN-NEW/edge-pod/crates/edge-pod-runtime/src/forge/ai_processor.rs`
+1. `[edge-pod]docs/prompts/11-project-conventions.md`
+2. `[edge-pod]docs/prompts/14-prompt-versioning.md`
+3. `[edge-pod]crates/edge-pod-llm/src/prompt/typed_output.rs`
+4. `[edge-pod]crates/edge-pod-runtime/src/forge/ai_processor.rs`
 
 ## 3. Contract objective
 

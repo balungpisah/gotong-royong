@@ -1,28 +1,32 @@
 > [← Back to AI Spec index](../AI-SPEC-v0.2.md)
 
-## 5. AI-01: Track & Seed Classification
+## 5. AI-01: Triple Refinement (formerly Track & Seed Hint Classification)
 
 ### 5.1 Property Table
 
 | Property | Value |
 |---|---|
 | **ID** | AI-01 |
-| **Name** | Track & Seed Classification |
+| **Name** | Triple Refinement |
 | **Trigger** | (v0.2) Invoked by AI-00 during triage; also re-invoked at submission if changes detected |
 | **UI Location** | (v0.2) Runs inside AI-00 context bar morphing; user does not see model output directly |
 | **Interaction Mode** | Synchronous, blocking |
 | **Latency Budget** | < 1 second per invocation |
-| **Model Tier** | Medium (Haiku-class) |
+| **Model Tier** | Fast (Haiku-class) — S3-MD7 |
 | **UI-UX-SPEC Ref** | Section 19 (Bagikan), implicit in triage flow |
 
 ### 5.2 Purpose
 
-**AI-01 classifies a witness report into:**
-- One of 5 Community tracks (Tuntaskan, Wujudkan, Telusuri, Rayakan, Musyawarah)
-- One of 5 seed types (Keresahan, Gagasan, Pertanyaan, Kabar Baik, Usul)
+**AI-01 validates and refines RDF triples produced by AI-00 (S3-MD1, S3-A2):**
+- Validates Wikidata QIDs and Schema.org predicates in triples
+- Can add additional triples if AI-00 missed concepts
+- Provides `seed_hint` for discovery (Keresahan, Gagasan, Pertanyaan, Kabar Baik, Usul)
+- Track hints are derived from the `schema:potentialAction` Action type — not separately classified (S3-MD2)
 - Extracts 0–3 relevant ESCO skills
 
 **Key change in v0.2:** AI-01 is not triggered by user submission; it is invoked **internally by AI-00** during conversation. This means classification happens *before* the user commits, enabling the context bar morphing UX.
+
+> **Note (2026-02-16, Session 3):** AI-01 is now primarily a triple refinement step. Track hints are derived from Schema.org Action types in the triples, not separately classified. See `ONTOLOGY-VOCAB-v0.1.md` and `DECISIONS-LOG.md` (S3-MD1, S3-MD2, S3-A2).
 
 ### 5.3 Input
 
@@ -47,9 +51,9 @@
 
 ```json
 {
-  "track": "enum: tuntaskan | wujudkan | telusuri | rayakan | musyawarah",
+  "track_hint": "enum: tuntaskan | wujudkan | telusuri | rayakan | musyawarah (hint only)",
   "track_confidence": "float 0.0–1.0",
-  "seed_type": "enum: Keresahan | Gagasan | Pertanyaan | Kabar Baik | Usul",
+  "seed_hint": "enum: Keresahan | Gagasan | Pertanyaan | Kabar Baik | Usul",
   "seed_confidence": "float 0.0–1.0",
   "esco_skills": [
     {
@@ -60,7 +64,7 @@
   ],
   "reasoning": "string (1–2 sentences explaining classification)",
   "is_ambiguous": "boolean (true if track_confidence < 0.5)",
-  "alternative_track": "enum (if is_ambiguous=true)",
+  "alternative_track_hint": "enum (if is_ambiguous=true)",
   "alternative_confidence": "float"
 }
 ```
@@ -175,6 +179,7 @@ Output:
 
 After AI-01 classification:
 
+0. **Adaptive Path Generation (AI-00):** AI-00 uses classification hints to propose an adaptive path plan with phases and checkpoints
 1. **Redaction (AI-02):** Text is passed to redaction LLM to mask PII
 2. **Duplicate Check (AI-03):** Redacted text is checked against existing seeds
 3. **Media Scan (AI-08):** Attached images are scanned for sensitive content

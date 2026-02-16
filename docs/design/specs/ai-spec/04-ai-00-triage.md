@@ -26,7 +26,7 @@
 5. Guides the user through the entry flow (Community, Catatan Saksi vault, or Siaga emergency broadcast)
 6. Morphs a context bar above the keyboard to visualize AI's understanding in real-time
 
-User never sees an empty text field. The conversation becomes the seed's first message in Bahas Diskusi (context carries over).
+User never sees an empty text field. The conversation becomes the seed's first message in Percakapan tab (context carries over).
 
 ### 4.3 Context Bar — 8 States
 
@@ -95,8 +95,8 @@ The context bar sits above the keyboard and visualizes AI's classification confi
    - If scope unclear: "Berapa banyak orang yang terlibat? Apakah ini masalah lokal atau lebih luas?"
 6. **Context bar morphs** → As AI gains confidence, bar transitions: Listening → Probing → Leaning → Ready/Vault-ready/Siaga-ready
 7. **User confirms** → When bar shows "Ready", user taps "Lanjutkan" or "Ubah"
-8. **Entry flow begins** → If Community: Bagikan Step 1 (Rancang track, seed type, skills). If Vault: direct to Catatan Saksi form. If Siaga: launch Siaga broadcast composer.
-9. **Context carries over** → Full conversation becomes first message in seed's Bahas Diskusi tab; user doesn't repeat themselves
+8. **Entry flow begins** → If Community: Bagikan Step 1 (plan setup: track hint, seed type, skills). If Vault: direct to Catatan Saksi form. If Siaga: launch Siaga broadcast composer.
+9. **Context carries over** → Full conversation becomes first message in Percakapan tab; user doesn't repeat themselves
 
 ### 4.7 Prompt Strategy
 
@@ -192,7 +192,7 @@ Users always have the option to:
 When user confirms classification and enters the entry flow:
 
 1. Full conversation history (AI-00) is stored as `triage_transcript`
-2. Triage transcript becomes the **first message** in the seed's **Bahas Diskusi** tab
+2. Triage transcript becomes the **first message** in the **Percakapan** tab
 3. Attribution: "**[User]** tela cerita melalui triage AI"
 4. Subsequent messages in Diskusi tab are authored by community members
 5. User can refer back to triage transcript for context without re-reading the entire conversation

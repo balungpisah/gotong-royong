@@ -9,7 +9,7 @@
 | Author | Penulis | Automatic | Any user |
 | Co-witness | Saksi | Self-assign | Any user |
 | Participant | Peserta | Self-assign | Any user |
-| Responsibility Owner | PIC | Bahas → vote | Terverifikasi |
+| Responsibility Owner | PIC | Discussion phase → vote | Terverifikasi |
 | Treasurer | Bendahara | Galang → vote | I >= 0.5, clean J, ≠ PIC |
 | Communications | Humas | Siarkan → vote | Terverifikasi |
 | Verifier | Verifikator | Auto-selected | I >= 0.4, not involved, min 3 |

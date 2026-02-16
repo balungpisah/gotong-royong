@@ -6,7 +6,7 @@
 - Bagikan: AI-00 conversational triage + community-confirm classification.
 - Role separation: Bendahara ≠ PIC.
 - Jury: 5 jurors (<200) or 7 (200+). Max 8 days.
-- Rutin spawn: per-track execution stage.
+- Rutin spawn: per-plan execution phase (or via recurring template).
 
 ---
 

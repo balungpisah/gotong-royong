@@ -84,13 +84,13 @@ Use these prompt headings when creating Edge-Pod endpoint tasks.
 ## Strict JSON schemas for Gotong-Royong consumption
 
 Canonical strict schema is stored in:
-`/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/research/edgepod-endpoint-contracts.schema.json`
+`docs/research/edgepod-endpoint-contracts.schema.json`
 
 Compact endpoint map is stored in:
-`/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/research/edgepod-endpoint-contracts.contract-map.md`
+`docs/research/edgepod-endpoint-contracts.contract-map.md`
 
 Per-endpoint strict schemas are stored in:
-`/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/research/edgepod-endpoint-contracts/EP-00.schema.json` ... `EP-11.schema.json`
+`docs/research/edgepod-endpoint-contracts/EP-00.schema.json` ... `EP-11.schema.json`
 
 The inline blocks below are kept for traceability only and are not the canonical contract.
 

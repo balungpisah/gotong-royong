@@ -12,7 +12,7 @@ Reach tracker, share actions, media kit, Humas role.
 
 ### 5.3 Rutin (Recurring)
 
-Frequency: harian/mingguan/bulanan/custom. Set at Bahas or Rancang. Auto-spawn 48h before at track-specific execution stage. PIC rotation: fixed, round-robin, volunteer.
+Frequency: harian/mingguan/bulanan/custom. Set during planning phase or at plan creation. Auto-spawn 48h before next scheduled execution phase. PIC rotation: fixed, round-robin, volunteer.
 
 ---
 

@@ -6,7 +6,7 @@
 
 **Living Card.** Every witness is a card that evolves. Same identity, different face at each stage. A Seed-stage card looks like a social media post. An Execute-stage card looks like a task board. An Impact-stage card looks like a celebration. The shape tells the story.
 
-**Stage-Specific Detail.** Tapping a card opens a purpose-built detail page for that stage. Not one morphing page — each stage has its own page with its own job. A Bahas page is a discussion forum. A Garap page is a task board. A Periksa page is a verification panel. Different rooms in the same house.
+**Phase-Specific Detail.** Tapping a card opens a purpose-built detail page for that phase. Not one morphing page — each phase has its own page with its own job. A discussion phase page is a forum. An execution phase page is a task board. A verification phase page is a review panel. Different rooms in the same house.
 
 **Subtle Signals.** Reputation is ambient. Trust shows through visual cues — tier badges, avatar warmth, weight in governance — not through leaderboards or point counters. Trust is the texture of the interface.
 

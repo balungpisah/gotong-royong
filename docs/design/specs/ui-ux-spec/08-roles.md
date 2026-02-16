@@ -4,7 +4,7 @@
 
 ### 7.1 PIC
 
-Nominated at Bahas → standard vote. Self-nomination OK. No volunteers 48h → system suggests top-3. Transfer: successor → 24h consent. Emergency: inactive 7+ days → any participant proposes.
+Nominated during discussion phase → standard vote. Self-nomination OK. No volunteers 48h → system suggests top-3. Transfer: successor → 24h consent. Emergency: inactive 7+ days → any participant proposes.
 
 ### 7.2 Bendahara
 

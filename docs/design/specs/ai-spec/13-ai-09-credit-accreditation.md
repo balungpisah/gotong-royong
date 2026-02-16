@@ -8,16 +8,16 @@
 |---|---|
 | **ID** | AI-09 |
 | **Name** | Tandang Credit Accreditation |
-| **Trigger** | 1) Continuous silent tracking. 2) Computed block at Tuntas stage. 3) On-demand credit distribution form. |
-| **UI Location** | Credit toast (inline), AI nudge in Diskusi tab chat, Kontribusi diff card at Tuntas |
-| **Interaction Mode** | Mixed — passive tracking + one-shot summary at Tuntas |
-| **Latency Budget** | Toast: instant. Tuntas summary: < 5 seconds. |
+| **Trigger** | 1) Continuous silent tracking. 2) Computed block at plan completion (final phase). 3) On-demand credit distribution form. |
+| **UI Location** | Credit toast (inline), AI nudge in Percakapan tab chat, Kontribusi diff card at plan completion |
+| **Interaction Mode** | Mixed — passive tracking + one-shot summary at plan completion |
+| **Latency Budget** | Toast: instant. Completion summary: < 5 seconds. |
 | **Model Tier** | Medium (Haiku-class) |
-| **UI-UX-SPEC Ref** | Section 20 (Garap), Section 21 (Tuntas), credit distribution card |
+| **UI-UX-SPEC Ref** | Execution phases, Completion phase, credit distribution card |
 
 ### 13.2 Purpose (New v0.2)
 
-**AI-09 tracks community contributions throughout a seed's lifecycle** and proposes fair credit (reputation point) distribution when the seed reaches Tuntas (completion). Credit rewards:
+**AI-09 tracks community contributions throughout an adaptive path's lifecycle** and proposes fair credit (reputation point) distribution when the plan reaches completion (final phase completed). Credit rewards:
 - Seeding the issue (idea creation)
 - Thoughtful discussion (idea refinement)
 - Task execution and problem-solving
@@ -30,7 +30,7 @@
 | Type | Name | Scoring Model | When Award | Examples |
 |---|---|---|---|---|
 | **A** | Binary Verification | Did / Didn't | Immediate after action | Submit seed, vote, complete task |
-| **B** | Time-Weighted | Effort over duration | Batched daily | Hours spent in Rancang, days managing Galang |
+| **B** | Time-Weighted | Effort over duration | Batched daily | Hours spent in planning, days managing Galang |
 | **C** | Peer Consensus | Group validates quality | After peer review threshold | Validation count (Sahkan), verification (Periksa) |
 | **D** | Quality Spectrum | Quality rating | After PIC or peer rate | Discussion quality, proposal quality (1–5 stars) |
 | **E** | Stake-Weighted | Reputation at stake | After action confirmed | Vouch (Jaminkan), personal guarantee |
@@ -48,12 +48,12 @@
 - Type E → toast after vouch: "🔐 Jaminkan diterima — reputasi Anda tercatat"
 
 **Step 3: AI Nudge in Chat**
-- AI-09 sends inline message in Diskusi tab during discussion:
+- AI-09 sends inline message in Percakapan tab during discussion:
   > "💡 Diskusi berkualitas — kontribusi Anda dicatat (Tipe D · Kompetensi)"
 - Message counts toward discussion participation but is not replicated
 
-**Step 4: Tuntas Summary**
-- When card reaches Tuntas, AI-09 proposes Kontribusi distribution as **diff card**
+**Step 4: Completion Summary**
+- When plan reaches completion (final phase), AI-09 proposes Kontribusi distribution as **diff card**
 - Diff card shows: Proposed allocation (who gets how many points for what action)
 - PIC reviews: **Terapkan** (apply) / **Tinjau** (review & edit) / **Tolak** (reject)
 
@@ -68,12 +68,12 @@
 | GR Action | Context Axis | Credit Type | Base Points | Notes |
 |---|---|---|---|---|
 | **Submit seed** | Initiative (I+) | A | 10 | Fixed: one per seed |
-| **Diskusi di Bahas** | Context (C) | D | Variable (1–5) | Based on discussion quality rating |
-| **Kontribusi Rancang** | Context (C) | B | Variable | 1 point per 2 hours, capped 20 |
-| **Selesaikan task Garap** | Context (C) | A | Variable | 10 + task complexity bonus (0–10) |
-| **Validasi di Sahkan** | Judging (J) | C | 5 + consensus | 5 base + 1 per additional validating peer |
-| **Vote di Putuskan** | Initiative (I+) | A | 2 | 2 points per vote, any direction |
-| **Verifikasi Periksa/Tinjau** | Judging (J) | C | 8 | Expert verification weight |
+| **Diskusi di phase pembahasan** | Context (C) | D | Variable (1–5) | Based on discussion quality rating |
+| **Kontribusi phase perencanaan** | Context (C) | B | Variable | 1 point per 2 hours, capped 20 |
+| **Selesaikan task phase pelaksanaan** | Context (C) | A | Variable | 10 + task complexity bonus (0–10) |
+| **Validasi di phase validasi** | Judging (J) | C | 5 + consensus | 5 base + 1 per additional validating peer |
+| **Vote di phase keputusan** | Initiative (I+) | A | 2 | 2 points per vote, any direction |
+| **Verifikasi di phase verifikasi/tinjauan** | Judging (J) | C | 8 | Expert verification weight |
 | **Kontribusi Galang** | Context (C) | B | Variable | 1 point per Rp 100k raised, capped 20 |
 | **Vouch (Jaminkan)** | Initiative + Stake (I+S) | E | 15 | Highest-stake action; reputation on line |
 | **Ajukan hipotesis** | Context (C) | D | 3–7 | Based on discussion impact |
@@ -107,14 +107,14 @@
         └──────┬─────┘
                │
         ┌──────▼──────────┐
-        │  At Tuntas:     │
+        │  At completion: │
         │  Aggregate →    │
         │  Propose Dist.  │
         │  Diff Card      │
         └─────────────────┘
 ```
 
-### 13.7 Diff Card Layout (at Tuntas)
+### 13.7 Diff Card Layout (at Plan Completion)
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -123,7 +123,7 @@
 │                                              │
 │  Budi (Seeder)                               │
 │    Inisiatif: 10 poin ✓                      │
-│    Rancang: 5 jam → 10 poin ✓               │
+│    Perencanaan: 5 jam → 10 poin ✓           │
 │    Total: 20 poin                            │
 │                                              │
 │  Siti (Diskusi)                              │
@@ -131,8 +131,8 @@
 │    Total: 4 poin                             │
 │                                              │
 │  Ahmad (Eksekusi)                            │
-│    Garap Task 1: 15 poin ✓                  │
-│    Garap Task 2: 15 poin ✓                  │
+│    Execution Task 1: 15 poin ✓              │
+│    Execution Task 2: 15 poin ✓              │
 │    Jaminkan (Vouch): 15 poin ✓              │
 │    Total: 45 poin                            │
 │                                              │
@@ -146,13 +146,13 @@
 | Scenario | Behavior |
 |---|---|
 | **Tracking failure** | Log gap detected → async reconciliation within 24h |
-| **Tuntas summary unavailable** | PIC manually distributes credit using simple form (text input) |
+| **Completion summary unavailable** | PIC manually distributes credit using simple form (text input) |
 | **Credit dispute model unavailable** | Peer review only (no AI mediation); manual resolution by council |
 | **User credit balance error** | Audit log used as source of truth; reconcile forward |
 
 ### 13.9 Community Override
 
-- **PIC has final say** on credit distribution at Tuntas
+- **PIC has final say** on credit distribution at plan completion
 - **Participants can dispute** within 72h window
 - **Disputes are logged** and can lead to credit adjustments
 - **Community council** arbitrates disputed credits

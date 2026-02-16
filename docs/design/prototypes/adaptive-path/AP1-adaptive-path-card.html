@@ -1,0 +1,976 @@
+<!-- Gotong Royong Design System · Reference: ADAPTIVE-PATH-SPEC-v0.1.md · Adaptive Path Prototype -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotong Royong — AP1 · Adaptive Path Card</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --fs-h2:20px; --fs-h3:16px; --fs-body:14px; --fs-small:12px;
+    --fs-caption:11px; --fs-micro:9px;
+    --fw-regular:400; --fw-semi:600; --fw-bold:700; --fw-extra:800;
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-6:24px; --sp-8:32px;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:9999px;
+    --shadow-sm:0 1px 4px rgba(62,39,35,0.06);
+    --shadow-md:0 2px 12px rgba(62,39,35,0.08);
+    --shadow-lg:0 4px 24px rgba(62,39,35,0.12);
+    --c-tanah-gelap:#3E2723; --c-tanah:#5D4037; --c-kayu:#8D6E63;
+    --c-pasir:#A1887F; --c-batu:#D7CCC8; --c-kapas:#F5EDE3; --c-susu:#FFFBF5;
+    --c-api:#C05621; --c-api-terang:#D2691E; --c-api-dalam:#A0461A; --c-bara:#FFF3E0;
+    --c-berhasil:#2E7D32; --c-berhasil-l:#E8F5E9;
+    --c-peringatan:#E65100; --c-peringatan-l:#FFF3E0;
+    --c-bahaya:#C62828; --c-bahaya-l:#FFEBEE;
+    --c-keterangan:#4E342E; --c-keterangan-l:#EFEBE9;
+    --t-tuntaskan:#C05621; --t-tuntaskan-soft:#FFF3E0;
+    --t-wujudkan:#2E7D32; --t-wujudkan-soft:#E8F5E9;
+    --t-telusuri:#6A1B9A; --t-telusuri-soft:#F3E5F5;
+    --t-rayakan:#F57F17; --t-rayakan-soft:#FFF8E1;
+    --t-musyawarah:#4E342E; --t-musyawarah-soft:#EFEBE9;
+    /* Adaptive path status colors */
+    --s-planned:#78909C; --s-planned-bg:#ECEFF1;
+    --s-active:#1565C0; --s-active-bg:#E3F2FD;
+    --s-open:#7B1FA2; --s-open-bg:#F3E5F5;
+    --s-completed:#2E7D32; --s-completed-bg:#E8F5E9;
+    --s-blocked:#C62828; --s-blocked-bg:#FFEBEE;
+    --s-skipped:#9E9E9E; --s-skipped-bg:#F5F5F5;
+    /* Source tags */
+    --src-ai:#1565C0; --src-human:#C05621; --src-system:#546E7A;
+  }
+
+  body {
+    font-family: 'Nunito', -apple-system, sans-serif;
+    background: #e8e0d8; color: var(--c-tanah-gelap);
+    min-height: 100vh;
+  }
+
+  .doc-bar {
+    background: var(--c-tanah-gelap); color: #fff;
+    padding: 16px 24px; text-align: center;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .doc-bar h1 { font-size: 15px; font-weight: 700; }
+  .doc-bar p { font-size: 11px; opacity: 0.5; margin-top: 2px; }
+
+  .scenario-nav {
+    background: var(--c-tanah-gelap);
+    display: flex; justify-content: center; flex-wrap: wrap;
+    position: sticky; top: 52px; z-index: 99;
+  }
+  .scenario-btn {
+    padding: 8px 12px; font-size: 10px; font-weight: 700;
+    cursor: pointer; border: none; background: transparent;
+    color: rgba(255,255,255,0.35); border-bottom: 2px solid transparent;
+    transition: all 0.2s; font-family: 'Nunito', sans-serif;
+  }
+  .scenario-btn:hover { color: rgba(255,255,255,0.7); }
+  .scenario-btn.active { color: #fff; border-bottom-color: var(--c-api); }
+
+  .phone-frame {
+    width: 375px; margin: 24px auto;
+    background: var(--c-kapas);
+    border-radius: 28px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.08);
+  }
+
+  .status-bar {
+    height: 44px; background: var(--c-susu);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; font-size: 12px; font-weight: 700;
+  }
+
+  .app-bar {
+    background: var(--c-susu); padding: 8px 16px 0;
+    border-bottom: 1px solid var(--c-batu);
+  }
+  .app-bar-title {
+    font-size: var(--fs-h3); font-weight: var(--fw-bold);
+    margin-bottom: 4px; display: flex; align-items: center; gap: 8px;
+  }
+  .track-hint-pill {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    padding: 2px 8px; border-radius: var(--r-full);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  /* ═══════════════════════════
+     DUAL TAB: Percakapan / Tahapan
+     ═══════════════════════════ */
+  .dual-tab-bar {
+    display: flex; background: var(--c-susu);
+    border-bottom: 1px solid var(--c-batu);
+  }
+  .tab-btn {
+    flex: 1; padding: 10px 0; text-align: center;
+    font-size: var(--fs-small); font-weight: var(--fw-bold);
+    border: none; background: transparent; cursor: pointer;
+    color: var(--c-pasir); border-bottom: 2px solid transparent;
+    font-family: 'Nunito', sans-serif; transition: all 0.2s;
+  }
+  .tab-btn.active { color: var(--c-tanah-gelap); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ═══════════════════════════
+     TAHAPAN (TIMELINE) TAB
+     ═══════════════════════════ */
+  .tahapan-container { padding: 16px; }
+
+  .plan-header {
+    background: var(--c-susu); border-radius: var(--r-md);
+    padding: 12px; margin-bottom: 16px;
+    box-shadow: var(--shadow-sm); border: 1px solid var(--c-batu);
+  }
+  .plan-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .plan-version {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    background: var(--c-keterangan-l); color: var(--c-keterangan);
+    padding: 2px 6px; border-radius: var(--r-sm);
+  }
+  .plan-title { font-size: var(--fs-h3); font-weight: var(--fw-bold); }
+  .plan-summary { font-size: var(--fs-small); color: var(--c-kayu); margin-top: 4px; }
+
+  /* Branch */
+  .branch-label {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--c-kayu); text-transform: uppercase; letter-spacing: 0.5px;
+    margin: 16px 0 8px; padding-left: 4px;
+  }
+
+  /* Phase */
+  .phase-card {
+    background: var(--c-susu); border-radius: var(--r-md);
+    margin-bottom: 12px; overflow: hidden;
+    box-shadow: var(--shadow-sm); border: 1px solid var(--c-batu);
+    transition: all 0.2s;
+  }
+  .phase-card.expanded { box-shadow: var(--shadow-md); }
+
+  .phase-header {
+    padding: 12px; display: flex; align-items: flex-start; gap: 10px;
+    cursor: pointer; position: relative;
+  }
+  .phase-number {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--fs-small); font-weight: var(--fw-extra);
+    color: #fff; flex-shrink: 0;
+  }
+  .phase-info { flex: 1; }
+  .phase-title { font-size: var(--fs-body); font-weight: var(--fw-bold); }
+  .phase-objective { font-size: var(--fs-caption); color: var(--c-kayu); margin-top: 2px; }
+
+  .phase-badges { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+
+  .status-badge {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    padding: 2px 6px; border-radius: var(--r-sm);
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .status-planned { background: var(--s-planned-bg); color: var(--s-planned); }
+  .status-active { background: var(--s-active-bg); color: var(--s-active); }
+  .status-open { background: var(--s-open-bg); color: var(--s-open); }
+  .status-completed { background: var(--s-completed-bg); color: var(--s-completed); }
+  .status-blocked { background: var(--s-blocked-bg); color: var(--s-blocked); }
+  .status-skipped { background: var(--s-skipped-bg); color: var(--s-skipped); }
+
+  .source-tag {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    padding: 2px 6px; border-radius: var(--r-sm);
+  }
+  .source-ai { background: #E3F2FD; color: var(--src-ai); }
+  .source-human { background: var(--c-bara); color: var(--src-human); }
+  .source-system { background: #ECEFF1; color: var(--src-system); }
+
+  .lock-icon { font-size: var(--fs-micro); }
+
+  /* Checkpoints */
+  .checkpoint-list { padding: 0 12px 12px; }
+  .checkpoint-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0; border-top: 1px solid var(--c-batu);
+  }
+  .checkpoint-dot {
+    width: 18px; height: 18px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; flex-shrink: 0;
+  }
+  .checkpoint-dot.completed { background: var(--s-completed); color: #fff; }
+  .checkpoint-dot.active { background: var(--s-active); color: #fff; }
+  .checkpoint-dot.open { background: var(--s-open); color: #fff; }
+  .checkpoint-dot.planned { background: var(--s-planned-bg); border: 2px solid var(--s-planned); }
+  .checkpoint-dot.blocked { background: var(--s-blocked); color: #fff; }
+  .checkpoint-dot.skipped { background: var(--s-skipped-bg); border: 2px solid var(--s-skipped); }
+
+  .checkpoint-info { flex: 1; }
+  .checkpoint-title { font-size: var(--fs-small); font-weight: var(--fw-semi); }
+  .checkpoint-meta { font-size: var(--fs-micro); color: var(--c-pasir); }
+  .checkpoint-lock { font-size: var(--fs-caption); color: var(--src-human); }
+
+  /* ═══════════════════════════
+     PERCAKAPAN (CONVERSATION) TAB
+     ═══════════════════════════ */
+  .percakapan-container { padding: 16px; }
+
+  .chat-bubble {
+    max-width: 80%; padding: 10px 14px;
+    border-radius: 16px; margin-bottom: 8px;
+    font-size: var(--fs-small); line-height: 1.5;
+  }
+  .chat-bubble.other {
+    background: #fff; border: 1px solid var(--c-batu);
+    border-bottom-left-radius: 4px; margin-right: auto;
+  }
+  .chat-bubble.self {
+    margin-left: auto;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-bubble .sender {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    margin-bottom: 4px; display: flex; align-items: center; gap: 4px;
+  }
+  .chat-bubble .timestamp {
+    font-size: var(--fs-micro); color: var(--c-pasir);
+    text-align: right; margin-top: 4px;
+  }
+
+  .ai-card {
+    background: #fff; border: 1px solid var(--c-batu);
+    border-radius: var(--r-md); padding: 12px;
+    margin-bottom: 8px; box-shadow: var(--shadow-sm);
+  }
+  .ai-card-header {
+    font-size: var(--fs-caption); font-weight: var(--fw-bold);
+    color: var(--src-ai); display: flex; align-items: center; gap: 4px;
+    margin-bottom: 8px;
+  }
+  .diff-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--c-batu);
+    font-size: var(--fs-small);
+  }
+  .diff-row:last-child { border-bottom: none; }
+  .diff-add { color: var(--c-berhasil); }
+  .diff-remove { color: var(--c-bahaya); text-decoration: line-through; }
+
+  .action-buttons {
+    display: flex; gap: 8px; margin-top: 8px;
+  }
+  .btn {
+    flex: 1; padding: 8px; text-align: center;
+    border-radius: var(--r-sm); font-size: var(--fs-small);
+    font-weight: var(--fw-bold); border: none; cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+  }
+  .btn-accept { background: var(--c-berhasil); color: #fff; }
+  .btn-reject { background: var(--c-bahaya-l); color: var(--c-bahaya); }
+  .btn-review { background: var(--c-keterangan-l); color: var(--c-keterangan); }
+
+  /* ═══════════════════════════
+     BRANCH FORK VISUAL
+     ═══════════════════════════ */
+  .branch-fork {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; margin: 8px 0;
+    background: var(--c-keterangan-l); border-radius: var(--r-sm);
+    font-size: var(--fs-caption); color: var(--c-kayu);
+  }
+  .branch-fork-icon { font-size: 16px; }
+
+  /* ═══════════════════════════
+     SEED CARD (FEED VIEW)
+     ═══════════════════════════ */
+  .seed-card {
+    background: var(--c-susu); border-radius: var(--r-lg);
+    overflow: hidden; box-shadow: var(--shadow-md);
+    margin: 16px; border: 1px solid var(--c-batu);
+  }
+  .seed-card-strip { height: 100%; width: 4px; position: absolute; left: 0; top: 0; }
+  .seed-card-inner { padding: 14px 14px 14px 18px; position: relative; }
+
+  .seed-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+  .seed-badge {
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    padding: 2px 8px; border-radius: var(--r-full);
+  }
+  .seed-title { font-size: var(--fs-body); font-weight: var(--fw-bold); }
+  .seed-author {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--fs-caption); color: var(--c-kayu); margin-bottom: 8px;
+  }
+  .seed-avatar {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--c-batu); display: flex; align-items: center;
+    justify-content: center; font-size: 10px; font-weight: 700;
+  }
+  .seed-body {
+    font-size: var(--fs-small); color: var(--c-tanah);
+    line-height: 1.5; margin-bottom: 10px;
+    display: -webkit-box; -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  /* Adaptive stepper */
+  .adaptive-stepper {
+    display: flex; align-items: center; gap: 2px;
+    padding: 8px 0; overflow-x: auto;
+  }
+  .step-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  .step-dot.completed { background: var(--s-completed); }
+  .step-dot.active { background: var(--s-active); box-shadow: 0 0 0 3px rgba(21,101,192,0.2); }
+  .step-dot.planned { background: var(--s-planned-bg); border: 1.5px solid var(--s-planned); }
+  .step-connector { width: 12px; height: 2px; flex-shrink: 0; }
+  .step-connector.done { background: var(--s-completed); }
+  .step-connector.pending { background: var(--c-batu); }
+
+  .step-label {
+    font-size: var(--fs-micro); color: var(--c-kayu);
+    white-space: nowrap; margin-left: 2px;
+  }
+  .step-label.current { color: var(--s-active); font-weight: var(--fw-bold); }
+
+  .seed-footer {
+    display: flex; align-items: center; gap: 12px;
+    padding-top: 8px; border-top: 1px solid var(--c-batu);
+    font-size: var(--fs-caption); color: var(--c-pasir);
+  }
+  .seed-footer .ai-badge {
+    margin-left: auto;
+    font-size: var(--fs-micro); font-weight: var(--fw-bold);
+    padding: 2px 6px; border-radius: var(--r-sm);
+  }
+
+  /* ═══════════════════════════
+     SCENARIO VIEWS
+     ═══════════════════════════ */
+  .scenario { display: none; }
+  .scenario.active { display: block; }
+
+  .info-panel {
+    margin: 16px; padding: 12px;
+    background: var(--c-keterangan-l); border-radius: var(--r-md);
+    font-size: var(--fs-caption); color: var(--c-keterangan);
+  }
+  .info-panel strong { font-weight: var(--fw-bold); }
+</style>
+</head>
+<body>
+  <div class="doc-bar">
+    <h1>AP1 · Adaptive Path Card</h1>
+    <p>Gotong Royong · Adaptive Path Guidance · PathPlan → Branch → Phase → Checkpoint</p>
+  </div>
+
+  <div class="scenario-nav">
+    <button class="scenario-btn active" onclick="showScenario('feed')">Feed Card</button>
+    <button class="scenario-btn" onclick="showScenario('tahapan')">Tahapan Tab</button>
+    <button class="scenario-btn" onclick="showScenario('percakapan')">Percakapan Tab</button>
+    <button class="scenario-btn" onclick="showScenario('suggestion')">AI Suggestion</button>
+    <button class="scenario-btn" onclick="showScenario('branch')">Branching</button>
+    <button class="scenario-btn" onclick="showScenario('statuses')">All Statuses</button>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SCENARIO 1: Feed Card with Adaptive Stepper
+       ════════════════════════════════════════ -->
+  <div class="scenario active" id="scene-feed">
+    <div class="phone-frame">
+      <div class="status-bar"><span>9:41</span><span>📶 🔋</span></div>
+
+      <div class="info-panel" style="margin:12px 16px 0; background: var(--c-bara);">
+        <strong>Feed View — Seed Card with Adaptive Stepper</strong><br>
+        The stepper shows dynamic phases instead of fixed stages. Track hint provides color only.
+      </div>
+
+      <!-- Card: Tuntaskan hint -->
+      <div class="seed-card" style="position: relative;">
+        <div style="position:absolute; left:0; top:0; bottom:0; width:4px; background: var(--t-tuntaskan);"></div>
+        <div class="seed-card-inner">
+          <div class="seed-header">
+            <span class="seed-badge" style="background: var(--t-tuntaskan-soft); color: var(--t-tuntaskan);">Keresahan</span>
+            <span class="track-hint-pill" style="background: var(--t-tuntaskan-soft); color: var(--t-tuntaskan);">tuntaskan</span>
+          </div>
+          <div class="seed-title" style="margin-bottom: 6px;">Jalan rusak di Jl. Merdeka dekat pasar</div>
+          <div class="seed-author">
+            <div class="seed-avatar">B</div>
+            Budi · Tier 2 · 2j lalu
+          </div>
+          <div class="seed-body">
+            Ada lubang besar yang bikin macet dan membahayakan pengendara motor. Sudah bilang ke RT tapi belum ada respon. Perlu koordinasi warga untuk perbaikan bersama.
+          </div>
+
+          <!-- Adaptive Stepper -->
+          <div class="adaptive-stepper">
+            <div class="step-dot completed"></div>
+            <span class="step-label">Diskusi</span>
+            <div class="step-connector done"></div>
+            <div class="step-dot active"></div>
+            <span class="step-label current">Perencanaan</span>
+            <div class="step-connector pending"></div>
+            <div class="step-dot planned"></div>
+            <span class="step-label">Pelaksanaan</span>
+            <div class="step-connector pending"></div>
+            <div class="step-dot planned"></div>
+            <span class="step-label">Verifikasi</span>
+          </div>
+
+          <div class="seed-footer">
+            <span>💬 12</span>
+            <span>👥 8</span>
+            <span>⏱ 3h di Perencanaan</span>
+            <span class="ai-badge" style="background: var(--s-active-bg); color: var(--s-active);">🤖 Phase 2/4</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card: Wujudkan hint -->
+      <div class="seed-card" style="position: relative;">
+        <div style="position:absolute; left:0; top:0; bottom:0; width:4px; background: var(--t-wujudkan);"></div>
+        <div class="seed-card-inner">
+          <div class="seed-header">
+            <span class="seed-badge" style="background: var(--t-wujudkan-soft); color: var(--t-wujudkan);">Gagasan</span>
+            <span class="track-hint-pill" style="background: var(--t-wujudkan-soft); color: var(--t-wujudkan);">wujudkan</span>
+          </div>
+          <div class="seed-title" style="margin-bottom: 6px;">Perpustakaan digital kampung</div>
+          <div class="seed-author">
+            <div class="seed-avatar" style="background: var(--t-wujudkan-soft); color: var(--t-wujudkan);">S</div>
+            Siti · Tier 3 · 1h lalu
+          </div>
+          <div class="seed-body">
+            Mari kita buat perpustakaan digital agar semua warga bisa akses buku gratis. Sudah ada relawan yang siap bantu.
+          </div>
+
+          <div class="adaptive-stepper">
+            <div class="step-dot completed"></div>
+            <span class="step-label">Diskusi</span>
+            <div class="step-connector done"></div>
+            <div class="step-dot completed"></div>
+            <span class="step-label">Rencana</span>
+            <div class="step-connector done"></div>
+            <div class="step-dot active"></div>
+            <span class="step-label current">Galang</span>
+            <div class="step-connector pending"></div>
+            <div class="step-dot planned"></div>
+            <span class="step-label">Bangun</span>
+            <div class="step-connector pending"></div>
+            <div class="step-dot planned"></div>
+            <span class="step-label">Rayakan</span>
+          </div>
+
+          <div class="seed-footer">
+            <span>💬 24</span>
+            <span>👥 15</span>
+            <span>⏱ 2h di Galang</span>
+            <span class="ai-badge" style="background: var(--s-completed-bg); color: var(--s-completed);">🤖 Phase 3/5</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="height: 24px;"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SCENARIO 2: Tahapan (Timeline) Tab
+       ════════════════════════════════════════ -->
+  <div class="scenario" id="scene-tahapan">
+    <div class="phone-frame">
+      <div class="status-bar"><span>9:41</span><span>📶 🔋</span></div>
+
+      <div class="app-bar">
+        <div class="app-bar-title">
+          Jalan rusak di Jl. Merdeka
+          <span class="track-hint-pill" style="background: var(--t-tuntaskan-soft); color: var(--t-tuntaskan);">tuntaskan</span>
+        </div>
+      </div>
+
+      <div class="dual-tab-bar">
+        <button class="tab-btn" onclick="switchTab(this, 'percakapan-tab-2')">💬 Percakapan</button>
+        <button class="tab-btn active" onclick="switchTab(this, 'tahapan-tab-2')" style="border-bottom-color: var(--t-tuntaskan);">📋 Tahapan</button>
+      </div>
+
+      <div class="tab-content active" id="tahapan-tab-2">
+        <div class="tahapan-container">
+
+          <!-- Plan Header -->
+          <div class="plan-header">
+            <div class="plan-meta">
+              <span class="plan-version">v3</span>
+              <span class="source-tag source-ai">🤖 ai</span>
+              <span style="font-size:var(--fs-micro); color:var(--c-pasir);">Updated 2m ago</span>
+            </div>
+            <div class="plan-title">Rencana Perbaikan Jalan</div>
+            <div class="plan-summary">Koordinasi warga untuk perbaikan lubang jalan di Jl. Merdeka. 4 phase, 9 checkpoint.</div>
+          </div>
+
+          <div class="branch-label">🌿 Main Branch</div>
+
+          <!-- Phase 1: Completed -->
+          <div class="phase-card">
+            <div class="phase-header" onclick="togglePhase(this)">
+              <div class="phase-number" style="background: var(--s-completed);">1</div>
+              <div class="phase-info">
+                <div class="phase-title">Diskusi & Diagnosis</div>
+                <div class="phase-objective">Identifikasi masalah, tentukan PIC, kumpulkan saksi</div>
+                <div class="phase-badges">
+                  <span class="status-badge status-completed">✓ completed</span>
+                  <span class="source-tag source-ai">🤖 ai</span>
+                </div>
+              </div>
+            </div>
+            <div class="checkpoint-list" style="display:none;">
+              <div class="checkpoint-item">
+                <div class="checkpoint-dot completed">✓</div>
+                <div class="checkpoint-info">
+                  <div class="checkpoint-title">Dokumentasi foto lubang jalan</div>
+                  <div class="checkpoint-meta">source: human · completed 2h ago</div>
+                </div>
+                <span class="checkpoint-lock">🔒</span>
+              </div>
+              <div class="checkpoint-item">
+                <div class="checkpoint-dot completed">✓</div>
+                <div class="checkpoint-info">
+                  <div class="checkpoint-title">Tentukan PIC (Budi)</div>
+                  <div class="checkpoint-meta">source: human · completed 1h ago</div>
+                </div>
+                <span class="checkpoint-lock">🔒</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 2: Active -->
+          <div class="phase-card expanded">
+            <div class="phase-header" onclick="togglePhase(this)">
+              <div class="phase-number" style="background: var(--s-active);">2</div>
+              <div class="phase-info">
+                <div class="phase-title">Perencanaan & Penganggaran</div>
+                <div class="phase-objective">Rancang rencana kerja, estimasi biaya, buat daftar tugas</div>
+                <div class="phase-badges">
+                  <span class="status-badge status-active">● active</span>
+                  <span class="source-tag source-ai">🤖 ai</span>
+                  <span class="source-tag source-human">✏️ human edits</span>
+                </div>
+              </div>
+            </div>
+            <div class="checkpoint-list">
+              <div class="checkpoint-item">
+                <div class="checkpoint-dot completed">✓</div>
+                <div class="checkpoint-info">
+                  <div class="checkpoint-title">Survei ukuran lubang & material</div>
+                  <div class="checkpoint-meta">source: ai → accepted · completed</div>
+                </div>
+              </div>
+              <div class="checkpoint-item">
+                <div class="checkpoint-dot active">●</div>
+                <div class="checkpoint-info">
+                  <div class="checkpoint-title">Estimasi biaya material</div>
+                  <div class="checkpoint-meta">source: human · active</div>
+                </div>
+                <span class="checkpoint-lock">🔒</span>
+              </div>
+              <div class="checkpoint-item">
+                <div class="checkpoint-dot planned"></div>
+                <div class="checkpoint-info">
+                  <div class="checkpoint-title">Bagi tugas ke relawan</div>
+                  <div class="checkpoint-meta">source: ai · planned</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 3: Planned -->
+          <div class="phase-card">
+            <div class="phase-header" onclick="togglePhase(this)">
+              <div class="phase-number" style="background: var(--s-planned);">3</div>
+              <div class="phase-info">
+                <div class="phase-title">Pelaksanaan</div>
+                <div class="phase-objective">Kerjakan perbaikan jalan bersama warga</div>
+                <div class="phase-badges">
+                  <span class="status-badge status-planned">○ planned</span>
+                  <span class="source-tag source-ai">🤖 ai</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 4: Planned -->
+          <div class="phase-card">
+            <div class="phase-header" onclick="togglePhase(this)">
+              <div class="phase-number" style="background: var(--s-planned);">4</div>
+              <div class="phase-info">
+                <div class="phase-title">Verifikasi & Tuntas</div>
+                <div class="phase-objective">Verifikasi hasil, challenge window, arsipkan</div>
+                <div class="phase-badges">
+                  <span class="status-badge status-planned">○ planned</span>
+                  <span class="source-tag source-ai">🤖 ai</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SCENARIO 3: Percakapan (Conversation) Tab
+       ════════════════════════════════════════ -->
+  <div class="scenario" id="scene-percakapan">
+    <div class="phone-frame">
+      <div class="status-bar"><span>9:41</span><span>📶 🔋</span></div>
+
+      <div class="app-bar">
+        <div class="app-bar-title">
+          Jalan rusak di Jl. Merdeka
+          <span class="track-hint-pill" style="background: var(--t-tuntaskan-soft); color: var(--t-tuntaskan);">tuntaskan</span>
+        </div>
+      </div>
+
+      <div class="dual-tab-bar">
+        <button class="tab-btn active" style="border-bottom-color: var(--t-tuntaskan);">💬 Percakapan</button>
+        <button class="tab-btn">📋 Tahapan</button>
+      </div>
+
+      <div class="percakapan-container">
+        <div class="chat-bubble other">
+          <div class="sender">🤖 AI-00 <span class="source-tag source-system" style="font-size:8px;">system</span></div>
+          Ceritakan apa yang kamu lihat atau alami...
+          <div class="timestamp">14:20</div>
+        </div>
+
+        <div class="chat-bubble self" style="background: var(--t-tuntaskan-soft);">
+          <div class="sender" style="justify-content: flex-end;">Budi</div>
+          Ada lubang besar di Jl. Merdeka dekat pasar yang bikin macet dan membahayakan motor. Sudah bilang ke RT tapi nggak ada respon.
+          <div class="timestamp">14:21</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="sender">🤖 AI-00</div>
+          Terima kasih Budi. Saya sudah buatkan rencana penyelesaian di tab Tahapan. Ada 4 tahap: diskusi, perencanaan, pelaksanaan, dan verifikasi. Kamu bisa sesuaikan rencananya.
+          <div class="timestamp">14:21</div>
+        </div>
+
+        <div class="chat-bubble self" style="background: var(--t-tuntaskan-soft);">
+          <div class="sender" style="justify-content: flex-end;">Siti</div>
+          Saya juga lihat lubangnya kemarin, memang bahaya. Saya bisa bantu koordinasi material.
+          <div class="timestamp">14:35</div>
+        </div>
+
+        <div class="chat-bubble other">
+          <div class="sender">🤖 AI-06 <span class="source-tag source-ai" style="font-size:8px;">suggestion</span></div>
+          💡 Berdasarkan diskusi, saya sarankan tambahkan checkpoint "Koordinasi material dengan Siti" di phase Perencanaan. Lihat di tab Tahapan.
+          <div class="timestamp">14:36</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SCENARIO 4: AI Suggestion Diff Card
+       ════════════════════════════════════════ -->
+  <div class="scenario" id="scene-suggestion">
+    <div class="phone-frame">
+      <div class="status-bar"><span>9:41</span><span>📶 🔋</span></div>
+
+      <div class="app-bar">
+        <div class="app-bar-title">Jalan rusak di Jl. Merdeka</div>
+      </div>
+
+      <div class="dual-tab-bar">
+        <button class="tab-btn">💬 Percakapan</button>
+        <button class="tab-btn active" style="border-bottom-color: var(--t-tuntaskan);">📋 Tahapan</button>
+      </div>
+
+      <div class="info-panel" style="margin:12px 16px 0; background: var(--s-active-bg);">
+        <strong>Suggest-Don't-Overwrite Pattern</strong><br>
+        AI proposes changes as diffs. Privileged editors accept/reject. Accepted edits auto-lock fields.
+      </div>
+
+      <div style="padding: 16px;">
+        <!-- AI Suggestion Card -->
+        <div class="ai-card">
+          <div class="ai-card-header">🤖 AI Suggestion · Plan v3 → v4</div>
+
+          <div style="font-size: var(--fs-caption); color: var(--c-kayu); margin-bottom: 8px;">
+            AI proposes adding a Galang phase based on community discussion about funding needs.
+          </div>
+
+          <div class="diff-row">
+            <span class="diff-add">+ Phase: "Galang Dana Material"</span>
+            <span class="source-tag source-ai" style="font-size: 8px;">ai</span>
+          </div>
+          <div class="diff-row">
+            <span class="diff-add">+ Checkpoint: "Tentukan target dana"</span>
+            <span class="source-tag source-ai" style="font-size: 8px;">ai</span>
+          </div>
+          <div class="diff-row">
+            <span class="diff-add">+ Checkpoint: "Buka pengumpulan dana"</span>
+            <span class="source-tag source-ai" style="font-size: 8px;">ai</span>
+          </div>
+          <div class="diff-row">
+            <span style="font-size: var(--fs-caption); color: var(--c-kayu);">Insert after Phase 2 (Perencanaan)</span>
+          </div>
+
+          <div class="action-buttons">
+            <button class="btn btn-accept">✓ Terima</button>
+            <button class="btn btn-review">👁 Tinjau</button>
+            <button class="btn btn-reject">✗ Tolak</button>
+          </div>
+        </div>
+
+        <!-- Locked field notice -->
+        <div class="ai-card" style="border-color: var(--c-bara);">
+          <div class="ai-card-header" style="color: var(--src-human);">🔒 Locked Fields</div>
+          <div style="font-size: var(--fs-caption); color: var(--c-kayu);">
+            The following fields were manually edited and cannot be changed by AI:
+          </div>
+          <div style="margin-top: 8px;">
+            <div class="diff-row">
+              <span>Phase 1 → title</span>
+              <span class="source-tag source-human" style="font-size: 8px;">🔒 human</span>
+            </div>
+            <div class="diff-row">
+              <span>Phase 2 → checkpoint "Estimasi biaya"</span>
+              <span class="source-tag source-human" style="font-size: 8px;">🔒 human</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SCENARIO 5: Branching
+       ════════════════════════════════════════ -->
+  <div class="scenario" id="scene-branch">
+    <div class="phone-frame">
+      <div class="status-bar"><span>9:41</span><span>📶 🔋</span></div>
+
+      <div class="app-bar">
+        <div class="app-bar-title">Perpustakaan digital kampung</div>
+      </div>
+
+      <div class="dual-tab-bar">
+        <button class="tab-btn">💬 Percakapan</button>
+        <button class="tab-btn active" style="border-bottom-color: var(--t-wujudkan);">📋 Tahapan</button>
+      </div>
+
+      <div class="tahapan-container">
+        <div class="plan-header">
+          <div class="plan-meta">
+            <span class="plan-version">v5</span>
+            <span class="source-tag source-human">✏️ human</span>
+          </div>
+          <div class="plan-title">Rencana Perpustakaan Digital</div>
+          <div class="plan-summary">Path with branch: digital platform + physical space running in parallel.</div>
+        </div>
+
+        <div class="branch-label">🌿 Main Branch</div>
+
+        <!-- Phase 1: Completed -->
+        <div class="phase-card">
+          <div class="phase-header">
+            <div class="phase-number" style="background: var(--s-completed);">1</div>
+            <div class="phase-info">
+              <div class="phase-title">Diskusi & Visi</div>
+              <div class="phase-badges">
+                <span class="status-badge status-completed">✓ completed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 2: Completed - fork point -->
+        <div class="phase-card">
+          <div class="phase-header">
+            <div class="phase-number" style="background: var(--s-completed);">2</div>
+            <div class="phase-info">
+              <div class="phase-title">Perencanaan</div>
+              <div class="phase-badges">
+                <span class="status-badge status-completed">✓ completed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Branch Fork -->
+        <div class="branch-fork">
+          <span class="branch-fork-icon">🔀</span>
+          <span>Forked from checkpoint "Finalisasi rencana" → 2 parallel branches</span>
+        </div>
+
+        <div class="branch-label">🌿 Branch A: Platform Digital</div>
+
+        <div class="phase-card expanded">
+          <div class="phase-header">
+            <div class="phase-number" style="background: var(--s-active);">3a</div>
+            <div class="phase-info">
+              <div class="phase-title">Bangun Website</div>
+              <div class="phase-badges">
+                <span class="status-badge status-active">● active</span>
+                <span class="source-tag source-human">✏️ human</span>
+              </div>
+            </div>
+          </div>
+          <div class="checkpoint-list">
+            <div class="checkpoint-item">
+              <div class="checkpoint-dot completed">✓</div>
+              <div class="checkpoint-info">
+                <div class="checkpoint-title">Setup hosting & domain</div>
+              </div>
+            </div>
+            <div class="checkpoint-item">
+              <div class="checkpoint-dot active">●</div>
+              <div class="checkpoint-info">
+                <div class="checkpoint-title">Develop catalog system</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="branch-label">🌿 Branch B: Ruang Fisik</div>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <div class="phase-number" style="background: var(--s-active);">3b</div>
+            <div class="phase-info">
+              <div class="phase-title">Galang & Siapkan Ruang</div>
+              <div class="phase-badges">
+                <span class="status-badge status-active">● active</span>
+                <span class="source-tag source-ai">🤖 ai</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="branch-label" style="color: var(--c-pasir);">↳ Branches merge at completion</div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SCENARIO 6: All Status States
+       ════════════════════════════════════════ -->
+  <div class="scenario" id="scene-statuses">
+    <div class="phone-frame">
+      <div class="status-bar"><span>9:41</span><span>📶 🔋</span></div>
+
+      <div class="info-panel" style="margin:12px 16px;">
+        <strong>Status Reference</strong> — All 6 checkpoint/phase statuses + 3 source tags
+      </div>
+
+      <div style="padding: 0 16px;">
+        <div style="margin-bottom: 16px;">
+          <div style="font-size:var(--fs-caption); font-weight:700; margin-bottom:8px; color:var(--c-kayu);">STATUSES</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <span class="status-badge status-planned">○ planned</span>
+            <span class="status-badge status-active">● active</span>
+            <span class="status-badge status-open">◎ open</span>
+            <span class="status-badge status-completed">✓ completed</span>
+            <span class="status-badge status-blocked">✗ blocked</span>
+            <span class="status-badge status-skipped">— skipped</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <div style="font-size:var(--fs-caption); font-weight:700; margin-bottom:8px; color:var(--c-kayu);">SOURCE TAGS</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <span class="source-tag source-ai">🤖 ai</span>
+            <span class="source-tag source-human">✏️ human</span>
+            <span class="source-tag source-system">⚙️ system</span>
+          </div>
+        </div>
+
+        <div style="font-size:var(--fs-caption); font-weight:700; margin-bottom:8px; color:var(--c-kayu);">CHECKPOINT STATES</div>
+
+        <!-- All checkpoint states -->
+        <div style="background: var(--c-susu); border-radius: var(--r-md); padding: 12px; box-shadow: var(--shadow-sm); border: 1px solid var(--c-batu);">
+          <div class="checkpoint-item" style="border-top: none;">
+            <div class="checkpoint-dot planned"></div>
+            <div class="checkpoint-info">
+              <div class="checkpoint-title">Planned checkpoint</div>
+              <div class="checkpoint-meta">Not yet started · source: ai</div>
+            </div>
+          </div>
+          <div class="checkpoint-item">
+            <div class="checkpoint-dot active">●</div>
+            <div class="checkpoint-info">
+              <div class="checkpoint-title">Active checkpoint</div>
+              <div class="checkpoint-meta">Currently in progress · source: human</div>
+            </div>
+            <span class="checkpoint-lock">🔒</span>
+          </div>
+          <div class="checkpoint-item">
+            <div class="checkpoint-dot open">◎</div>
+            <div class="checkpoint-info">
+              <div class="checkpoint-title">Open checkpoint</div>
+              <div class="checkpoint-meta">Available for work · source: ai</div>
+            </div>
+          </div>
+          <div class="checkpoint-item">
+            <div class="checkpoint-dot completed">✓</div>
+            <div class="checkpoint-info">
+              <div class="checkpoint-title">Completed checkpoint</div>
+              <div class="checkpoint-meta">Done · verified 2h ago</div>
+            </div>
+          </div>
+          <div class="checkpoint-item">
+            <div class="checkpoint-dot blocked">!</div>
+            <div class="checkpoint-info">
+              <div class="checkpoint-title">Blocked checkpoint</div>
+              <div class="checkpoint-meta">Waiting on external dependency</div>
+            </div>
+          </div>
+          <div class="checkpoint-item">
+            <div class="checkpoint-dot skipped">—</div>
+            <div class="checkpoint-info">
+              <div class="checkpoint-title">Skipped checkpoint</div>
+              <div class="checkpoint-meta">No longer needed · skipped by PIC</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 24px;"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  function showScenario(id) {
+    document.querySelectorAll('.scenario').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('scene-' + id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function togglePhase(header) {
+    const card = header.closest('.phase-card');
+    const list = card.querySelector('.checkpoint-list');
+    if (list) {
+      const isVisible = list.style.display !== 'none';
+      list.style.display = isVisible ? 'none' : 'block';
+      card.classList.toggle('expanded', !isVisible);
+    }
+  }
+
+  function switchTab(btn, tabId) {
+    const parent = btn.closest('.phone-frame');
+    parent.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.style.borderBottomColor = 'transparent';
+    });
+    btn.classList.add('active');
+    btn.style.borderBottomColor = 'var(--t-tuntaskan)';
+  }
+</script>
+</body>
+</html>

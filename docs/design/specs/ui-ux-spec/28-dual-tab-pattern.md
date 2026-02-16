@@ -15,12 +15,12 @@ Chat style: `.chat-bubble.other` (left, white bg), `.chat-bubble.self` (right, t
 
 ### 27.1 Tab Mapping Example (Tuntaskan)
 
-| Stage | Tab 1 | Tab 2 |
+| Phase | Tab 1 | Tab 2 |
 |---|---|---|
-| Bahas | 💬 Diskusi | 📋 Rangkuman |
-| Rancang | 📋 Papan GR | 💬 Koordinasi |
-| Garap | ✅ Progres | 💬 Koordinasi |
-| Periksa | 📊 Laporan | 💬 Tanggapan |
+| Pembahasan | 💬 Diskusi | 📋 Rangkuman |
+| Perencanaan | 📋 Papan GR | 💬 Koordinasi |
+| Pelaksanaan | ✅ Progres | 💬 Koordinasi |
+| Verifikasi | 📊 Laporan | 💬 Tanggapan |
 
 ---
 

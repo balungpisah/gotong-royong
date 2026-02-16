@@ -14,13 +14,13 @@
 | **Redaction** | AI-02 masking of PII in text |
 | **Duplicate** | Similar existing seed detected by AI-03 |
 | **Moderation Hold** | Seed in review queue pending moderator approval |
-| **Tuntas** | Completion stage where seed lifecycle ends and credits are awarded |
+| **Penyelesaian** | Completion phase where plan lifecycle ends and credits are awarded |
 | **Kontribusi** | Proposed credit distribution (reputation points) to community members |
 | **Vouch / Jaminkan** | High-stake action where user puts personal reputation on the line |
 | **Catatan Saksi** | Private vault for sensitive/personal stories (not public) |
 | **Siaga** | Emergency broadcast for urgent community threats |
-| **Bahas Diskusi** | Discussion thread for a seed (community deliberation) |
-| **PIC** | Pic seeded in Garap; person in charge of task execution |
+| **Percakapan** | Conversation tab for a case (community discussion and LLM interaction) |
+| **PIC** | PIC assigned during planning/execution phases; person in charge of task execution |
 
 ### 20.2 Acronyms
 

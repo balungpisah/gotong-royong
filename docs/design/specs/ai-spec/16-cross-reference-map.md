@@ -12,10 +12,10 @@ This section maps AI-SPEC v0.2 concepts to UI-UX-SPEC v0.5 and Tandang backend.
 | **AI-03 Duplicate** | C2 (Duplikat view) | Tandang (vector) | Tandang search; GR displays results |
 | **AI-04 Moderation** | C2 (Moderasi view) | GR + Tandang | Moderation queue; timer countdown |
 | **AI-05 Gaming** | Moderator dashboard | Tandang + GR | Continuous background scan; flags to moderator |
-| **AI-06 Criteria** | Section 18 (Rancang), Section 20 (Garap) | GR | User taps "Saran"; AI-06 output editable |
-| **AI-07 Summary** | Section 18 (Bahas Diskusi) | GR + Tandang | Tandang provides messages; GR displays summary |
+| **AI-06 Criteria** | Planning / Execution phases | GR | User taps "Saran"; AI-06 output editable |
+| **AI-07 Summary** | Section 18 (Percakapan) | GR + Tandang | Tandang provides messages; GR displays summary |
 | **AI-08 Media** | Section 19 (Bagikan), media upload modal | GR | User uploads; AI-08 scans; user approves redaction |
-| **AI-09 Credit** | Section 21 (Tuntas), credit distribution card | Tandang (audit log) + GR (UI) | Tandang tracks; GR proposes; PIC approves |
+| **AI-09 Credit** | Completion phase, credit distribution card | Tandang (audit log) + GR (UI) | Tandang tracks; GR proposes; PIC approves |
 
 ---
 

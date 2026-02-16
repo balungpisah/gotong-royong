@@ -10,10 +10,10 @@ Tandang adalah mesin kredensial Markov yang mengukur reputasi lewat 3 sumbu: **I
 
 | Tipe | Nama | Model Skor | Contoh Aksi GR | Peran AI-09 |
 |---|---|---|---|---|
-| **A** | Verifikasi Biner | Did/didn't — pass/fail | Task completion (Garap), voting, seeding | SYSTEM (auto) |
-| **B** | Bobot Waktu | Effort over duration | Building di Rancang, kontribusi Galang | SYSTEM (auto) |
+| **A** | Verifikasi Biner | Did/didn't — pass/fail | Task completion (pelaksanaan phase), voting, seeding | SYSTEM (auto) |
+| **B** | Bobot Waktu | Effort over duration | Building di perencanaan, kontribusi Galang | SYSTEM (auto) |
 | **C** | Konsensus Rekan | Grup validasi kualitas | Validasi (Sahkan), verifikasi (Periksa) | PEERS (human) |
-| **D** | Spektrum Kualitas | Rating kualitas | Kualitas diskusi (Bahas), proposal (Usul) | AI-PROPOSED → HUMAN |
+| **D** | Spektrum Kualitas | Rating kualitas | Kualitas diskusi (pembahasan), proposal (Usul) | AI-PROPOSED → HUMAN |
 | **E** | Jaminan (Stake) | Reputasi dipertaruhkan | Vouching, menjamin | HUMAN (self-initiated) |
 
 #### 8.1.2 Pemetaan Aksi GR → Tandang
@@ -21,9 +21,9 @@ Tandang adalah mesin kredensial Markov yang mengukur reputasi lewat 3 sumbu: **I
 | Aksi GR | Sumbu | Tipe | Detail |
 |---|---|---|---|
 | Submit seed | I+ | A | Inisiatif sipil |
-| Diskusi di Bahas | C | D | Kualitas diskusi |
-| Kontribusi Rancang | C | B | Effort perencanaan |
-| Selesaikan task Garap | C | A | Task completion |
+| Diskusi di phase pembahasan | C | D | Kualitas diskusi |
+| Kontribusi Perencanaan | C | B | Effort perencanaan |
+| Selesaikan task Pelaksanaan | C | A | Task completion |
 | Validasi di Sahkan | J | C | Akurasi endorsement |
 | Vote di Putuskan | I+ | A | Partisipasi sipil |
 | Verifikasi Periksa/Tinjau | J | C | Akurasi verifikasi |
@@ -39,7 +39,7 @@ Tandang adalah mesin kredensial Markov yang mengukur reputasi lewat 3 sumbu: **I
 | **1. Silent tracking** | Sistem mencatat setiap aksi (siapa, apa, kapan, durasi). Log aktivitas = buku besar kredit. |
 | **2. Instant feedback** | Tipe A/B: toast langsung. Tipe C: toast saat threshold tercapai. Tipe D: setelah PIC konfirmasi. Tipe E: setelah vouch. |
 | **3. AI nudge di chat** | AI-09 mengirim pesan inline di tab Diskusi: "💡 Diskusi berkualitas — kontribusi Anda dicatat (Tipe D · Kompetensi)" |
-| **4. Ringkasan Tuntas** | Saat kartu Tuntas, AI-09 mengusulkan distribusi Kontribusi sebagai diff card. PIC review: Terapkan / Tinjau / Tolak. |
+| **4. Ringkasan Penyelesaian** | Saat plan selesai, AI-09 mengusulkan distribusi Kontribusi sebagai diff card. PIC review: Terapkan / Tinjau / Tolak. |
 | **5. Mekanisme sengketa** | Peserta bisa flag kredit otomatis → peer review → AI-09 mediasi. |
 
 #### 8.1.4 Sistem Tier

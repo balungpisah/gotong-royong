@@ -6,11 +6,12 @@ You are reviewing the design system for **Gotong Royong**, a witness-first commu
 
 ## What This Platform Does (30-second summary)
 
-Residents observe things in their community — problems, ideas, questions, celebrations, proposals — and submit them through an AI-powered conversational triage (AI-00). The AI routes their input to one of three modes:
+Residents observe things in their community — problems, ideas, questions, celebrations, proposals — and submit them through an AI-powered conversational triage (AI-00). The AI routes their input to one of four modes:
 
-1. **Komunitas** — collaborative community action via 5 tracks (Tuntaskan/Wujudkan/Telusuri/Rayakan/Musyawarah), each with its own lifecycle
+1. **Komunitas** — collaborative community action via Adaptive Path Guidance (LLM proposes case-specific phases and checkpoints; 5 track hints provide visual theming)
 2. **Catatan Saksi** — private encrypted witness vault (for sensitive personal records)
 3. **Siaga** — emergency broadcast (speed-first, one-tap)
+4. **Catatan Komunitas** — lightweight public notes for sharing useful facts (prices, status updates, schedules) with vouch/challenge and TTL decay
 
 A reputation engine called **Tandang** tracks contributions across 3 axes (Integrity/Competence/Judgment) with 5 credit types (A–E) and 5 tiers. Privacy is handled via a 4-level **Rahasia** system (L0 Terbuka → L3 Sangat Rahasia). 10 AI touch points (AI-00 through AI-09) support the platform with a strict "Suggest-Don't-Overwrite" principle.
 
@@ -23,14 +24,23 @@ All files are in the `docs/` folder. Start with **DESIGN-CONTEXT.md** — it's t
 | Priority | File | What It Is |
 |---|---|---|
 | 1 | `DESIGN-CONTEXT.md` | **START HERE.** Master handoff doc with all terminology, locked decisions, design tokens, file map |
-| 2 | `DESIGN-SEQUENCE.md` | Checklist of all 22 design steps with status and descriptions |
+| 2 | `ADAPTIVE-PATH-SPEC-v0.1.md` | Adaptive path data model — how the LLM generates case-specific plans |
 | 3 | `DESIGN-DNA-v0.1.md` | Formal design system spec (philosophy, tokens, components, patterns, architecture) |
 | 4 | `AI-SPEC-v0.2.md` | AI layer spec — 10 touch points, model selection, guardrails, decision log |
-| 5 | `UI-UX-SPEC-v0.5.md` | UI/UX spec — 29 sections covering every screen and interaction |
+| 5 | `UI-UX-SPEC-v0.5.md` | UI/UX spec — 24 sections covering every screen and interaction |
+| 6 | `ADAPTIVE-PATH-ORCHESTRATION-v0.1.md` | Orchestration flow — where LLM acts, where human acts, timeouts, templates |
 
-### HTML Prototypes (24 files, browser-viewable)
+### HTML Prototypes (browser-viewable)
 
-These are interactive reference prototypes — open in a browser to see live-rendered components.
+Interactive reference prototypes — open in a browser to see live-rendered components.
+
+**Adaptive Path (Current)**
+
+| File | Contents |
+|---|---|
+| `adaptive-path/AP1-adaptive-path-card.html` | Adaptive path card: feed view, Tahapan/Percakapan tabs, AI suggestions, branching, all statuses |
+
+**Foundation (Current)**
 
 | File | Contents |
 |---|---|
@@ -41,12 +51,6 @@ These are interactive reference prototypes — open in a browser to see live-ren
 | `A+1-triage-screen.html` | AI-00 conversational triage + morphing context bar (8 states) |
 | `A+2-catatan-saksi.html` | Vault UI — 5-state lifecycle + seal bar |
 | `A+3-siaga-broadcast.html` | Emergency broadcast — 4-state lifecycle + broadcast bar |
-| `B0-seed-card.html` | Universal card anatomy (5 views including Rahasia variants) |
-| `B1-tuntaskan-card.html` | Tuntaskan track — 6 states + dual-tab + LLM architecture |
-| `B2-wujudkan-card.html` | Wujudkan track — 7 states + milestones + Galang fundraising |
-| `B3-telusuri-card.html` | Telusuri track — 5 states + hypotheses + evidence board |
-| `B4-rayakan-card.html` | Rayakan track — 4 states + validation + appreciation wall |
-| `B5-musyawarah-card.html` | Musyawarah track — 6 states + voting + Ketetapan document |
 | `C1-rahasia-overlays.html` | Privacy system — 4 levels applied to same card |
 | `C2-ai-surface-states.html` | AI badges, confidence bands, diff cards, moderation holds |
 | `C3-navigation-feed.html` | 5-tab nav, feed, search, scope picker, profile (CV Hidup) |
@@ -59,14 +63,25 @@ These are interactive reference prototypes — open in a browser to see live-ren
 | `prototype.html` | Prototype app shell and interaction scaffolding |
 | `wireframe.html` | Low-fidelity screen layout baseline |
 
+**Legacy Tracks (Superseded — UI components still reusable)**
+
+| File | Contents |
+|---|---|
+| `legacy-tracks/B0-seed-card.html` | Universal card anatomy (5 views including Rahasia variants) |
+| `legacy-tracks/B1-tuntaskan-card.html` | Tuntaskan components (reusable in adaptive phases) |
+| `legacy-tracks/B2-wujudkan-card.html` | Wujudkan components (reusable in adaptive phases) |
+| `legacy-tracks/B3-telusuri-card.html` | Telusuri components (reusable in adaptive phases) |
+| `legacy-tracks/B4-rayakan-card.html` | Rayakan components (reusable in adaptive phases) |
+| `legacy-tracks/B5-musyawarah-card.html` | Musyawarah components (reusable in adaptive phases) |
+
 ## What to Evaluate
 
 ### 1. Flow Completeness
 
 - Can a user go from app install → first contribution → seeing results, without hitting an undefined screen?
-- Is every lifecycle state for all 5 tracks fully specified (what the user sees, what actions are available)?
-- Are transitions between states clear (what triggers the move, who triggers it, what happens to the UI)?
-- Is the AI-00 triage → card handoff fully defined for all 3 modes?
+- Is every phase/checkpoint in the adaptive path model fully specified (what the user sees, what actions are available)?
+- Are transitions between phases clear (what triggers the move, who triggers it, what happens to the UI)?
+- Is the AI-00 triage → card handoff fully defined for all 4 modes?
 
 ### 2. Edge Cases & Error States
 
@@ -82,9 +97,9 @@ These are interactive reference prototypes — open in a browser to see live-ren
 
 - Does Rahasia (privacy) interact correctly with Share (C6)? (L1+ should block sharing)
 - Does Rahasia interact correctly with Tandang (reputation)? (L2 anonymous but still earns credit?)
-- Does the dual-tab pattern work consistently across all tracks?
+- Does the dual-tab pattern work consistently across all adaptive phases?
 - Do AI touch points overlap or conflict with each other?
-- Is the credit system (AI-09) consistent across all 5 tracks + all contribution types?
+- Is the credit system (AI-09) consistent across all phase patterns + all contribution types?
 
 ### 4. Missing Screens or Flows
 
@@ -115,7 +130,7 @@ Look for screens that a real app would need but may not be explicitly designed:
 ### 6. Consistency & Contradictions
 
 - Do color tokens in HTML prototypes match DESIGN-DNA-v0.1.md?
-- Do lifecycle names in card HTMLs match DESIGN-CONTEXT.md terminology?
+- Do phase/checkpoint names in card HTMLs match DESIGN-CONTEXT.md terminology?
 - Does AI-SPEC-v0.2.md align with how AI is shown in the HTML prototypes?
 - Does UI-UX-SPEC-v0.5.md match the actual HTML implementations?
 - Are there any places where two documents say different things about the same feature?

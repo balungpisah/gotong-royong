@@ -42,11 +42,11 @@ Font utama: **Nunito** (Major Third scale). Bentuk membulat (border-radius tingg
 | **Source-Tagged Data** | Setiap konten terstruktur ditag origin: `ai` / `human` / `system`. AI menghormati edit manusia (berhenti menyentuh item human-sourced). |
 | **Track Color = Identity** | Warna aksen track tetap konstan sepanjang lifecycle. Tidak berubah dengan state atau Rahasia level. |
 | **Speed Over Ceremony (Siaga)** | Siaga broadcast dirancang untuk aksi instan. Layar minimal, satu ketuk, auto-lokasi. Dibangun untuk respons krisis. |
-| **Context Carries Over** | Percakapan AI-00 triage menjadi pesan pertama di tab Bahas Diskusi. Cerita saksi tidak hilang atau diulang. |
+| **Context Carries Over** | Percakapan AI-00 triage menjadi pesan pertama di tab Percakapan. Cerita saksi tidak hilang atau diulang. |
 | **Single Entry Point** | Semua entry via halaman Bagikan dengan AI-00 conversational triage. Tidak ada textarea kosong. AI menyapa, menyelidiki, context bar morfing. |
 | **Reputation is Area-Aware** | Skor Tandang dapat dilihat per tingkat scope (RT→Nasional). Pengguna bisa menjadi pahlawan lokal di RT tapi pemula di provinsi. |
 | **GDF Weather = Difficulty Floor** | Cuaca Komunitas: Cerah/Berawan/Hujan/Badai. Semakin sulit → bonus multiplier pada kredit Kompetensi (C). Mendorong kontribusi saat sulit. |
-| **No Separate Credit Screen** | Kredit diperoleh di dalam aktivitas yang ada (Garap, Bahas, dll), bukan alur terpisah. Visibilitas via toast + nudge AI + diff card. |
+| **No Separate Credit Screen** | Kredit diperoleh di dalam aktivitas yang ada (pelaksanaan, pembahasan, dll), bukan alur terpisah. Visibilitas via toast + nudge AI + diff card. |
 | **Strict Wali Permissions** | Wali hanya bisa: baca, surface-with-consent. Tidak bisa: edit, bagikan tanpa izin. Menjamin privasi vault. |
 
 ---

@@ -7,10 +7,12 @@
 | Tab | Ikon | Label | Fungsi |
 |---|---|---|---|
 | 1 | 🏠 | **Beranda** | Feed komunitas: semua seed, Community Pulse, filter track horizontal |
-| 2 | 📋 | **Terlibat** | Seed di mana pengguna terlibat (author/PIC/kontributor/pemilih). Streak banner, role badge, progress ring. |
+| 2 | 📝 | **Catatan** | Catatan Komunitas: catatan publik ringan (harga, status, jadwal), concept pills, progressive disclosure (S3-B4) |
 | 3 | 🤝 | **Bantu** | Peluang sesuai keahlian ESCO pengguna. Pill validated ● vs declared ○. Jumlah sukarelawan. |
 | 4 | 🔔 | **Notifikasi** | Dikelompokkan waktu (Hari Ini/Kemarin/Minggu Ini). 7 tipe: skill-match, credit, mention, stage, vote, stall, digest. |
-| 5 | 👤 | **Profil** | CV Hidup: hero + tier, skor I/C/J, dual-layer skills, kontribusi timeline, vouch, dampak, QR. |
+| 5 | ☰ | **Lainnya** | Menu hamburger: CV Hidup (Profil), Terlibat, Template Saya (S3-C3), Pengaturan |
+
+> **Perubahan S3-MD3:** Catatan Komunitas menggantikan Terlibat sebagai tab utama (penghalang masuk terendah, terbaik untuk akuisisi pengguna). Terlibat dan Profil pindah ke menu hamburger.
 
 ### 7.2 App Header
 
@@ -49,10 +51,10 @@ Di header Beranda: `☀️ Cerah · 14 aktif · 3 baru · 1 vote`. Menampilkan G
 | Prioritas | Kondisi | Contoh |
 |---|---|---|
 | 1 — Your Action | Seed butuh aksi dari pengguna | PIC menugaskan Anda, vote terbuka |
-| 2 — Nearing | Deadline/milestone dekat | Garap H-3, vote 2 jam lagi |
+| 2 — Nearing | Deadline/milestone dekat | Pelaksanaan H-3, vote 2 jam lagi |
 | 3 — New | Baru dibuat (24 jam) | Seed baru di RT Anda |
 | 4 — Active | Aktivitas terkini | Diskusi berlangsung |
-| 5 — Completed | Selesai/Tuntas | Seed yang sudah Tuntas |
+| 5 — Completed | Selesai | Seed yang sudah selesai |
 
 ---
 

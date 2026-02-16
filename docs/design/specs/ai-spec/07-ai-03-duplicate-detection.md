@@ -123,7 +123,7 @@ where:
 
 **Merge flow:**
 - User taps "Merge"
-- Existing seed's Bahas Diskusi is linked to new story
+- Existing plan's Percakapan tab is linked to new story
 - New story marked as `merged_into: [seed_id]`
 - Credits allocated to original author (see AI-09)
 

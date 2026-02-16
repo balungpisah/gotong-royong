@@ -83,6 +83,11 @@ for migration_file in \
   "0009_audit_retention_fields.surql" \
   "0010_contributions_evidence_vouch_schema.surql" \
   "0011_webhook_outbox_schema.surql" \
-  "0012_adaptive_path_schema.surql"; do
+  "0012_adaptive_path_schema.surql" \
+  "0013_ontology_schema.surql" \
+  "0014_remove_track_state_transition.surql" \
+  "0015_discovery_drop_track_stage.surql" \
+  "0016_add_mode_fields.surql" \
+  "0017_path_plan_action_type.surql"; do
   run_migration "$migration_file"
 done

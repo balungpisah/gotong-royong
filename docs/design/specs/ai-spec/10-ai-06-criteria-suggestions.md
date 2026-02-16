@@ -8,12 +8,12 @@
 |---|---|
 | **ID** | AI-06 |
 | **Name** | Criteria & Task Suggestion |
-| **Trigger** | User enters Rancang phase; also on-demand during Garap |
-| **UI Location** | Rancang screen, Garap task creation modal |
+| **Trigger** | User enters a planning phase; also on-demand during execution phases |
+| **UI Location** | Planning phase screen, task creation modal |
 | **Interaction Mode** | Interactive (user can accept, edit, or ignore suggestions) |
 | **Latency Budget** | < 3 seconds |
 | **Model Tier** | Strong (Sonnet-class) |
-| **UI-UX-SPEC Ref** | Section 18 (Rancang), Section 20 (Garap) |
+| **UI-UX-SPEC Ref** | Planning phases, Execution phases |
 
 ### 10.2 Purpose
 

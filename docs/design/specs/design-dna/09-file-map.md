@@ -107,7 +107,7 @@ Model dua lapis: conversation layer (tab chat) + structured layer (tab rangkuman
 | B | `B1-tuntaskan-card.html` | Tuntaskan: 6 state, dual-tab, Papan GR, LLM architecture |
 | B | `B2-wujudkan-card.html` | Wujudkan: 7 state, milestone tracker, Galang, Rayakan |
 | B | `B3-telusuri-card.html` | Telusuri: 5 state, hypothesis cards, evidence board, Temuan |
-| B | `B4-rayakan-card.html` | Rayakan: 4 state (+ panel Dampak opsional post-Tuntas), validation, recognition, appreciation wall |
+| B | `B4-rayakan-card.html` | Rayakan: 4 state (+ panel Dampak opsional post-completion), validation, recognition, appreciation wall |
 | B | `B5-musyawarah-card.html` | Musyawarah: 6 state, position board, vote, Ketetapan |
 | C | `C5-tandang-credit.html` | Tandang: kredit, tier, vouch, GDF Weather, CV Hidup |
 | C | `C1-rahasia-overlays.html` | Rahasia: 4 level, gerbang akses, media redaction |

@@ -1,12 +1,16 @@
 # Gotong Royong — Design Context (Session Handoff)
 
-> **READ THIS FIRST** in every new session. This is the single source of truth for all locked design decisions. Last updated after B5 lock. Phase B complete.
+> **READ THIS FIRST** in every new session. This is the single source of truth for all locked design decisions. Last updated after Session 3: Ontology, Architecture & System Design (2026-02-16).
+>
+> **Decision log:** See [DECISIONS-LOG.md](./DECISIONS-LOG.md) for the complete chronological record of all design decisions with rationale, session tracking, and what they supersede.
+>
+> **Session 3 key changes:** Pure RDF triple ontology (S3-MD1), mode routing via Schema.org Action types (S3-MD2), navigation rearranged with Catatan tab (S3-MD3), Rahasia ai_readable flag (S3-MD4), pre-screen all modes including Siaga (S3-MD6), two LLM tiers (S3-MD7), ranking-based moderation (S3-MD8).
 
 ---
 
 ## What Is This Project?
 
-**Gotong Royong** is a witness-first community coordination platform. Users ("saksi"/witnesses) share what they observe — problems, ideas, questions, good news, or proposals — and the community acts on them through structured tracks.
+**Gotong Royong** is a witness-first community coordination platform. Users ("saksi"/witnesses) share what they observe — problems, ideas, questions, good news, or proposals — and the community acts on them through adaptive, LLM-guided paths.
 
 **Design mood: TANAH** — warm, earthy, Nunito font, rounded shapes, Indonesian token names.
 
@@ -14,41 +18,87 @@
 
 ## Terminology — USE THESE EXACT TERMS
 
-### 5 Tracks (Komunitas)
+### Adaptive Path Guidance (Canonical Model)
 
-| Track | Meaning | Seed | Lifecycle |
-|---|---|---|---|
-| **Tuntaskan** | Resolve a problem | Keresahan | Keresahan → Bahas → Rancang → Garap → Periksa → Tuntas (+ Dampak opsional) |
-| **Wujudkan** | Create from idea | Gagasan | Gagasan → Bahas → Rancang → [Galang] → Garap → Rayakan → Tuntas (+ Dampak opsional) |
-| **Telusuri** | Explore a question | Pertanyaan | Pertanyaan → Dugaan → Uji → Temuan → Tuntas |
-| **Rayakan** | Celebrate achievement | Kabar Baik | Kabar Baik → Sahkan → Apresiasi → Tuntas (+ Dampak opsional) |
-| **Musyawarah** | Deliberate a decision | Usul | Usul → Bahas → Putuskan → Jalankan → [Tinjau] → Tuntas |
+Every case gets a dynamically generated path of **phases** and **checkpoints**, proposed by the LLM and refined by privileged editors. Paths are not predefined — they adapt to the nature of the case.
 
-**Tuntaskan = reactive** (fix a problem). **Wujudkan = proactive** (build something new).
+| Concept | Definition |
+|---|---|
+| **`path_plan`** | The canonical adaptive plan for a case. Contains branches, phases, and checkpoints. Phases are dynamically generated, not fixed. |
+| **`phase`** | A high-level step with an objective (e.g., "Perencanaan", "Pelaksanaan", "Verifikasi"). Phases are adaptive and context-dependent. |
+| **`checkpoint`** | A verifiable unit of progress within a phase. |
+| **`branch`** | An alternate path linked to a parent checkpoint (e.g., "Jika air naik lagi"). |
+| **`source`** | Who created the item: `ai`, `human`, or `system`. |
+| **`locked_fields`** | Fields manually edited by humans — LLM cannot overwrite these. |
+
+**Status values**: Planned → Active → Open → Completed (also: Blocked, Skipped).
+
+**Editor roles**: `project_manager` and `highest_profile_user` can edit phases/checkpoints. `ai` can only propose via suggestions. All proposals appear as diff cards (Suggest-Don't-Overwrite).
+
+**Version control**: Every plan edit increments version. AI proposals target a base version and become invalid if the plan updates. All writes are idempotent with `request_id` + `correlation_id` + SHA-256 `event_hash`.
+
+See: `docs/design/specs/ADAPTIVE-PATH-SPEC-v0.1.md` for full specification.
+
+### 5 Track Hints (Derived from Action Types — S3-MD2)
+
+Track hints are **derived from the Schema.org Action type** in the content's RDF triples. They are UI display labels only — not separately classified. The `schema:potentialAction` triple produced by AI-00 determines both mode routing and track hint.
+
+| Track Hint | Action Type | Spirit | Seed Hint | Energy |
+|---|---|---|---|---|
+| **Tuntaskan** | `schema:RepairAction` | Fix a problem (reactive) | Keresahan | Tenaga + Modal |
+| **Wujudkan** | `schema:CreateAction` | Build something new (proactive) | Gagasan | Tenaga + Modal |
+| **Telusuri** | `schema:SearchAction` | Explore a question | Pertanyaan | Pikiran |
+| **Rayakan** | `schema:AchieveAction` | Honor an achievement | Kabar Baik | Hati |
+| **Musyawarah** | `schema:AssessAction` | Decide together (governance) | Usul | Suara |
+
+Track accents (colors) are used when `track_hint` is set. If no hint, cards render in neutral accent.
 
 ### Cross-Cutting Features
 
 | Feature | Meaning |
 |---|---|
-| **Galang** | Mobilize/pool resources. Sub-lifecycle: Sasaran → Kumpul → Salurkan → Lapor |
+| **Galang** | Mobilize/pool resources. Can appear as phases in any adaptive path where resource pooling is needed. |
 | **Siarkan** | Broadcast/share. No lifecycle — capability-based. |
 | **Rutin** | Recurring/routine activity |
-| **Rahasia** | Confidentiality overlay. L0 (Terbuka) → L1 (Terbatas) → L2 (Rahasia) → L3 (Sangat Rahasia) |
+| **Rahasia** | Confidentiality overlay. L0 (Terbuka) → L1 (Terbatas) → L2 (Rahasia) → L3 (Sangat Rahasia). New: `ai_readable` boolean flag per note (S3-MD4) — when true, AI can read for anonymized pattern detection even at L2. |
 
-### Three Saksi Modes (decided in this project)
+### Ontology — RDF-Style Triples (S3-MD1)
+
+All content classified as 2–5 RDF-style triples: `(subject, predicate, object)`. No custom vocabulary — each position constrained by its source standard.
+
+| Position | Constrained By | Example |
+|---|---|---|
+| Subject | Wikidata QID | Q93189 (egg), Q8068 (flood) |
+| Predicate | Schema.org property | `schema:price`, `schema:potentialAction` |
+| Object | Wikidata QID or literal | Q132510 (market), "28000 IDR/kg" |
+| Location | OpenStreetMap tags | `amenity=marketplace` |
+
+Domain (ranah) is derived from Wikidata hierarchy at display time. Mode routing from `schema:potentialAction` Action type. See: `ONTOLOGY-VOCAB-v0.1.md`.
+
+### Two LLM Tiers (S3-MD7)
+
+| Tier | Model Class | Purpose |
+|---|---|---|
+| **Fast** | Haiku-class | Real-time UX: triage, classification, triple generation. No internet. |
+| **Capable** | Sonnet-class with tools | Background: QID verification, label refresh, enrichment, pattern detection. Has browsing. |
+
+### Four Modes (S2-05, S3-MD3)
 
 | Mode | Nature | Key Properties |
 |---|---|---|
-| **Komunitas** | Community / collaborative | 5 tracks, public, reputation impacts, lifecycle |
+| **Komunitas** | Community / collaborative | Adaptive path (phases: Perencanaan, Pelaksanaan, Verifikasi, etc.), public, reputation impacts, LLM-guided |
 | **Catatan Saksi** | Private witness vault | Encrypted, timestamped, author-only, zero Tandang impact, optional Wali (trustee), can surface later |
-| **Siaga** | Emergency broadcast | Instant, no lifecycle, auto-location, 112/BPBD link |
+| **Siaga** | Emergency broadcast | Fast (post AI-00 triage — S3-MD6), no lifecycle, auto-location, 112/BPBD link |
+| **Catatan Komunitas** | Public community notes | Lightweight facts (prices, status, schedules), vouch/challenge, TTL decay, Rahasia L0-L3 + ai_readable flag (S3-MD4), ranking-based moderation (S3-MD8) |
+
+All four modes go through AI-00 conversational triage (S3-MD6). The triage IS the pre-screen.
 
 ### AI Touch Points
 
 | ID | Name | Function |
 |---|---|---|
-| **AI-00** | Conversational Triage | NEW. Conversational chat before classification. Routes to Komunitas / Catatan Saksi / Siaga. Detects multi-entity splits. |
-| **AI-01** | Track & Seed Classification | Track & seed classification (≥0.80 auto, 0.50-0.79 suggest, <0.50 manual) |
+| **AI-00** | Conversational Triage | Conversational chat that routes to all 4 modes. Produces 2–5 RDF triples per input (S3-MD1). `schema:potentialAction` triple determines mode routing (S3-MD2). For Komunitas, proposes initial adaptive path plan. Pre-screens ALL modes including Siaga (S3-MD6). Detects multi-entity splits. |
+| **AI-01** | Triple Refinement | Validates/refines triples from AI-00. Can add additional triples. Provides `seed_hint` for discovery. |
 | **AI-02** | Redaction LLM | |
 | **AI-03** | Duplicate Detection | |
 | **AI-04** | Content Moderation | |
@@ -56,7 +106,7 @@
 | **AI-06** | Criteria & Task Suggestion | |
 | **AI-07** | Discussion Summarization | Discussion summaries, especially Musyawarah |
 | **AI-08** | Sensitive Media Detection & Redaction | |
-| **AI-09** | Credit Accreditation | Tracks all GR actions, calculates Tandang credit per contribution type (A–E), proposes credit distributions at Tuntas, nudges for quality ratings (Type D) and vouch suggestions (Type E). Uses Suggest-Don't-Overwrite for proposed distributions. |
+| **AI-09** | Credit Accreditation | Tracks all GR actions, calculates Tandang credit per contribution type (A–E), proposes credit distributions at plan completion, nudges for quality ratings (Type D) and vouch suggestions (Type E). Uses Suggest-Don't-Overwrite for proposed distributions. |
 
 ### Reputation Tiers (Tandang Markov Credential Engine)
 
@@ -80,27 +130,27 @@
 
 | Type | Name | Scoring | Example GR Actions |
 |---|---|---|---|
-| **A** | Binary Verification (Verifikasi Biner) | Did/didn't — pass/fail | Task completion (Garap), voting (Putuskan), seeding |
-| **B** | Time-Weighted (Bobot Waktu) | Effort over duration | Building in Rancang, contributing to Galang |
-| **C** | Peer Consensus (Konsensus Rekan) | Group validates quality | Validation (Sahkan), verification (Periksa/Tinjau) |
-| **D** | Quality Spectrum (Spektrum Kualitas) | Rated on quality scale | Discussion quality (Bahas), proposal writing (Usul) |
+| **A** | Binary Verification (Verifikasi Biner) | Did/didn't — pass/fail | Checkpoint completion, voting, seeding |
+| **B** | Time-Weighted (Bobot Waktu) | Effort over duration | Sustained phase contributions, resource pooling (Galang) |
+| **C** | Peer Consensus (Konsensus Rekan) | Group validates quality | Peer validation, verification checkpoints |
+| **D** | Quality Spectrum (Spektrum Kualitas) | Rated on quality scale | Discussion quality, proposal writing |
 | **E** | Stake-Weighted (Jaminan) | Reputation risked/staked | Vouching, guaranteeing. Only type where credit can be *subtracted* via slash cascade. |
 
 ### GR Action → Tandang Credit Mapping
 
-| GR Action | Where | Score | Type | Detail |
+| GR Action | Context | Score | Type | Detail |
 |---|---|---|---|---|
-| Submit a seed | AI-00 → any track | **I+** | A · Binary | Civic initiation — you started something |
-| Discuss in Bahas | All tracks with Bahas | **C** | D · Quality Spectrum | Discussion quality rated by AI-08 Sensitive Media Detection & Redaction + peers |
-| Contribute to Rancang | Tuntaskan, Wujudkan | **C** | B · Time-Weighted | Sustained planning effort |
-| Complete task in Garap | Tuntaskan, Wujudkan | **C** | A · Binary | Task done or not done |
-| Validate in Sahkan | Rayakan | **J** | C · Peer Consensus | Endorsement accuracy |
-| Vote in Putuskan | Musyawarah | **I+** | A · Binary | Civic participation — you showed up |
-| Verify in Periksa/Tinjau | Tuntaskan, Musyawarah | **J** | C · Peer Consensus | Verification accuracy |
-| Contribute to Galang | Wujudkan (Galang sub-flow) | **C** | B · Time-Weighted | Resource contribution |
+| Initiate a path | AI-00 → adaptive path | **I+** | A · Binary | Civic initiation — you started something |
+| Discuss in a phase | Pembahasan phase | **C** | D · Quality Spectrum | Discussion quality rated by AI-08 + peers |
+| Contribute to planning | Perencanaan phase | **C** | B · Time-Weighted | Sustained planning effort |
+| Complete a checkpoint | Pelaksanaan phase | **C** | A · Binary | Checkpoint done or not done |
+| Validate outcomes | Validation phases | **J** | C · Peer Consensus | Endorsement accuracy |
+| Vote on decisions | Governance phases | **I+** | A · Binary | Civic participation — you showed up |
+| Verify results | Verifikasi phase | **J** | C · Peer Consensus | Verification accuracy |
+| Contribute to Galang | Resource pooling phases | **C** | B · Time-Weighted | Resource contribution |
 | Vouch for someone | Profile | **I** (stake) | E · Stake-Weighted | Risk proportional to vouchee behavior. Slash cascade if vouchee penalized. |
-| Propose hypothesis | Telusuri (Dugaan) | **C** | D · Quality Spectrum | Hypothesis quality rated by outcome |
-| Collect evidence | Telusuri (Uji) | **C** | B · Time-Weighted | Research effort over time |
+| Propose hypothesis | Investigation phases | **C** | D · Quality Spectrum | Hypothesis quality rated by outcome |
+| Collect evidence | Research phases | **C** | B · Time-Weighted | Research effort over time |
 
 ### ESCO-ID Skill Taxonomy
 **ESCO** (European Skills, Competences, Qualifications and Occupations) — Indonesian localization (**ESCO-ID**). ~13,000 skills in hierarchical taxonomy. Used for:
@@ -225,15 +275,16 @@ AI response includes XML metadata parsed into the context bar:
 | **vault-ready** | `<triage status="ready" mode="vault" sensitivity="high"/>` | Steel-grey tinted bar |
 | **siaga-ready** | `<triage status="ready" mode="siaga" urgency="critical" location="auto:..."/>` | Pulsing red bar, auto-location, 112 link |
 | **split-ready** | `<triage status="ready" mode="split" entities="siaga,vault" linkability="warning"/>` | Split items + linkability warning |
-| **manual** | `<triage status="uncertain" fallback="manual"/>` | 3×2 grid: 5 tracks + Catatan Saksi |
+| **informational** | `<triage status="ready" mode="catatan_komunitas" confidence="0.85"/>` | Green-tinted bar: "Bagikan sebagai Catatan Komunitas?" + concept pills preview |
+| **manual** | `<triage status="uncertain" fallback="manual"/>` | 3×2 grid: 5 tracks + Catatan Saksi + Catatan Komunitas |
 
 User can tap "Pilih sendiri" at any time → jumps to manual grid.
 
-### Triage → Card Handoff
-When user confirms track ("Setuju — Tuntaskan"), the AI-00 triage conversation **carries over** as the first messages in the card's Bahas Diskusi tab. The witness story isn't lost or repeated — it becomes the opening context for community discussion.
+### Triage → Adaptive Path Handoff (S3-A4)
+When user confirms the proposed path, AI-00 produces a **summary** for the Percakapan tab. The full triage transcript is preserved in the graph as `triage_transcript` on the content node — searchable and queryable, but not shown in conversation UI. Summary is cleaner for UX; nothing is lost.
 
-### Emergency (Siaga) Skips Follow-up
-AI detects emergency language → immediately shows siaga-ready bar. No probing.
+### Emergency (Siaga) — Fast Triage, Then Broadcast (S3-MD6)
+AI detects emergency language → fast, focused triage (extracts: what, where, how urgent) → shows siaga-ready bar. Triage IS the pre-screen — it makes users calmer and reports more useful. Zero moderation hold AFTER triage.
 
 ### Multi-Entity Split
 AI can detect mixed content → splits into separate entities → warns about linkability between public and private content.
@@ -279,17 +330,12 @@ All three A+ screens share the same bottom-bar concept with different skins:
 | A+2 Vault | Seal Bar | unsealed (editable) → sealed (locked + actions) |
 | A+3 Siaga | Broadcast Bar | composing → active (pulsing) → resolved (green) |
 
-### Dual-Tab Pattern (B1 — Cross-Cutting Component)
-Every stage that has both structured content and conversation gets two swipeable tabs. Bookend stages (seeds + Tuntas) have no tabs.
+### Dual-Tab Pattern (Cross-Cutting Component)
+Every phase that has both structured content and conversation gets two swipeable tabs:
+- **Tab A**: `Percakapan` — ongoing chat, clarifications, refinements with LLM and participants
+- **Tab B**: `Tahapan` — scrollable timeline of phases and checkpoints rendered from plan JSON
 - **Tab bar**: sits below app bar, track-colored underline on active tab, `‹ geser ›` swipe hint
-- **Left tab**: primary action for that stage (varies)
-- **Right tab**: secondary (usually conversation)
-- **Tab mapping per stage**:
-  - Bahas: 💬 Diskusi | 📋 Rangkuman
-  - Rancang: 📋 Papan GR | 💬 Koordinasi
-  - Garap: ✅ Progres | 💬 Koordinasi
-  - Periksa: 📊 Laporan | 💬 Tanggapan
-  - (Other tracks adapt naming but follow same dual-tab structure)
+- Tab naming adapts to phase context (e.g., a discussion phase shows 💬 Diskusi | 📋 Rangkuman; a planning phase shows 📋 Papan GR | 💬 Koordinasi)
 - **Notification dot**: red 6px circle on tab when unread content exists on the other tab
 - **WhatsApp-style chat**: `.chat-bubble.other` (left, white) and `.chat-bubble.self` (right, track-soft). Names, timestamps, emoji reactions, date separators.
 - **AI inline cards in chat**: `.ai-chat-card` — dashed border, centered, italic — appears mid-conversation when AI-07 surfaces summaries or cross-references the other tab.
@@ -318,8 +364,8 @@ The structured layer is composed of **block primitives**. The LLM decides which 
 `list` is the workhorse: checklists, hypotheses, experiments, evidence, contributions, attestors, budget items, media — anything "collection of similar things." UI rendering adapts to item fields: items with dates → timeline, with amounts → table, with checkboxes → checklist, with media → gallery.
 
 #### LLM-Driven Composition
-No rigid per-stage schemas. Instead:
-- LLM receives: stage context + block catalog + current structured state + new conversation
+No rigid per-phase schemas. Instead:
+- LLM receives: phase context + block catalog + current structured state + new conversation
 - LLM decides: which blocks this specific problem needs, fills them appropriately
 - Human refines: edit directly (✏️) or ask LLM to restructure (🤖 Bantu edit)
 - Iteration: each cycle, LLM respects existing human edits (source locking)
@@ -362,7 +408,7 @@ Every GR action earns Tandang credit. The accreditation mechanism varies by cont
 | **A · Binary** | SYSTEM (auto) | Observes action completion | Action = proof. No confirmation needed. | Instant — task checked, vote cast, seed submitted |
 | **B · Time-Weighted** | SYSTEM (auto) | Calculates duration from activity logs | Participation = proof | Accumulated — tallied over time |
 | **C · Peer Consensus** | PEERS (human collective) | Tracks consensus progress, nudges when threshold nears | Humans vote/endorse — consensus IS the accreditation | When enough peers validate (e.g., Sahkan threshold) |
-| **D · Quality Spectrum** | AI-PROPOSED → HUMAN-CONFIRMED | AI-08 Sensitive Media Detection & Redaction + AI-07 Discussion Summarization → proposes quality rating | PIC or peers accept/override AI rating | At milestone moments (end of Bahas, Tuntas) |
+| **D · Quality Spectrum** | AI-PROPOSED → HUMAN-CONFIRMED | AI-08 Sensitive Media Detection & Redaction + AI-07 Discussion Summarization → proposes quality rating | PIC or peers accept/override AI rating | At milestone moments (end of discussion phase, plan completion) |
 | **E · Stake-Weighted** | HUMAN (self-initiated) | Suggests vouch candidates based on collaboration history | Deliberate "Jaminkan" action with explicit risk warning | When human chooses to vouch |
 
 **Credit Flow:**
@@ -373,7 +419,7 @@ Every GR action earns Tandang credit. The accreditation mechanism varies by cont
    - Approaching validation threshold: *"📊 12 dari 15 validator sudah mengkonfirmasi"*
    - Vouch suggestion: *"🤝 Anda sudah 3× berkolaborasi dengan Bu Maya. Pertimbangkan menjaminkannya?"*
    - Stall + decay reminder: *"⏳ Belum ada aktivitas 14 hari. Kompetensi kontributor aktif akan luruh."*
-4. **Tuntas credit summary** — When a card reaches Tuntas, AI-09 proposes the full Kontribusi distribution as a **diff card** (same Suggest-Don't-Overwrite pattern). PIC reviews: [Terapkan] · [Tinjau Satu-satu] · [Tolak]. Once confirmed, the Kontribusi panel locks as a `computed` block (source: system).
+4. **Completion credit summary** — When a plan reaches completion (final phase), AI-09 proposes the full Kontribusi distribution as a **diff card** (same Suggest-Don't-Overwrite pattern). PIC reviews: [Terapkan] · [Tinjau Satu-satu] · [Tolak]. Once confirmed, the Kontribusi panel locks as a `computed` block (source: system).
 5. **Dispute mechanism** — For auto-awarded credits (Type A/B), any participant can flag "Kredit ini tidak tepat" → triggers peer review → AI-09 mediates resolution.
 
 **Key Principles:**
@@ -388,7 +434,7 @@ Every GR action earns Tandang credit. The accreditation mechanism varies by cont
   1. **Track Strip**: 4px left border in track accent color — identity marker, never changes
   2. **Header**: seed badge (track icon + seed name) + optional Rahasia badge (L1/L2/L3) + title (max 2 lines) + author row (avatar + name + tier + timestamp)
   3. **Body**: content text (3-line clamp + "...selengkapnya") + media thumbnails + location tag + optional PIC row + optional Dampak row
-  4. **Stepper**: horizontal breadcrumb with actual Indonesian stage names. Current stage = track-colored filled dot + bold label. Done = muted. Future = empty circle.
+  4. **Stepper**: horizontal breadcrumb showing adaptive path phases. Current phase = track-colored filled dot + bold label. Done = muted. Future = empty circle.
   5. **Footer**: 💬 comments · 👥 supporters · ⏱ time-in-stage · AI badge (rightmost)
 - **AI badges** (footer, right-aligned):
   - 🤖 **Classified** (green): auto-classified with confidence, e.g., "🤖 Tuntaskan · 92%"
@@ -404,21 +450,43 @@ Every GR action earns Tandang credit. The accreditation mechanism varies by cont
   - **L3 (Sangat Rahasia)**: title → "Judul disembunyikan", author → "Tersembunyi", content → hatched redaction block
 - **Track color = identity**: left strip + seed badge + stepper current dot all use the same accent color. Card shape never changes across tracks.
 
-### App Navigation (5-Tab Bottom Bar)
+### App Navigation (5-Tab Bottom Bar — S3-MD3)
 Bottom navigation with 5 equal-width tabs. No floating action button — the entry point is the Beranda header.
 
 | Tab | Icon | Label | Purpose |
 |---|---|---|---|
 | 🏠 | home | **Beranda** | Community feed — all seeds, Community Pulse, track filter tabs |
-| 📋 | clipboard | **Terlibat** | Seeds the user is involved in (as author, PIC, contributor, voter) |
+| 📝 | note | **Catatan** | Catatan Komunitas — lightweight public notes feed with concept pills, progressive disclosure (S3-B4) |
 | 🤝 | handshake | **Bantu** | Skill-matched opportunities — seeds that need your declared/validated skills |
 | 🔔 | bell | **Notifikasi** | Grouped notifications (mentions, stage changes, credit earned, stall alerts) |
-| 👤 | person | **Profil** | CV Hidup — the Tandang profile IS the profile page |
+| ☰ | menu | **Lainnya** | Hamburger menu: CV Hidup (Profil), Terlibat, Template Saya, Pengaturan |
 
-**Key changes from earlier draft:**
+**Key changes from Session 3 (S3-MD3):**
+- **Catatan Komunitas gets dedicated tab** (position 2) — lowest barrier to entry, best for user acquisition
+- **Terlibat** moves to hamburger menu (power-user feature)
+- **Profil (CV Hidup)** moves to hamburger menu
+- **Template Saya** (personal saved templates, S3-C3) accessible via hamburger
 - Search is NOT a nav tab — it's a 🔍 icon in the app header (opens full-screen overlay)
-- "Butuh Bantuan Anda" promoted to its own nav tab as **Bantu** (shorter, action-oriented)
-- Terlibat is a separate page, not a toggle on Beranda
+
+### Contribution Examples in Adaptive Phases
+Concrete examples of how contributions map to adaptive phases:
+
+**Perencanaan (Planning) phase**:
+- Building di perencanaan: developing solution frameworks, mapping resources, drafting timelines
+- Kontribusi Perencanaan: proposing criteria, refining objectives, research support
+- Tandang type: B · Time-Weighted (sustained effort)
+
+**Pelaksanaan (Execution) phase**:
+- Selesaikan task pelaksanaan: completing discrete checkpoints, delivering outputs, managing work
+- Tandang type: A · Binary (task done or not done) + C · Peer Consensus if peer-validated
+
+**Pembahasan (Discussion) phase**:
+- Diskusi kualitas: thoughtful participation, evidence-backed arguments, collaborative refinement
+- Tandang type: D · Quality Spectrum (AI-rated + human consensus)
+
+**Verifikasi (Verification) phase**:
+- Verifikasi hasil: checking outcomes, validating evidence, confirming completeness
+- Tandang type: C · Peer Consensus (endorsement accuracy)
 
 ### App Header (Sticky, All Pages)
 Every page shares the same app header:
@@ -471,7 +539,7 @@ Users have skills from two sources. The distinction is visible everywhere skills
 **Skill lifecycle:**
 1. **Declare** → user picks skills from ESCO-ID picker (searchable, hierarchical) + can type free-text skills
 2. **Match** → Bantu tab shows seeds that need your declared skills
-3. **Contribute** → user helps on matched seeds (Garap tasks, Bahas discussions, etc.)
+3. **Contribute** → user helps on matched seeds (execution tasks, discussions, etc.)
 4. **Validate** → peers confirm quality of contribution (Type C/D accreditation)
 5. **CV Hidup grows** → validated skill ● replaces declared ○ on profile. Tandang Competence (C) score increases.
 
@@ -490,10 +558,10 @@ The Bantu tab is a personalized feed of seeds that need the user's skills. It an
 - **Empty state**: if no matches, show ESCO skill picker prompt ("Tambah keahlian untuk melihat peluang")
 - **Scope-filtered**: respects the current scope selector (app header)
 
-### Terlibat Tab (Involvement Feed)
-The Terlibat tab shows seeds where the user has a stake. It answers: "What needs my attention?"
+### Terlibat Page (Involvement Feed — moved to hamburger menu, S3-MD3)
+The Terlibat page shows seeds where the user has a stake. It answers: "What needs my attention?"
 
-- **Includes seeds where user is**: author, PIC, contributor (any Garap task), voter (Putuskan), validator (Sahkan/Periksa), discussant (Bahas with recent message)
+- **Includes seeds where user is**: author, PIC, contributor (any execution task), voter, validator, discussant (recent activity)
 - **Sorting**: by urgency — (1) seeds needing YOUR action as PIC, (2) seeds with unread activity, (3) seeds nearing completion, (4) recently active
 - **Card enhancements**: progress ring overlay showing % completion, role badge ("PIC" / "Kontributor" / "Penulis"), unread indicator dot
 - **Streak counter**: top of feed shows contribution streak ("🔥 12 hari berturut-turut")
@@ -518,7 +586,7 @@ Beranda feed is NOT chronological. It's ordered by community utility:
 | Priority | What | Why |
 |---|---|---|
 | 1 | Seeds needing YOUR action (PIC tasks, pending votes) | Direct responsibility |
-| 2 | Seeds nearing stage completion (≥80% progress) | Momentum — help finish |
+| 2 | Seeds nearing path completion (≥80% progress) | Momentum — help finish |
 | 3 | New seeds (< 24h old) | Fresh opportunities |
 | 4 | Active seeds with recent discussion | Community energy |
 | 5 | Completed/celebrated seeds | Positive reinforcement |
@@ -527,8 +595,8 @@ Beranda feed is NOT chronological. It's ordered by community utility:
 - **Pull-to-refresh**: updates feed and Community Pulse stats
 - **Infinite scroll**: loads more seeds as user scrolls down
 
-### CV Hidup as Profile (Profil Tab)
-The Profil tab IS the Tandang profile — the "CV Hidup" (living resume). No separate profile page.
+### CV Hidup as Profile (moved to hamburger menu, S3-MD3)
+The Profil page IS the Tandang profile — the "CV Hidup" (living resume). Accessible via Lainnya (☰) menu.
 
 - **Identity section**: avatar, name, area (RT/RW/Kelurahan), tier badge (◆◇ system), member-since date
 - **I/C/J Radar**: triangular radar chart showing Integrity / Competence / Judgment scores
@@ -564,9 +632,11 @@ Design patterns that encourage continued positive contribution (not attention-se
 |---|---|---|
 | **Context & Tracking** |||
 | `design/context/DESIGN-CONTEXT.md` | Living | **THIS FILE** — session handoff reference |
-| `design/context/DESIGN-SEQUENCE.md` | Living | Design checklist (what's locked, what's next) |
-| `design/context/TRACK-MAP.md` | Locked | ASCII flowcharts for all 5 track lifecycles |
+| `design/context/ADAPTIVE-PATH-MAP.md` | Living | Adaptive path visual reference (phases, branches, checkpoints) |
+| `design/archive/DESIGN-SEQUENCE.md` | Archived | Legacy design checklist for fixed-track era |
+| `design/archive/TRACK-MAP.md` | Archived | Legacy ASCII flowcharts for fixed track lifecycles |
 | `design/context/REVIEW-FIXES.md` | Living | Review amendments (14 parts A–N): contradiction fixes, design decisions, GDF computation, Vault Security Contract, Rahasia×Tandang matrix, Wali consent, moderator dashboard, offline/error patterns, account management, block/mute, push notifications, Siaga abuse prevention, accessibility contract, deep link landing pages. |
+| `design/context/DECISIONS-LOG.md` | Living | **Chronological decision record** — all sessions, rationale, superseded decisions, open questions |
 | `design/context/REVIEW-PROMPT.md` | Reference | Completeness review prompt for external reviewers |
 | `design/context/TANDANG-GAP-PROMPTS.md` | Reference | Implementation prompts for Tandang gap items |
 | **HTML Prototypes** (`design/prototypes/`) |||
@@ -578,11 +648,11 @@ Design patterns that encourage continued positive contribution (not attention-se
 | `design/prototypes/A+2-catatan-saksi.html` | Locked | Dark vault UI, 5-state lifecycle, seal bar |
 | `design/prototypes/A+3-siaga-broadcast.html` | Locked | Siaga red UI, 4-state lifecycle, broadcast bar |
 | `design/prototypes/B0-seed-card.html` | Locked | Universal card anatomy, 5 views |
-| `design/prototypes/B1-tuntaskan-card.html` | Locked (v3) | Tuntaskan lifecycle: 6 states, dual-tab, Papan GR, Kontribusi |
-| `design/prototypes/B2-wujudkan-card.html` | Locked (v1) | Wujudkan lifecycle: 7 states, milestones, Galang, Rayakan |
-| `design/prototypes/B3-telusuri-card.html` | Locked (v1) | Telusuri lifecycle: 5 states, hypotheses, evidence board, Temuan |
-| `design/prototypes/B4-rayakan-card.html` | Locked (v1) | Rayakan lifecycle: 4 states + post-Tuntas Dampak panel |
-| `design/prototypes/B5-musyawarah-card.html` | Locked (v1) | Musyawarah lifecycle: 6 states, voting, Ketetapan |
+| `design/prototypes/B1-tuntaskan-card.html` | Legacy (v3) | Tuntaskan UI components (legacy fixed stages; reusable in adaptive phases) |
+| `design/prototypes/B2-wujudkan-card.html` | Legacy (v1) | Wujudkan UI components (legacy fixed stages; reusable in adaptive phases) |
+| `design/prototypes/B3-telusuri-card.html` | Legacy (v1) | Telusuri UI components (legacy fixed stages; reusable in adaptive phases) |
+| `design/prototypes/B4-rayakan-card.html` | Legacy (v1) | Rayakan UI components (legacy fixed stages; reusable in adaptive phases) |
+| `design/prototypes/B5-musyawarah-card.html` | Legacy (v1) | Musyawarah UI components (legacy fixed stages; reusable in adaptive phases) |
 | `design/prototypes/C1-rahasia-overlays.html` | Locked (v1) | Rahasia 4-level privacy (L0–L3), 5 views |
 | `design/prototypes/C2-ai-surface-states.html` | Locked (v1) | AI badges, confidence bands, diff cards, moderation, duplicate detection |
 | `design/prototypes/C3-navigation-feed.html` | Locked (v2) | 5-tab nav, feed, search, scope picker, CV Hidup, 7 views |
@@ -594,6 +664,10 @@ Design patterns that encourage continued positive contribution (not attention-se
 | `design/specs/DESIGN-DNA-v0.1.md` | Locked (v0.1) | Design DNA: 9 sections + appendix. Also split into `design/specs/design-dna/01–10` chapter files. |
 | `design/specs/AI-SPEC-v0.2.md` | Locked (v0.2) | AI Layer: 10 touch points (AI-00–AI-09). Also split into `design/specs/ai-spec/01–21` chapter files. |
 | `design/specs/UI-UX-SPEC-v0.5.md` | Locked (v0.5) | UI/UX: 29 sections. Also split into `design/specs/ui-ux-spec/01–30` chapter files. |
+| `design/specs/ADAPTIVE-PATH-SPEC-v0.1.md` | Locked (v0.1) | Adaptive Path Guidance: dynamic phases, checkpoints, branches, LLM proposals |
+| `design/specs/ADAPTIVE-PATH-ORCHESTRATION-v0.1.md` | Locked (v0.1) | Orchestration flow: who does what, when, timeouts, templates |
+| `design/specs/ENTRY-PATH-MATRIX-v0.1.md` | Locked (v0.1) | Eagle view: all 4 modes, routing logic, Catatan Komunitas spec |
+| `design/specs/ONTOLOGY-VOCAB-v0.1.md` | Locked (v0.1) | RDF triple model: Schema.org + Wikidata + OSM, SurrealDB graph storage |
 | **Archive** (`design/archive/`) |||
 | `design/archive/AI-SPEC-v0.1.docx` | Superseded | Original AI spec (8 touch points). Replaced by AI-SPEC-v0.2.md. |
 | `design/archive/UI-UX-SPEC-v0.4.docx` | Superseded | Original UI/UX spec (22 sections). Replaced by UI-UX-SPEC-v0.5.md. |
@@ -611,14 +685,19 @@ Design patterns that encourage continued positive contribution (not attention-se
 
 ## What's Next
 
-**Phase D complete.** All steps locked: D1 (Design DNA) + D2 (Style Guide) + D3 (AI-SPEC v0.2 + UI-UX-SPEC v0.5).
+**Session 3 complete (2026-02-16).** Major architecture decisions locked: pure RDF triple ontology, unified mode routing via Schema.org Action types, 4-mode system with Catatan Komunitas, navigation rearranged, two LLM tiers, ranking-based moderation.
 
-**All phases locked**: A (4 steps) + A+ (3 steps) + B (6 steps) + C (6 steps) + D (3 steps) = **22 design steps total.** C6 (Share Sheet) added post-D3 as cross-cutting addition.
+**Still open (see DECISIONS-LOG.md → Still Open):**
+- OPEN-01: Vault encryption algorithm
+- OPEN-04: Offline behavior
+- OPEN-05: AI touchpoints 02-08 full specs
+- OPEN-07: Onboarding flow
+- OPEN-08: Reputation system deep design (PARKED for dedicated session)
+- OPEN-11: Catatan Komunitas discovery UX wireframe
+- OPEN-12: SurrealDB DDL schema & migration strategy
 
-**Review amendments applied**: REVIEW-FIXES.md resolves 8 critical gaps, 8 important gaps, 10 contradictions, and 4 nice-to-haves from external completeness review. Score target: 7/10 → 9/10.
-
-See `DESIGN-SEQUENCE.md` for full checklist.
+See: `docs/design/context/DECISIONS-LOG.md` for all decisions. `docs/design/specs/ONTOLOGY-VOCAB-v0.1.md` for the triple model.
 
 ---
 
-*This file should be updated every time a new design step is locked. Last updated after REVIEW-FIXES.md.*
+*This file should be updated every time a design decision changes. Last updated after Session 3: Ontology, Architecture & System Design (2026-02-16).*

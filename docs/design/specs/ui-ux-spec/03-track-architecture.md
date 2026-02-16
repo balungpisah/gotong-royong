@@ -1,33 +1,56 @@
 > [← Back to UI/UX Spec index](../UI-UX-SPEC-v0.5.md)
 
-## 2. Track Architecture
+## 2. Track Architecture → Adaptive Path Guidance
 
-> **Note (2026-02-15):** Fixed track lifecycles are superseded for new experiences by `docs/design/specs/ADAPTIVE-PATH-SPEC-v0.1.md`. Tracks remain as optional hints and legacy views, while adaptive phase timelines are the default path.
+> **Updated 2026-02-16.** Fixed track lifecycles are superseded by Adaptive Path Guidance (`docs/design/specs/ADAPTIVE-PATH-SPEC-v0.1.md`). Tracks remain as optional classification hints only.
 
-Every entity starts as a signal — a testimony, idea, question, good news, or proposal. AI-00 conversational triage classifies the seed type and suggests a track; confirmation is implicit unless challenged during Bahas. Five tracks represent five fundamentally different journeys:
+### 2.1 Canonical Model: Adaptive Path
 
-| Track | Indonesian | Spirit | Seed Type | Energy |
-|---|---|---|---|---|
-| TUNTASKAN | Tuntaskan | Fix a problem (reactive) | Keresahan (concern) | Tenaga + Modal |
-| WUJUDKAN | Wujudkan | Build something new (proactive) | Gagasan (idea) | Tenaga + Modal |
-| TELUSURI | Telusuri | Understand / investigate | Pertanyaan (question) | Pikiran |
-| RAYAKAN | Rayakan | Honor an achievement | Kabar Baik (good news) | Hati |
-| MUSYAWARAH | Musyawarah | Decide together (governance) | Usul (proposal) | Suara |
+Every entity starts as a signal — a testimony, idea, question, good news, or proposal. The user describes the situation in the **Percakapan** (conversation) tab. The LLM proposes a case-specific **path plan** consisting of phases and checkpoints. The **Tahapan** (timeline) tab renders the plan.
 
-Universal entry point: "Bagikan" (share) via AI-00 conversational triage (see Section 19). The user tells their story; AI classifies and users can challenge/change classification (no explicit community-wide confirmation step).
+**Core hierarchy:** `PathPlan → Branch → Phase → Checkpoint`
 
-Track changes are allowed at any stage via governed proposal + vote (1.5x quorum, 72h challenge window). All reputation earned carries over.
+- **Phase**: a high-level step with an objective and status.
+- **Checkpoint**: a verifiable unit of progress within a phase.
+- **Branch**: an alternate path forked from a parent checkpoint.
+- **Source tags**: `ai` (LLM-proposed), `human` (manually edited), `system` (automated).
+- **Locked fields**: any field manually edited by a privileged role becomes locked; the LLM cannot overwrite it.
 
-### 2.1 Track Component Summaries
+Statuses: `planned`, `active`, `open`, `completed`, `blocked`, `skipped`.
 
-**Tuntaskan (Fix It):** 6 states (Keresahan → Bahas → Rancang → Garap → Periksa → Tuntas). Unique components: Papan Gotong Royong (task list), contribution slots (anonymous), PIC-controlled readiness checklist, Periksa peer verification. Also locks LLM ↔ UI Architecture (7 block primitives, source tags, 4 triggers).
+### 2.2 Track Hints (Optional Metadata)
 
-**Wujudkan (Build It):** 7 states (Gagasan → Bahas → Rancang → Galang → Garap → Rayakan → Tuntas). Unique components: Milestone tracker, Galang sub-lifecycle (6 financial fields protected 🔒), Rayakan celebration display.
+The LLM may attach `track_hint` and `seed_hint` to a plan as classification metadata. These do not drive the lifecycle — they serve as optional labels for filtering and analytics.
 
-**Telusuri (Explore It):** 5 states (Pertanyaan → Dugaan → Uji → Temuan → Tuntas). Unique components: Hypothesis cards (5 states: Diajukan/Diuji/Terbukti/Ditolak/Belum Jelas), evidence board with support/refute/neutral indicators, Temuan document with confidence meter, track-change suggestion card.
+| Track Hint | Seed Hint | Spirit | Energy |
+|---|---|---|---|
+| tuntaskan | Keresahan (concern) | Fix a problem (reactive) | Tenaga + Modal |
+| wujudkan | Gagasan (idea) | Build something new (proactive) | Tenaga + Modal |
+| telusuri | Pertanyaan (question) | Understand / investigate | Pikiran |
+| rayakan | Kabar Baik (good news) | Honor an achievement | Hati |
+| musyawarah | Usul (proposal) | Decide together (governance) | Suara |
 
-**Rayakan (Honor It):** 4 states (Kabar Baik → Sahkan → Apresiasi → Tuntas). Unique components: Validation panel (endorsement threshold), recognition card (badge + stats), appreciation wall (community messages + emoji reactions), optional post-Tuntas Dampak panel (time-trigger, before/after comparison).
+Track hints can be changed at any time by the LLM or a privileged editor without governance overhead — they are metadata, not lifecycle state.
 
-**Musyawarah (Decide Together):** 6 states (Usul → Bahas → Putuskan → Jalankan → Tinjau → Tuntas). Unique components: Position board (options + support bars + supporter chips), vote panel (system-authoritative, quorum bar, timer, anonymous + immutable notice), Ketetapan formal document, Tinjau review panel (time-trigger).
+### 2.3 Privileged Editing
+
+Only `project_manager` or `highest_profile_user` can edit phases and checkpoints. Manual edits lock the affected fields (`locked_fields`) and increment the plan version. The LLM can propose changes as suggestions shown as diffs; users accept or reject.
+
+### 2.4 Branching
+
+A plan supports branches within a single timeline. Each branch anchors to a `parent_checkpoint_id` (or `null` for the main branch). Branches are labeled and rendered as forks in the Tahapan tab.
+
+### 2.5 Legacy Track Component Patterns
+
+The following component patterns from the original track architecture remain available as reusable UI primitives within adaptive phases. They are no longer tied to fixed stages:
+
+- **Papan Gotong Royong** (task board) — usable in any execution phase.
+- **Galang** (resource pooling) — cross-cutting feature, activatable in any phase. See Section 16.
+- **Hypothesis cards & evidence board** — usable in investigation-oriented phases.
+- **Validation panel & appreciation wall** — usable in celebration-oriented phases.
+- **Position board & vote panel** — usable in governance-oriented phases.
+- **Ketetapan** (formal decision document) — output of governance phases.
+
+> For the full adaptive path data model and API, see `ADAPTIVE-PATH-SPEC-v0.1.md` and `docs/research/prd-adaptive-path-guidance.md`.
 
 ---

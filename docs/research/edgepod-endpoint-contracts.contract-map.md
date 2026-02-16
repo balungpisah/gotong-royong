@@ -1,5 +1,5 @@
 ## Edge-Pod Compact Endpoint Contract Map
-Source: `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/research/edgepod-endpoint-contracts.schema.json`
+Source: `docs/research/edgepod-endpoint-contracts.schema.json`
 
 Generated for implementation handoff and endpoint-task creation.
 

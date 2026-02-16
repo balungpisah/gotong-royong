@@ -2,26 +2,26 @@
 
 ## Section 6: Alur Entry
 
-Semua entry dimulai dari AI-00 conversational triage di halaman **Bagikan**, lalu diarahkan ke salah satu dari 3 alur.
+Semua entry dimulai dari AI-00 conversational triage di halaman **Bagikan**. AI-00 proposes an adaptive path plan, then directs to one of 3 flows.
 
 ### 6.1 AI-00 Conversational Triage
 
-Pengguna tidak melihat textarea kosong. AI-00 menyapa, mendengarkan cerita, menyelidiki jika perlu, lalu mengklasifikasikan. Context bar di atas keyboard berubah bentuk (morph) sesuai state percakapan.
+Pengguna tidak melihat textarea kosong. AI-00 menyapa, mendengarkan cerita, menyelidiki jika perlu, lalu menghasilkan adaptive path plan. Context bar di atas keyboard berubah bentuk (morph) sesuai state percakapan.
 
 | State Bar | Visual | Penjelasan |
 |---|---|---|
 | **Listening** | Bar kosong, indikator gelombang | AI sedang mendengarkan, belum ada klasifikasi |
 | **Probing** | Bar + signal indicator | AI mengirim follow-up untuk klarifikasi |
 | **Leaning** | Pill track bisa diketuk | AI punya kecenderungan awal (tappable preview) |
-| **Ready** | Kartu penuh: track + confidence | Klasifikasi selesai, siap submit ke Komunitas |
+| **Ready** | Kartu penuh: track + confidence | Path plan dihasilkan, siap submit ke Komunitas |
 | **Vault-ready** | Kartu vault (gelap) | Cerita diarahkan ke Catatan Saksi |
 | **Siaga-ready** | Kartu siaga (merah, pulse) | Darurat terdeteksi, arahkan ke Siaga |
 | **Split-ready** | Kartu terbelah | Cerita bisa dipecah ke 2 alur (dengan peringatan linkability) |
-| **Manual** | Grid 5 tracks + vault | Pengguna tekan "Pilih sendiri" untuk bypass AI |
+| **Manual** | Grid 5 tracks + vault | Pengguna tekan "Pilih sendiri" untuk pilih track hint manual |
 
 ### 6.2 Alur Komunitas
 
-Context bar `status="ready"` + track terpilih. Percakapan AI-00 menjadi pesan pertama di tab Bahas Diskusi. Seed card terbuat dengan tag ESCO dari AI-00, confidence badge, dan stage Keresahan/Gagasan/Pertanyaan/dll sesuai track.
+Context bar `status="ready"` + track terpilih. Percakapan AI-00 menjadi pesan pertama di tab Percakapan. Tahapan tab menampilkan path plan. Plan card terbuat dengan tag ESCO dari AI-00, confidence badge, dan track hint sesuai klasifikasi.
 
 **Dampak reputasi: PENUH** — semua kontribusi di lifecycle menghasilkan kredit Tandang sesuai tipe (A–E).
 

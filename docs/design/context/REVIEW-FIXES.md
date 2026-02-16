@@ -311,7 +311,7 @@ At RT/RW scale, moderators are:
 
 ### Access Point
 
-Moderators access their queue via **Profil tab → "Moderasi" section** (appears only for users with moderator role). This is NOT a separate app or tab — it's a section within the existing profile, keeping the 5-tab nav clean.
+Moderators access their queue via **Lainnya (☰) → CV Hidup (Profil) → "Moderasi" section** (appears only for users with moderator role). This is NOT a separate app or tab — it's a section within the hamburger menu profile page, keeping the 5-tab nav clean. *(Updated per S3-MD3: Profil moved from tab bar to hamburger menu.)*
 
 ### Moderator Queue UI
 

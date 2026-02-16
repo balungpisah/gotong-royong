@@ -30,7 +30,7 @@ All AI touch points are monitored for accuracy, safety, and community impact.
 | **AI-08 Media** | Face detection accuracy | > 95% | Weekly |
 | **AI-08 Media** | License plate detection accuracy | > 90% | Weekly |
 | **AI-09 Credit** | Credit dispute rate | < 5% | Weekly |
-| **AI-09 Credit** | PIC acceptance rate of Tuntas distribution | > 85% | Weekly |
+| **AI-09 Credit** | PIC acceptance rate of completion distribution | > 85% | Weekly |
 | **AI-09 Credit** | Dispute resolution time | < 72h | Weekly |
 
 ### 18.2 Monitoring Dashboard

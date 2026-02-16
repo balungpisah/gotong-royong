@@ -23,16 +23,16 @@ Gotong Royong's AI layer comprises **10 AI touch points** spanning the full life
 
 | Touch Point | Name | Phase | Purpose |
 |---|---|---|---|
-| **AI-00** | Conversational Triage | Entry | Greet user, listen to story, probe for clarity, classify into entry flow |
-| **AI-01** | Track & Seed Classification | Entry | Classify witness report into track + seed type + extract skills |
+| **AI-00** | Conversational Triage | Entry | Greet user, listen to story, probe for clarity, propose adaptive path plan and classify into entry flow |
+| **AI-01** | Triple Refinement | Entry | Validate and refine RDF triples from AI-00; extract Action type, temporal class, and skills (optional metadata) |
 | **AI-02** | Redaction LLM | Entry | Identify and mask PII from story text |
 | **AI-03** | Duplicate Detection | Entry / Ongoing | Find similar existing seeds; flag or merge |
 | **AI-04** | Content Moderation | Submission | Policy compliance check; hold for review if needed |
 | **AI-05** | Gaming Pattern Detection | Ongoing | Detect coordinated abuse, false endorsements, reputation gaming |
-| **AI-06** | Criteria & Task Suggestion | Rancang / Garap | Recommend objective criteria and decompose into tasks |
-| **AI-07** | Discussion Summarization | Bahas | Summarize discussion threads for quick reference |
+| **AI-06** | Criteria & Task Suggestion | Planning / Execution phases | Recommend objective criteria and decompose into tasks |
+| **AI-07** | Discussion Summarization | Discussion phases | Summarize discussion threads for quick reference |
 | **AI-08** | Sensitive Media Detection & Redaction | Submission | Detect faces, plates, private locations; offer redaction |
-| **AI-09** | Credit Accreditation | Lifecycle / Tuntas | Track and distribute community credit (reputation points) |
+| **AI-09** | Credit Accreditation | Lifecycle / Completion | Track and distribute community credit across adaptive path phases |
 
 ### 1.2 Scope Boundaries
 

@@ -9,11 +9,11 @@
 | **ID** | AI-07 |
 | **Name** | Discussion Summarization |
 | **Trigger** | On-demand (user taps "Ringkas" button); also scheduled (daily digest) |
-| **UI Location** | Bahas Diskusi tab, summary card above discussion thread |
+| **UI Location** | Percakapan tab (discussion thread), summary card above discussion thread |
 | **Interaction Mode** | Asynchronous, non-blocking |
 | **Latency Budget** | < 5 seconds (on-demand); < 30 seconds (batch) |
 | **Model Tier** | Medium (Haiku-class) |
-| **UI-UX-SPEC Ref** | Section 18 (Bahas Diskusi), summary card |
+| **UI-UX-SPEC Ref** | Section 18 (Percakapan), summary card |
 
 ### 11.2 Purpose
 
@@ -76,7 +76,7 @@
 ```
 You are a discussion moderator for Gotong Royong communities.
 
-Your task: Summarize a discussion thread (Bahas Diskusi) in a way that helps newcomers understand the issue quickly.
+Your task: Summarize a discussion thread (Percakapan tab) in a way that helps newcomers understand the issue quickly.
 
 Guidelines:
 - Focus on main arguments, not every opinion

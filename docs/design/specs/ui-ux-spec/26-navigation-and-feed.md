@@ -7,10 +7,12 @@
 | Tab | Icon | Label | Function |
 |---|---|---|---|
 | 1 | 🏠 | Beranda | Community feed: all seeds, Community Pulse, horizontal track filter tabs |
-| 2 | 📋 | Terlibat | Seeds where user is involved (author/PIC/contributor/voter). Streak banner + role badges + SVG progress rings |
+| 2 | 📝 | Catatan | Catatan Komunitas: lightweight public notes (prices, status, schedules), concept pills, progressive disclosure (S3-B4) |
 | 3 | 🤝 | Bantu | Skill-matched opportunities via ESCO. Validated ● vs declared ○ pills. Volunteer counts |
 | 4 | 🔔 | Notifikasi | Time-grouped: Hari Ini / Kemarin / Minggu Ini. 7 types: skill-match, credit, mention, stage, vote, stall, digest |
-| 5 | 👤 | Profil | CV Hidup: hero + tier badge, I/C/J score cards, dual-layer skills, contributions, vouch, impact, QR |
+| 5 | ☰ | Lainnya | Hamburger menu: CV Hidup (Profil), Terlibat, Template Saya (S3-C3), Pengaturan |
+
+> **Change (S3-MD3):** Catatan Komunitas replaces Terlibat as primary tab (lowest barrier to entry, best for user acquisition). Terlibat and Profil move to hamburger menu.
 
 ### 25.2 App Header
 
@@ -43,10 +45,10 @@ In Beranda header: `☀️ Cerah · 14 aktif · 3 baru · 1 vote`. GDF Weather e
 | Priority | Condition | Example |
 |---|---|---|
 | 1 — Your Action | Seed needs your action | PIC assigned you, vote open |
-| 2 — Nearing | Deadline/milestone close | Garap H-3, vote 2h left |
+| 2 — Nearing | Deadline/milestone close | Pelaksanaan H-3, vote 2h left |
 | 3 — New | Created within 24h | New seed in your RT |
 | 4 — Active | Recent activity | Ongoing discussion |
-| 5 — Completed | Tuntas | Finished seeds |
+| 5 — Completed | Selesai | Completed plans |
 
 ### 25.6 Horizontal Track Tabs
 

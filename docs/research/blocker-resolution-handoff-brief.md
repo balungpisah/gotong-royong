@@ -27,7 +27,7 @@ Request final signatures on:
 - `docs/research/research-summary-and-decision-record.md`
 
 ## Handoff outputs (already completed)
-- `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/research/tandang-gap-log.md` rows updated.
-- `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/research/feature-contract-map.md` rows moved from `UNKNOWN` to `KNOWN/PARTIAL`.
-- `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/research/prompt-id-registration-log.md` has registered IDs.
-- `/Users/damarpanuluh/MERIDIAN-NEW/gotong-royong/docs/research/edgepod-endpoint-contracts.md` and schema artifacts include prompt bindings.
+- `docs/research/tandang-gap-log.md` rows updated.
+- `docs/research/feature-contract-map.md` rows moved from `UNKNOWN` to `KNOWN/PARTIAL`.
+- `docs/research/prompt-id-registration-log.md` has registered IDs.
+- `docs/research/edgepod-endpoint-contracts.md` and schema artifacts include prompt bindings.

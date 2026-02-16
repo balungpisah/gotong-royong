@@ -38,7 +38,6 @@ CHECKS=(
   "0001_initial_schema_check.surql"
   "0002_chat_indexes_check.surql"
   "0003_permissions_private_channels_check.surql"
-  "0004_transition_prereq_check.surql"
   "0005_moderation_check.surql"
   "0006_vault_check.surql"
   "0007_siaga_check.surql"
@@ -47,6 +46,9 @@ CHECKS=(
   "0010_contributions_evidence_vouch_check.surql"
   "0011_webhook_outbox_check.surql"
   "0012_adaptive_path_check.surql"
+  "0013_ontology_schema_check.surql"
+  "0016_add_mode_fields_check.surql"
+  "0017_path_plan_action_type_check.surql"
 )
 
 run_check() {
@@ -127,8 +129,6 @@ def get_metric(key):
 
 
 required_metrics = (
-    "transition_rows_missing_event_hash",
-    "transition_rows_missing_retention_tag",
     "vault_entry_rows_missing_event_hash",
     "vault_entry_rows_missing_retention_tag",
     "vault_timeline_rows_missing_event_hash",
