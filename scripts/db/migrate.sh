@@ -15,14 +15,24 @@ CONTAINER_WORKDIR="/workspace"
 run_migration() {
   local migration_file="$1"
   local migration_path="$WORKDIR/database/migrations/$migration_file"
+  local output
 
-  cat "$migration_path" | "${SUR_CMD[@]}" sql \
-    --multi \
-    --endpoint "$SURREAL_ENDPOINT" \
-    --user "$SURREAL_USER" \
-    --pass "$SURREAL_PASS" \
-    --namespace "$SURREAL_NS" \
-    --database "$SURREAL_DB"
+  output=$(
+    cat "$migration_path" | "${SUR_CMD[@]}" sql \
+      --multi \
+      --endpoint "$SURREAL_ENDPOINT" \
+      --user "$SURREAL_USER" \
+      --pass "$SURREAL_PASS" \
+      --namespace "$SURREAL_NS" \
+      --database "$SURREAL_DB"
+  )
+
+  echo "$output"
+
+  if [[ "$output" == *"Thrown error"* ]]; then
+    echo "migration failed for $migration_file due to Surreal thrown error" >&2
+    return 1
+  fi
 }
 
 if command -v "${SUR_CMD[0]}" >/dev/null 2>&1; then

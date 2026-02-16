@@ -44,16 +44,17 @@ run_check() {
 
   echo "$output"
 
+  if [[ "$output" == *"Thrown error"* ]]; then
+    echo "$check_file failed: Surreal returned thrown error" >&2
+    return 1
+  fi
+
   if [[ "$check_file" == *0009_audit_retention_fields_check.surql ]]; then
     if ! printf '%s\n' "$output" | python3 - <<'PY'
 import json
 import sys
 
 raw = sys.stdin.read()
-
-if "Thrown error" in raw:
-    print("audit retention check failed: Surreal returned an error", file=sys.stderr)
-    sys.exit(1)
 
 parsed_lines = []
 for line in raw.splitlines():

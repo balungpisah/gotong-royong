@@ -232,7 +232,7 @@ impl ChatRealtimeBus {
                 let Some(url_client) = client.clone() else {
                     return;
                 };
-                (format!("{channel_prefix}:{thread_id}"), Some(url_client))
+                (format!("{channel_prefix}:{thread_id}"), url_client)
             }
             _ => return,
         };
@@ -246,7 +246,7 @@ impl ChatRealtimeBus {
             let max_backoff_ms = 5_000_u64;
 
             loop {
-                let mut pubsub = match client.clone().unwrap().get_async_pubsub().await {
+                let mut pubsub = match client.clone().get_async_pubsub().await {
                     Ok(pubsub) => pubsub,
                     Err(err) => {
                         observability::register_chat_realtime_bridge_event(
