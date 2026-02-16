@@ -1,20 +1,10 @@
 -- 0009_audit_retention_fields_check
-INFO FOR TABLE track_state_transition;
 INFO FOR TABLE vault_entry;
 INFO FOR TABLE vault_timeline_event;
 INFO FOR TABLE siaga_broadcast;
 INFO FOR TABLE siaga_timeline_event;
 INFO FOR TABLE content_moderation;
 INFO FOR TABLE moderation_decision;
-
-SELECT
-  count() AS transition_rows_total,
-  count(event_hash) AS transition_rows_with_hash,
-  count(retention_tag) AS transition_rows_with_retention_tag,
-  (count() - count(event_hash)) AS transition_rows_missing_event_hash,
-  (count() - count(retention_tag)) AS transition_rows_missing_retention_tag
-FROM track_state_transition
-;
 
 SELECT
   count() AS vault_entry_count,
