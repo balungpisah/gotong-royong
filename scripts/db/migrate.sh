@@ -11,6 +11,28 @@ set -euo pipefail
 SUR_CMD=(surreal)
 WORKDIR="$(pwd)"
 CONTAINER_WORKDIR="/workspace"
+CLI_ENDPOINT="$SURREAL_ENDPOINT"
+
+configure_docker_cli() {
+  local os_name
+  local docker_network_flag="--network host"
+  os_name="$(uname -s 2>/dev/null || echo unknown)"
+
+  case "$os_name" in
+    Darwin|MINGW*|MSYS*|CYGWIN*)
+      # Docker Desktop doesn't provide host networking semantics equivalent to Linux.
+      docker_network_flag=""
+      CLI_ENDPOINT="${CLI_ENDPOINT/127.0.0.1/host.docker.internal}"
+      CLI_ENDPOINT="${CLI_ENDPOINT/localhost/host.docker.internal}"
+      ;;
+  esac
+
+  if [[ -n "$docker_network_flag" ]]; then
+    SUR_CMD=(docker run --rm -i "$docker_network_flag" -v "${WORKDIR}:${CONTAINER_WORKDIR}" "$SURREAL_IMAGE")
+  else
+    SUR_CMD=(docker run --rm -i -v "${WORKDIR}:${CONTAINER_WORKDIR}" "$SURREAL_IMAGE")
+  fi
+}
 
 run_migration() {
   local migration_file="$1"
@@ -20,7 +42,7 @@ run_migration() {
   output=$(
     cat "$migration_path" | "${SUR_CMD[@]}" sql \
       --multi \
-      --endpoint "$SURREAL_ENDPOINT" \
+      --endpoint "$CLI_ENDPOINT" \
       --user "$SURREAL_USER" \
       --pass "$SURREAL_PASS" \
       --namespace "$SURREAL_NS" \
@@ -39,12 +61,10 @@ if command -v "${SUR_CMD[0]}" >/dev/null 2>&1; then
   surreal_version="$(${SUR_CMD[0]} version 2>/dev/null | awk 'NR==1 {print $1}')"
   surreal_major="${surreal_version%%.*}"
   if [[ "$surreal_major" != "3" ]]; then
-    SUR_CMD=(docker run --rm -i --network host -v "${WORKDIR}:${CONTAINER_WORKDIR}" "$SURREAL_IMAGE")
+    configure_docker_cli
   fi
 else
-  # Note: Docker Desktop on macOS/Windows doesn't support --network host.
-  # Fall back to container-based CLI for reliable protocol compatibility.
-  SUR_CMD=(docker run --rm -i --network host -v "${WORKDIR}:${CONTAINER_WORKDIR}" "$SURREAL_IMAGE")
+  configure_docker_cli
 fi
 
 for migration_file in \
