@@ -34,19 +34,19 @@ Use DB script commands only for tickets that touch migrations/checks/scripts.
 
 | ID | Title | Depends On | Status | Notes |
 |---|---|---|---|---|
-| GR-001 | Migration/check runner sync to 0013 ontology | - | todo | |
-| GR-002 | Rename shared API queue field to neutral name (`job_queue`) | - | todo | |
-| GR-003 | Remove transition feature from domain/API/infra/worker | GR-002 | todo | |
-| GR-004 | Transition schema/check cleanup migration | GR-003 | todo | |
-| GR-005 | Remove discovery `track`/`stage` in code paths | GR-003 | todo | |
-| GR-006 | Discovery schema migration for `track`/`stage` removal | GR-005 | todo | |
-| GR-007 | Introduce `Mode` with contribution persistence | GR-006 | todo | |
-| GR-008 | Adaptive-path classification swap to `ActionType` | GR-007 | todo | |
-| GR-009 | Add ranking primitive (`wilson_score`) + tests | GR-008 | todo | |
-| GR-010 | Ontology repository port + in-memory + Surreal impl | GR-008, GR-009 | todo | |
-| GR-011 | Ontology API routes + AppState wiring | GR-010 | todo | |
-| GR-012 | Worker jobs (`TTLCleanup`, `ConceptVerification`) + periodic producer | GR-010, GR-011 | todo | |
-| GR-013 | Split `infra/repositories/mod.rs` monolith | GR-012 | todo | |
+| GR-001 | Migration/check runner sync to 0013 ontology | - | done | implemented |
+| GR-002 | Rename shared API queue field to neutral name (`job_queue`) | - | done | implemented |
+| GR-003 | Remove transition feature from domain/API/infra/worker | GR-002 | done | implemented |
+| GR-004 | Transition schema/check cleanup migration | GR-003 | done | implemented |
+| GR-005 | Remove discovery `track`/`stage` in code paths | GR-003 | done | implemented |
+| GR-006 | Discovery schema migration for `track`/`stage` removal | GR-005 | done | implemented |
+| GR-007 | Introduce `Mode` with contribution persistence | GR-006 | done | implemented |
+| GR-008 | Adaptive-path classification swap to `ActionType` | GR-007 | done | implemented |
+| GR-009 | Add ranking primitive (`wilson_score`) + tests | GR-008 | done | implemented |
+| GR-010 | Ontology repository port + in-memory + Surreal impl | GR-008, GR-009 | done | implemented |
+| GR-011 | Ontology API routes + AppState wiring | GR-010 | done | implemented |
+| GR-012 | Worker jobs (`TTLCleanup`, `ConceptVerification`) + periodic producer | GR-010, GR-011 | done | implemented |
+| GR-013 | Split `infra/repositories/mod.rs` monolith | GR-012 | done | implemented |
 
 ---
 
@@ -224,4 +224,3 @@ Use DB script commands only for tickets that touch migrations/checks/scripts.
 - `GR-001` and `GR-002` can run in parallel.
 - `GR-009` can run in parallel with early `GR-010` work once `GR-008` lands.
 - Keep `GR-013` last to reduce merge conflicts.
-

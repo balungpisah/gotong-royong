@@ -83,3 +83,44 @@ pub fn new_job(
         created_at_ms: now,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn backoff_ms_returns_zero_for_zero_attempt() {
+        assert_eq!(backoff_ms(1_000, 0, 60_000), 0);
+    }
+
+    #[test]
+    fn backoff_ms_grows_geometrically() {
+        assert_eq!(backoff_ms(1_000, 1, 60_000), 1_000);
+        assert_eq!(backoff_ms(1_000, 2, 60_000), 2_000);
+        assert_eq!(backoff_ms(1_000, 3, 60_000), 4_000);
+    }
+
+    #[test]
+    fn backoff_ms_caps_at_maximum() {
+        assert_eq!(backoff_ms(1_000, 10, 3_000), 3_000);
+    }
+
+    #[test]
+    fn new_job_populates_payload_and_retries() {
+        let job = new_job(
+            "job-1".to_string(),
+            JobType::WebhookRetry,
+            json!({"event_id":"evt-1"}),
+            "req-1".to_string(),
+            "corr-1".to_string(),
+            JobDefaults { max_attempts: 9 },
+        );
+        assert_eq!(job.job_id, "job-1");
+        assert_eq!(job.attempt, 1);
+        assert_eq!(job.max_attempts, 9);
+        assert!(job.created_at_ms >= 0);
+        assert_eq!(job.created_at_ms, job.run_at_ms);
+        assert_eq!(job.payload, json!({"event_id":"evt-1"}));
+    }
+}

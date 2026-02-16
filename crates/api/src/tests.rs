@@ -56,6 +56,7 @@ fn test_config() -> AppConfig {
         worker_backoff_max_ms: 60000,
         worker_ttl_cleanup_interval_ms: 3_600_000,
         worker_concept_verification_interval_ms: 86_400_000,
+        worker_concept_verification_qids: "Q2095".to_string(),
         webhook_enabled: false,
         webhook_markov_url: "http://127.0.0.1:8080/webhook".to_string(),
         webhook_secret: "dev_webhook_secret_32_chars_minimum".to_string(),
@@ -328,6 +329,445 @@ async fn ontology_feed_validation_rejects_invalid_temporal_privacy_and_confidenc
 }
 
 #[tokio::test]
+async fn ontology_concept_by_qid_returns_not_found_when_unknown() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let request = Request::builder()
+        .method("GET")
+        .uri("/v1/ontology/concepts/Q_NOT_FOUND_999")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn ontology_feed_rejects_has_action_without_predicate() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let payload = json!({
+        "content": "Action edge missing predicate",
+        "community_id": "rt05",
+        "temporal_class": "ephemeral",
+        "ttl_expires_ms": 1_893_456_000_000i64,
+        "triples": [
+            {
+                "edge": "HasAction",
+                "to_id": "concept:Q2095"
+            }
+        ]
+    });
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn ontology_feed_rejects_has_action_with_invalid_predicate() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let payload = json!({
+        "content": "Action edge with wrong predicate",
+        "community_id": "rt05",
+        "temporal_class": "ephemeral",
+        "ttl_expires_ms": 1_893_456_000_000i64,
+        "triples": [
+            {
+                "edge": "HasAction",
+                "to_id": "concept:Q2095",
+                "predicate": "invalid:Action"
+            }
+        ]
+    });
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn ontology_ranking_returns_zero_for_empty_feedback() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let concept = json!({
+        "concept_id": "Q93189",
+        "qid": "Q93189",
+        "label_id": "Telur",
+        "label_en": "Egg",
+        "verified": true
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/concepts")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(concept.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let feed_payload = json!({
+        "content": "Telur masih murah",
+        "community_id": "rt05",
+        "temporal_class": "persistent",
+        "confidence": 0.9
+    });
+    let create_feed_request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(feed_payload.to_string()))
+        .expect("request");
+    let response = app
+        .clone()
+        .oneshot(create_feed_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let feed_response: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let note_id = feed_response
+        .get("note")
+        .and_then(|note| note.get("note_id"))
+        .and_then(|value| value.as_str())
+        .expect("note_id")
+        .to_string();
+
+    let ranked_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/ontology/notes/{note_id}/ranked"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(ranked_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let ranked: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(ranked.get("vouch_count"), Some(&json!(0)));
+    assert_eq!(ranked.get("challenge_count"), Some(&json!(0)));
+    assert_eq!(ranked.get("score"), Some(&json!(0.0)));
+}
+
+#[tokio::test]
+async fn ontology_note_feedback_for_unknown_note_returns_zero_counts() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let note_id = "note-unknown-for-feedback";
+
+    let feedback_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/ontology/notes/{note_id}/feedback"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(feedback_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let feedback: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(feedback.get("note_id"), Some(&json!(note_id)));
+    assert_eq!(feedback.get("vouch_count"), Some(&json!(0)));
+    assert_eq!(feedback.get("challenge_count"), Some(&json!(0)));
+}
+
+#[tokio::test]
+async fn ontology_ranking_for_unknown_note_returns_zero_score() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let note_id = "note-unknown-for-ranking";
+
+    let ranking_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/ontology/notes/{note_id}/ranked"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(ranking_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let ranking: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(ranking.get("note_id"), Some(&json!(note_id)));
+    assert_eq!(ranking.get("vouch_count"), Some(&json!(0)));
+    assert_eq!(ranking.get("challenge_count"), Some(&json!(0)));
+    assert_eq!(ranking.get("score"), Some(&json!(0.0)));
+}
+
+#[tokio::test]
+async fn ontology_feed_rejects_ephemeral_without_ttl() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let payload = json!({
+        "content": "Ephemeral without ttl",
+        "community_id": "rt05",
+        "temporal_class": "ephemeral",
+        "confidence": 0.95
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn ontology_feed_rejects_negative_ttl_expires_ms() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let payload = json!({
+        "content": "Negative ttl",
+        "community_id": "rt05",
+        "temporal_class": "persistent",
+        "ttl_expires_ms": -1,
+        "confidence": 0.95
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn ontology_feed_accepts_explicit_note_id() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "note_id": "note-explicit-007",
+        "content": "Explicit note id flow",
+        "community_id": "rt05",
+        "temporal_class": "persistent",
+        "confidence": 0.98
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let feed_response: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let note_id = feed_response
+        .get("note")
+        .and_then(|note| note.get("note_id"))
+        .and_then(|value| value.as_str())
+        .expect("note_id");
+    assert_eq!(note_id, "note-explicit-007");
+
+    let feedback_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/ontology/notes/{note_id}/feedback"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(feedback_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let feedback: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    assert_eq!(feedback.get("note_id"), Some(&json!(note_id)));
+}
+
+#[tokio::test]
+async fn ontology_feed_accepts_valid_schema_action_predicate() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let concept = json!({
+        "concept_id": "Q2048",
+        "qid": "Q2048",
+        "label_id": "Donasi",
+        "label_en": "Donation",
+        "verified": true
+    });
+    let upsert_request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/concepts")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(concept.to_string()))
+        .expect("request");
+    let upsert_response = app
+        .clone()
+        .oneshot(upsert_request)
+        .await
+        .expect("response");
+    assert_eq!(upsert_response.status(), StatusCode::CREATED);
+
+    let payload = json!({
+        "content": "Valid schema action predicate",
+        "community_id": "rt05",
+        "temporal_class": "persistent",
+        "triples": [
+            {
+                "edge": "HasAction",
+                "to_id": "concept:Q2048",
+                "predicate": "schema:DonateAction"
+            }
+        ]
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn contribution_create_rejects_invalid_mode_payload() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let contribution_request = json!({
+        "mode": "unknown_mode",
+        "contribution_type": "task_completion",
+        "title": "Invalid mode contribution",
+        "description": "Must fail",
+        "skill_ids": ["skill-1"]
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/contributions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(contribution_request.to_string()))
+        .unwrap();
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn contribution_create_rejects_missing_mode() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let contribution_request = json!({
+        "contribution_type": "task_completion",
+        "title": "Missing mode contribution",
+        "description": "Must fail",
+        "skill_ids": ["skill-1"]
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/contributions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(contribution_request.to_string()))
+        .unwrap();
+    let response = app.oneshot(request).await.expect("response");
+    assert!(response.status().is_client_error());
+    assert_ne!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn contribution_create_persists_mode_in_list_response() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let contribution_request = json!({
+        "mode": "siaga",
+        "contribution_type": "task_completion",
+        "title": "Mode persistence check",
+        "description": "Verify mode round-trips",
+        "skill_ids": ["skill-1"],
+        "metadata": {
+            "phase": "siaga_beta"
+        }
+    });
+
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/contributions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "mode-list-1")
+        .body(Body::from(contribution_request.to_string()))
+        .unwrap();
+    let create_response = app
+        .clone()
+        .oneshot(create_request)
+        .await
+        .expect("response");
+    assert_eq!(create_response.status(), StatusCode::CREATED);
+    let create_body = to_bytes(create_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let created: serde_json::Value = serde_json::from_slice(&create_body).expect("json");
+    let contribution_id = created
+        .get("contribution_id")
+        .and_then(|value| value.as_str())
+        .expect("contribution_id")
+        .to_string();
+    assert_eq!(created.get("mode"), Some(&json!("siaga")));
+
+    let list_request = Request::builder()
+        .method("GET")
+        .uri("/v1/contributions?author_id=user-123")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let list_response = app
+        .clone()
+        .oneshot(list_request)
+        .await
+        .expect("response");
+    assert_eq!(list_response.status(), StatusCode::OK);
+    let list_body = to_bytes(list_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let contributions: serde_json::Value = serde_json::from_slice(&list_body).expect("json");
+    let contribution = contributions
+        .as_array()
+        .expect("array")
+        .iter()
+        .find(|item| item.get("contribution_id") == Some(&json!(contribution_id)))
+        .expect("created contribution");
+    assert_eq!(contribution.get("mode"), Some(&json!("siaga")));
+}
+
+#[tokio::test]
 async fn contribution_evidence_vouch_flow() {
     let app = test_app();
     let token = test_token("test-secret");
@@ -462,6 +902,108 @@ async fn contribution_evidence_vouch_flow() {
         .unwrap();
     let response = app.oneshot(vouch_list_request).await.expect("response");
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn vouch_submit_is_idempotent_with_request_id() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let vouch_request = json!({
+        "vouchee_id": "user-456",
+        "message": "Great contribution",
+        "skill_id": "skill-1"
+    });
+    let first_request = Request::builder()
+        .method("POST")
+        .uri("/v1/vouches")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "vouch-idempotency-1")
+        .body(Body::from(vouch_request.to_string()))
+        .unwrap();
+    let first_response = app
+        .clone()
+        .oneshot(first_request)
+        .await
+        .expect("response");
+    assert_eq!(first_response.status(), StatusCode::CREATED);
+    let first_body = to_bytes(first_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+
+    let second_request = Request::builder()
+        .method("POST")
+        .uri("/v1/vouches")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "vouch-idempotency-1")
+        .body(Body::from(vouch_request.to_string()))
+        .unwrap();
+    let second_response = app
+        .clone()
+        .oneshot(second_request)
+        .await
+        .expect("response");
+    assert_eq!(second_response.status(), StatusCode::CREATED);
+    let second_body = to_bytes(second_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    assert_eq!(first_body, second_body);
+}
+
+#[tokio::test]
+async fn adaptive_path_create_rejects_invalid_action_type() {
+    let app = test_app();
+    let token = test_token_with_identity("test-secret", "admin", "admin-action-invalid");
+
+    let create_payload = json!({
+        "entity_id": "case-adaptive-invalid",
+        "payload": {
+            "title": "Invalid adaptive plan",
+            "summary": "Should fail",
+            "action_type": "schema:UnknownAction",
+            "branches": [
+                {
+                    "branch_id": "main",
+                    "label": "Utama",
+                    "parent_checkpoint_id": null,
+                    "order": 0,
+                    "phases": [
+                        {
+                            "phase_id": "phase-1",
+                            "title": "Analisis",
+                            "objective": "Kumpulkan konteks",
+                            "status": "active",
+                            "order": 0,
+                            "source": "ai",
+                            "checkpoints": [
+                                {
+                                    "checkpoint_id": "checkpoint-1",
+                                    "title": "Validasi data",
+                                    "status": "open",
+                                    "order": 0,
+                                    "source": "ai"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/adaptive-path/plans")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "adaptive-invalid-action-1")
+        .header("x-correlation-id", "adaptive-invalid-action-corr-1")
+        .body(Body::from(create_payload.to_string()))
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert!(response.status().is_client_error());
+    assert_ne!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]
@@ -705,6 +1247,106 @@ async fn adaptive_path_plan_flow_works() {
     let suggestions: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
     assert_eq!(suggestions.len(), 1);
     assert_eq!(suggestions[0].get("status"), Some(&json!("accepted")));
+}
+
+#[tokio::test]
+async fn adaptive_path_plan_by_entity_returns_latest_plan() {
+    let app = test_app();
+    let token = test_token_with_identity("test-secret", "admin", "admin-entity");
+
+    let create_payload = json!({
+        "entity_id": "entity-lookup-1",
+        "payload": {
+            "title": "Rencana awal",
+            "summary": "Ringkas",
+            "action_type": "schema:InformAction",
+            "branches": [
+                {
+                    "branch_id": "main",
+                    "label": "Utama",
+                    "parent_checkpoint_id": null,
+                    "order": 0,
+                    "phases": [
+                        {
+                            "phase_id": "phase-1",
+                            "title": "Analisis",
+                            "objective": "Kumpulkan konteks",
+                            "status": "active",
+                            "order": 0,
+                            "source": "ai",
+                            "checkpoints": [
+                                {
+                                    "checkpoint_id": "checkpoint-1",
+                                    "title": "Validasi data",
+                                    "status": "open",
+                                    "order": 0,
+                                    "source": "ai"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    });
+
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/adaptive-path/plans")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "adaptive-entity-create-1")
+        .body(Body::from(create_payload.to_string()))
+        .expect("request");
+    let create_response = app
+        .clone()
+        .oneshot(create_request)
+        .await
+        .expect("response");
+    assert_eq!(create_response.status(), StatusCode::CREATED);
+    let create_body = to_bytes(create_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let created_plan: serde_json::Value = serde_json::from_slice(&create_body).expect("json");
+    let created_plan_id = created_plan
+        .get("plan_id")
+        .and_then(|value| value.as_str())
+        .expect("plan_id")
+        .to_string();
+
+    let by_entity_request = Request::builder()
+        .method("GET")
+        .uri("/v1/adaptive-path/entities/entity-lookup-1/plan")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let by_entity_response = app.clone().oneshot(by_entity_request).await.expect("response");
+    assert_eq!(by_entity_response.status(), StatusCode::OK);
+    let by_entity_body = to_bytes(by_entity_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let by_entity_plan: serde_json::Value = serde_json::from_slice(&by_entity_body).expect("json");
+    let by_entity_plan_id = by_entity_plan
+        .get("plan_id")
+        .and_then(|value| value.as_str())
+        .expect("plan_id");
+    assert_eq!(by_entity_plan_id, created_plan_id);
+    assert_eq!(by_entity_plan.get("version"), Some(&json!(1)));
+}
+
+#[tokio::test]
+async fn adaptive_path_plan_by_entity_returns_not_found_when_unknown() {
+    let app = test_app();
+    let token = test_token_with_identity("test-secret", "admin", "admin-lookup-miss");
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/v1/adaptive-path/entities/unknown-entity-404/plan")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]

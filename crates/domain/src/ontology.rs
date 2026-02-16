@@ -108,3 +108,25 @@ pub struct NoteFeedbackCounts {
     pub vouch_count: usize,
     pub challenge_count: usize,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn action_type_roundtrips_known_values() {
+        let encoded = r#""schema:InformAction""#;
+        let parsed: ActionType =
+            serde_json::from_str(encoded).expect("parse known action type");
+        assert_eq!(parsed, ActionType::InformAction);
+        let encoded_back = serde_json::to_string(&parsed).expect("serialize action type");
+        assert_eq!(encoded_back, encoded);
+        assert_eq!(parsed.as_str(), "schema:InformAction");
+    }
+
+    #[test]
+    fn action_type_rejects_unknown_schema_value() {
+        let parsed = serde_json::from_str::<ActionType>(r#""schema:UnknownAction""#);
+        assert!(parsed.is_err());
+    }
+}

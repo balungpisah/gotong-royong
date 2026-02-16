@@ -1690,6 +1690,60 @@ impl OntologyRepository for InMemoryOntologyRepository {
             })
         })
     }
+
+    fn cleanup_expired_notes(
+        &self,
+        cutoff_ms: i64,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<usize>> {
+        let notes = self.notes.clone();
+        let triples = self.triples.clone();
+        Box::pin(async move {
+            if cutoff_ms < 0 {
+                return Err(DomainError::Validation(
+                    "cleanup cutoff_ms must be non-negative".to_string(),
+                ));
+            }
+
+            let mut expired_notes = Vec::new();
+            {
+                let mut notes = notes.write().await;
+                let mut keys = Vec::new();
+                for (key, note) in notes.iter() {
+                    if note
+                        .ttl_expires_ms
+                        .is_some_and(|value| value <= cutoff_ms)
+                    {
+                        expired_notes.push(note.note_id.clone());
+                        keys.push(key.clone());
+                    }
+                }
+                for key in keys {
+                    notes.remove(&key);
+                }
+            }
+
+            if expired_notes.is_empty() {
+                return Ok(0);
+            }
+
+            let mut normalized_expired = Vec::with_capacity(expired_notes.len() * 2);
+            for raw in &expired_notes {
+                let id = Self::id_part(raw);
+                normalized_expired.push(id.clone());
+                normalized_expired.push(format!("note:{id}"));
+            }
+
+            let mut triples = triples.write().await;
+            let before = triples.len();
+            triples.retain(|triple| {
+                !normalized_expired.iter().any(|candidate| {
+                    triple.from_id == *candidate || triple.to_id == *candidate
+                })
+            });
+            let _removed_triples = before.saturating_sub(triples.len());
+            Ok(expired_notes.len())
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -2055,6 +2109,92 @@ impl OntologyRepository for SurrealOntologyRepository {
             })
         })
     }
+
+    fn cleanup_expired_notes(
+        &self,
+        cutoff_ms: i64,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<usize>> {
+        let client = self.client.clone();
+        Box::pin(async move {
+            if cutoff_ms < 0 {
+                return Err(DomainError::Validation(
+                    "cleanup cutoff_ms must be non-negative".to_string(),
+                ));
+            }
+
+            let cutoff = Self::to_rfc3339(cutoff_ms)?;
+            let expired_rows: Vec<Value> = client
+                .query(
+                    "SELECT VALUE id FROM note WHERE ttl_expires IS NOT NONE AND ttl_expires < $cutoff",
+                )
+                .bind(("cutoff", cutoff))
+                .await
+                .map_err(Self::map_surreal_error)?
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let expired_note_ids: Vec<String> = expired_rows
+                .into_iter()
+                .filter_map(|value| {
+                    value
+                        .as_str()
+                        .map(ToString::to_string)
+                        .or_else(|| {
+                            value
+                                .get("id")
+                                .and_then(Value::as_str)
+                                .map(ToString::to_string)
+                        })
+                })
+                .collect();
+            if expired_note_ids.is_empty() {
+                return Ok(0);
+            }
+
+            for raw_note_id in &expired_note_ids {
+                let note_id = Self::normalize_id_part(raw_note_id);
+                let _deleted_note_rows: Vec<Value> = client
+                    .query("DELETE note WHERE id = type::thing('note', $note_id)")
+                    .bind(("note_id", note_id.clone()))
+                    .await
+                    .map_err(Self::map_surreal_error)?
+                    .take(0)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid query result: {err}"))
+                    })?;
+
+                for edge in [
+                    "ABOUT",
+                    "LOCATED_AT",
+                    "HAS_ACTION",
+                    "INSTANCE_OF",
+                    "VOUCHES",
+                    "CHALLENGES",
+                ] {
+                    client
+                        .query(format!(
+                            "DELETE {edge} WHERE in = type::thing('note', $note_id) OR out = type::thing('note', $note_id)"
+                        ))
+                        .bind(("note_id", note_id.clone()))
+                        .await
+                        .map_err(Self::map_surreal_error)?
+                        .take::<Vec<Value>>(0)
+                        .map_err(|err| {
+                            DomainError::Validation(format!("invalid query result: {err}"))
+                        })?;
+                }
+
+                let _deleted_measurement_rows: Vec<Value> = client
+                    .query("DELETE measurement WHERE note = type::thing('note', $note_id)")
+                    .bind(("note_id", note_id))
+                    .await
+                    .map_err(Self::map_surreal_error)?
+                    .take(0)
+                    .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            }
+
+            Ok(expired_note_ids.len())
+        })
+    }
 }
 
 #[cfg(test)]
@@ -2151,6 +2291,106 @@ mod ontology_repository_tests {
             .expect("feedback counts");
         assert_eq!(counts.vouch_count, 1);
         assert_eq!(counts.challenge_count, 1);
+    }
+
+    #[tokio::test]
+    async fn in_memory_ontology_repository_cleanup_expired_notes_removes_notes_and_edges() {
+        let repo = InMemoryOntologyRepository::new();
+        let now = gotong_domain::jobs::now_ms();
+
+        let concept = repo
+            .upsert_concept(&OntologyConcept {
+                concept_id: "Q93189".to_string(),
+                qid: "Q93189".to_string(),
+                label_id: Some("Telur".to_string()),
+                label_en: Some("Egg".to_string()),
+                verified: true,
+            })
+            .await
+            .expect("upsert concept");
+
+        let expired_note = repo
+            .create_note(&OntologyNoteCreate {
+                note_id: Some("expired-note".to_string()),
+                content: "expired".to_string(),
+                author_id: "warga-expired".to_string(),
+                community_id: "rt05".to_string(),
+                temporal_class: "ephemeral".to_string(),
+                ttl_expires_ms: Some(now - 1),
+                ai_readable: true,
+                rahasia_level: 0,
+                confidence: 0.82,
+            })
+            .await
+            .expect("create expired note");
+
+        let active_note = repo
+            .create_note(&OntologyNoteCreate {
+                note_id: Some("active-note".to_string()),
+                content: "active".to_string(),
+                author_id: "warga-active".to_string(),
+                community_id: "rt05".to_string(),
+                temporal_class: "ephemeral".to_string(),
+                ttl_expires_ms: Some(now + 60_000),
+                ai_readable: true,
+                rahasia_level: 0,
+                confidence: 0.85,
+            })
+            .await
+            .expect("create active note");
+
+        repo.write_triples(&[
+            OntologyTripleCreate {
+                edge: OntologyEdgeKind::About,
+                from_id: format!("note:{}", expired_note.note_id),
+                to_id: format!("concept:{}", concept.qid),
+                predicate: None,
+                metadata: None,
+            },
+            OntologyTripleCreate {
+                edge: OntologyEdgeKind::About,
+                from_id: format!("note:{}", active_note.note_id),
+                to_id: format!("concept:{}", concept.qid),
+                predicate: None,
+                metadata: None,
+            },
+            OntologyTripleCreate {
+                edge: OntologyEdgeKind::Vouches,
+                from_id: "warga:alpha".to_string(),
+                to_id: format!("note:{}", expired_note.note_id),
+                predicate: None,
+                metadata: None,
+            },
+            OntologyTripleCreate {
+                edge: OntologyEdgeKind::Challenges,
+                from_id: "warga:beta".to_string(),
+                to_id: format!("note:{}", active_note.note_id),
+                predicate: None,
+                metadata: None,
+            },
+        ])
+        .await
+        .expect("write triples");
+
+        let removed = repo
+            .cleanup_expired_notes(now)
+            .await
+            .expect("cleanup expired notes");
+        assert_eq!(removed, 1);
+
+        let expired_feedback = repo
+            .note_feedback_counts(&expired_note.note_id)
+            .await
+            .expect("expired feedback");
+        assert_eq!(expired_feedback.vouch_count, 0);
+        assert_eq!(expired_feedback.challenge_count, 0);
+
+        let active_feedback = repo
+            .note_feedback_counts(&active_note.note_id)
+            .await
+            .expect("active feedback");
+        assert_eq!(active_feedback.vouch_count, 0);
+        assert_eq!(active_feedback.challenge_count, 1);
     }
 }
 

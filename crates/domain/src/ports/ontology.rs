@@ -33,4 +33,9 @@ pub trait OntologyRepository: Send + Sync {
         &self,
         note_id: &str,
     ) -> BoxFuture<'_, DomainResult<NoteFeedbackCounts>>;
+
+    fn cleanup_expired_notes(
+        &self,
+        cutoff_ms: i64,
+    ) -> BoxFuture<'_, DomainResult<usize>>;
 }

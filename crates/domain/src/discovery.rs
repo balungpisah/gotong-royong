@@ -16,13 +16,11 @@ const MAX_SEARCH_FETCH_LIMIT: usize = 1_024;
 const ONE_WEEK_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
 pub const FEED_SOURCE_CONTRIBUTION: &str = "contribution";
-pub const FEED_SOURCE_TRANSITION: &str = "transition";
 pub const FEED_SOURCE_VAULT: &str = "vault";
 pub const FEED_SOURCE_SIAGA: &str = "siaga";
 pub const FEED_SOURCE_MODERATION: &str = "moderation";
 pub const FEED_SOURCE_VOUCH: &str = "vouch";
 
-pub const NOTIF_TYPE_TRANSITION: &str = "transition";
 pub const NOTIF_TYPE_VOUCH: &str = "vouch";
 pub const NOTIF_TYPE_VAULT: &str = "vault";
 pub const NOTIF_TYPE_SIAGA: &str = "siaga";
@@ -800,7 +798,7 @@ mod tests {
             SearchResult {
                 item: FeedItem {
                     feed_id: "a".into(),
-                    source_type: FEED_SOURCE_TRANSITION.into(),
+                    source_type: FEED_SOURCE_CONTRIBUTION.into(),
                     source_id: "s1".into(),
                     actor_id: "a1".into(),
                     actor_username: "a".into(),
@@ -820,7 +818,7 @@ mod tests {
             SearchResult {
                 item: FeedItem {
                     feed_id: "b".into(),
-                    source_type: FEED_SOURCE_TRANSITION.into(),
+                    source_type: FEED_SOURCE_CONTRIBUTION.into(),
                     source_id: "s2".into(),
                     actor_id: "a1".into(),
                     actor_username: "a".into(),

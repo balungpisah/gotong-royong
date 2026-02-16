@@ -625,6 +625,7 @@ mod tests {
             worker_backoff_max_ms: 60000,
             worker_ttl_cleanup_interval_ms: 3_600_000,
             worker_concept_verification_interval_ms: 86_400_000,
+            worker_concept_verification_qids: "Q2095".to_string(),
             webhook_enabled: false,
             webhook_markov_url: "http://127.0.0.1:5000/webhook".to_string(),
             webhook_secret: "test-webhook-secret-32-chars-minimum".to_string(),

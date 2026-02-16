@@ -76,8 +76,8 @@ impl IdempotencyService {
     }
 }
 
-pub fn timer_request_id(transition_id: &str, closes_at: i64) -> String {
-    format!("timer:{transition_id}:{closes_at}")
+pub fn timer_request_id(entity_id: &str, closes_at: i64) -> String {
+    format!("timer:{entity_id}:{closes_at}")
 }
 
 pub fn job_request_id(job_name: &str, entity_id: &str, scheduled_at: &str) -> String {

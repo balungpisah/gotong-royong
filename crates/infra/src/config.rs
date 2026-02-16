@@ -27,6 +27,7 @@ pub struct AppConfig {
     pub worker_backoff_max_ms: u64,
     pub worker_ttl_cleanup_interval_ms: u64,
     pub worker_concept_verification_interval_ms: u64,
+    pub worker_concept_verification_qids: String,
     pub webhook_enabled: bool,
     pub webhook_markov_url: String,
     pub webhook_secret: String,
@@ -62,6 +63,7 @@ impl AppConfig {
             .set_default("worker_backoff_max_ms", 60000)?
             .set_default("worker_ttl_cleanup_interval_ms", 3_600_000)?
             .set_default("worker_concept_verification_interval_ms", 86_400_000)?
+            .set_default("worker_concept_verification_qids", "Q2095")?
             .set_default("webhook_enabled", false)?
             .set_default(
                 "webhook_markov_url",

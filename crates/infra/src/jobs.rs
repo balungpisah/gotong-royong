@@ -56,6 +56,64 @@ impl RedisJobQueue {
         serde_json::from_str(payload).map_err(|err| JobQueueError::Serialization(err.to_string()))
     }
 
+    pub async fn enqueue_if_absent(
+        &self,
+        job: &JobEnvelope,
+        dedupe_ttl_ms: u64,
+    ) -> Result<bool, JobQueueError> {
+        let payload = Self::serialize(job)?;
+        let payload_key = self.payload_key.clone();
+        let ready_key = self.ready_key.clone();
+        let delayed_key = self.delayed_key.clone();
+        let dedupe_key = format!("{}:dedupe:{job_id}", self.payload_key, job_id = job.job_id);
+        let run_at_ms = job.run_at_ms;
+        let job_id = job.job_id.clone();
+        let now_ms = gotong_domain::jobs::now_ms();
+        let dedupe_ttl_ms = dedupe_ttl_ms.max(1);
+
+        let mut conn = self.manager.clone();
+        let script = redis::Script::new(
+            r#"
+                local marker_key = KEYS[4]
+                local payload_key = KEYS[1]
+                local ready_key = KEYS[2]
+                local delayed_key = KEYS[3]
+                local job_id = ARGV[1]
+                local payload = ARGV[2]
+                local run_at_ms = tonumber(ARGV[3])
+                local now_ms = tonumber(ARGV[4])
+                local dedupe_ttl_ms = tonumber(ARGV[5])
+
+                if redis.call('SET', marker_key, 1, 'PX', dedupe_ttl_ms, 'NX') == false then
+                    return 0
+                end
+
+                redis.call('HSET', payload_key, job_id, payload)
+                if run_at_ms <= now_ms then
+                    redis.call('RPUSH', ready_key, job_id)
+                else
+                    redis.call('ZADD', delayed_key, run_at_ms, job_id)
+                end
+                return 1
+            "#,
+        );
+        let inserted: i32 = script
+            .key(&payload_key)
+            .key(&ready_key)
+            .key(&delayed_key)
+            .key(&dedupe_key)
+            .arg(&job_id)
+            .arg(payload)
+            .arg(run_at_ms)
+            .arg(now_ms)
+            .arg(dedupe_ttl_ms as i64)
+            .invoke_async(&mut conn)
+            .await
+            .map_err(|err| JobQueueError::Operation(err.to_string()))?;
+
+        Ok(inserted == 1)
+    }
+
     pub async fn restore_processing_with_retry_delay(
         &self,
         job: &JobEnvelope,

@@ -28,7 +28,7 @@ use gotong_infra::{
 use hmac::{Hmac, Mac};
 use serde_json::json;
 use sha2::Sha256;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -257,6 +257,7 @@ impl Worker {
                 now,
                 1,
                 "ttl_cleanup",
+                ttl_interval_ms,
             )
             .await;
             *next_ttl_cleanup_at_ms = slot_start_ms + ttl_interval_ms as i64;
@@ -268,20 +269,31 @@ impl Worker {
             .max(60_000);
         if now >= *next_concept_verification_at_ms {
             let slot_start_ms = periodic_slot_start_ms(now, concept_interval_ms);
-            let job_id = format!("system:concept_verification:{slot_start_ms}");
-            let payload = ConceptVerificationPayload {
-                qid: "Q2095".to_string(),
-                scheduled_ms: now,
-            };
-            self.enqueue_periodic_job(
-                JobType::ConceptVerification,
-                job_id,
-                json!(payload),
-                now,
-                1,
-                "concept_verification",
-            )
-            .await;
+            let qids = concept_verification_qids(&self.config.worker_concept_verification_qids);
+            if qids.is_empty() {
+                warn!(
+                    concept_verification_qids = %self.config.worker_concept_verification_qids,
+                    "skipping periodic concept verification: no qids configured"
+                );
+            } else {
+                for qid in qids {
+                    let job_id = format!("system:concept_verification:{slot_start_ms}:{qid}");
+                    let payload = ConceptVerificationPayload {
+                        qid,
+                        scheduled_ms: now,
+                    };
+                    self.enqueue_periodic_job(
+                        JobType::ConceptVerification,
+                        job_id,
+                        json!(payload),
+                        now,
+                        1,
+                        "concept_verification",
+                        concept_interval_ms,
+                    )
+                    .await;
+                }
+            }
             *next_concept_verification_at_ms = slot_start_ms + concept_interval_ms as i64;
         }
     }
@@ -294,6 +306,7 @@ impl Worker {
         now: i64,
         max_attempts: u32,
         job_type_label: &str,
+        dedupe_window_ms: u64,
     ) {
         let envelope = JobEnvelope {
             job_id: job_id.clone(),
@@ -307,9 +320,20 @@ impl Worker {
             created_at_ms: now,
         };
 
-        match self.queue.enqueue(&envelope).await {
-            Ok(()) => {
+        match self
+            .queue
+            .enqueue_if_absent(&envelope, dedupe_window_ms)
+            .await
+        {
+            Ok(true) => {
                 info!(job_id = %job_id, job_type = %job_type_label, "enqueued periodic job");
+            }
+            Ok(false) => {
+                debug!(
+                    job_id = %job_id,
+                    job_type = %job_type_label,
+                    "skipping duplicate periodic job enqueue"
+                );
             }
             Err(err) => {
                 warn!(
@@ -451,6 +475,14 @@ fn periodic_slot_start_ms(now: i64, interval_ms: u64) -> i64 {
     now - now.rem_euclid(interval)
 }
 
+fn concept_verification_qids(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
 fn parse_moderation_auto_release_payload(
     job: &JobEnvelope,
 ) -> anyhow::Result<gotong_domain::jobs::ModerationAutoReleasePayload> {
@@ -527,14 +559,14 @@ async fn handle_ttl_cleanup(
         return Ok(());
     };
 
-    let probe_note_id = format!("ttl_cleanup_probe_{}", payload.cutoff_ms);
-    let _ = repo
-        .note_feedback_counts(&probe_note_id)
+    let removed = repo
+        .cleanup_expired_notes(payload.cutoff_ms)
         .await
-        .map_err(|err| anyhow::anyhow!("ttl cleanup ontology probe failed: {err}"))?;
+        .map_err(|err| anyhow::anyhow!("ttl cleanup ontology cleanup failed: {err}"))?;
     info!(
         job_id = %job.job_id,
         cutoff_ms = payload.cutoff_ms,
+        removed,
         "handled ttl cleanup job"
     );
     Ok(())
@@ -559,7 +591,11 @@ async fn handle_concept_verification(
         .map_err(|err| anyhow::anyhow!("failed to fetch concept by qid: {err}"))?;
     let concept = if let Some(mut concept) = current {
         concept.verified = true;
-        if concept.concept_id.trim().is_empty() {
+        let concept_id_missing = match concept.concept_id.split_once(':') {
+            Some((_, id_part)) => id_part.trim().is_empty(),
+            None => concept.concept_id.trim().is_empty(),
+        };
+        if concept_id_missing {
             concept.concept_id = concept.qid.clone();
         }
         concept
@@ -822,4 +858,387 @@ fn webhook_signature(secret: &str, payload: &[u8]) -> anyhow::Result<String> {
 fn hash_sha256_hex(payload: &[u8]) -> String {
     use sha2::Digest;
     hex::encode(Sha256::digest(payload))
+}
+
+#[cfg(test)]
+mod periodic_job_tests {
+    use super::*;
+
+    use gotong_domain::ontology::{OntologyConcept, OntologyEdgeKind, OntologyNoteCreate, OntologyTripleCreate};
+    use gotong_infra::repositories::InMemoryOntologyRepository;
+
+    fn moderation_auto_release_job(payload: serde_json::Value) -> JobEnvelope {
+        JobEnvelope {
+            job_id: "job-1".to_string(),
+            job_type: JobType::ModerationAutoRelease,
+            payload,
+            request_id: "req-1".to_string(),
+            correlation_id: "corr-1".to_string(),
+            attempt: 1,
+            max_attempts: 1,
+            run_at_ms: 1,
+            created_at_ms: 1,
+        }
+    }
+
+    fn ttl_cleanup_job(payload: serde_json::Value) -> JobEnvelope {
+        JobEnvelope {
+            job_id: "job-1".to_string(),
+            job_type: JobType::TTLCleanup,
+            payload,
+            request_id: "req-1".to_string(),
+            correlation_id: "corr-1".to_string(),
+            attempt: 1,
+            max_attempts: 1,
+            run_at_ms: 1,
+            created_at_ms: 1,
+        }
+    }
+
+    fn concept_verification_job(payload: serde_json::Value) -> JobEnvelope {
+        JobEnvelope {
+            job_id: "job-1".to_string(),
+            job_type: JobType::ConceptVerification,
+            payload,
+            request_id: "req-1".to_string(),
+            correlation_id: "corr-1".to_string(),
+            attempt: 1,
+            max_attempts: 1,
+            run_at_ms: 1,
+            created_at_ms: 1,
+        }
+    }
+
+    #[test]
+    fn periodic_slot_start_ms_rounds_down_to_interval_boundary() {
+        assert_eq!(periodic_slot_start_ms(12_345, 1_000), 12_000);
+    }
+
+    #[test]
+    fn periodic_slot_start_ms_zero_interval_passthrough() {
+        assert_eq!(periodic_slot_start_ms(12_345, 0), 12_345);
+    }
+
+    #[test]
+    fn concept_verification_qids_trims_and_filters() {
+        let qids = concept_verification_qids("Q2095,  Q93189 , ,Q5,");
+        assert_eq!(qids, vec!["Q2095", "Q93189", "Q5"]);
+    }
+
+    #[test]
+    fn parse_ttl_cleanup_payload_rejects_negative_cutoff() {
+        let payload = serde_json::json!({
+            "scheduled_ms": 1_000,
+            "cutoff_ms": -1
+        });
+        let job = ttl_cleanup_job(payload);
+        assert!(parse_ttl_cleanup_payload(&job).is_err());
+    }
+
+    #[test]
+    fn parse_ttl_cleanup_payload_accepts_valid_payload() {
+        let payload = serde_json::json!({
+            "scheduled_ms": 1_000,
+            "cutoff_ms": 2_000
+        });
+        let job = ttl_cleanup_job(payload);
+        let parsed = parse_ttl_cleanup_payload(&job).expect("valid ttl cleanup payload");
+        assert_eq!(parsed.scheduled_ms, 1_000);
+        assert_eq!(parsed.cutoff_ms, 2_000);
+    }
+
+    #[test]
+    fn parse_ttl_cleanup_payload_rejects_missing_required_fields() {
+        let job = ttl_cleanup_job(serde_json::json!({
+            "scheduled_ms": 1_000
+        }));
+        assert!(parse_ttl_cleanup_payload(&job).is_err());
+    }
+
+    #[test]
+    fn parse_ttl_cleanup_payload_rejects_missing_payload() {
+        let job = ttl_cleanup_job(serde_json::json!({}));
+        assert!(parse_ttl_cleanup_payload(&job).is_err());
+    }
+
+    #[test]
+    fn parse_ttl_cleanup_payload_rejects_negative_scheduled_ms() {
+        let payload = serde_json::json!({
+            "scheduled_ms": -1,
+            "cutoff_ms": 1_000,
+        });
+        let job = ttl_cleanup_job(payload);
+        assert!(parse_ttl_cleanup_payload(&job).is_err());
+    }
+
+    #[test]
+    fn parse_concept_verification_payload_requires_qid() {
+        let payload = serde_json::json!({
+            "qid": " ",
+            "scheduled_ms": 1_000
+        });
+        let mut job = ttl_cleanup_job(payload);
+        job.job_type = JobType::ConceptVerification;
+        assert!(parse_concept_verification_payload(&job).is_err());
+    }
+
+    #[test]
+    fn parse_concept_verification_payload_rejects_missing_payload() {
+        let mut job = ttl_cleanup_job(serde_json::json!({}));
+        job.job_type = JobType::ConceptVerification;
+        assert!(parse_concept_verification_payload(&job).is_err());
+    }
+
+    #[test]
+    fn parse_concept_verification_payload_rejects_negative_scheduled_ms() {
+        let payload = serde_json::json!({
+            "qid": "Q123",
+            "scheduled_ms": -1,
+        });
+        let job = concept_verification_job(payload);
+        assert!(parse_concept_verification_payload(&job).is_err());
+    }
+
+    #[test]
+    fn parse_concept_verification_payload_accepts_valid_payload() {
+        let payload = serde_json::json!({
+            "qid": "Q2095",
+            "scheduled_ms": 1_000
+        });
+        let job = concept_verification_job(payload);
+        let parsed = parse_concept_verification_payload(&job)
+            .expect("valid concept verification payload");
+        assert_eq!(parsed.qid, "Q2095");
+        assert_eq!(parsed.scheduled_ms, 1_000);
+    }
+
+    #[test]
+    fn parse_webhook_retry_payload_rejects_missing_event_id() {
+        let payload = serde_json::json!({});
+        let job = JobEnvelope {
+            job_id: "job-1".to_string(),
+            job_type: JobType::WebhookRetry,
+            payload,
+            request_id: "req-1".to_string(),
+            correlation_id: "corr-1".to_string(),
+            attempt: 1,
+            max_attempts: 1,
+            run_at_ms: 1,
+            created_at_ms: 1,
+        };
+        assert!(parse_webhook_retry_payload(&job).is_err());
+    }
+
+    #[tokio::test]
+    async fn handle_ttl_cleanup_removes_expired_notes_and_edges() {
+        let repo: Arc<dyn OntologyRepository> = Arc::new(InMemoryOntologyRepository::new());
+        let now = gotong_domain::jobs::now_ms();
+
+        repo
+            .upsert_concept(&OntologyConcept {
+                concept_id: "Q93189".to_string(),
+                qid: "Q93189".to_string(),
+                label_id: Some("Telur".to_string()),
+                label_en: Some("Egg".to_string()),
+                verified: true,
+            })
+            .await
+            .expect("upsert concept");
+
+        let expired = repo
+            .create_note(&OntologyNoteCreate {
+                note_id: Some("note-expired".to_string()),
+                content: "expired note".to_string(),
+                author_id: "author-1".to_string(),
+                community_id: "rt-1".to_string(),
+                temporal_class: "ephemeral".to_string(),
+                ttl_expires_ms: Some(now - 1),
+                ai_readable: true,
+                rahasia_level: 0,
+                confidence: 0.9,
+            })
+            .await
+            .expect("create expired note");
+
+        let active = repo
+            .create_note(&OntologyNoteCreate {
+                note_id: Some("note-active".to_string()),
+                content: "active note".to_string(),
+                author_id: "author-2".to_string(),
+                community_id: "rt-1".to_string(),
+                temporal_class: "ephemeral".to_string(),
+                ttl_expires_ms: Some(now + 60_000),
+                ai_readable: true,
+                rahasia_level: 0,
+                confidence: 0.9,
+            })
+            .await
+            .expect("create active note");
+
+        repo.write_triples(&[
+            OntologyTripleCreate {
+                edge: OntologyEdgeKind::About,
+                from_id: format!("note:{}", expired.note_id),
+                to_id: "concept:Q93189".to_string(),
+                predicate: Some("schema:price".to_string()),
+                metadata: None,
+            },
+            OntologyTripleCreate {
+                edge: OntologyEdgeKind::Vouches,
+                from_id: "warga:user-1".to_string(),
+                to_id: format!("note:{}", expired.note_id),
+                predicate: None,
+                metadata: Some(serde_json::json!({"reason": "expired"})),
+            },
+            OntologyTripleCreate {
+                edge: OntologyEdgeKind::Challenges,
+                from_id: "warga:user-2".to_string(),
+                to_id: format!("note:{}", active.note_id),
+                predicate: None,
+                metadata: Some(serde_json::json!({"reason": "active"})),
+            },
+        ])
+        .await
+        .expect("write triples");
+
+        let job = ttl_cleanup_job(serde_json::json!({
+            "scheduled_ms": now,
+            "cutoff_ms": now,
+        }));
+
+        handle_ttl_cleanup(Some(&repo), &job)
+            .await
+            .expect("handle ttl cleanup");
+
+        let expired_feedback = repo
+            .note_feedback_counts(&expired.note_id)
+            .await
+            .expect("expired feedback counts");
+        assert_eq!(expired_feedback.vouch_count, 0);
+        assert_eq!(expired_feedback.challenge_count, 0);
+
+        let active_feedback = repo
+            .note_feedback_counts(&active.note_id)
+            .await
+            .expect("active feedback counts");
+        assert_eq!(active_feedback.challenge_count, 1);
+    }
+
+    #[tokio::test]
+    async fn handle_ttl_cleanup_without_repo_is_noop() {
+        let job = ttl_cleanup_job(serde_json::json!({
+            "scheduled_ms": 1_000,
+            "cutoff_ms": 1_000,
+        }));
+        assert!(handle_ttl_cleanup(None, &job).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn handle_concept_verification_updates_and_creates_concepts() {
+        let repo: Arc<dyn OntologyRepository> = Arc::new(InMemoryOntologyRepository::new());
+        let existing = repo
+            .upsert_concept(&OntologyConcept {
+                concept_id: "Q111".to_string(),
+                qid: "Q111".to_string(),
+                label_id: Some("Existing".to_string()),
+                label_en: Some("Existing".to_string()),
+                verified: false,
+            })
+            .await
+            .expect("upsert concept");
+
+        let update_job = concept_verification_job(serde_json::json!({
+            "qid": "Q111",
+            "scheduled_ms": 1_000,
+        }));
+        handle_concept_verification(Some(&repo), &update_job)
+            .await
+            .expect("update existing concept");
+
+        let updated = repo
+            .get_concept_by_qid(&existing.qid)
+            .await
+            .expect("get updated concept")
+            .expect("concept exists");
+        assert!(updated.verified);
+
+        let create_job = concept_verification_job(serde_json::json!({
+            "qid": "Q222",
+            "scheduled_ms": 1_000,
+        }));
+        handle_concept_verification(Some(&repo), &create_job)
+            .await
+            .expect("create missing concept");
+
+        let created = repo
+            .get_concept_by_qid("Q222")
+            .await
+            .expect("get created concept")
+            .expect("concept exists");
+        assert!(created.concept_id.ends_with("Q222"));
+        assert!(created.verified);
+    }
+
+    #[tokio::test]
+    async fn handle_concept_verification_fills_empty_concept_id() {
+        let repo: Arc<dyn OntologyRepository> = Arc::new(InMemoryOntologyRepository::new());
+        repo
+            .upsert_concept(&OntologyConcept {
+                concept_id: "".to_string(),
+                qid: "Q_MISSING_ID".to_string(),
+                label_id: None,
+                label_en: None,
+                verified: false,
+            })
+            .await
+            .expect("upsert concept");
+
+        let job = concept_verification_job(serde_json::json!({
+            "qid": "Q_MISSING_ID",
+            "scheduled_ms": 1_000,
+        }));
+        handle_concept_verification(Some(&repo), &job)
+            .await
+            .expect("verify concept");
+
+        let updated = repo
+            .get_concept_by_qid("Q_MISSING_ID")
+            .await
+            .expect("get updated concept")
+            .expect("concept exists");
+        assert!(updated.concept_id.ends_with("Q_MISSING_ID"));
+        assert!(updated.verified);
+    }
+
+    #[tokio::test]
+    async fn handle_concept_verification_without_repo_is_noop() {
+        let job = concept_verification_job(serde_json::json!({
+            "qid": "Q2095",
+            "scheduled_ms": 1_000,
+        }));
+        assert!(handle_concept_verification(None, &job).await.is_ok());
+    }
+
+    #[test]
+    fn parse_moderation_auto_release_payload_rejects_blank_content_id() {
+        let payload = serde_json::json!({
+            "content_id": " ",
+            "scheduled_ms": 1_000,
+            "hold_decision_request_id": "hold-1",
+            "release_ms": 2_000
+        });
+        let job = moderation_auto_release_job(payload);
+        assert!(parse_moderation_auto_release_payload(&job).is_err());
+    }
+
+    #[test]
+    fn parse_moderation_auto_release_payload_rejects_missing_payload() {
+        let job = moderation_auto_release_job(serde_json::json!({}));
+        assert!(parse_moderation_auto_release_payload(&job).is_err());
+    }
+
+    #[test]
+    fn periodic_slot_start_ms_with_negative_now_rounds_down() {
+        assert_eq!(periodic_slot_start_ms(-1, 1_000), -1000);
+    }
 }
