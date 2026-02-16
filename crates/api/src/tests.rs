@@ -11,6 +11,7 @@ use gotong_domain::discovery::{
 };
 use gotong_domain::idempotency::InMemoryIdempotencyStore;
 use gotong_domain::identity::ActorIdentity;
+use gotong_domain::ranking::wilson_score;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::Serialize;
 use serde_json::json;
@@ -53,6 +54,8 @@ fn test_config() -> AppConfig {
         worker_promote_batch: 10,
         worker_backoff_base_ms: 1000,
         worker_backoff_max_ms: 60000,
+        worker_ttl_cleanup_interval_ms: 3_600_000,
+        worker_concept_verification_interval_ms: 86_400_000,
         webhook_enabled: false,
         webhook_markov_url: "http://127.0.0.1:8080/webhook".to_string(),
         webhook_secret: "dev_webhook_secret_32_chars_minimum".to_string(),
@@ -106,10 +109,230 @@ fn test_app_state_router() -> (AppState, axum::Router) {
 }
 
 #[tokio::test]
+async fn ontology_routes_support_feed_hierarchy_feedback_and_ranking() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    for concept in [
+        json!({
+            "concept_id": "Q93189",
+            "qid": "Q93189",
+            "label_id": "Telur",
+            "label_en": "Egg",
+            "verified": true
+        }),
+        json!({
+            "concept_id": "Q2095",
+            "qid": "Q2095",
+            "label_id": "Makanan",
+            "label_en": "Food",
+            "verified": true
+        }),
+    ] {
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/ontology/concepts")
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token}"))
+            .body(Body::from(concept.to_string()))
+            .expect("request");
+        let response = app.clone().oneshot(request).await.expect("response");
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    let broader_request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/concepts/Q93189/broader/Q2095")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app
+        .clone()
+        .oneshot(broader_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    let feed_payload = json!({
+        "content": "Telur Rp 28k di pasar",
+        "community_id": "rt05",
+        "temporal_class": "ephemeral",
+        "ttl_expires_ms": 1_893_456_000_000i64,
+        "confidence": 0.92,
+        "triples": [
+            {
+                "edge": "About",
+                "to_id": "concept:Q93189",
+                "predicate": "schema:price",
+                "metadata": {
+                    "object_value": 28000,
+                    "object_unit": "IDR"
+                }
+            }
+        ]
+    });
+    let create_feed_request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(feed_payload.to_string()))
+        .expect("request");
+    let response = app
+        .clone()
+        .oneshot(create_feed_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let feed_response: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let note_id = feed_response
+        .get("note")
+        .and_then(|note| note.get("note_id"))
+        .and_then(|value| value.as_str())
+        .expect("note_id")
+        .to_string();
+
+    let get_concept_request = Request::builder()
+        .method("GET")
+        .uri("/v1/ontology/concepts/Q93189")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app
+        .clone()
+        .oneshot(get_concept_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let hierarchy_request = Request::builder()
+        .method("GET")
+        .uri("/v1/ontology/concepts/Q93189/hierarchy")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app
+        .clone()
+        .oneshot(hierarchy_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let hierarchy: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let has_parent = hierarchy
+        .as_array()
+        .expect("array")
+        .iter()
+        .any(|row| row.get("qid") == Some(&json!("Q2095")));
+    assert!(has_parent);
+
+    let vouch_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/ontology/notes/{note_id}/vouches"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(r#"{"metadata":{"reason":"valid"}}"#))
+        .expect("request");
+    let response = app.clone().oneshot(vouch_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let challenge_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/ontology/notes/{note_id}/challenges"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(r#"{"metadata":{"reason":"unsure"}}"#))
+        .expect("request");
+    let response = app
+        .clone()
+        .oneshot(challenge_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let feedback_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/ontology/notes/{note_id}/feedback"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app
+        .clone()
+        .oneshot(feedback_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let feedback: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(feedback.get("vouch_count"), Some(&json!(1)));
+    assert_eq!(feedback.get("challenge_count"), Some(&json!(1)));
+
+    let ranked_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/ontology/notes/{note_id}/ranked"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(ranked_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let ranked: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let score = ranked
+        .get("score")
+        .and_then(|value| value.as_f64())
+        .expect("score");
+    let ranked_vouch_count = ranked
+        .get("vouch_count")
+        .and_then(|value| value.as_u64())
+        .expect("vouch_count");
+    let ranked_challenge_count = ranked
+        .get("challenge_count")
+        .and_then(|value| value.as_u64())
+        .expect("challenge_count");
+    let expected_score = wilson_score(
+        ranked_vouch_count,
+        ranked_vouch_count + ranked_challenge_count,
+    );
+    assert!((score - expected_score).abs() < 1e-12);
+}
+
+#[tokio::test]
+async fn ontology_feed_validation_rejects_invalid_temporal_privacy_and_confidence() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let payload = json!({
+        "content": "Invalid ontology feed",
+        "community_id": "rt05",
+        "temporal_class": "ephemeral",
+        "rahasia_level": 5,
+        "confidence": 1.5
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn contribution_evidence_vouch_flow() {
     let app = test_app();
     let token = test_token("test-secret");
     let contribution_request = json!({
+        "mode": "komunitas",
         "contribution_type": "task_completion",
         "title": "Test task",
         "description": "Completed integration test task",
@@ -242,243 +465,6 @@ async fn contribution_evidence_vouch_flow() {
 }
 
 #[tokio::test]
-async fn track_transition_end_to_end() {
-    let app = test_app();
-    let token = test_token("test-secret");
-    let first_request = json!({
-        "track": "resolve",
-        "entity_id": "entity-100",
-        "from_stage": "garap",
-        "to_stage": "periksa",
-        "transition_action": "object",
-        "transition_type": "user_action",
-        "mechanism": "user_action",
-        "track_roles": ["participant"],
-        "gate_status": "open",
-        "gate_metadata": {
-            "por_refs_ready": true
-        },
-        "occurred_at_ms": 1000
-    });
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/v1/transitions")
-        .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {token}"))
-        .header("x-request-id", "t-req-1")
-        .body(Body::from(first_request.to_string()))
-        .unwrap();
-    let response = app.clone().oneshot(request).await.expect("response");
-    assert_eq!(response.status(), StatusCode::CREATED);
-    let body = to_bytes(response.into_body(), usize::MAX)
-        .await
-        .expect("body");
-    let first_transition: serde_json::Value = serde_json::from_slice(&body).expect("json");
-    let first_transition_id = first_transition
-        .get("transition_id")
-        .and_then(|value| value.as_str())
-        .expect("transition_id")
-        .to_string();
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/v1/transitions")
-        .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {token}"))
-        .header("x-request-id", "t-req-1")
-        .body(Body::from(first_request.to_string()))
-        .unwrap();
-    let response = app.clone().oneshot(request).await.expect("response");
-    assert_eq!(response.status(), StatusCode::CREATED);
-    let body = to_bytes(response.into_body(), usize::MAX)
-        .await
-        .expect("body");
-    let second_transition: serde_json::Value = serde_json::from_slice(&body).expect("json");
-    assert_eq!(
-        first_transition_id,
-        second_transition
-            .get("transition_id")
-            .and_then(|value| value.as_str())
-            .expect("transition_id")
-    );
-
-    let timeline_request = Request::builder()
-        .method("GET")
-        .uri("/v1/transitions/entity-100/timeline")
-        .header("authorization", format!("Bearer {token}"))
-        .body(Body::empty())
-        .unwrap();
-    let response = app
-        .clone()
-        .oneshot(timeline_request)
-        .await
-        .expect("response");
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX)
-        .await
-        .expect("body");
-    let timeline: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
-    assert_eq!(timeline.len(), 1);
-    assert_eq!(
-        timeline[0].get("transition_id"),
-        Some(&json!(first_transition_id))
-    );
-
-    let active_request = Request::builder()
-        .method("GET")
-        .uri("/v1/transitions/entity-100/active")
-        .header("authorization", format!("Bearer {token}"))
-        .body(Body::empty())
-        .unwrap();
-    let response = app.clone().oneshot(active_request).await.expect("response");
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX)
-        .await
-        .expect("body");
-    let active: serde_json::Value = serde_json::from_slice(&body).expect("json");
-    assert_eq!(active.get("active_stage"), Some(&json!("periksa")));
-
-    let get_request = Request::builder()
-        .method("GET")
-        .uri(format!("/v1/transitions/{first_transition_id}"))
-        .header("authorization", format!("Bearer {token}"))
-        .body(Body::empty())
-        .unwrap();
-    let response = app.clone().oneshot(get_request).await.expect("response");
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX)
-        .await
-        .expect("body");
-    let transition_by_id: serde_json::Value = serde_json::from_slice(&body).expect("json");
-    assert_eq!(
-        transition_by_id.get("transition_id"),
-        Some(&json!(first_transition_id))
-    );
-}
-
-#[tokio::test]
-async fn track_transition_request_id_is_entity_scoped() {
-    let app = test_app();
-    let token = test_token("test-secret");
-    let request_payload = |entity_id: &str| {
-        json!({
-            "track": "resolve",
-            "entity_id": entity_id,
-            "from_stage": "garap",
-            "to_stage": "periksa",
-            "transition_action": "object",
-            "transition_type": "user_action",
-            "mechanism": "user_action",
-            "track_roles": ["participant"],
-            "gate_status": "open",
-            "gate_metadata": {
-                "por_refs_ready": true
-            },
-            "occurred_at_ms": 1000
-        })
-    };
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/v1/transitions")
-        .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {token}"))
-        .header("x-request-id", "scoped-req-1")
-        .body(Body::from(request_payload("entity-scope-a").to_string()))
-        .unwrap();
-    let response = app.clone().oneshot(request).await.expect("response");
-    assert_eq!(response.status(), StatusCode::CREATED);
-    let body = to_bytes(response.into_body(), usize::MAX)
-        .await
-        .expect("body");
-    let first_transition: serde_json::Value = serde_json::from_slice(&body).expect("json");
-    let first_transition_id = first_transition
-        .get("transition_id")
-        .and_then(|value| value.as_str())
-        .expect("transition_id")
-        .to_string();
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/v1/transitions")
-        .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {token}"))
-        .header("x-request-id", "scoped-req-1")
-        .body(Body::from(request_payload("entity-scope-b").to_string()))
-        .unwrap();
-    let response = app.clone().oneshot(request).await.expect("response");
-    assert_eq!(response.status(), StatusCode::CREATED);
-    let body = to_bytes(response.into_body(), usize::MAX)
-        .await
-        .expect("body");
-    let second_transition: serde_json::Value = serde_json::from_slice(&body).expect("json");
-    let second_transition_id = second_transition
-        .get("transition_id")
-        .and_then(|value| value.as_str())
-        .expect("transition_id")
-        .to_string();
-
-    assert_ne!(first_transition_id, second_transition_id);
-}
-
-#[tokio::test]
-async fn track_transition_validates_gate_and_role_matrix() {
-    let app = test_app();
-    let token = test_token("test-secret");
-    let bad_gate_request = json!({
-        "track": "resolve",
-        "entity_id": "entity-bad-1",
-        "from_stage": "garap",
-        "to_stage": "periksa",
-        "transition_action": "object",
-        "transition_type": "user_action",
-        "mechanism": "user_action",
-        "track_roles": ["participant"],
-        "gate_status": "open",
-        "gate_metadata": {
-            "por_refs_ready": false
-        }
-    });
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/v1/transitions")
-        .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {token}"))
-        .header("x-request-id", "bad-1")
-        .body(Body::from(bad_gate_request.to_string()))
-        .unwrap();
-    let response = app.clone().oneshot(request).await.expect("response");
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-
-    let bad_role_request = json!({
-        "track": "resolve",
-        "entity_id": "entity-bad-2",
-        "from_stage": "garap",
-        "to_stage": "periksa",
-        "transition_action": "propose",
-        "transition_type": "user_action",
-        "mechanism": "user_action",
-        "track_roles": ["participant"],
-        "gate_status": "open",
-        "gate_metadata": {
-            "por_refs_ready": true
-        }
-    });
-    let request = Request::builder()
-        .method("POST")
-        .uri("/v1/transitions")
-        .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {token}"))
-        .header("x-request-id", "bad-2")
-        .body(Body::from(bad_role_request.to_string()))
-        .unwrap();
-    let response = app.oneshot(request).await.expect("response");
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-}
-
-#[tokio::test]
 async fn adaptive_path_plan_flow_works() {
     let app = test_app();
     let token = test_token_with_identity("test-secret", "admin", "admin-123");
@@ -489,8 +475,7 @@ async fn adaptive_path_plan_flow_works() {
         "payload": {
             "title": "Rencana awal",
             "summary": "Ringkas",
-            "track_hint": "resolve",
-            "seed_hint": "issue",
+            "action_type": "schema:InformAction",
             "branches": [
                 {
                     "branch_id": "main",
@@ -556,8 +541,7 @@ async fn adaptive_path_plan_flow_works() {
         "payload": {
             "title": "Rencana awal",
             "summary": "Ringkas",
-            "track_hint": "resolve",
-            "seed_hint": "issue",
+            "action_type": "schema:InformAction",
             "branches": [
                 {
                     "branch_id": "main",
@@ -613,8 +597,7 @@ async fn adaptive_path_plan_flow_works() {
         "payload": {
             "title": "Rencana awal",
             "summary": "Ringkas",
-            "track_hint": "resolve",
-            "seed_hint": "issue",
+            "action_type": "schema:InformAction",
             "branches": [
                 {
                     "branch_id": "main",
@@ -735,8 +718,7 @@ async fn adaptive_path_user_cannot_spoof_privileged_editor_roles() {
         "payload": {
             "title": "Rencana awal",
             "summary": "Ringkas",
-            "track_hint": "resolve",
-            "seed_hint": "issue",
+            "action_type": "schema:InformAction",
             "branches": [
                 {
                     "branch_id": "main",
@@ -793,8 +775,7 @@ async fn adaptive_path_user_cannot_spoof_privileged_editor_roles() {
         "payload": {
             "title": "Rencana awal",
             "summary": "Ringkas",
-            "track_hint": "resolve",
-            "seed_hint": "issue",
+            "action_type": "schema:InformAction",
             "branches": [
                 {
                     "branch_id": "main",
@@ -843,6 +824,7 @@ async fn contribution_create_is_idempotent() {
     let token = test_token("test-secret");
 
     let contribution_request = json!({
+        "mode": "komunitas",
         "contribution_type": "task_completion",
         "title": "Idempotent task",
         "description": "This is a repeated create",
@@ -1294,8 +1276,6 @@ async fn discovery_feed_and_search_endpoints() {
             actor: actor.clone(),
             title: "Need help in neighborhood".into(),
             summary: Some("Need help fixing flood barrier".into()),
-            track: Some("resolve".into()),
-            stage: Some("garap".into()),
             scope_id: Some("scope-rw-01".into()),
             privacy_level: Some("public".into()),
             occurred_at_ms: Some(1_000),
@@ -1315,8 +1295,6 @@ async fn discovery_feed_and_search_endpoints() {
             actor: second_actor.clone(),
             title: "Cleanup support requested".into(),
             summary: Some("Need cleanup support this weekend".into()),
-            track: Some("resolve".into()),
-            stage: Some("garap".into()),
             scope_id: Some("scope-rw-01".into()),
             privacy_level: Some("public".into()),
             occurred_at_ms: Some(2_000),
@@ -1329,15 +1307,13 @@ async fn discovery_feed_and_search_endpoints() {
         .await
         .expect("seed feed-b");
 
-    let _feed_c = service
+    let feed_c = service
         .ingest_feed(FeedIngestInput {
             source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
             source_id: "seed-c".into(),
             actor: second_actor,
             title: "Neighborhood event announcement".into(),
             summary: Some("Community cleanup event scheduled".into()),
-            track: Some("bantu".into()),
-            stage: Some("garap".into()),
             scope_id: Some("scope-rw-01".into()),
             privacy_level: Some("private".into()),
             occurred_at_ms: Some(3_000),
@@ -1352,7 +1328,7 @@ async fn discovery_feed_and_search_endpoints() {
 
     let feed_list_request = Request::builder()
         .method("GET")
-        .uri("/v1/feed?scope_id=scope-rw-01&track=resolve&limit=10")
+        .uri("/v1/feed?scope_id=scope-rw-01&limit=10")
         .header(
             "authorization",
             format!("Bearer {}", test_token("test-secret")),
@@ -1383,7 +1359,7 @@ async fn discovery_feed_and_search_endpoints() {
         .collect();
     assert!(feed_ids.iter().any(|id| *id == feed_a.feed_id));
     assert!(feed_ids.iter().any(|id| *id == feed_b.feed_id));
-    assert_eq!(feed_ids.len(), 2);
+    assert_eq!(feed_ids.len(), 3);
 
     let search_request = Request::builder()
         .method("GET")
@@ -1421,7 +1397,7 @@ async fn discovery_feed_and_search_endpoints() {
 
     let private_feed_request = Request::builder()
         .method("GET")
-        .uri("/v1/feed?scope_id=scope-rw-01&track=resolve&involvement_only=true")
+        .uri("/v1/feed?scope_id=scope-rw-01&involvement_only=true")
         .header(
             "authorization",
             format!("Bearer {}", test_token("test-secret")),
@@ -1449,8 +1425,9 @@ async fn discovery_feed_and_search_endpoints() {
                 .unwrap()
         })
         .collect();
-    assert_eq!(private_feed_ids.len(), 1);
-    assert_eq!(private_feed_ids[0], feed_a.feed_id.as_str());
+    assert_eq!(private_feed_ids.len(), 2);
+    assert!(private_feed_ids.contains(&feed_a.feed_id.as_str()));
+    assert!(private_feed_ids.contains(&feed_c.feed_id.as_str()));
 }
 
 #[tokio::test]
@@ -1474,8 +1451,6 @@ async fn discovery_feed_pagination_skips_hidden_rows_for_actor_visibility() {
                 },
                 title: format!("seed {idx}"),
                 summary: Some("pagination test payload".to_string()),
-                track: None,
-                stage: None,
                 scope_id: None,
                 privacy_level: Some(if is_visible { "public" } else { "private" }.to_string()),
                 occurred_at_ms: Some(occurred_at_ms),
@@ -1495,8 +1470,6 @@ async fn discovery_feed_pagination_skips_hidden_rows_for_actor_visibility() {
             cursor: None,
             limit: Some(2),
             scope_id: None,
-            track: None,
-            stage: None,
             privacy_level: None,
             from_ms: None,
             to_ms: None,
@@ -1520,8 +1493,6 @@ async fn discovery_feed_pagination_skips_hidden_rows_for_actor_visibility() {
             cursor: Some(cursor),
             limit: Some(2),
             scope_id: None,
-            track: None,
-            stage: None,
             privacy_level: None,
             from_ms: None,
             to_ms: None,
@@ -1578,8 +1549,6 @@ async fn discovery_search_pagination_skips_hidden_rows_for_actor_visibility() {
                 },
                 title: format!("seed-search {idx}"),
                 summary: Some("pagination search payload".to_string()),
-                track: None,
-                stage: None,
                 scope_id: None,
                 privacy_level: Some(if is_visible { "public" } else { "private" }.to_string()),
                 occurred_at_ms: Some(occurred_at_ms),
@@ -1600,8 +1569,6 @@ async fn discovery_search_pagination_skips_hidden_rows_for_actor_visibility() {
             cursor: None,
             limit: Some(2),
             scope_id: None,
-            track: None,
-            stage: None,
             privacy_level: None,
             from_ms: None,
             to_ms: None,
@@ -1627,8 +1594,6 @@ async fn discovery_search_pagination_skips_hidden_rows_for_actor_visibility() {
             cursor: Some(cursor),
             limit: Some(2),
             scope_id: None,
-            track: None,
-            stage: None,
             privacy_level: None,
             from_ms: None,
             to_ms: None,
