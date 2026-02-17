@@ -607,9 +607,14 @@ impl Worker {
         self.emit_queue_metrics().await;
         let mut next_ttl_cleanup_at_ms = 0_i64;
         let mut next_concept_verification_at_ms = 0_i64;
+        let mut next_dead_letter_metric_at_ms = 0_i64;
         loop {
             self.emit_queue_metrics().await;
             let now = now_ms();
+            if now >= next_dead_letter_metric_at_ms {
+                self.emit_dead_letter_metrics().await;
+                next_dead_letter_metric_at_ms = now + 10_000;
+            }
             if let Err(err) = self
                 .queue
                 .promote_due(now, self.config.worker_promote_batch)
@@ -697,6 +702,30 @@ impl Worker {
             }
             Err(err) => {
                 warn!(error = %err, "failed to collect queue metrics snapshot");
+            }
+        }
+    }
+
+    async fn emit_dead_letter_metrics(&self) {
+        let Some(repo) = self.webhook_outbox_repo.as_ref() else {
+            observability::set_webhook_dead_letter_depth(0);
+            return;
+        };
+        match repo
+            .list(&WebhookOutboxListQuery {
+                status: Some(WebhookOutboxStatus::DeadLetter),
+                limit: 10_000,
+            })
+            .await
+        {
+            Ok(events) => {
+                observability::set_webhook_dead_letter_depth(events.len() as u64);
+            }
+            Err(err) => {
+                warn!(
+                    error = %err,
+                    "failed to collect dead-letter outbox depth metric"
+                );
             }
         }
     }
@@ -1096,6 +1125,16 @@ enum WebhookDeliveryResultClass {
     Terminal,
 }
 
+impl WebhookDeliveryResultClass {
+    fn as_label(&self) -> &'static str {
+        match self {
+            Self::Success => "success",
+            Self::Retryable => "retryable_failure",
+            Self::Terminal => "terminal_failure",
+        }
+    }
+}
+
 struct DeliveryResponse {
     status_code: Option<u16>,
     response_body_sha256: Option<String>,
@@ -1126,6 +1165,7 @@ async fn handle_webhook_retry(
     }
 
     let request = build_webhook_request(&event)?;
+    let delivery_started_at = now_ms();
     let response = send_webhook_request(config, &request, &event).await;
 
     let (delivery_class, status_code, response_body_sha256, error_message) = match response {
@@ -1142,6 +1182,11 @@ async fn handle_webhook_retry(
             err.to_string(),
         ),
     };
+    observability::register_webhook_delivery(
+        delivery_class.as_label(),
+        status_code,
+        (now_ms() - delivery_started_at).max(0) as f64,
+    );
 
     let update = webhook_outbox_update(&event, &delivery_class, status_code, &error_message, job);
     repo.update(&event.event_id, &update)

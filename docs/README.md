@@ -50,6 +50,7 @@ Canonical decision:
 - [Monitoring](deployment/monitoring.md) - Metrics and alerting
 - [Tandang Integration Config](deployment/tandang-integration-config.md) - Required env vars, toggles, and safe defaults
 - [Webhook Backfill + Replay](deployment/webhook-backfill-replay.md) - Historical backfill and DLQ replay tooling
+- [Tandang Observability SLOs](deployment/tandang-observability-slos.md) - Integration dashboards, SLOs, and alert rules
 
 ### Development
 - [Setup Guide](development/setup-guide.md) - Local development environment setup

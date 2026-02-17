@@ -10,6 +10,9 @@ const QUEUE_READY_GAUGE: &str = "gotong_worker_queue_ready_total";
 const QUEUE_DELAYED_GAUGE: &str = "gotong_worker_queue_delayed_total";
 const QUEUE_PROCESSING_GAUGE: &str = "gotong_worker_queue_processing_total";
 const QUEUE_LAG_GAUGE: &str = "gotong_worker_queue_lag_ms";
+const WEBHOOK_DELIVERY_TOTAL: &str = "gotong_worker_webhook_delivery_total";
+const WEBHOOK_DELIVERY_DURATION_MS: &str = "gotong_worker_webhook_delivery_duration_ms";
+const WEBHOOK_DLQ_DEPTH_GAUGE: &str = "gotong_worker_webhook_dead_letter_total";
 
 static METRICS_HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
 
@@ -46,4 +49,28 @@ pub fn set_queue_depth_gauge(ready: u64, delayed: u64, processing: u64) {
 
 pub fn set_queue_lag_ms(lag_ms: i64) {
     gauge!(QUEUE_LAG_GAUGE).set(lag_ms.max(0) as f64);
+}
+
+pub fn register_webhook_delivery(result: &str, status_code: Option<u16>, duration_ms: f64) {
+    let status_code = status_code
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "none".to_string());
+
+    counter!(
+        WEBHOOK_DELIVERY_TOTAL,
+        "result" => result.to_string(),
+        "status_code" => status_code.clone()
+    )
+    .increment(1);
+
+    histogram!(
+        WEBHOOK_DELIVERY_DURATION_MS,
+        "result" => result.to_string(),
+        "status_code" => status_code
+    )
+    .record(duration_ms.max(0.0));
+}
+
+pub fn set_webhook_dead_letter_depth(depth: u64) {
+    gauge!(WEBHOOK_DLQ_DEPTH_GAUGE).set(depth as f64);
 }
