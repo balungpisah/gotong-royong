@@ -17,7 +17,7 @@ Gotong Royong integrates with the Markov Credential Engine using a **Native + Tr
 **Advantages**:
 - Clear separation of concerns
 - Independent scaling of each system
-- Simplified security model (webhook signatures only)
+- Unified security model (webhook signatures + platform service token for read APIs)
 - Easier to version and deploy independently
 - Transparent user experience (no manual account linking)
 
@@ -386,16 +386,14 @@ fn verify_hmac(secret: &str, payload: &[u8], signature: &str) -> Result<(), Erro
 ### Metrics to Track
 
 **Webhook Delivery**:
-- `webhook_delivery_total` (counter) - Total webhook attempts
-- `webhook_delivery_success` (counter) - Successful deliveries
-- `webhook_delivery_failure` (counter) - Failed deliveries
-- `webhook_delivery_latency` (histogram) - Delivery time in milliseconds
-- `webhook_retry_count` (histogram) - Number of retries per event
+- `gotong_worker_webhook_delivery_total{result,status_code}` (counter) - Total webhook delivery attempts by outcome
+- `gotong_worker_webhook_delivery_duration_ms{result,status_code}` (histogram) - Delivery latency in milliseconds
+- `gotong_worker_webhook_dead_letter_total` (gauge) - Current dead-letter outbox depth
 
 **Example Prometheus Query**:
 ```promql
 # Success rate over last 5 minutes
-rate(webhook_delivery_success[5m]) / rate(webhook_delivery_total[5m]) * 100
+sum(rate(gotong_worker_webhook_delivery_total{result="success"}[5m])) / sum(rate(gotong_worker_webhook_delivery_total[5m])) * 100
 ```
 
 ### Logging

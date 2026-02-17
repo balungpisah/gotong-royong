@@ -566,10 +566,9 @@ app.listen(3000, () => console.log('Mock Markov server running on port 3000'));
 
 ### Metrics to Track
 
-- `webhook_delivery_total` - Total webhook attempts
-- `webhook_delivery_success` - Successful deliveries
-- `webhook_delivery_failure` - Failed deliveries (by status code)
-- `webhook_delivery_latency` - Response time (p50, p95, p99)
+- `gotong_worker_webhook_delivery_total{result,status_code}` - Total webhook attempts by outcome and response status
+- `gotong_worker_webhook_delivery_duration_ms{result,status_code}` - Response time (p50, p95, p99)
+- `gotong_worker_webhook_dead_letter_total` - Current dead-letter queue depth
 
 ### Alerting
 

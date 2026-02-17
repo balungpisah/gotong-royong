@@ -13,7 +13,7 @@ This document is the deployment source of truth for integration-specific env var
 | `WEBHOOK_SECRET` | Yes when `WEBHOOK_ENABLED=true` | `dev_webhook_secret_32_chars_minimum` | 32+ random bytes from secrets manager. |
 | `WEBHOOK_MAX_ATTEMPTS` | Yes | `5` | Keep `5` unless SLO tuning requires change. |
 | `MARKOV_READ_BASE_URL` | Yes | `http://127.0.0.1:3000/api/v1` | Set real Tandang API base URL. |
-| `MARKOV_READ_PLATFORM_TOKEN` | Yes for production reads | empty string | Required in prod for service-token read routes. |
+| `MARKOV_READ_PLATFORM_TOKEN` | Yes when Markov read APIs are enabled | empty string | Required for Gotong server-to-server read routes. |
 | `MARKOV_READ_TIMEOUT_MS` | Yes | `2500` | Keep `2000-4000` based on latency profile. |
 | `MARKOV_READ_RETRY_MAX_ATTEMPTS` | Yes | `3` | Keep low to avoid fan-out storms. |
 | `MARKOV_READ_RETRY_BACKOFF_BASE_MS` | Yes | `200` | Keep exponential retry base small. |

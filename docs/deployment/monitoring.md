@@ -28,9 +28,9 @@ This document specifies the monitoring, observability, and alerting requirements
 | `http_requests_total` | Counter | Total HTTP requests |
 | `http_request_duration_seconds` | Histogram | Request latency |
 | `http_requests_in_progress` | Gauge | Concurrent requests |
-| `webhook_delivery_total` | Counter | Webhook attempts |
-| `webhook_delivery_success` | Counter | Successful webhooks |
-| `webhook_delivery_latency` | Histogram | Webhook latency |
+| `gotong_worker_webhook_delivery_total{result,status_code}` | Counter | Webhook attempts by outcome/status |
+| `gotong_worker_webhook_delivery_duration_ms{result,status_code}` | Histogram | Webhook latency |
+| `gotong_worker_webhook_dead_letter_total` | Gauge | Current dead-letter queue depth |
 | `db_connections_active` | Gauge | Active DB connections |
 | `db_query_duration_seconds` | Histogram | Query duration |
 | `cache_hits_total` | Counter | Cache hits |
@@ -66,16 +66,22 @@ const httpRequestDuration = new promClient.Histogram({
 });
 
 const webhookDeliveryTotal = new promClient.Counter({
-  name: 'webhook_delivery_total',
+  name: 'gotong_worker_webhook_delivery_total',
   help: 'Total webhook delivery attempts',
-  labelNames: ['event_type'],
+  labelNames: ['result', 'status_code'],
   registers: [register],
 });
 
-const webhookDeliverySuccess = new promClient.Counter({
-  name: 'webhook_delivery_success',
-  help: 'Successful webhook deliveries',
-  labelNames: ['event_type'],
+const webhookDeliveryDurationMs = new promClient.Histogram({
+  name: 'gotong_worker_webhook_delivery_duration_ms',
+  help: 'Webhook delivery duration in milliseconds',
+  labelNames: ['result', 'status_code'],
+  registers: [register],
+});
+
+const webhookDeadLetterDepth = new promClient.Gauge({
+  name: 'gotong_worker_webhook_dead_letter_total',
+  help: 'Current dead-letter queue depth',
   registers: [register],
 });
 
@@ -193,13 +199,13 @@ db_connections_active
 
 ```promql
 # Success rate
-rate(webhook_delivery_success[5m]) / rate(webhook_delivery_total[5m]) * 100
+sum(rate(gotong_worker_webhook_delivery_total{result="success"}[5m])) / sum(rate(gotong_worker_webhook_delivery_total[5m])) * 100
 
-# Failures by event type
-sum(rate(webhook_delivery_total[5m]) - rate(webhook_delivery_success[5m])) by (event_type)
+# Failures by status code
+sum(rate(gotong_worker_webhook_delivery_total{result!="success"}[5m])) by (status_code)
 
 # P95 delivery latency
-histogram_quantile(0.95, rate(webhook_delivery_latency_bucket[5m]))
+histogram_quantile(0.95, sum(rate(gotong_worker_webhook_delivery_duration_ms_bucket[5m])) by (le))
 ```
 
 #### 3. Database Dashboard
@@ -536,8 +542,7 @@ groups:
       # Webhook delivery failures
       - alert: WebhookDeliveryFailures
         expr: |
-          rate(webhook_delivery_total[5m])
-          - rate(webhook_delivery_success[5m]) > 10
+          sum(rate(gotong_worker_webhook_delivery_total{result!="success"}[5m])) > 10
         for: 5m
         labels:
           severity: warning

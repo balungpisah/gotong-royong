@@ -16,8 +16,7 @@ This document defines the server-to-server read behavior from Gotong Royong to T
 - Base URL: `MARKOV_READ_BASE_URL` (default `http://127.0.0.1:3000/api/v1`)
 - Header for platform read auth: `X-Platform-Token: <token>`
 - Token config: `MARKOV_READ_PLATFORM_TOKEN`
-- Required-token endpoints: `reputation/leaderboard`, `reputation/distribution`
-- Optional-token endpoints: profile, CV hidup, skills, PoR requirements
+- Required-token endpoints: all Gotong server-to-server Markov read endpoints (`users/{id}/reputation`, `users/{uuid}/tier`, `users/{uuid}/activity`, `cv-hidup/{uuid}`, `skills/search`, `por/requirements/{task_type}`, `por/triad-requirements/{track}/{transition}`, `reputation/leaderboard`, `reputation/distribution`)
 
 ## Reliability Controls
 

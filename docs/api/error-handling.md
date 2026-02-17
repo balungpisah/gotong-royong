@@ -541,22 +541,22 @@ async function reprocessFailedWebhooks(limit = 10) {
 
 **Success Rate**:
 ```promql
-rate(webhook_delivery_success_total[5m]) / rate(webhook_delivery_total[5m]) * 100
+sum(rate(gotong_worker_webhook_delivery_total{result="success"}[5m])) / sum(rate(gotong_worker_webhook_delivery_total[5m])) * 100
 ```
 
 **Error Rate by Status Code**:
 ```promql
-sum(rate(webhook_delivery_failure_total[5m])) by (status_code)
+sum(rate(gotong_worker_webhook_delivery_total{result!="success"}[5m])) by (status_code)
 ```
 
 **Retry Count Distribution**:
 ```promql
-histogram_quantile(0.95, rate(webhook_retry_count_bucket[5m]))
+histogram_quantile(0.95, sum(rate(gotong_worker_webhook_delivery_duration_ms_bucket[5m])) by (le))
 ```
 
 **DLQ Size**:
-```sql
-SELECT COUNT(*) FROM webhook_failures WHERE created_at > NOW() - INTERVAL '1 hour';
+```promql
+gotong_worker_webhook_dead_letter_total
 ```
 
 ### Alerting Rules
