@@ -9,3 +9,4 @@ bun.lockb
 /static/
 /node_modules/
 /.svelte-kit/
+/src/lib/paraglide/

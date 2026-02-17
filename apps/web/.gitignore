@@ -21,3 +21,8 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Generated i18n runtime
+/src/lib/paraglide/
+/project.inlang/.meta.json
+/project.inlang/README.md
