@@ -9,6 +9,8 @@ bun install
 bun run dev
 bun run check
 bun run lint
+bun run test:unit
+bun run test:e2e
 bun run build
 ```
 

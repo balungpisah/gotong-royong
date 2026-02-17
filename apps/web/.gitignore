@@ -22,6 +22,11 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# Test outputs
+/playwright-report/
+/test-results/
+/blob-report/
+
 # Generated i18n runtime
 /src/lib/paraglide/
 /project.inlang/.meta.json

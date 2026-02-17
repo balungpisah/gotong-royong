@@ -60,7 +60,10 @@ export default defineConfig({
 				cleanupOutdatedCaches: true,
 				// Prevent the SvelteKit wrapper from forcing prerender glob patterns when this app has no prerendered pages.
 				modifyURLPrefix: {},
-				globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,webmanifest,woff2,txt}', 'client/_app/version.json'],
+				globPatterns: [
+					'client/**/*.{js,css,ico,png,svg,webp,webmanifest,woff2,txt}',
+					'client/_app/version.json'
+				],
 				navigateFallback: null,
 				navigateFallbackDenylist: sensitiveRouteDenylist,
 				runtimeCaching: []
