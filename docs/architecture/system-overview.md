@@ -197,7 +197,7 @@ graph TB
 
 ### Markov Engine Integration
 
-**Mode**: Native (Gotong controls its own database; Markov receives webhooks and serves reputation API reads)
+**Mode**: Native (Trusted Platform; Gotong controls its own database; Markov receives webhooks and serves read APIs with transparent auto-linking)
 
 **Flow**:
 ```
@@ -207,8 +207,14 @@ Gotong Royong → Webhook Event → Markov Engine API → Reputation Update
 **Endpoints**:
 - **POST** `/api/v1/platforms/gotong_royong/webhook` (Markov receives events)
 - **GET** `/api/v1/users/{user_id}/reputation` (Gotong Royong queries reputation)
+- **GET** `/api/v1/users/{user_id}/tier`
+- **GET** `/api/v1/users/{user_id}/activity`
+- **GET** `/api/v1/cv-hidup/{user_id}`
+- **GET** `/api/v1/reputation/leaderboard`
+- **GET** `/api/v1/skills/search` (optional UX enrichment)
+- **GET** `/api/v1/por/requirements` (PoR UX guidance)
 
-**Authentication**: HMAC-SHA256 webhook signatures
+**Authentication**: HMAC-SHA256 webhook signatures + platform service token for read APIs
 
 **Reference**: [Integration Architecture](integration-architecture.md)
 
