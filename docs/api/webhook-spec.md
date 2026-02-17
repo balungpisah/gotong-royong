@@ -9,13 +9,13 @@ Gotong Royong publishes webhook events to the Markov Credential Engine for real-
 ### Target URL
 
 ```
-POST https://api.markov.local/v1/platforms/gotong_royong/webhook
+POST https://api.markov.local/api/v1/platforms/gotong_royong/webhook
 ```
 
 **Environment-specific URLs**:
-- **Development**: `http://localhost:3000/v1/platforms/gotong_royong/webhook`
-- **Staging**: `https://staging-api.markov.local/v1/platforms/gotong_royong/webhook`
-- **Production**: `https://api.markov.local/v1/platforms/gotong_royong/webhook`
+- **Development**: `http://localhost:3000/api/v1/platforms/gotong_royong/webhook`
+- **Staging**: `https://staging-api.markov.local/api/v1/platforms/gotong_royong/webhook`
+- **Production**: `https://api.markov.local/api/v1/platforms/gotong_royong/webhook`
 
 ### HTTP Method
 
@@ -23,13 +23,15 @@ POST https://api.markov.local/v1/platforms/gotong_royong/webhook
 
 ## Request Format
 
+All events MUST include `event_id` for idempotency, `schema_version` for contract versioning, and `request_id` for end-to-end traceability.
+
 ### Headers
 
 | Header | Required | Description | Example |
 |--------|----------|-------------|---------|
 | `Content-Type` | Yes | Must be `application/json` | `application/json` |
 | `X-GR-Signature` | Yes | HMAC-SHA256 signature | `sha256=a1b2c3...` |
-| `X-Request-ID` | No | Unique request ID for tracing | `req_xyz123` |
+| `X-Request-ID` | Yes | Unique request ID for tracing; must match payload `request_id` | `req_xyz123` |
 | `User-Agent` | No | Client identifier | `GotongRoyong/1.0` |
 
 ### Body
@@ -39,7 +41,10 @@ JSON payload containing event data. Structure varies by event type.
 **General Structure**:
 ```json
 {
+  "event_id": "string (required, format: evt_<16-hex>)",
   "event_type": "string (required)",
+  "schema_version": "string (required, current: \"1\")",
+  "request_id": "string (required, must match X-Request-ID)",
   "actor": {
     "user_id": "string (required)",
     "username": "string (required)"

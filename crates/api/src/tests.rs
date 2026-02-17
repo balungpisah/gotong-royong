@@ -15,6 +15,7 @@ use gotong_domain::discovery::{
 use gotong_domain::idempotency::InMemoryIdempotencyStore;
 use gotong_domain::identity::ActorIdentity;
 use gotong_domain::ranking::wilson_score;
+use gotong_domain::webhook::WebhookOutboxListQuery;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::Serialize;
 use serde_json::json;
@@ -125,6 +126,15 @@ fn test_app_state_router() -> (AppState, axum::Router) {
     (state, app)
 }
 
+fn test_app_state_router_webhook_enabled() -> (AppState, axum::Router) {
+    let mut config = test_config();
+    config.webhook_enabled = true;
+    let store = InMemoryIdempotencyStore::new("test");
+    let state = AppState::with_idempotency_store(config, Arc::new(store));
+    let app = routes::router(state.clone());
+    (state, app)
+}
+
 fn test_app_with_markov_base(markov_base_url: String) -> axum::Router {
     let mut config = test_config();
     config.markov_read_base_url = markov_base_url;
@@ -186,7 +196,9 @@ async fn spawn_markov_stub_base_url() -> String {
         }))
     }
 
-    async fn por_triad(Path((track, transition)): Path<(String, String)>) -> AxumJson<serde_json::Value> {
+    async fn por_triad(
+        Path((track, transition)): Path<(String, String)>,
+    ) -> AxumJson<serde_json::Value> {
         AxumJson(json!({
             "track": track,
             "stage_transition": transition,
@@ -608,7 +620,11 @@ async fn ontology_note_feedback_for_unknown_note_returns_zero_counts() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .expect("request");
-    let response = app.clone().oneshot(feedback_request).await.expect("response");
+    let response = app
+        .clone()
+        .oneshot(feedback_request)
+        .await
+        .expect("response");
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_bytes(response.into_body(), usize::MAX)
         .await
@@ -631,7 +647,11 @@ async fn ontology_ranking_for_unknown_note_returns_zero_score() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .expect("request");
-    let response = app.clone().oneshot(ranking_request).await.expect("response");
+    let response = app
+        .clone()
+        .oneshot(ranking_request)
+        .await
+        .expect("response");
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_bytes(response.into_body(), usize::MAX)
         .await
@@ -724,7 +744,11 @@ async fn ontology_feed_accepts_explicit_note_id() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .expect("request");
-    let response = app.clone().oneshot(feedback_request).await.expect("response");
+    let response = app
+        .clone()
+        .oneshot(feedback_request)
+        .await
+        .expect("response");
     assert_eq!(response.status(), StatusCode::OK);
     let feedback: serde_json::Value = serde_json::from_slice(
         &to_bytes(response.into_body(), usize::MAX)
@@ -754,11 +778,7 @@ async fn ontology_feed_accepts_valid_schema_action_predicate() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::from(concept.to_string()))
         .expect("request");
-    let upsert_response = app
-        .clone()
-        .oneshot(upsert_request)
-        .await
-        .expect("response");
+    let upsert_response = app.clone().oneshot(upsert_request).await.expect("response");
     assert_eq!(upsert_response.status(), StatusCode::CREATED);
 
     let payload = json!({
@@ -852,11 +872,7 @@ async fn contribution_create_persists_mode_in_list_response() {
         .header("x-request-id", "mode-list-1")
         .body(Body::from(contribution_request.to_string()))
         .unwrap();
-    let create_response = app
-        .clone()
-        .oneshot(create_request)
-        .await
-        .expect("response");
+    let create_response = app.clone().oneshot(create_request).await.expect("response");
     assert_eq!(create_response.status(), StatusCode::CREATED);
     let create_body = to_bytes(create_response.into_body(), usize::MAX)
         .await
@@ -876,11 +892,7 @@ async fn contribution_create_persists_mode_in_list_response() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .unwrap();
-    let list_response = app
-        .clone()
-        .oneshot(list_request)
-        .await
-        .expect("response");
+    let list_response = app.clone().oneshot(list_request).await.expect("response");
     assert_eq!(list_response.status(), StatusCode::OK);
     let list_body = to_bytes(list_response.into_body(), usize::MAX)
         .await
@@ -1033,6 +1045,58 @@ async fn contribution_evidence_vouch_flow() {
 }
 
 #[tokio::test]
+async fn contribution_webhook_outbox_payload_includes_schema_and_request_id() {
+    let (state, app) = test_app_state_router_webhook_enabled();
+    let token = test_token("test-secret");
+    let request_id = "webhook-contribution-req-1";
+
+    let contribution_request = json!({
+        "mode": "komunitas",
+        "contribution_type": "task_completion",
+        "title": "Webhook payload contract test",
+        "description": "Ensures required payload fields are present",
+        "skill_ids": ["skill-1"]
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/contributions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", request_id)
+        .header("x-correlation-id", "webhook-contribution-corr-1")
+        .body(Body::from(contribution_request.to_string()))
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let outbox = state
+        .webhook_outbox_repo
+        .list(&WebhookOutboxListQuery {
+            status: None,
+            limit: 10,
+        })
+        .await
+        .expect("outbox list");
+    assert_eq!(outbox.len(), 1);
+    let event = outbox.first().expect("webhook event");
+    assert_eq!(event.request_id, request_id);
+    assert_eq!(
+        event
+            .payload
+            .get("schema_version")
+            .and_then(|value| value.as_str()),
+        Some("1")
+    );
+    assert_eq!(
+        event
+            .payload
+            .get("request_id")
+            .and_then(|value| value.as_str()),
+        Some(request_id)
+    );
+}
+
+#[tokio::test]
 async fn vouch_submit_is_idempotent_with_request_id() {
     let app = test_app();
     let token = test_token("test-secret");
@@ -1050,11 +1114,7 @@ async fn vouch_submit_is_idempotent_with_request_id() {
         .header("x-request-id", "vouch-idempotency-1")
         .body(Body::from(vouch_request.to_string()))
         .unwrap();
-    let first_response = app
-        .clone()
-        .oneshot(first_request)
-        .await
-        .expect("response");
+    let first_response = app.clone().oneshot(first_request).await.expect("response");
     assert_eq!(first_response.status(), StatusCode::CREATED);
     let first_body = to_bytes(first_response.into_body(), usize::MAX)
         .await
@@ -1068,11 +1128,7 @@ async fn vouch_submit_is_idempotent_with_request_id() {
         .header("x-request-id", "vouch-idempotency-1")
         .body(Body::from(vouch_request.to_string()))
         .unwrap();
-    let second_response = app
-        .clone()
-        .oneshot(second_request)
-        .await
-        .expect("response");
+    let second_response = app.clone().oneshot(second_request).await.expect("response");
     assert_eq!(second_response.status(), StatusCode::CREATED);
     let second_body = to_bytes(second_response.into_body(), usize::MAX)
         .await
@@ -1426,11 +1482,7 @@ async fn adaptive_path_plan_by_entity_returns_latest_plan() {
         .header("x-request-id", "adaptive-entity-create-1")
         .body(Body::from(create_payload.to_string()))
         .expect("request");
-    let create_response = app
-        .clone()
-        .oneshot(create_request)
-        .await
-        .expect("response");
+    let create_response = app.clone().oneshot(create_request).await.expect("response");
     assert_eq!(create_response.status(), StatusCode::CREATED);
     let create_body = to_bytes(create_response.into_body(), usize::MAX)
         .await
@@ -1448,7 +1500,11 @@ async fn adaptive_path_plan_by_entity_returns_latest_plan() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .expect("request");
-    let by_entity_response = app.clone().oneshot(by_entity_request).await.expect("response");
+    let by_entity_response = app
+        .clone()
+        .oneshot(by_entity_request)
+        .await
+        .expect("response");
     assert_eq!(by_entity_response.status(), StatusCode::OK);
     let by_entity_body = to_bytes(by_entity_response.into_body(), usize::MAX)
         .await
@@ -3116,7 +3172,10 @@ async fn tandang_routes_surface_cache_metadata_and_data() {
                 .is_some(),
             "missing cache status for endpoint {endpoint}"
         );
-        assert!(parsed.get("data").is_some(), "missing data for endpoint {endpoint}");
+        assert!(
+            parsed.get("data").is_some(),
+            "missing data for endpoint {endpoint}"
+        );
     }
 }
 

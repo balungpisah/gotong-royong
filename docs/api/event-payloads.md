@@ -19,7 +19,9 @@ All events share these top-level fields:
 | `event_type` | string | Yes | Event type identifier |
 | `actor` | object | Yes | User who triggered the event |
 | `subject` | object | Yes | Event-specific data |
-| `event_id` | string | No | Unique event ID (for idempotency) |
+| `event_id` | string | Yes | Unique event ID (for idempotency) |
+| `schema_version` | string | Yes | Event schema version (current: `1`) |
+| `request_id` | string | Yes | Request trace ID; must match webhook `X-Request-ID` |
 | `timestamp` | string (RFC3339) | No | Event creation time |
 
 ### Actor Object
@@ -38,7 +40,7 @@ All events share these top-level fields:
 ```json
 {
   "type": "object",
-  "required": ["event_type", "actor", "subject"],
+  "required": ["event_type", "actor", "subject", "event_id", "schema_version", "request_id"],
   "properties": {
     "event_type": {
       "type": "string",
@@ -47,6 +49,14 @@ All events share these top-level fields:
     "event_id": {
       "type": "string",
       "pattern": "^evt_[a-f0-9]{16}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
     },
     "actor": {
       "type": "object",
@@ -58,8 +68,12 @@ All events share these top-level fields:
     },
     "subject": {
       "type": "object",
-      "required": ["contribution_type", "title"],
+      "required": ["mode", "contribution_type", "title"],
       "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["komunitas", "catatan_komunitas", "catatan_saksi", "siaga"]
+        },
         "contribution_type": {
           "type": "string",
           "enum": [
@@ -120,11 +134,14 @@ Common metadata fields (all optional):
 {
   "event_type": "contribution_created",
   "event_id": "evt_a1b2c3d4e5f6789a",
+  "schema_version": "1",
+  "request_id": "req_contrib_001",
   "actor": {
     "user_id": "user_123",
     "username": "alice"
   },
   "subject": {
+    "mode": "komunitas",
     "contribution_type": "task_completion",
     "title": "Plant seedlings in community garden",
     "description": "Prepared soil and planted 200 vegetable seedlings",
@@ -139,11 +156,14 @@ Common metadata fields (all optional):
 {
   "event_type": "contribution_created",
   "event_id": "evt_b2c3d4e5f6789012",
+  "schema_version": "1",
+  "request_id": "req_contrib_002",
   "actor": {
     "user_id": "farmer_001",
     "username": "budi_farmer"
   },
   "subject": {
+    "mode": "komunitas",
     "contribution_type": "task_completion",
     "title": "Delivered 50kg rice to warehouse",
     "description": "Successfully delivered relief supplies to central warehouse",
@@ -166,11 +186,14 @@ Common metadata fields (all optional):
 {
   "event_type": "contribution_created",
   "event_id": "evt_c3d4e5f6789abc12",
+  "schema_version": "1",
+  "request_id": "req_contrib_003",
   "actor": {
     "user_id": "mentor_005",
     "username": "dr_siti"
   },
   "subject": {
+    "mode": "catatan_komunitas",
     "contribution_type": "mentoring",
     "title": "Led 3-day organic farming workshop",
     "description": "Taught 25 farmers about sustainable pest control methods",
@@ -190,6 +213,7 @@ Common metadata fields (all optional):
 | Field | Validation |
 |-------|------------|
 | `title` | 1-200 characters |
+| `mode` | One of: komunitas, catatan_komunitas, catatan_saksi, siaga |
 | `description` | Max 2000 characters |
 | `evidence_url` | Valid URL format |
 | `skill_ids` | Max 10 skills per contribution |
@@ -214,7 +238,7 @@ Common metadata fields (all optional):
 ```json
 {
   "type": "object",
-  "required": ["event_type", "actor", "subject"],
+  "required": ["event_type", "actor", "subject", "event_id", "schema_version", "request_id"],
   "properties": {
     "event_type": {
       "type": "string",
@@ -223,6 +247,14 @@ Common metadata fields (all optional):
     "event_id": {
       "type": "string",
       "pattern": "^evt_[a-f0-9]{16}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
     },
     "actor": {
       "type": "object",
@@ -264,6 +296,8 @@ Common metadata fields (all optional):
 {
   "event_type": "vouch_submitted",
   "event_id": "evt_d4e5f6789abc1234",
+  "schema_version": "1",
+  "request_id": "req_vouch_001",
   "actor": {
     "user_id": "expert_002",
     "username": "dr_siti"
@@ -283,6 +317,8 @@ Common metadata fields (all optional):
 {
   "event_type": "vouch_submitted",
   "event_id": "evt_e5f6789abc123456",
+  "schema_version": "1",
+  "request_id": "req_vouch_002",
   "actor": {
     "user_id": "coordinator_001",
     "username": "pak_ahmad"
@@ -323,7 +359,7 @@ Common metadata fields (all optional):
 ```json
 {
   "type": "object",
-  "required": ["event_type", "actor", "subject", "proof"],
+  "required": ["event_type", "actor", "subject", "proof", "event_id", "schema_version", "request_id"],
   "properties": {
     "event_type": {
       "type": "string",
@@ -332,6 +368,14 @@ Common metadata fields (all optional):
     "event_id": {
       "type": "string",
       "pattern": "^evt_[a-f0-9]{16}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
     },
     "actor": {
       "type": "object",
@@ -393,6 +437,8 @@ Common metadata fields (all optional):
 {
   "event_type": "por_evidence",
   "event_id": "evt_f6789abc12345678",
+  "schema_version": "1",
+  "request_id": "req_por_001",
   "actor": {
     "user_id": "farmer_001",
     "username": "budi"
@@ -433,6 +479,8 @@ Common metadata fields (all optional):
 {
   "event_type": "por_evidence",
   "event_id": "evt_g789abc123456789",
+  "schema_version": "1",
+  "request_id": "req_por_002",
   "actor": {
     "user_id": "farmer_001",
     "username": "budi"
@@ -479,6 +527,8 @@ Common metadata fields (all optional):
 {
   "event_type": "por_evidence",
   "event_id": "evt_h89abc1234567890",
+  "schema_version": "1",
+  "request_id": "req_por_003",
   "actor": {
     "user_id": "farmer_001",
     "username": "budi"
@@ -607,7 +657,7 @@ let timestamp = Utc::now().to_rfc3339();
 | `message` | 500 characters |
 | `skill_ids` array | 10 items |
 | `metadata` object | 50 keys |
-| `witnesses` array | 10 items |
+| `witnesses` array | 50 items |
 
 Payloads exceeding limits will be rejected with `400 Bad Request`.
 

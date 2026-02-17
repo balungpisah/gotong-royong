@@ -104,6 +104,8 @@ impl EvidenceService {
             },
             "proof": evidence.proof,
             "event_id": evidence_to_event_id(&evidence.evidence_id),
+            "schema_version": "1",
+            "request_id": evidence.request_id,
             "timestamp": format_rfc3339(evidence.created_at_ms),
         })
     }
@@ -344,5 +346,33 @@ mod tests {
         };
         let result = validate_evidence_create(&input);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn tandang_payload_contains_schema_version_and_request_id() {
+        let evidence = Evidence {
+            evidence_id: "018f9b2cd4f1aa11bbee223344556677".to_string(),
+            contribution_id: "contrib-1".to_string(),
+            actor_id: "user-123".to_string(),
+            actor_username: "user-123-name".to_string(),
+            evidence_type: EvidenceType::WitnessAttestation,
+            evidence_data: serde_json::json!({ "notes": "ok" }),
+            proof: witness_input(),
+            request_id: "req-evidence-123".to_string(),
+            correlation_id: "corr-evidence-123".to_string(),
+            created_at_ms: 1_739_750_400_000,
+            updated_at_ms: 1_739_750_400_000,
+        };
+        let payload = EvidenceService::into_tandang_event_payload(&evidence);
+        assert_eq!(
+            payload
+                .get("schema_version")
+                .and_then(|value| value.as_str()),
+            Some("1")
+        );
+        assert_eq!(
+            payload.get("request_id").and_then(|value| value.as_str()),
+            Some("req-evidence-123")
+        );
     }
 }

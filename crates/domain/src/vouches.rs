@@ -90,6 +90,8 @@ impl VouchService {
                 "message": vouch.message,
             },
             "event_id": vouch_to_event_id(&vouch.vouch_id),
+            "schema_version": "1",
+            "request_id": vouch.request_id,
             "timestamp": format_rfc3339(vouch.created_at_ms),
         })
     }
@@ -182,5 +184,33 @@ mod tests {
             message: Some(long_message),
         };
         assert!(validate_vouch_create(&input).is_err());
+    }
+
+    #[test]
+    fn tandang_payload_contains_schema_version_and_request_id() {
+        let vouch = Vouch {
+            vouch_id: "018f9b2cd4f1aa11bbee223344556677".to_string(),
+            voucher_id: "user-123".to_string(),
+            voucher_username: "user-123-name".to_string(),
+            vouchee_id: "user-456".to_string(),
+            skill_id: Some("skill-1".to_string()),
+            weight_hint: Some(VouchWeightHint::Strong),
+            message: Some("great work".to_string()),
+            request_id: "req-vouch-123".to_string(),
+            correlation_id: "corr-vouch-123".to_string(),
+            created_at_ms: 1_739_750_400_000,
+            updated_at_ms: 1_739_750_400_000,
+        };
+        let payload = VouchService::into_tandang_event_payload(&vouch);
+        assert_eq!(
+            payload
+                .get("schema_version")
+                .and_then(|value| value.as_str()),
+            Some("1")
+        );
+        assert_eq!(
+            payload.get("request_id").and_then(|value| value.as_str()),
+            Some("req-vouch-123")
+        );
     }
 }

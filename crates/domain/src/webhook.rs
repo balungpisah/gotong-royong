@@ -136,6 +136,24 @@ impl WebhookOutboxEvent {
             .ok_or_else(|| DomainError::Validation("missing event_type in webhook payload".into()))?
             .to_string();
 
+        let _schema_version = payload
+            .get("schema_version")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                DomainError::Validation("missing schema_version in webhook payload".into())
+            })?
+            .to_string();
+
+        let payload_request_id = payload
+            .get("request_id")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| DomainError::Validation("missing request_id in webhook payload".into()))?
+            .to_string();
+
         let actor_id = payload
             .get("actor")
             .and_then(|value| value.get("user_id"))
@@ -163,6 +181,11 @@ impl WebhookOutboxEvent {
         if request_id.is_empty() || correlation_id.is_empty() {
             return Err(DomainError::Validation(
                 "request_id and correlation_id are required".into(),
+            ));
+        }
+        if payload_request_id != request_id {
+            return Err(DomainError::Validation(
+                "payload request_id must match webhook request_id".into(),
             ));
         }
 
@@ -221,4 +244,65 @@ pub struct WebhookDeliveryLog {
     pub response_body_sha256: Option<String>,
     pub error_message: Option<String>,
     pub created_at_ms: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn valid_payload() -> serde_json::Value {
+        json!({
+            "event_id": "evt_a1b2c3d4e5f67890",
+            "event_type": "contribution_created",
+            "schema_version": "1",
+            "request_id": "req-1",
+            "actor": {
+                "user_id": "user-123",
+                "username": "user-123-name"
+            },
+            "subject": {
+                "contribution_type": "task_completion",
+                "title": "test"
+            }
+        })
+    }
+
+    #[test]
+    fn webhook_outbox_event_requires_schema_version() {
+        let mut payload = valid_payload();
+        payload
+            .as_object_mut()
+            .expect("payload object")
+            .remove("schema_version");
+        let err = WebhookOutboxEvent::new(payload, "req-1", "corr-1", 3).expect_err("error");
+        assert!(
+            matches!(err, DomainError::Validation(message) if message.contains("schema_version"))
+        );
+    }
+
+    #[test]
+    fn webhook_outbox_event_requires_payload_request_id() {
+        let mut payload = valid_payload();
+        payload
+            .as_object_mut()
+            .expect("payload object")
+            .remove("request_id");
+        let err = WebhookOutboxEvent::new(payload, "req-1", "corr-1", 3).expect_err("error");
+        assert!(matches!(err, DomainError::Validation(message) if message.contains("request_id")));
+    }
+
+    #[test]
+    fn webhook_outbox_event_rejects_mismatched_payload_request_id() {
+        let payload = valid_payload();
+        let err = WebhookOutboxEvent::new(payload, "req-2", "corr-1", 3).expect_err("error");
+        assert!(matches!(err, DomainError::Validation(message) if message.contains("must match")));
+    }
+
+    #[test]
+    fn webhook_outbox_event_accepts_valid_schema_and_request_id() {
+        let payload = valid_payload();
+        let event = WebhookOutboxEvent::new(payload, "req-1", "corr-1", 3).expect("event");
+        assert_eq!(event.request_id, "req-1");
+    }
 }

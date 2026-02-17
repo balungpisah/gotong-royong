@@ -82,6 +82,8 @@ impl ContributionService {
                 "metadata": contribution.metadata,
             },
             "event_id": contribution_to_event_id(&contribution.contribution_id),
+            "schema_version": "1",
+            "request_id": contribution.request_id,
             "timestamp": format_rfc3339(contribution.created_at_ms),
         })
     }
