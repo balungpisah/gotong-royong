@@ -48,6 +48,7 @@ Canonical decision:
 - [Infrastructure](deployment/infrastructure.md) - Deployment architecture options
 - [Security Checklist](deployment/security-checklist.md) - Security hardening guide
 - [Monitoring](deployment/monitoring.md) - Metrics and alerting
+- [Tandang Integration Config](deployment/tandang-integration-config.md) - Required env vars, toggles, and safe defaults
 
 ### Development
 - [Setup Guide](development/setup-guide.md) - Local development environment setup
