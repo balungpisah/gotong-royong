@@ -24,20 +24,13 @@ Semua seed card mengikuti struktur 6-bagian yang sama, terlepas dari track:
 - 📝 **Summary** (blue): "📝 Ringkasan"
 - ⚠ **Duplicate** (orange): "⚠ Duplikat"
 
-### 5.2 Pola Dual-Tab (Cross-cutting)
+### 5.2 Chat-First + Drawable Phase Panel
 
-Setiap phase memiliki 2 tab yang bisa diswipe: tab konten terstruktur + tab percakapan. Bar tab di bawah app bar, underline warna track pada tab aktif, hint "‹ geser ›". Notification dot merah 6px saat konten belum dibaca di tab lain.
+> **Updated 2026-02-17.** The Dual-Tab Pattern (v0.5) is superseded by the Chat-First model. See `UI-GUIDELINE-v1.0.md` Section 2 for the canonical definition.
 
-Chat menggunakan gaya WhatsApp: `.chat-bubble.other` (kiri, putih) dan `.chat-bubble.self` (kanan, track-soft). AI inline card muncul sebagai kartu khusus dalam alur chat.
+Chat is the primary surface. Structured content (phases, checkpoints, progress) lives in a **drawable panel** above the chat, accessible via a **phase breadcrumb** (`●───●───◦`). Tapping a dot or pulling down reveals the phase card.
 
-**Contoh pemetaan tab (Adaptive Path):**
-
-| Phase | Tab 1 | Tab 2 |
-|---|---|---|
-| Pembahasan | 💬 Diskusi | 📋 Rangkuman |
-| Perencanaan | 📋 Papan GR | 💬 Koordinasi |
-| Pelaksanaan | ✅ Progres | 💬 Koordinasi |
-| Verifikasi | 📊 Laporan | 💬 Tanggapan |
+Chat uses WhatsApp-style: `.chat-bubble.other` (left, white) and `.chat-bubble.self` (right, track-soft). AI inline cards appear as special cards within chat flow.
 
 ### 5.3 Adaptive Path & Track Hints
 
