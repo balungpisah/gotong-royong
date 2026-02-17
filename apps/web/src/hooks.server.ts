@@ -1,6 +1,6 @@
 import { base } from '$app/paths';
 import { sequence } from '@sveltejs/kit/hooks';
-import { redirect, type Handle } from '@sveltejs/kit';
+import { type Handle } from '@sveltejs/kit';
 import {
 	HOME_PATH,
 	LOGIN_PATH,
@@ -11,6 +11,8 @@ import {
 } from '$lib/auth';
 import { resolveAuthSession } from '$lib/auth/server';
 import { paraglideMiddleware } from '$lib/paraglide/server';
+
+const NO_STORE_CACHE_CONTROL = 'no-store, no-cache, must-revalidate, private, max-age=0';
 
 const stripBasePath = (pathname: string) => {
 	if (!base) {
@@ -31,6 +33,21 @@ const stripBasePath = (pathname: string) => {
 
 const withBase = (pathname: string) => `${base}${pathname}`;
 
+const applyNoStoreHeaders = (response: Response) => {
+	response.headers.set('cache-control', NO_STORE_CACHE_CONTROL);
+	response.headers.set('pragma', 'no-cache');
+	response.headers.set('expires', '0');
+	return response;
+};
+
+const noStoreRedirect = (location: string) =>
+	applyNoStoreHeaders(
+		new Response(null, {
+			status: 303,
+			headers: { location }
+		})
+	);
+
 const authHandle: Handle = async ({ event, resolve }) => {
 	const session = await resolveAuthSession(event.cookies, event.request.headers);
 	const user = session?.user ?? null;
@@ -42,21 +59,28 @@ const authHandle: Handle = async ({ event, resolve }) => {
 	event.locals.hasRole = (roles) => hasAnyRole(role, roles);
 
 	const pathname = stripBasePath(event.url.pathname);
+	const requiredRoles = requiredRolesForPath(pathname);
+	const isSensitivePath =
+		isPublicOnlyPath(pathname) || isProtectedPath(pathname) || Boolean(requiredRoles);
 
 	if (!session && isProtectedPath(pathname)) {
-		throw redirect(303, withBase(LOGIN_PATH));
+		return noStoreRedirect(withBase(LOGIN_PATH));
 	}
 
 	if (session && isPublicOnlyPath(pathname)) {
-		throw redirect(303, withBase(HOME_PATH));
+		return noStoreRedirect(withBase(HOME_PATH));
 	}
 
-	const requiredRoles = requiredRolesForPath(pathname);
 	if (requiredRoles && !event.locals.hasRole(requiredRoles)) {
-		throw redirect(303, withBase(HOME_PATH));
+		return noStoreRedirect(withBase(HOME_PATH));
 	}
 
-	return resolve(event);
+	const response = await resolve(event);
+	if (isSensitivePath) {
+		return applyNoStoreHeaders(response);
+	}
+
+	return response;
 };
 
 const paraglideHandle: Handle = async ({ event, resolve }) =>

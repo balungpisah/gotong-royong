@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+	<title id="title">Gotong Royong</title>
+	<defs>
+		<linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#5d4037" />
+			<stop offset="100%" stop-color="#c05621" />
+		</linearGradient>
+	</defs>
+	<rect width="512" height="512" rx="112" fill="url(#bg)" />
+	<circle cx="166" cy="214" r="42" fill="#fffbf5" />
+	<circle cx="346" cy="214" r="42" fill="#fffbf5" />
+	<path
+		d="M110 340c19-57 74-96 146-96s127 39 146 96"
+		fill="none"
+		stroke="#fffbf5"
+		stroke-linecap="round"
+		stroke-width="44"
+	/>
+	<path
+		d="M144 166c29-27 70-44 112-44s83 17 112 44"
+		fill="none"
+		stroke="#fffbf5"
+		stroke-linecap="round"
+		stroke-width="24"
+		opacity=".85"
+	/>
+</svg>
