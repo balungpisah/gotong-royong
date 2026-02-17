@@ -39,84 +39,92 @@
 			icon: UserRound
 		}
 	] as const;
+
+	const loginPath = resolve('/masuk');
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<div class="min-h-dvh bg-background text-foreground">
-	<div class="mx-auto flex min-h-dvh w-full max-w-screen-xl flex-col md:px-6">
-		<header
-			class="sticky top-0 z-20 border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85"
-		>
-			<div
-				class="mx-auto flex w-full max-w-screen-md items-center justify-between gap-3 px-4 py-3 md:max-w-none md:px-0"
+{#if page.url.pathname === loginPath}
+	<main class="mx-auto flex min-h-dvh w-full max-w-screen-md px-4 py-6">
+		{@render children()}
+	</main>
+{:else}
+	<div class="min-h-dvh bg-background text-foreground">
+		<div class="mx-auto flex min-h-dvh w-full max-w-screen-xl flex-col md:px-6">
+			<header
+				class="sticky top-0 z-20 border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85"
 			>
-				<a
-					href={resolve('/beranda')}
-					class="text-sm font-extrabold tracking-wide text-foreground uppercase"
-				>
-					{m.shell_brand_name()}
-				</a>
-				<p class="hidden text-sm text-muted-foreground md:block">{m.shell_brand_tagline()}</p>
-			</div>
-
-			<nav class="hidden border-t border-border/60 md:block">
 				<div
-					class="mx-auto flex w-full max-w-screen-md items-center gap-2 px-4 py-2 md:max-w-none md:px-0"
+					class="mx-auto flex w-full max-w-screen-md items-center justify-between gap-3 px-4 py-3 md:max-w-none md:px-0"
 				>
-					{#each navItems as item (item.href)}
-						{@const Icon = item.icon}
-						{@const resolvedHref = resolve(item.href)}
-						{@const active = page.url.pathname === resolvedHref}
-						<a
-							class={[
-								'inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition',
-								active
-									? 'bg-primary text-primary-foreground'
-									: 'text-muted-foreground hover:bg-muted hover:text-foreground'
-							]}
-							href={resolvedHref}
-							aria-current={active ? 'page' : undefined}
-						>
-							<Icon class="size-4" />
-							<span>{item.label()}</span>
-						</a>
-					{/each}
+					<a
+						href={resolve('/beranda')}
+						class="text-sm font-extrabold tracking-wide text-foreground uppercase"
+					>
+						{m.shell_brand_name()}
+					</a>
+					<p class="hidden text-sm text-muted-foreground md:block">{m.shell_brand_tagline()}</p>
 				</div>
-			</nav>
-		</header>
 
-		<main
-			class="mx-auto flex w-full max-w-screen-md flex-1 flex-col px-4 py-6 pb-24 md:max-w-none md:px-0 md:pb-8"
-		>
-			{@render children()}
-		</main>
-	</div>
+				<nav class="hidden border-t border-border/60 md:block">
+					<div
+						class="mx-auto flex w-full max-w-screen-md items-center gap-2 px-4 py-2 md:max-w-none md:px-0"
+					>
+						{#each navItems as item (item.href)}
+							{@const Icon = item.icon}
+							{@const resolvedHref = resolve(item.href)}
+							{@const active = page.url.pathname === resolvedHref}
+							<a
+								class={[
+									'inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition',
+									active
+										? 'bg-primary text-primary-foreground'
+										: 'text-muted-foreground hover:bg-muted hover:text-foreground'
+								]}
+								href={resolvedHref}
+								aria-current={active ? 'page' : undefined}
+							>
+								<Icon class="size-4" />
+								<span>{item.label()}</span>
+							</a>
+						{/each}
+					</div>
+				</nav>
+			</header>
 
-	<nav
-		class="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:hidden"
-	>
-		<div class="mx-auto grid max-w-screen-md grid-cols-5 px-2 py-2">
-			{#each navItems as item (item.href)}
-				{@const Icon = item.icon}
-				{@const resolvedHref = resolve(item.href)}
-				{@const active = page.url.pathname === resolvedHref}
-				<a
-					class={[
-						'inline-flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium transition',
-						active
-							? 'bg-primary/12 text-primary'
-							: 'text-muted-foreground hover:bg-muted hover:text-foreground'
-					]}
-					href={resolvedHref}
-					aria-current={active ? 'page' : undefined}
-				>
-					<Icon class="size-4" />
-					<span>{item.label()}</span>
-				</a>
-			{/each}
+			<main
+				class="mx-auto flex w-full max-w-screen-md flex-1 flex-col px-4 py-6 pb-24 md:max-w-none md:px-0 md:pb-8"
+			>
+				{@render children()}
+			</main>
 		</div>
-	</nav>
-</div>
+
+		<nav
+			class="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:hidden"
+		>
+			<div class="mx-auto grid max-w-screen-md grid-cols-5 px-2 py-2">
+				{#each navItems as item (item.href)}
+					{@const Icon = item.icon}
+					{@const resolvedHref = resolve(item.href)}
+					{@const active = page.url.pathname === resolvedHref}
+					<a
+						class={[
+							'inline-flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium transition',
+							active
+								? 'bg-primary/12 text-primary'
+								: 'text-muted-foreground hover:bg-muted hover:text-foreground'
+						]}
+						href={resolvedHref}
+						aria-current={active ? 'page' : undefined}
+					>
+						<Icon class="size-4" />
+						<span>{item.label()}</span>
+					</a>
+				{/each}
+			</div>
+		</nav>
+	</div>
+{/if}

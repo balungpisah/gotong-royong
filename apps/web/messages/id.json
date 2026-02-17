@@ -17,5 +17,8 @@
 	"page_notifikasi_title": "Pusat Notifikasi",
 	"page_notifikasi_description": "Pembaruan penting, pengingat, dan status tindak lanjut tim akan muncul di sini.",
 	"page_profil_title": "Profil Warga",
-	"page_profil_description": "Reputasi, riwayat kontribusi, dan pengaturan akun akan dikelola di halaman ini."
+	"page_profil_description": "Reputasi, riwayat kontribusi, dan pengaturan akun akan dikelola di halaman ini.",
+	"auth_login_title": "Masuk ke Gotong Royong",
+	"auth_login_description": "Halaman ini disiapkan untuk alur autentikasi berbasis JWT.",
+	"auth_login_hint": "Gunakan token sesi valid (cookie gr_session atau header Bearer) untuk mengakses area aplikasi."
 }

@@ -1,4 +1,1 @@
-export interface SessionUser {
-	id: string;
-	role: string;
-}
+export type { AuthRole, AuthSession, SessionUser } from '$lib/auth';

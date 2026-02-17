@@ -1,4 +1,5 @@
 export * as api from './api';
+export * as auth from './auth';
 export * as stores from './stores';
 export * as utils from './utils';
 export * as types from './types';
