@@ -120,3 +120,5 @@ Status legend: `existing` means already supported in `docs/api/event-payloads.md
 ## Implementation Notes
 
 All proposed event types should be added to `docs/api/event-payloads.md` and to the Markov adapter once approved. If a Gotong action maps to `no_event`, that is a deliberate decision and should not emit webhooks.
+
+Gameplay outcomes driven by these signals are defined in `docs/architecture/tandang-gameplay-rules.md`.

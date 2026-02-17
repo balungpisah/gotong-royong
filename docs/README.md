@@ -18,6 +18,7 @@ Canonical decision:
 - [System Overview](architecture/system-overview.md) - High-level component architecture
 - [Integration Architecture](architecture/integration-architecture.md) - Markov Engine integration patterns
 - [Data Flow](architecture/data-flow.md) - Task and evidence flow diagrams
+- [Gameplay Rules (Tandang Signals)](architecture/tandang-gameplay-rules.md) - Deterministic gameplay gates/rewards driven by Tandang
 
 ### API Specifications
 - [Webhook Specification](api/webhook-spec.md) - Webhook endpoint requirements
@@ -97,6 +98,7 @@ Canonical decision:
 - **Markov Engine Integration Guide**: [../tandang/markov-engine/docs/GOTONG-ROYONG-INTEGRATION-GUIDE.md](../../tandang/markov-engine/docs/GOTONG-ROYONG-INTEGRATION-GUIDE.md)
 - **Tandang Signal Mapping**: [architecture/tandang-signal-mapping.md](architecture/tandang-signal-mapping.md)
 - **Full Gotong ↔ Tandang Integration Spec**: [architecture/tandang-full-integration.md](architecture/tandang-full-integration.md)
+- **Gameplay Rules Mapping**: [architecture/tandang-gameplay-rules.md](architecture/tandang-gameplay-rules.md)
 - **Markov Engine Adapter**: [../tandang/markov-engine/crates/infrastructure/src/adapters/gotong_royong.rs](../../tandang/markov-engine/crates/infrastructure/src/adapters/gotong_royong.rs)
 - **Test Payloads**: [../tandang/markov-engine/tests/fixtures/gotong_royong_payloads.json](../../tandang/markov-engine/tests/fixtures/gotong_royong_payloads.json)
 

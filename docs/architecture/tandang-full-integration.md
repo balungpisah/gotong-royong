@@ -88,6 +88,9 @@
 | PoR guidance | `/api/v1/por/requirements`, `/api/v1/por/triad-requirements` |
 | Leaderboards | `/api/v1/reputation/leaderboard` |
 
+Gameplay gates, rewards, and badge rules are specified in:
+- `docs/architecture/tandang-gameplay-rules.md`
+
 ## Backfill and Replay
 
 - Use `POST /api/v1/platforms/gotong_royong/ingest` for historical data.
