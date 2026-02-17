@@ -1,7 +1,21 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"home_title": "Selamat datang di Gotong Royong",
-	"home_docs_prefix": "Kunjungi",
-	"home_docs_link_label": "dokumentasi SvelteKit",
-	"home_docs_suffix": "untuk referensi teknis."
+	"shell_brand_name": "Gotong Royong",
+	"shell_brand_tagline": "Kolaborasi warga, dari masalah menuju solusi bersama.",
+	"shell_nav_beranda": "Beranda",
+	"shell_nav_terlibat": "Terlibat",
+	"shell_nav_bantu": "Bantu",
+	"shell_nav_notifikasi": "Notifikasi",
+	"shell_nav_profil": "Profil",
+	"page_placeholder_badge": "Fondasi",
+	"page_beranda_title": "Beranda Warga",
+	"page_beranda_description": "Ringkasan aktivitas dan aksi prioritas akan ditampilkan di halaman ini.",
+	"page_terlibat_title": "Ruang Terlibat",
+	"page_terlibat_description": "Inisiatif aktif yang butuh partisipasi komunitas akan dikelola di sini.",
+	"page_bantu_title": "Ruang Bantu",
+	"page_bantu_description": "Kebutuhan bantuan, kecocokan skill, dan peluang kontribusi akan muncul di sini.",
+	"page_notifikasi_title": "Pusat Notifikasi",
+	"page_notifikasi_description": "Pembaruan penting, pengingat, dan status tindak lanjut tim akan muncul di sini.",
+	"page_profil_title": "Profil Warga",
+	"page_profil_description": "Reputasi, riwayat kontribusi, dan pengaturan akun akan dikelola di halaman ini."
 }
