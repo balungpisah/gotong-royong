@@ -1709,10 +1709,7 @@ impl OntologyRepository for InMemoryOntologyRepository {
                 let mut notes = notes.write().await;
                 let mut keys = Vec::new();
                 for (key, note) in notes.iter() {
-                    if note
-                        .ttl_expires_ms
-                        .is_some_and(|value| value <= cutoff_ms)
-                    {
+                    if note.ttl_expires_ms.is_some_and(|value| value <= cutoff_ms) {
                         expired_notes.push(note.note_id.clone());
                         keys.push(key.clone());
                     }
@@ -1736,9 +1733,9 @@ impl OntologyRepository for InMemoryOntologyRepository {
             let mut triples = triples.write().await;
             let before = triples.len();
             triples.retain(|triple| {
-                !normalized_expired.iter().any(|candidate| {
-                    triple.from_id == *candidate || triple.to_id == *candidate
-                })
+                !normalized_expired
+                    .iter()
+                    .any(|candidate| triple.from_id == *candidate || triple.to_id == *candidate)
             });
             let _removed_triples = before.saturating_sub(triples.len());
             Ok(expired_notes.len())
@@ -2135,15 +2132,12 @@ impl OntologyRepository for SurrealOntologyRepository {
             let expired_note_ids: Vec<String> = expired_rows
                 .into_iter()
                 .filter_map(|value| {
-                    value
-                        .as_str()
-                        .map(ToString::to_string)
-                        .or_else(|| {
-                            value
-                                .get("id")
-                                .and_then(Value::as_str)
-                                .map(ToString::to_string)
-                        })
+                    value.as_str().map(ToString::to_string).or_else(|| {
+                        value
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .map(ToString::to_string)
+                    })
                 })
                 .collect();
             if expired_note_ids.is_empty() {
@@ -2189,7 +2183,9 @@ impl OntologyRepository for SurrealOntologyRepository {
                     .await
                     .map_err(Self::map_surreal_error)?
                     .take(0)
-                    .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid query result: {err}"))
+                    })?;
             }
 
             Ok(expired_note_ids.len())

@@ -1075,31 +1075,34 @@ pub(crate) async fn edgepod_credit_recommendation(
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
             let ignored_client_snapshot = payload.reputation_snapshot.is_some();
-            let (trusted_reputation_snapshot, markov_enrichment) =
-                match state.markov_client.get_user_reputation(&payload.user_id).await {
-                    Ok(cached) => {
-                        let context = markov_enrichment_context(&cached);
-                        (Some(cached.value), context)
-                    }
-                    Err(err) => {
-                        observability::register_edgepod_fallback(
-                            "ep09_credit_recommendation",
-                            "MARKOV_REPUTATION_UNAVAILABLE",
-                        );
-                        tracing::warn!(
-                            error = %err,
-                            user_id = %payload.user_id,
-                            "edgepod credit recommendation markov reputation enrichment failed"
-                        );
-                        (
-                            None,
-                            json!({
-                                "used": false,
-                                "reason": "markov_reputation_unavailable",
-                            }),
-                        )
-                    }
-                };
+            let (trusted_reputation_snapshot, markov_enrichment) = match state
+                .markov_client
+                .get_user_reputation(&payload.user_id)
+                .await
+            {
+                Ok(cached) => {
+                    let context = markov_enrichment_context(&cached);
+                    (Some(cached.value), context)
+                }
+                Err(err) => {
+                    observability::register_edgepod_fallback(
+                        "ep09_credit_recommendation",
+                        "MARKOV_REPUTATION_UNAVAILABLE",
+                    );
+                    tracing::warn!(
+                        error = %err,
+                        user_id = %payload.user_id,
+                        "edgepod credit recommendation markov reputation enrichment failed"
+                    );
+                    (
+                        None,
+                        json!({
+                            "used": false,
+                            "reason": "markov_reputation_unavailable",
+                        }),
+                    )
+                }
+            };
 
             let output = credit_output(&payload, trusted_reputation_snapshot.is_some());
             let reason_code = if should_fallback_from_request(&request_id, &payload.user_id) {
@@ -1113,7 +1116,10 @@ pub(crate) async fn edgepod_credit_recommendation(
             let mut actor_context_map = Map::new();
             actor_context_map.insert("markov_reputation".to_string(), markov_enrichment);
             if ignored_client_snapshot {
-                actor_context_map.insert("client_reputation_snapshot_ignored".to_string(), json!(true));
+                actor_context_map.insert(
+                    "client_reputation_snapshot_ignored".to_string(),
+                    json!(true),
+                );
             }
             if reason_code == "MODEL_UNAVAILABLE" {
                 actor_context_map.insert("fallback".to_string(), json!(true));

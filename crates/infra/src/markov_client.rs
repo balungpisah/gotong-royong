@@ -179,7 +179,10 @@ impl MarkovReadClient {
         let token = config.markov_read_platform_token.trim().to_string();
         Self {
             http,
-            base_url: config.markov_read_base_url.trim_end_matches('/').to_string(),
+            base_url: config
+                .markov_read_base_url
+                .trim_end_matches('/')
+                .to_string(),
             platform_token: if token.is_empty() { None } else { Some(token) },
             retry_max_attempts: config.markov_read_retry_max_attempts.max(1),
             retry_backoff_base: Duration::from_millis(config.markov_read_retry_backoff_base_ms),
@@ -300,8 +303,13 @@ impl MarkovReadClient {
             ));
         }
         let path = format!("por/requirements/{task_type}");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Optional)
-            .await
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Optional,
+        )
+        .await
     }
 
     pub async fn get_por_triad_requirements(
@@ -317,8 +325,13 @@ impl MarkovReadClient {
             ));
         }
         let path = format!("por/triad-requirements/{track}/{transition}");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Optional)
-            .await
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Optional,
+        )
+        .await
     }
 
     pub async fn get_reputation_leaderboard(

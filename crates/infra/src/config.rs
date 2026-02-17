@@ -129,7 +129,8 @@ impl AppConfig {
                 "markov_read_circuit_fail_threshold must be >= 1".to_string(),
             ));
         }
-        if config.markov_cache_profile_stale_while_revalidate_ms < config.markov_cache_profile_ttl_ms
+        if config.markov_cache_profile_stale_while_revalidate_ms
+            < config.markov_cache_profile_ttl_ms
         {
             return Err(config::ConfigError::Message(
                 "markov_cache_profile_stale_while_revalidate_ms must be >= markov_cache_profile_ttl_ms".to_string(),

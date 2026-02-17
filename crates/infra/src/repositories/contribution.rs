@@ -1,3 +1,1 @@
-pub use super::impls::{
-    InMemoryContributionRepository, SurrealContributionRepository,
-};
+pub use super::impls::{InMemoryContributionRepository, SurrealContributionRepository};

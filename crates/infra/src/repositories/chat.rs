@@ -1,3 +1,1 @@
-pub use super::impls::{
-    InMemoryChatRepository, SurrealChatRepository,
-};
+pub use super::impls::{InMemoryChatRepository, SurrealChatRepository};

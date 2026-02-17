@@ -1,3 +1,1 @@
-pub use super::impls::{
-    InMemoryAdaptivePathRepository, SurrealAdaptivePathRepository,
-};
+pub use super::impls::{InMemoryAdaptivePathRepository, SurrealAdaptivePathRepository};
