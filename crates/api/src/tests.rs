@@ -3180,6 +3180,181 @@ async fn tandang_routes_surface_cache_metadata_and_data() {
 }
 
 #[tokio::test]
+async fn tandang_routes_match_read_contract_shapes() {
+    let markov_base_url = spawn_markov_stub_base_url().await;
+    let app = test_app_with_markov_base(markov_base_url);
+    let token = test_token("test-secret");
+
+    let profile_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/me/profile")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("profile request");
+    let profile_response = app.clone().oneshot(profile_request).await.expect("profile response");
+    assert_eq!(profile_response.status(), StatusCode::OK);
+    let profile_body = to_bytes(profile_response.into_body(), usize::MAX)
+        .await
+        .expect("profile body");
+    let profile_json: serde_json::Value = serde_json::from_slice(&profile_body).expect("profile");
+    let profile_data = profile_json.get("data").expect("profile data");
+    assert!(
+        profile_data
+            .get("reputation")
+            .and_then(|value| value.get("user_id"))
+            .is_some()
+    );
+    assert!(
+        profile_data
+            .get("reputation")
+            .and_then(|value| value.get("tier"))
+            .is_some()
+    );
+    assert!(
+        profile_data
+            .get("tier")
+            .and_then(|value| value.get("tier_symbol"))
+            .is_some()
+    );
+    assert!(
+        profile_data
+            .get("cv_hidup")
+            .and_then(|value| value.get("user_id"))
+            .is_some()
+    );
+
+    let skills_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/skills/search?q=cleanup")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("skills request");
+    let skills_response = app.clone().oneshot(skills_request).await.expect("skills response");
+    assert_eq!(skills_response.status(), StatusCode::OK);
+    let skills_body = to_bytes(skills_response.into_body(), usize::MAX)
+        .await
+        .expect("skills body");
+    let skills_json: serde_json::Value = serde_json::from_slice(&skills_body).expect("skills");
+    assert!(
+        skills_json
+            .get("data")
+            .and_then(|value| value.get("results"))
+            .and_then(|value| value.as_array())
+            .is_some()
+    );
+
+    let por_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/por/requirements/delivery")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("por request");
+    let por_response = app.clone().oneshot(por_request).await.expect("por response");
+    assert_eq!(por_response.status(), StatusCode::OK);
+    let por_body = to_bytes(por_response.into_body(), usize::MAX)
+        .await
+        .expect("por body");
+    let por_json: serde_json::Value = serde_json::from_slice(&por_body).expect("por");
+    assert!(
+        por_json
+            .get("data")
+            .and_then(|value| value.get("task_type"))
+            .is_some()
+    );
+    assert!(
+        por_json
+            .get("data")
+            .and_then(|value| value.get("min_media_items"))
+            .is_some()
+    );
+
+    let triad_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/por/triad-requirements/resolve/seed_to_define")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("triad request");
+    let triad_response = app
+        .clone()
+        .oneshot(triad_request)
+        .await
+        .expect("triad response");
+    assert_eq!(triad_response.status(), StatusCode::OK);
+    let triad_body = to_bytes(triad_response.into_body(), usize::MAX)
+        .await
+        .expect("triad body");
+    let triad_json: serde_json::Value = serde_json::from_slice(&triad_body).expect("triad");
+    assert!(
+        triad_json
+            .get("data")
+            .and_then(|value| value.get("track"))
+            .is_some()
+    );
+    assert!(
+        triad_json
+            .get("data")
+            .and_then(|value| value.get("stage_transition"))
+            .is_some()
+    );
+
+    let leaderboard_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/reputation/leaderboard?limit=5")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("leaderboard request");
+    let leaderboard_response = app
+        .clone()
+        .oneshot(leaderboard_request)
+        .await
+        .expect("leaderboard response");
+    assert_eq!(leaderboard_response.status(), StatusCode::OK);
+    let leaderboard_body = to_bytes(leaderboard_response.into_body(), usize::MAX)
+        .await
+        .expect("leaderboard body");
+    let leaderboard_json: serde_json::Value =
+        serde_json::from_slice(&leaderboard_body).expect("leaderboard");
+    assert!(
+        leaderboard_json
+            .get("data")
+            .and_then(|value| value.get("entries"))
+            .and_then(|value| value.as_array())
+            .is_some()
+    );
+    assert!(
+        leaderboard_json
+            .get("data")
+            .and_then(|value| value.get("total_users"))
+            .is_some()
+    );
+
+    let distribution_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/reputation/distribution")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("distribution request");
+    let distribution_response = app
+        .clone()
+        .oneshot(distribution_request)
+        .await
+        .expect("distribution response");
+    assert_eq!(distribution_response.status(), StatusCode::OK);
+    let distribution_body = to_bytes(distribution_response.into_body(), usize::MAX)
+        .await
+        .expect("distribution body");
+    let distribution_json: serde_json::Value =
+        serde_json::from_slice(&distribution_body).expect("distribution");
+    let distribution_data = distribution_json.get("data").expect("distribution data");
+    for field in ["keystone", "pillar", "contributor", "novice", "shadow", "total"] {
+        assert!(
+            distribution_data.get(field).is_some(),
+            "missing field {field} in distribution response"
+        );
+    }
+}
+
+#[tokio::test]
 async fn metrics_endpoint_is_exposed() {
     let _ = observability::init_metrics();
     observability::register_markov_integration_error("test_reason");

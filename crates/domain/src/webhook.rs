@@ -305,4 +305,38 @@ mod tests {
         let event = WebhookOutboxEvent::new(payload, "req-1", "corr-1", 3).expect("event");
         assert_eq!(event.request_id, "req-1");
     }
+
+    #[test]
+    fn cross_repo_gotong_fixtures_satisfy_webhook_contract() {
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../tandang/markov-engine/tests/fixtures/gotong_royong_payloads.json"
+        ))
+        .expect("load fixture json");
+
+        for fixture_name in [
+            "valid_contribution",
+            "valid_vouch",
+            "valid_por_photo",
+            "valid_por_gps",
+            "valid_por_witness",
+        ] {
+            let payload = fixtures
+                .get(fixture_name)
+                .cloned()
+                .unwrap_or_else(|| panic!("missing fixture {fixture_name}"));
+            let request_id = payload
+                .get("request_id")
+                .and_then(|value| value.as_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| panic!("fixture {fixture_name} missing request_id"));
+            let event = WebhookOutboxEvent::new(
+                payload,
+                request_id,
+                format!("corr-{fixture_name}"),
+                3,
+            )
+            .unwrap_or_else(|err| panic!("fixture {fixture_name} failed contract: {err}"));
+            assert!(!event.event_id.trim().is_empty());
+        }
+    }
 }
