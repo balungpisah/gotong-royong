@@ -49,6 +49,7 @@ Canonical decision:
 - [Security Checklist](deployment/security-checklist.md) - Security hardening guide
 - [Monitoring](deployment/monitoring.md) - Metrics and alerting
 - [Tandang Integration Config](deployment/tandang-integration-config.md) - Required env vars, toggles, and safe defaults
+- [Webhook Backfill + Replay](deployment/webhook-backfill-replay.md) - Historical backfill and DLQ replay tooling
 
 ### Development
 - [Setup Guide](development/setup-guide.md) - Local development environment setup

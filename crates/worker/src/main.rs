@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -7,13 +9,16 @@ use gotong_domain::ports::webhook::WebhookOutboxRepository;
 use gotong_domain::{
     auth::Role,
     identity::ActorIdentity,
-    jobs::{ConceptVerificationPayload, TTLCleanupPayload, backoff_ms, now_ms},
+    jobs::{
+        ConceptVerificationPayload, JobDefaults, TTLCleanupPayload, WebhookRetryPayload,
+        backoff_ms, new_job, now_ms,
+    },
     moderation::{ModerationAutoReleaseCommand, ModerationService},
     ontology::OntologyConcept,
     ports::{jobs::JobEnvelope, moderation::ModerationRepository},
     webhook::{
-        WebhookDeliveryLog, WebhookDeliveryResult, WebhookOutboxEvent, WebhookOutboxStatus,
-        WebhookOutboxUpdate,
+        WebhookDeliveryLog, WebhookDeliveryResult, WebhookOutboxEvent, WebhookOutboxListQuery,
+        WebhookOutboxStatus, WebhookOutboxUpdate,
     },
 };
 use gotong_infra::{
@@ -39,6 +44,21 @@ async fn main() -> anyhow::Result<()> {
     let config = AppConfig::load()?;
     init_tracing(&config)?;
     observability::init_metrics()?;
+
+    let args = std::env::args().skip(1).collect::<Vec<_>>();
+    if let Some(command) = args.first().map(String::as_str) {
+        match command {
+            "webhook-backfill" => {
+                run_webhook_backfill_mode(&config, &args[1..]).await?;
+                return Ok(());
+            }
+            "webhook-replay-dlq" => {
+                run_webhook_replay_mode(&config, &args[1..]).await?;
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
 
     let queue =
         RedisJobQueue::connect_with_prefix(&config.redis_url, config.worker_queue_prefix.clone())
@@ -97,6 +117,451 @@ struct Worker {
     moderation_repo: Option<Arc<dyn ModerationRepository>>,
     ontology_repo: Option<Arc<dyn OntologyRepository>>,
     webhook_outbox_repo: Option<Arc<dyn WebhookOutboxRepository>>,
+}
+
+#[derive(Debug, Clone)]
+struct WebhookBackfillOptions {
+    file: String,
+    dry_run: bool,
+    progress_every: usize,
+    max_attempts: Option<u32>,
+}
+
+impl Default for WebhookBackfillOptions {
+    fn default() -> Self {
+        Self {
+            file: String::new(),
+            dry_run: false,
+            progress_every: 100,
+            max_attempts: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct WebhookReplayOptions {
+    status: WebhookOutboxStatus,
+    limit: usize,
+    dry_run: bool,
+    progress_every: usize,
+}
+
+impl Default for WebhookReplayOptions {
+    fn default() -> Self {
+        Self {
+            status: WebhookOutboxStatus::DeadLetter,
+            limit: 500,
+            dry_run: false,
+            progress_every: 100,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct WebhookBackfillSummary {
+    processed: usize,
+    created: usize,
+    enqueued: usize,
+    duplicates: usize,
+    failed: usize,
+}
+
+#[derive(Debug, Default)]
+struct WebhookReplaySummary {
+    processed: usize,
+    replayed: usize,
+    failed: usize,
+}
+
+fn parse_webhook_backfill_options(args: &[String]) -> anyhow::Result<WebhookBackfillOptions> {
+    let mut opts = WebhookBackfillOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--file" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --file"))?;
+                opts.file = value.to_string();
+                idx += 2;
+            }
+            "--dry-run" => {
+                opts.dry_run = true;
+                idx += 1;
+            }
+            "--progress-every" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --progress-every"))?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|err| anyhow::anyhow!("invalid --progress-every value: {err}"))?;
+                if parsed == 0 {
+                    return Err(anyhow::anyhow!("--progress-every must be >= 1"));
+                }
+                opts.progress_every = parsed;
+                idx += 2;
+            }
+            "--max-attempts" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --max-attempts"))?;
+                let parsed = value
+                    .parse::<u32>()
+                    .map_err(|err| anyhow::anyhow!("invalid --max-attempts value: {err}"))?;
+                if parsed == 0 {
+                    return Err(anyhow::anyhow!("--max-attempts must be >= 1"));
+                }
+                opts.max_attempts = Some(parsed);
+                idx += 2;
+            }
+            other => {
+                return Err(anyhow::anyhow!(
+                    "unknown argument for webhook-backfill: {other}"
+                ));
+            }
+        }
+    }
+
+    if opts.file.trim().is_empty() {
+        return Err(anyhow::anyhow!(
+            "missing required --file argument for webhook-backfill"
+        ));
+    }
+    Ok(opts)
+}
+
+fn parse_webhook_replay_options(args: &[String]) -> anyhow::Result<WebhookReplayOptions> {
+    let mut opts = WebhookReplayOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--status" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --status"))?;
+                opts.status = WebhookOutboxStatus::parse(value).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "invalid --status; use pending|in_flight|delivered|retrying|dead_letter"
+                    )
+                })?;
+                idx += 2;
+            }
+            "--limit" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --limit"))?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|err| anyhow::anyhow!("invalid --limit value: {err}"))?;
+                if parsed == 0 {
+                    return Err(anyhow::anyhow!("--limit must be >= 1"));
+                }
+                opts.limit = parsed.min(10_000);
+                idx += 2;
+            }
+            "--dry-run" => {
+                opts.dry_run = true;
+                idx += 1;
+            }
+            "--progress-every" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --progress-every"))?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|err| anyhow::anyhow!("invalid --progress-every value: {err}"))?;
+                if parsed == 0 {
+                    return Err(anyhow::anyhow!("--progress-every must be >= 1"));
+                }
+                opts.progress_every = parsed;
+                idx += 2;
+            }
+            other => {
+                return Err(anyhow::anyhow!(
+                    "unknown argument for webhook-replay-dlq: {other}"
+                ));
+            }
+        }
+    }
+    Ok(opts)
+}
+
+async fn run_webhook_backfill_mode(config: &AppConfig, args: &[String]) -> anyhow::Result<()> {
+    let options = parse_webhook_backfill_options(args)?;
+    let db_config = DbConfig::from_app_config(config);
+    let repo = SurrealWebhookOutboxRepository::new(&db_config).await?;
+
+    let queue = if options.dry_run {
+        None
+    } else {
+        Some(
+            RedisJobQueue::connect_with_prefix(&config.redis_url, config.worker_queue_prefix.clone())
+                .await?,
+        )
+    };
+
+    let file = File::open(&options.file)
+        .map_err(|err| anyhow::anyhow!("failed opening backfill file '{}': {err}", options.file))?;
+    let reader = BufReader::new(file);
+    let mut summary = WebhookBackfillSummary::default();
+    let max_attempts = options
+        .max_attempts
+        .unwrap_or(config.webhook_max_attempts.max(1));
+
+    println!(
+        "[webhook-backfill] start file={} dry_run={} progress_every={}",
+        options.file, options.dry_run, options.progress_every
+    );
+
+    for line in reader.lines() {
+        let line = line.map_err(|err| anyhow::anyhow!("failed reading backfill file line: {err}"))?;
+        let payload_line = line.trim();
+        if payload_line.is_empty() {
+            continue;
+        }
+        summary.processed = summary.processed.saturating_add(1);
+
+        let payload: serde_json::Value = match serde_json::from_str(payload_line) {
+            Ok(value) => value,
+            Err(err) => {
+                summary.failed = summary.failed.saturating_add(1);
+                warn!(error = %err, "invalid json payload in backfill input");
+                continue;
+            }
+        };
+
+        let event_id = payload
+            .get("event_id")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .unwrap_or("")
+            .to_string();
+        let request_id = payload
+            .get("request_id")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .unwrap_or("")
+            .to_string();
+        if event_id.is_empty() || request_id.is_empty() {
+            summary.failed = summary.failed.saturating_add(1);
+            warn!("backfill payload is missing event_id or request_id");
+            continue;
+        }
+
+        let correlation_id = payload
+            .get("correlation_id")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| format!("backfill:{event_id}"));
+
+        if options.dry_run {
+            match repo.get(&event_id).await {
+                Ok(Some(_)) => {
+                    summary.duplicates = summary.duplicates.saturating_add(1);
+                }
+                Ok(None) => {
+                    summary.created = summary.created.saturating_add(1);
+                }
+                Err(err) => {
+                    summary.failed = summary.failed.saturating_add(1);
+                    warn!(error = %err, event_id = %event_id, "failed checking backfill duplicate");
+                }
+            }
+        } else {
+            let outbox_event = match WebhookOutboxEvent::new(
+                payload,
+                request_id.clone(),
+                correlation_id.clone(),
+                max_attempts,
+            ) {
+                Ok(event) => event,
+                Err(err) => {
+                    summary.failed = summary.failed.saturating_add(1);
+                    warn!(error = %err, event_id = %event_id, "invalid backfill payload");
+                    continue;
+                }
+            };
+
+            match repo.create(&outbox_event).await {
+                Ok(created) => {
+                    summary.created = summary.created.saturating_add(1);
+                    if let Some(queue) = queue.as_ref() {
+                        let payload = serde_json::to_value(WebhookRetryPayload {
+                            event_id: created.event_id.clone(),
+                        })
+                        .map_err(|err| {
+                            anyhow::anyhow!(
+                                "failed serializing webhook retry payload for {}: {err}",
+                                created.event_id
+                            )
+                        })?;
+                        let replay_request_id = format!("backfill:req:{}", created.event_id);
+                        let replay_correlation_id = format!("backfill:corr:{}", created.event_id);
+                        let job = new_job(
+                            format!("backfill:{}:{}", created.event_id, now_ms()),
+                            JobType::WebhookRetry,
+                            payload,
+                            replay_request_id,
+                            replay_correlation_id,
+                            JobDefaults {
+                                max_attempts: config.webhook_max_attempts.max(1),
+                            },
+                        );
+                        if let Err(err) = queue.enqueue(&job).await {
+                            summary.failed = summary.failed.saturating_add(1);
+                            warn!(
+                                error = %err,
+                                event_id = %created.event_id,
+                                "failed to enqueue webhook retry during backfill"
+                            );
+                            continue;
+                        }
+                        summary.enqueued = summary.enqueued.saturating_add(1);
+                    }
+                }
+                Err(gotong_domain::error::DomainError::Conflict) => {
+                    summary.duplicates = summary.duplicates.saturating_add(1);
+                }
+                Err(err) => {
+                    summary.failed = summary.failed.saturating_add(1);
+                    warn!(error = %err, event_id = %event_id, "failed creating outbox event");
+                }
+            }
+        }
+
+        if summary.processed % options.progress_every == 0 {
+            println!(
+                "[webhook-backfill] progress processed={} created={} enqueued={} duplicates={} failed={}",
+                summary.processed,
+                summary.created,
+                summary.enqueued,
+                summary.duplicates,
+                summary.failed
+            );
+        }
+    }
+
+    println!(
+        "[webhook-backfill] done processed={} created={} enqueued={} duplicates={} failed={} dry_run={}",
+        summary.processed,
+        summary.created,
+        summary.enqueued,
+        summary.duplicates,
+        summary.failed,
+        options.dry_run
+    );
+    Ok(())
+}
+
+async fn run_webhook_replay_mode(config: &AppConfig, args: &[String]) -> anyhow::Result<()> {
+    let options = parse_webhook_replay_options(args)?;
+    let db_config = DbConfig::from_app_config(config);
+    let repo = SurrealWebhookOutboxRepository::new(&db_config).await?;
+
+    let queue = if options.dry_run {
+        None
+    } else {
+        Some(
+            RedisJobQueue::connect_with_prefix(&config.redis_url, config.worker_queue_prefix.clone())
+                .await?,
+        )
+    };
+
+    let events = repo
+        .list(&WebhookOutboxListQuery {
+            status: Some(options.status.clone()),
+            limit: options.limit,
+        })
+        .await
+        .map_err(|err| anyhow::anyhow!("failed listing outbox replay candidates: {err}"))?;
+
+    println!(
+        "[webhook-replay-dlq] start status={} limit={} matched={} dry_run={}",
+        options.status.as_str(),
+        options.limit,
+        events.len(),
+        options.dry_run
+    );
+
+    let mut summary = WebhookReplaySummary::default();
+    for event in events {
+        summary.processed = summary.processed.saturating_add(1);
+
+        if options.dry_run {
+            summary.replayed = summary.replayed.saturating_add(1);
+        } else {
+            let request_id = format!("replay:req:{}:{}", event.event_id, now_ms());
+            let correlation_id = format!("replay:corr:{}", event.event_id);
+            let update = WebhookOutboxUpdate {
+                status: WebhookOutboxStatus::Pending,
+                attempts: 0,
+                max_attempts: config.webhook_max_attempts.max(1),
+                next_attempt_at_ms: None,
+                last_status_code: None,
+                last_error: None,
+                request_id: Some(request_id.clone()),
+                correlation_id: Some(correlation_id.clone()),
+            };
+            if let Err(err) = repo.update(&event.event_id, &update).await {
+                summary.failed = summary.failed.saturating_add(1);
+                warn!(
+                    error = %err,
+                    event_id = %event.event_id,
+                    "failed updating outbox event for replay"
+                );
+                continue;
+            }
+
+            if let Some(queue) = queue.as_ref() {
+                let payload = serde_json::to_value(WebhookRetryPayload {
+                    event_id: event.event_id.clone(),
+                })
+                .map_err(|err| {
+                    anyhow::anyhow!(
+                        "failed serializing replay payload for {}: {err}",
+                        event.event_id
+                    )
+                })?;
+                let job = new_job(
+                    format!("replay:{}:{}", event.event_id, now_ms()),
+                    JobType::WebhookRetry,
+                    payload,
+                    request_id,
+                    correlation_id,
+                    JobDefaults {
+                        max_attempts: config.webhook_max_attempts.max(1),
+                    },
+                );
+                if let Err(err) = queue.enqueue(&job).await {
+                    summary.failed = summary.failed.saturating_add(1);
+                    warn!(
+                        error = %err,
+                        event_id = %event.event_id,
+                        "failed enqueuing replay job"
+                    );
+                    continue;
+                }
+            }
+
+            summary.replayed = summary.replayed.saturating_add(1);
+        }
+
+        if summary.processed % options.progress_every == 0 {
+            println!(
+                "[webhook-replay-dlq] progress processed={} replayed={} failed={}",
+                summary.processed, summary.replayed, summary.failed
+            );
+        }
+    }
+
+    println!(
+        "[webhook-replay-dlq] done processed={} replayed={} failed={} dry_run={}",
+        summary.processed, summary.replayed, summary.failed, options.dry_run
+    );
+    Ok(())
 }
 
 impl Worker {
@@ -864,7 +1329,9 @@ fn hash_sha256_hex(payload: &[u8]) -> String {
 mod periodic_job_tests {
     use super::*;
 
-    use gotong_domain::ontology::{OntologyConcept, OntologyEdgeKind, OntologyNoteCreate, OntologyTripleCreate};
+    use gotong_domain::ontology::{
+        OntologyConcept, OntologyEdgeKind, OntologyNoteCreate, OntologyTripleCreate,
+    };
     use gotong_infra::repositories::InMemoryOntologyRepository;
 
     fn moderation_auto_release_job(payload: serde_json::Value) -> JobEnvelope {
@@ -1006,8 +1473,8 @@ mod periodic_job_tests {
             "scheduled_ms": 1_000
         });
         let job = concept_verification_job(payload);
-        let parsed = parse_concept_verification_payload(&job)
-            .expect("valid concept verification payload");
+        let parsed =
+            parse_concept_verification_payload(&job).expect("valid concept verification payload");
         assert_eq!(parsed.qid, "Q2095");
         assert_eq!(parsed.scheduled_ms, 1_000);
     }
@@ -1034,16 +1501,15 @@ mod periodic_job_tests {
         let repo: Arc<dyn OntologyRepository> = Arc::new(InMemoryOntologyRepository::new());
         let now = gotong_domain::jobs::now_ms();
 
-        repo
-            .upsert_concept(&OntologyConcept {
-                concept_id: "Q93189".to_string(),
-                qid: "Q93189".to_string(),
-                label_id: Some("Telur".to_string()),
-                label_en: Some("Egg".to_string()),
-                verified: true,
-            })
-            .await
-            .expect("upsert concept");
+        repo.upsert_concept(&OntologyConcept {
+            concept_id: "Q93189".to_string(),
+            qid: "Q93189".to_string(),
+            label_id: Some("Telur".to_string()),
+            label_en: Some("Egg".to_string()),
+            verified: true,
+        })
+        .await
+        .expect("upsert concept");
 
         let expired = repo
             .create_note(&OntologyNoteCreate {
@@ -1182,16 +1648,15 @@ mod periodic_job_tests {
     #[tokio::test]
     async fn handle_concept_verification_fills_empty_concept_id() {
         let repo: Arc<dyn OntologyRepository> = Arc::new(InMemoryOntologyRepository::new());
-        repo
-            .upsert_concept(&OntologyConcept {
-                concept_id: "".to_string(),
-                qid: "Q_MISSING_ID".to_string(),
-                label_id: None,
-                label_en: None,
-                verified: false,
-            })
-            .await
-            .expect("upsert concept");
+        repo.upsert_concept(&OntologyConcept {
+            concept_id: "".to_string(),
+            qid: "Q_MISSING_ID".to_string(),
+            label_id: None,
+            label_en: None,
+            verified: false,
+        })
+        .await
+        .expect("upsert concept");
 
         let job = concept_verification_job(serde_json::json!({
             "qid": "Q_MISSING_ID",
