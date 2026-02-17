@@ -61,6 +61,18 @@ fn test_config() -> AppConfig {
         webhook_markov_url: "http://127.0.0.1:8080/webhook".to_string(),
         webhook_secret: "dev_webhook_secret_32_chars_minimum".to_string(),
         webhook_max_attempts: 5,
+        markov_read_base_url: "http://127.0.0.1:3000/api/v1".to_string(),
+        markov_read_platform_token: "test-platform-token".to_string(),
+        markov_read_timeout_ms: 2_500,
+        markov_read_retry_max_attempts: 3,
+        markov_read_retry_backoff_base_ms: 200,
+        markov_read_retry_backoff_max_ms: 2_000,
+        markov_read_circuit_fail_threshold: 5,
+        markov_read_circuit_open_ms: 15_000,
+        markov_cache_profile_ttl_ms: 300_000,
+        markov_cache_profile_stale_while_revalidate_ms: 1_200_000,
+        markov_cache_gameplay_ttl_ms: 45_000,
+        markov_cache_gameplay_stale_while_revalidate_ms: 180_000,
     }
 }
 

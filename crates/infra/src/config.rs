@@ -32,6 +32,18 @@ pub struct AppConfig {
     pub webhook_markov_url: String,
     pub webhook_secret: String,
     pub webhook_max_attempts: u32,
+    pub markov_read_base_url: String,
+    pub markov_read_platform_token: String,
+    pub markov_read_timeout_ms: u64,
+    pub markov_read_retry_max_attempts: u32,
+    pub markov_read_retry_backoff_base_ms: u64,
+    pub markov_read_retry_backoff_max_ms: u64,
+    pub markov_read_circuit_fail_threshold: u32,
+    pub markov_read_circuit_open_ms: u64,
+    pub markov_cache_profile_ttl_ms: u64,
+    pub markov_cache_profile_stale_while_revalidate_ms: u64,
+    pub markov_cache_gameplay_ttl_ms: u64,
+    pub markov_cache_gameplay_stale_while_revalidate_ms: u64,
 }
 
 impl AppConfig {
@@ -71,6 +83,24 @@ impl AppConfig {
             )?
             .set_default("webhook_secret", "dev_webhook_secret_32_chars_minimum")?
             .set_default("webhook_max_attempts", 5u32)?
+            .set_default("markov_read_base_url", "http://127.0.0.1:3000/api/v1")?
+            .set_default("markov_read_platform_token", "")?
+            .set_default("markov_read_timeout_ms", 2_500u64)?
+            .set_default("markov_read_retry_max_attempts", 3u32)?
+            .set_default("markov_read_retry_backoff_base_ms", 200u64)?
+            .set_default("markov_read_retry_backoff_max_ms", 2_000u64)?
+            .set_default("markov_read_circuit_fail_threshold", 5u32)?
+            .set_default("markov_read_circuit_open_ms", 15_000u64)?
+            .set_default("markov_cache_profile_ttl_ms", 300_000u64)?
+            .set_default(
+                "markov_cache_profile_stale_while_revalidate_ms",
+                1_200_000u64,
+            )?
+            .set_default("markov_cache_gameplay_ttl_ms", 45_000u64)?
+            .set_default(
+                "markov_cache_gameplay_stale_while_revalidate_ms",
+                180_000u64,
+            )?
             .add_source(config::Environment::default().separator("__"))
             .build()?;
         let config = cfg.try_deserialize::<AppConfig>()?;
@@ -82,6 +112,34 @@ impl AppConfig {
         if config.webhook_enabled && config.webhook_secret.trim().len() < 4 {
             return Err(config::ConfigError::Message(
                 "webhook is enabled but webhook_secret is too short".to_string(),
+            ));
+        }
+        if config.markov_read_base_url.trim().is_empty() {
+            return Err(config::ConfigError::Message(
+                "markov_read_base_url must not be empty".to_string(),
+            ));
+        }
+        if config.markov_read_retry_max_attempts == 0 {
+            return Err(config::ConfigError::Message(
+                "markov_read_retry_max_attempts must be >= 1".to_string(),
+            ));
+        }
+        if config.markov_read_circuit_fail_threshold == 0 {
+            return Err(config::ConfigError::Message(
+                "markov_read_circuit_fail_threshold must be >= 1".to_string(),
+            ));
+        }
+        if config.markov_cache_profile_stale_while_revalidate_ms < config.markov_cache_profile_ttl_ms
+        {
+            return Err(config::ConfigError::Message(
+                "markov_cache_profile_stale_while_revalidate_ms must be >= markov_cache_profile_ttl_ms".to_string(),
+            ));
+        }
+        if config.markov_cache_gameplay_stale_while_revalidate_ms
+            < config.markov_cache_gameplay_ttl_ms
+        {
+            return Err(config::ConfigError::Message(
+                "markov_cache_gameplay_stale_while_revalidate_ms must be >= markov_cache_gameplay_ttl_ms".to_string(),
             ));
         }
         Ok(config)

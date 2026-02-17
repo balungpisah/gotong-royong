@@ -59,6 +59,7 @@ use gotong_domain::{
         WebhookDeliveryLog, WebhookOutboxEvent, WebhookOutboxListQuery, WebhookOutboxStatus,
     },
 };
+use gotong_infra::markov_client::{CachedJson, MarkovClientError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
@@ -202,6 +203,24 @@ pub fn router(state: AppState) -> Router {
             post(mark_notification_read),
         )
         .route("/v1/notifications", get(list_discovery_notifications))
+        .route("/v1/tandang/me/profile", get(get_tandang_profile_snapshot))
+        .route("/v1/tandang/skills/search", get(search_tandang_skills))
+        .route(
+            "/v1/tandang/por/requirements/:task_type",
+            get(get_tandang_por_requirements),
+        )
+        .route(
+            "/v1/tandang/por/triad-requirements/:track/:transition",
+            get(get_tandang_por_triad_requirements),
+        )
+        .route(
+            "/v1/tandang/reputation/leaderboard",
+            get(get_tandang_reputation_leaderboard),
+        )
+        .route(
+            "/v1/tandang/reputation/distribution",
+            get(get_tandang_reputation_distribution),
+        )
         .route("/v1/admin/webhooks/outbox", get(list_webhook_outbox))
         .route(
             "/v1/admin/webhooks/outbox/:event_id",
@@ -3477,6 +3496,130 @@ fn trusted_editor_roles(token_role: &gotong_domain::auth::Role) -> Vec<AdaptiveP
     }
 }
 
+#[derive(Debug, Deserialize)]
+struct TandangSkillSearchQuery {
+    q: String,
+    lang: Option<String>,
+    fuzzy: Option<bool>,
+    limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TandangLeaderboardQuery {
+    limit: Option<u32>,
+    tier: Option<String>,
+    rank_by: Option<String>,
+}
+
+async fn get_tandang_profile_snapshot(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<Value>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let snapshot = state
+        .markov_client
+        .user_profile_snapshot(&actor.user_id)
+        .await
+        .map_err(map_markov_error)?;
+
+    Ok(Json(json!({
+        "source": "tandang",
+        "identity": snapshot.identity,
+        "markov_user_id": snapshot.markov_user_id,
+        "reputation": cached_json_value(snapshot.reputation),
+        "tier": snapshot.tier.map(cached_json_value),
+        "activity": snapshot.activity.map(cached_json_value),
+        "cv_hidup": snapshot.cv_hidup.map(cached_json_value),
+    })))
+}
+
+async fn search_tandang_skills(
+    State(state): State<AppState>,
+    Query(query): Query<TandangSkillSearchQuery>,
+) -> Result<Json<Value>, ApiError> {
+    if query.q.trim().is_empty() {
+        return Err(ApiError::Validation("q is required".into()));
+    }
+    let result = state
+        .markov_client
+        .search_skills(
+            query.q.trim(),
+            query.lang.as_deref(),
+            query.fuzzy,
+            query.limit,
+        )
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_por_requirements(
+    State(state): State<AppState>,
+    Path(task_type): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    if task_type.trim().is_empty() {
+        return Err(ApiError::Validation("task_type is required".into()));
+    }
+    let result = state
+        .markov_client
+        .get_por_requirements(&task_type)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_por_triad_requirements(
+    State(state): State<AppState>,
+    Path((track, transition)): Path<(String, String)>,
+) -> Result<Json<Value>, ApiError> {
+    if track.trim().is_empty() || transition.trim().is_empty() {
+        return Err(ApiError::Validation(
+            "track and transition are required".into(),
+        ));
+    }
+    let result = state
+        .markov_client
+        .get_por_triad_requirements(&track, &transition)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_reputation_leaderboard(
+    State(state): State<AppState>,
+    Query(query): Query<TandangLeaderboardQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_reputation_leaderboard(query.limit, query.tier.as_deref(), query.rank_by.as_deref())
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_reputation_distribution(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_reputation_distribution()
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+fn cached_json_value(payload: CachedJson) -> Value {
+    json!({
+        "cache": {
+            "status": payload.meta.status.as_str(),
+            "stale": payload.meta.stale,
+            "age_ms": payload.meta.age_ms,
+            "cached_at_epoch_ms": payload.meta.cached_at_epoch_ms,
+        },
+        "data": payload.value,
+    })
+}
+
 fn actor_identity(auth: &AuthContext) -> Result<ActorIdentity, ApiError> {
     let user_id = auth
         .user_id
@@ -3513,6 +3656,26 @@ fn map_domain_error(err: DomainError) -> ApiError {
         DomainError::NotFound => ApiError::NotFound,
         DomainError::Conflict => ApiError::Conflict,
         DomainError::Forbidden(_) => ApiError::Forbidden,
+    }
+}
+
+fn map_markov_error(err: MarkovClientError) -> ApiError {
+    match err {
+        MarkovClientError::BadRequest(message) => ApiError::Validation(message),
+        MarkovClientError::Unauthorized(_) => ApiError::Unauthorized,
+        MarkovClientError::Forbidden(_) => ApiError::Forbidden,
+        MarkovClientError::NotFound(_) => ApiError::NotFound,
+        MarkovClientError::CircuitOpen => {
+            tracing::warn!("markov read circuit is open");
+            ApiError::Internal
+        }
+        MarkovClientError::Configuration(message)
+        | MarkovClientError::Upstream(message)
+        | MarkovClientError::Transport(message)
+        | MarkovClientError::InvalidResponse(message) => {
+            tracing::warn!(error = %message, "markov upstream integration failed");
+            ApiError::Internal
+        }
     }
 }
 

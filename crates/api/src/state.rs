@@ -24,6 +24,7 @@ use gotong_infra::config::AppConfig;
 use gotong_infra::db::DbConfig;
 use gotong_infra::idempotency::RedisIdempotencyStore;
 use gotong_infra::jobs::RedisJobQueue;
+use gotong_infra::markov_client::MarkovReadClient;
 use gotong_infra::repositories::{
     InMemoryAdaptivePathRepository, InMemoryChatRepository, InMemoryContributionRepository,
     InMemoryDiscoveryFeedRepository, InMemoryDiscoveryNotificationRepository,
@@ -59,6 +60,7 @@ type SharedJobQueue = Option<Arc<dyn JobQueue>>;
 #[derive(Clone)]
 pub struct AppState {
     pub config: AppConfig,
+    pub markov_client: Arc<MarkovReadClient>,
     pub idempotency: IdempotencyService,
     pub adaptive_path_repo: Arc<dyn AdaptivePathRepository>,
     pub contribution_repo: Arc<dyn ContributionRepository>,
@@ -413,8 +415,10 @@ impl AppState {
         let job_queue = job_queue_for_config(&config).await?;
         let idempotency = IdempotencyService::new(Arc::new(store), IdempotencyConfig::default());
         let chat_realtime = ChatRealtimeBus::new(&config);
+        let markov_client = Arc::new(MarkovReadClient::from_config(&config));
         Ok(Self {
             config,
+            markov_client,
             idempotency,
             adaptive_path_repo,
             contribution_repo,
@@ -450,8 +454,10 @@ impl AppState {
             webhook_outbox_repo,
         ) = memory_repositories();
         let chat_realtime = ChatRealtimeBus::new(&config);
+        let markov_client = Arc::new(MarkovReadClient::from_config(&config));
         Self {
             config,
+            markov_client,
             idempotency: IdempotencyService::new(store, IdempotencyConfig::default()),
             adaptive_path_repo,
             contribution_repo,
@@ -490,8 +496,10 @@ impl AppState {
     ) -> Self {
         let idempotency = IdempotencyService::new(store, IdempotencyConfig::default());
         let chat_realtime = ChatRealtimeBus::new(&config);
+        let markov_client = Arc::new(MarkovReadClient::from_config(&config));
         Self {
             config,
+            markov_client,
             idempotency,
             adaptive_path_repo,
             contribution_repo,
@@ -630,6 +638,18 @@ mod tests {
             webhook_markov_url: "http://127.0.0.1:5000/webhook".to_string(),
             webhook_secret: "test-webhook-secret-32-chars-minimum".to_string(),
             webhook_max_attempts: 5,
+            markov_read_base_url: "http://127.0.0.1:3000/api/v1".to_string(),
+            markov_read_platform_token: "test-platform-token".to_string(),
+            markov_read_timeout_ms: 2_500,
+            markov_read_retry_max_attempts: 3,
+            markov_read_retry_backoff_base_ms: 200,
+            markov_read_retry_backoff_max_ms: 2_000,
+            markov_read_circuit_fail_threshold: 5,
+            markov_read_circuit_open_ms: 15_000,
+            markov_cache_profile_ttl_ms: 300_000,
+            markov_cache_profile_stale_while_revalidate_ms: 1_200_000,
+            markov_cache_gameplay_ttl_ms: 45_000,
+            markov_cache_gameplay_stale_while_revalidate_ms: 180_000,
         }
     }
 

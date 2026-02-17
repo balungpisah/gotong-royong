@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 use axum::http::header::HeaderMap;
 use axum::{Json, response::Response};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use validator::Validate;
 
 use crate::error::ApiError;
@@ -12,6 +12,7 @@ use crate::state::AppState;
 use crate::validation;
 use gotong_domain::idempotency::BeginOutcome;
 use gotong_domain::ports::idempotency::{IdempotencyKey, IdempotencyResponse};
+use gotong_infra::markov_client::CachedJson;
 
 use super::{actor_identity, correlation_id_from_headers, request_id_from_headers, to_response};
 use crate::observability;
@@ -590,11 +591,15 @@ fn credit_output(payload: &EdgePodCreditRequest) -> EdgePodCreditOutput {
         }
     }
 
-    let confidence = if payload.timeline_events.is_empty() {
+    let has_reputation_snapshot = payload.reputation_snapshot.is_some();
+    let mut confidence = if payload.timeline_events.is_empty() {
         0.35
     } else {
         0.55 + ((payload.timeline_events.len() as f64) / 50.0).min(0.35)
     };
+    if has_reputation_snapshot {
+        confidence = (confidence + 0.08).min(0.97);
+    }
 
     let dispute_window = if confidence >= 0.8 {
         "minutes"
@@ -605,10 +610,31 @@ fn credit_output(payload: &EdgePodCreditRequest) -> EdgePodCreditOutput {
     EdgePodCreditOutput {
         candidate_allocations: allocations,
         confidence,
-        reasoning: "deterministic heuristic from timeline and skill profile".to_string(),
+        reasoning: if has_reputation_snapshot {
+            "deterministic heuristic from timeline, skill profile, and tandang reputation snapshot"
+                .to_string()
+        } else {
+            "deterministic heuristic from timeline and skill profile".to_string()
+        },
         dispute_window: dispute_window.to_string(),
-        confidence_source: "heuristic".to_string(),
+        confidence_source: if has_reputation_snapshot {
+            "heuristic+tandang_snapshot".to_string()
+        } else {
+            "heuristic".to_string()
+        },
     }
+}
+
+fn markov_enrichment_context(cached: &CachedJson) -> Value {
+    json!({
+        "used": true,
+        "cache": {
+            "status": cached.meta.status.as_str(),
+            "stale": cached.meta.stale,
+            "age_ms": cached.meta.age_ms,
+            "cached_at_epoch_ms": cached.meta.cached_at_epoch_ms,
+        }
+    })
 }
 
 fn siaga_output(payload: &EdgePodSiagaRequest) -> (EdgePodSiagaOutput, String) {
@@ -999,7 +1025,7 @@ pub(crate) async fn edgepod_credit_recommendation(
     State(state): State<AppState>,
     headers: HeaderMap,
     Extension(auth): Extension<AuthContext>,
-    Json(payload): Json<EdgePodCreditRequest>,
+    Json(mut payload): Json<EdgePodCreditRequest>,
 ) -> Result<Response, ApiError> {
     validate_base_request(&payload.base)?;
     let actor = actor_identity(&auth)?;
@@ -1043,6 +1069,31 @@ pub(crate) async fn edgepod_credit_recommendation(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
+            let mut markov_enrichment: Option<Value> = None;
+            if payload.reputation_snapshot.is_none() {
+                match state.markov_client.get_user_reputation(&payload.user_id).await {
+                    Ok(cached) => {
+                        markov_enrichment = Some(markov_enrichment_context(&cached));
+                        payload.reputation_snapshot = Some(cached.value);
+                    }
+                    Err(err) => {
+                        observability::register_edgepod_fallback(
+                            "ep09_credit_recommendation",
+                            "MARKOV_REPUTATION_UNAVAILABLE",
+                        );
+                        tracing::warn!(
+                            error = %err,
+                            user_id = %payload.user_id,
+                            "edgepod credit recommendation markov reputation enrichment failed"
+                        );
+                        markov_enrichment = Some(json!({
+                            "used": false,
+                            "reason": "markov_reputation_unavailable",
+                        }));
+                    }
+                }
+            }
+
             let output = credit_output(&payload);
             let reason_code = if should_fallback_from_request(&request_id, &payload.user_id) {
                 "MODEL_UNAVAILABLE"
@@ -1052,20 +1103,33 @@ pub(crate) async fn edgepod_credit_recommendation(
             if reason_code != "OK" {
                 observability::register_edgepod_fallback("ep09_credit_recommendation", reason_code);
             }
-            let actor_context = if reason_code == "MODEL_UNAVAILABLE" {
-                Some(json!({
-                    "fallback": true,
-                    "reason": "manual_form_only",
-                    "endpoint": "ep09",
-                }))
-            } else {
+            let mut actor_context_map = Map::new();
+            if let Some(markov_enrichment) = markov_enrichment {
+                actor_context_map.insert("markov_reputation".to_string(), markov_enrichment);
+            }
+            if reason_code == "MODEL_UNAVAILABLE" {
+                actor_context_map.insert("fallback".to_string(), json!(true));
+                actor_context_map.insert("reason".to_string(), json!("manual_form_only"));
+                actor_context_map.insert("endpoint".to_string(), json!("ep09"));
+            }
+            let actor_context = if actor_context_map.is_empty() {
                 None
+            } else {
+                Some(Value::Object(actor_context_map))
             };
             let response = idempotent_response(
                 &request_id,
                 StatusCode::OK,
                 output,
-                if reason_code == "OK" { 0.72 } else { 0.30 },
+                if reason_code == "OK" {
+                    payload
+                        .reputation_snapshot
+                        .as_ref()
+                        .map(|_| 0.80)
+                        .unwrap_or(0.72)
+                } else {
+                    0.30
+                },
                 reason_code,
                 actor_context,
             )?;
