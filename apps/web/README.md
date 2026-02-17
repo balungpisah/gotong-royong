@@ -2,6 +2,11 @@
 
 Frontend application for Gotong Royong using SvelteKit 2 + Svelte 5.
 
+## Foundation Guide
+
+- Contributor guide: `../../docs/development/frontend-foundation.md`
+- Environment template: `.env.example`
+
 ## Local Commands
 
 ```sh

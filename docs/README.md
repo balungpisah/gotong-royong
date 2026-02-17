@@ -56,6 +56,7 @@ Canonical decision:
 - [Setup Guide](development/setup-guide.md) - Local development environment setup
 - [Testing Integration](development/testing-integration.md) - Integration testing guide
 - [Local Development](development/local-development.md) - Development workflow
+- [Frontend Foundation Guide](development/frontend-foundation.md) - Frontend setup, env vars, conventions, and DoD checklist
 
 ## Reading Paths by Role
 
@@ -68,9 +69,10 @@ Canonical decision:
 
 ### Frontend Developer
 1. Start: [System Overview](architecture/system-overview.md)
-2. Then: [API Event Payloads](api/event-payloads.md)
-3. Then: [Evidence Format](por-evidence/evidence-format.md)
-4. Then: [Error Handling](api/error-handling.md)
+2. Then: [Frontend Foundation Guide](development/frontend-foundation.md)
+3. Then: [API Event Payloads](api/event-payloads.md)
+4. Then: [Evidence Format](por-evidence/evidence-format.md)
+5. Then: [Error Handling](api/error-handling.md)
 
 ### DevOps Engineer
 1. Start: [Infrastructure](deployment/infrastructure.md)
