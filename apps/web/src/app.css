@@ -1,5 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
 @import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
 	/* Tanah Inti */
@@ -107,10 +110,117 @@
 	--shadow-md: 0 2px 12px rgba(62, 39, 35, 0.08);
 	--shadow-lg: 0 4px 24px rgba(62, 39, 35, 0.12);
 	--shadow-xl: 0 8px 40px rgba(62, 39, 35, 0.16);
+
+	/* shadcn semantic bridge */
+	--radius: var(--r-md);
+	--background: var(--c-susu);
+	--foreground: var(--c-tanah-gelap);
+	--card: var(--c-susu);
+	--card-foreground: var(--c-tanah-gelap);
+	--popover: var(--c-susu);
+	--popover-foreground: var(--c-tanah-gelap);
+	--primary: var(--c-api);
+	--primary-foreground: var(--c-susu);
+	--secondary: var(--c-kapas);
+	--secondary-foreground: var(--c-tanah-gelap);
+	--muted: var(--c-kapas);
+	--muted-foreground: var(--c-kayu);
+	--accent: var(--c-bara);
+	--accent-foreground: var(--c-api-dalam);
+	--destructive: var(--c-bahaya);
+	--border: var(--c-batu);
+	--input: var(--c-kapas);
+	--ring: var(--c-api-terang);
+	--chart-1: var(--t-tuntaskan);
+	--chart-2: var(--t-wujudkan);
+	--chart-3: var(--t-telusuri);
+	--chart-4: var(--t-rayakan);
+	--chart-5: var(--t-musyawarah);
+	--sidebar: var(--c-kapas);
+	--sidebar-foreground: var(--c-tanah-gelap);
+	--sidebar-primary: var(--c-api);
+	--sidebar-primary-foreground: var(--c-susu);
+	--sidebar-accent: var(--c-bara);
+	--sidebar-accent-foreground: var(--c-api-dalam);
+	--sidebar-border: var(--c-batu);
+	--sidebar-ring: var(--c-api-terang);
 }
 
-@theme {
+.dark {
+	--background: var(--v-deep);
+	--foreground: var(--c-susu);
+	--card: var(--v-surface);
+	--card-foreground: var(--c-susu);
+	--popover: var(--v-surface);
+	--popover-foreground: var(--c-susu);
+	--primary: var(--c-api-terang);
+	--primary-foreground: var(--c-susu);
+	--secondary: var(--v-mid);
+	--secondary-foreground: var(--c-susu);
+	--muted: var(--v-mid);
+	--muted-foreground: var(--v-light);
+	--accent: var(--v-soft);
+	--accent-foreground: var(--c-susu);
+	--destructive: var(--s-accent);
+	--border: color-mix(in srgb, var(--v-light) 24%, transparent);
+	--input: color-mix(in srgb, var(--v-light) 20%, transparent);
+	--ring: var(--c-api-terang);
+	--sidebar: var(--v-surface);
+	--sidebar-foreground: var(--c-susu);
+	--sidebar-primary: var(--c-api-terang);
+	--sidebar-primary-foreground: var(--c-susu);
+	--sidebar-accent: var(--v-mid);
+	--sidebar-accent-foreground: var(--c-susu);
+	--sidebar-border: color-mix(in srgb, var(--v-light) 24%, transparent);
+	--sidebar-ring: var(--c-api-terang);
+}
+
+@theme inline {
 	--font-sans: var(--font-family);
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--radius-full: var(--r-full);
+	--shadow-sm: var(--shadow-sm);
+	--shadow-md: var(--shadow-md);
+	--shadow-lg: var(--shadow-lg);
+	--shadow-xl: var(--shadow-xl);
+
+	/* shadcn semantic colors */
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+
+	/* Design DNA direct tokens */
 	--color-tanah-gelap: var(--c-tanah-gelap);
 	--color-tanah: var(--c-tanah);
 	--color-kayu: var(--c-kayu);
@@ -160,6 +270,7 @@
 	--color-tandang-i: var(--c-tandang-i);
 	--color-tandang-c: var(--c-tandang-c);
 	--color-tandang-j: var(--c-tandang-j);
+
 	--spacing-1: var(--sp-1);
 	--spacing-2: var(--sp-2);
 	--spacing-3: var(--sp-3);
@@ -170,23 +281,18 @@
 	--spacing-10: var(--sp-10);
 	--spacing-12: var(--sp-12);
 	--spacing-16: var(--sp-16);
-	--radius-sm: var(--r-sm);
-	--radius-md: var(--r-md);
-	--radius-lg: var(--r-lg);
-	--radius-xl: var(--r-xl);
-	--radius-full: var(--r-full);
-	--shadow-sm: var(--shadow-sm);
-	--shadow-md: var(--shadow-md);
-	--shadow-lg: var(--shadow-lg);
-	--shadow-xl: var(--shadow-xl);
 }
 
 @layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+
 	html,
 	body {
 		font-family: var(--font-family);
-		background: var(--c-susu);
-		color: var(--c-tanah-gelap);
+		background: var(--background);
+		color: var(--foreground);
 		line-height: var(--lh-normal);
 	}
 }
