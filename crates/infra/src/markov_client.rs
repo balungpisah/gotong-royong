@@ -4,13 +4,14 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use reqwest::StatusCode;
 use serde_json::Value;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock};
 use tokio::time::sleep;
 
 use crate::config::AppConfig;
 
 const PLATFORM_TOKEN_HEADER: &str = "X-Platform-Token";
 const PLATFORM_ID_PREFIX: &str = "gotong_royong:";
+const MARKOV_CACHE_MAX_ENTRIES: usize = 4_096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CacheStatus {
@@ -163,6 +164,8 @@ pub struct MarkovReadClient {
     gameplay_stale_window: Duration,
     cache: Arc<RwLock<HashMap<String, CacheEntry>>>,
     revalidating_keys: Arc<Mutex<HashSet<String>>>,
+    inflight_fetches: Arc<Mutex<HashMap<String, Arc<Notify>>>>,
+    cache_max_entries: usize,
     circuit: Arc<Mutex<CircuitState>>,
 }
 
@@ -197,6 +200,8 @@ impl MarkovReadClient {
             ),
             cache: Arc::new(RwLock::new(HashMap::new())),
             revalidating_keys: Arc::new(Mutex::new(HashSet::new())),
+            inflight_fetches: Arc::new(Mutex::new(HashMap::new())),
+            cache_max_entries: MARKOV_CACHE_MAX_ENTRIES,
             circuit: Arc::new(Mutex::new(CircuitState::default())),
         }
     }
@@ -407,7 +412,6 @@ impl MarkovReadClient {
         let normalized_query = normalize_query(query_params);
         let cache_key = cache_key(&path, &normalized_query);
         let now = Instant::now();
-
         if let Some(entry) = self.cache.read().await.get(&cache_key).cloned() {
             if now <= entry.fresh_until {
                 return Ok(entry.into_cached_json(CacheStatus::Hit, now));
@@ -425,19 +429,64 @@ impl MarkovReadClient {
             }
         }
 
-        let value = self
-            .fetch_from_origin(&path, &normalized_query, token_policy)
-            .await?;
-        let now = Instant::now();
-        let entry = CacheEntry::new(
-            value,
-            now,
-            cache_class.ttl(self),
-            cache_class.stale_window(self),
-        );
-        let result = entry.into_cached_json(CacheStatus::Miss, now);
-        self.cache.write().await.insert(cache_key, entry);
-        Ok(result)
+        loop {
+            let waiter = {
+                let mut inflight = self.inflight_fetches.lock().await;
+                if let Some(notify) = inflight.get(&cache_key) {
+                    Some(notify.clone())
+                } else {
+                    inflight.insert(cache_key.clone(), Arc::new(Notify::new()));
+                    None
+                }
+            };
+
+            if let Some(waiter) = waiter {
+                waiter.notified().await;
+                let now = Instant::now();
+                if let Some(entry) = self.cache.read().await.get(&cache_key).cloned() {
+                    if now <= entry.fresh_until {
+                        return Ok(entry.into_cached_json(CacheStatus::Hit, now));
+                    }
+                    if now <= entry.stale_until {
+                        return Ok(entry.into_cached_json(CacheStatus::Stale, now));
+                    }
+                }
+                continue;
+            }
+
+            let fetched = self
+                .fetch_from_origin(&path, &normalized_query, token_policy)
+                .await;
+
+            let notify = {
+                let mut inflight = self.inflight_fetches.lock().await;
+                inflight
+                    .remove(&cache_key)
+                    .unwrap_or_else(|| Arc::new(Notify::new()))
+            };
+
+            match fetched {
+                Ok(value) => {
+                    let now = Instant::now();
+                    let entry = CacheEntry::new(
+                        value,
+                        now,
+                        cache_class.ttl(self),
+                        cache_class.stale_window(self),
+                    );
+                    let result = entry.into_cached_json(CacheStatus::Miss, now);
+                    let mut cache = self.cache.write().await;
+                    cache.insert(cache_key.clone(), entry);
+                    self.prune_cache_locked(&mut cache, now);
+                    notify.notify_waiters();
+                    return Ok(result);
+                }
+                Err(err) => {
+                    notify.notify_waiters();
+                    return Err(err);
+                }
+            }
+        }
     }
 
     async fn spawn_revalidate(
@@ -468,7 +517,9 @@ impl MarkovReadClient {
                     cache_class.ttl(&client),
                     cache_class.stale_window(&client),
                 );
-                client.cache.write().await.insert(cache_key.clone(), entry);
+                let mut cache = client.cache.write().await;
+                cache.insert(cache_key.clone(), entry);
+                client.prune_cache_locked(&mut cache, now);
             } else if let Err(err) = refreshed {
                 tracing::warn!(error = %err, path = %path, "markov cache revalidation failed");
             }
@@ -636,6 +687,24 @@ impl MarkovReadClient {
                 open_for_ms = self.circuit_open_duration.as_millis() as u64,
                 "markov read circuit opened after repeated failures"
             );
+        }
+    }
+
+    fn prune_cache_locked(&self, cache: &mut HashMap<String, CacheEntry>, now: Instant) {
+        cache.retain(|_, entry| now <= entry.stale_until);
+        if cache.len() <= self.cache_max_entries {
+            return;
+        }
+
+        let mut keys_by_age = cache
+            .iter()
+            .map(|(key, entry)| (key.clone(), entry.cached_at_instant))
+            .collect::<Vec<_>>();
+        keys_by_age.sort_by_key(|(_, cached_at)| *cached_at);
+
+        let evict_count = cache.len().saturating_sub(self.cache_max_entries);
+        for (key, _) in keys_by_age.into_iter().take(evict_count) {
+            cache.remove(&key);
         }
     }
 }

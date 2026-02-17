@@ -59,7 +59,7 @@ use gotong_domain::{
         WebhookDeliveryLog, WebhookOutboxEvent, WebhookOutboxListQuery, WebhookOutboxStatus,
     },
 };
-use gotong_infra::markov_client::{CachedJson, MarkovClientError};
+use gotong_infra::markov_client::{CacheMetadata, CachedJson, MarkovClientError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
@@ -3522,14 +3522,29 @@ async fn get_tandang_profile_snapshot(
         .await
         .map_err(map_markov_error)?;
 
+    let reputation = snapshot.reputation;
+    let tier = snapshot.tier;
+    let activity = snapshot.activity;
+    let cv_hidup = snapshot.cv_hidup;
+    let top_level_cache = cache_metadata_value(&reputation.meta);
+
     Ok(Json(json!({
-        "source": "tandang",
-        "identity": snapshot.identity,
-        "markov_user_id": snapshot.markov_user_id,
-        "reputation": cached_json_value(snapshot.reputation),
-        "tier": snapshot.tier.map(cached_json_value),
-        "activity": snapshot.activity.map(cached_json_value),
-        "cv_hidup": snapshot.cv_hidup.map(cached_json_value),
+        "cache": top_level_cache,
+        "data": {
+            "source": "tandang",
+            "identity": snapshot.identity,
+            "markov_user_id": snapshot.markov_user_id,
+            "reputation": reputation.value,
+            "tier": tier.as_ref().map(|item| item.value.clone()),
+            "activity": activity.as_ref().map(|item| item.value.clone()),
+            "cv_hidup": cv_hidup.as_ref().map(|item| item.value.clone()),
+            "component_cache": {
+                "reputation": cache_metadata_value(&reputation.meta),
+                "tier": tier.as_ref().map(|item| cache_metadata_value(&item.meta)),
+                "activity": activity.as_ref().map(|item| cache_metadata_value(&item.meta)),
+                "cv_hidup": cv_hidup.as_ref().map(|item| cache_metadata_value(&item.meta)),
+            }
+        }
     })))
 }
 
@@ -3610,13 +3625,17 @@ async fn get_tandang_reputation_distribution(
 
 fn cached_json_value(payload: CachedJson) -> Value {
     json!({
-        "cache": {
-            "status": payload.meta.status.as_str(),
-            "stale": payload.meta.stale,
-            "age_ms": payload.meta.age_ms,
-            "cached_at_epoch_ms": payload.meta.cached_at_epoch_ms,
-        },
+        "cache": cache_metadata_value(&payload.meta),
         "data": payload.value,
+    })
+}
+
+fn cache_metadata_value(meta: &CacheMetadata) -> Value {
+    json!({
+        "status": meta.status.as_str(),
+        "stale": meta.stale,
+        "age_ms": meta.age_ms,
+        "cached_at_epoch_ms": meta.cached_at_epoch_ms,
     })
 }
 
@@ -3660,6 +3679,19 @@ fn map_domain_error(err: DomainError) -> ApiError {
 }
 
 fn map_markov_error(err: MarkovClientError) -> ApiError {
+    let reason = match &err {
+        MarkovClientError::BadRequest(_) => "bad_request",
+        MarkovClientError::Unauthorized(_) => "unauthorized",
+        MarkovClientError::Forbidden(_) => "forbidden",
+        MarkovClientError::NotFound(_) => "not_found",
+        MarkovClientError::CircuitOpen => "circuit_open",
+        MarkovClientError::Configuration(_) => "configuration",
+        MarkovClientError::Upstream(_) => "upstream",
+        MarkovClientError::Transport(_) => "transport",
+        MarkovClientError::InvalidResponse(_) => "invalid_response",
+    };
+    observability::register_markov_integration_error(reason);
+
     match err {
         MarkovClientError::BadRequest(message) => ApiError::Validation(message),
         MarkovClientError::Unauthorized(_) => ApiError::Unauthorized,

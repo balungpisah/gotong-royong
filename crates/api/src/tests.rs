@@ -1,10 +1,13 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use axum::Json as AxumJson;
 use axum::body::Body;
 use axum::body::to_bytes;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{Request, StatusCode};
+use axum::routing::get;
+use axum::{Router, extract::Path};
 use gotong_domain::discovery::{
     DiscoveryService, FEED_SOURCE_CONTRIBUTION, FeedIngestInput, FeedListQuery, NOTIF_TYPE_SYSTEM,
     NotificationIngestInput, SearchListQuery,
@@ -15,6 +18,7 @@ use gotong_domain::ranking::wilson_score;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::Serialize;
 use serde_json::json;
+use tokio::net::TcpListener;
 use tower_util::ServiceExt;
 
 use crate::observability;
@@ -119,6 +123,118 @@ fn test_app_state_router() -> (AppState, axum::Router) {
     let state = test_app_state();
     let app = routes::router(state.clone());
     (state, app)
+}
+
+fn test_app_with_markov_base(markov_base_url: String) -> axum::Router {
+    let mut config = test_config();
+    config.markov_read_base_url = markov_base_url;
+    config.markov_cache_profile_ttl_ms = 60_000;
+    config.markov_cache_profile_stale_while_revalidate_ms = 120_000;
+    config.markov_cache_gameplay_ttl_ms = 60_000;
+    config.markov_cache_gameplay_stale_while_revalidate_ms = 120_000;
+    let store = InMemoryIdempotencyStore::new("test");
+    let state = AppState::with_idempotency_store(config, Arc::new(store));
+    routes::router(state)
+}
+
+async fn spawn_markov_stub_base_url() -> String {
+    async fn user_reputation(Path(identity): Path<String>) -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "user_id": "markov-user-123",
+            "identity": identity,
+            "tier": "Contributor",
+            "total_reputation": "0.77"
+        }))
+    }
+
+    async fn user_tier(Path(user_id): Path<String>) -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "user_id": user_id,
+            "tier": "Contributor",
+            "tier_symbol": "◆◆◇◇"
+        }))
+    }
+
+    async fn user_activity(Path(user_id): Path<String>) -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "user_id": user_id,
+            "solutions_submitted": 4,
+            "vouches_given": 2
+        }))
+    }
+
+    async fn cv_hidup(Path(user_id): Path<String>) -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "user_id": user_id,
+            "username": "markov-user",
+            "tier": "Contributor"
+        }))
+    }
+
+    async fn skills_search() -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "results": [
+                {"skill_id": "skill-1", "label": "cleanup"}
+            ]
+        }))
+    }
+
+    async fn por_requirements(Path(task_type): Path<String>) -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "task_type": task_type,
+            "min_media_items": 1
+        }))
+    }
+
+    async fn por_triad(Path((track, transition)): Path<(String, String)>) -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "track": track,
+            "stage_transition": transition,
+            "min_of_three": 2
+        }))
+    }
+
+    async fn leaderboard() -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "entries": [],
+            "total_users": 42
+        }))
+    }
+
+    async fn distribution() -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "keystone": 1,
+            "pillar": 3,
+            "contributor": 10,
+            "novice": 28,
+            "shadow": 0,
+            "total": 42
+        }))
+    }
+
+    let app = Router::new()
+        .route("/api/v1/users/:id/reputation", get(user_reputation))
+        .route("/api/v1/users/:id/tier", get(user_tier))
+        .route("/api/v1/users/:id/activity", get(user_activity))
+        .route("/api/v1/cv-hidup/:user_id", get(cv_hidup))
+        .route("/api/v1/skills/search", get(skills_search))
+        .route("/api/v1/por/requirements/:task_type", get(por_requirements))
+        .route(
+            "/api/v1/por/triad-requirements/:track/:transition",
+            get(por_triad),
+        )
+        .route("/api/v1/reputation/leaderboard", get(leaderboard))
+        .route("/api/v1/reputation/distribution", get(distribution));
+
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind markov stub");
+    let addr = listener.local_addr().expect("markov stub addr");
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.expect("serve markov stub");
+    });
+
+    format!("http://{addr}/api/v1")
 }
 
 #[tokio::test]
@@ -2737,7 +2853,8 @@ async fn edgepod_ep09_credit_recommendation_success_and_fallback() {
         "payload_version": "2026-02-14",
         "user_id": "user-123",
         "timeline_events": [{"event":"contrib-submitted"}],
-        "skill_profile": ["ar_site", "media"]
+        "skill_profile": ["ar_site", "media"],
+        "reputation_snapshot": { "forged": true }
     });
 
     let success_request = Request::builder()
@@ -2765,6 +2882,18 @@ async fn edgepod_ep09_credit_recommendation_success_and_fallback() {
             .and_then(|value| value.get("dispute_window"))
             .is_some()
     );
+    assert_eq!(
+        success_envelope
+            .get("output")
+            .and_then(|value| value.get("confidence_source")),
+        Some(&json!("heuristic"))
+    );
+    assert_eq!(
+        success_envelope
+            .get("actor_context")
+            .and_then(|context| context.get("client_reputation_snapshot_ignored")),
+        Some(&json!(true))
+    );
 
     let fallback_payload = json!({
         "request_id": "req_ep09_fallback_01",
@@ -2776,7 +2905,7 @@ async fn edgepod_ep09_credit_recommendation_success_and_fallback() {
         },
         "trigger": "timer",
         "payload_version": "2026-02-14",
-        "user_id": "fallback-user",
+        "user_id": "user-123",
         "timeline_events": [{"event":"contrib-submitted"}],
         "skill_profile": ["ar_site", "media"]
     });
@@ -2810,6 +2939,39 @@ async fn edgepod_ep09_credit_recommendation_success_and_fallback() {
             .and_then(|context| context.get("endpoint"))
             .is_some()
     );
+}
+
+#[tokio::test]
+async fn edgepod_ep09_rejects_cross_user_lookup() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "request_id": "req_ep09_cross_user_01",
+        "correlation_id": "corr-ep09-cross-user-01",
+        "actor": {
+            "user_id": "user-123",
+            "platform_user_id": "platform-user-123",
+            "role": "member"
+        },
+        "trigger": "timer",
+        "payload_version": "2026-02-14",
+        "user_id": "user-999",
+        "timeline_events": [{"event":"contrib-submitted"}],
+        "skill_profile": ["ar_site", "media"]
+    });
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/edge-pod/ai/09/credit-recommendation")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "req_ep09_cross_user_01")
+        .body(Body::from(payload.to_string()))
+        .unwrap();
+
+    let response = app.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]
@@ -2859,8 +3021,109 @@ async fn edgepod_ep11_siaga_evaluate_success() {
 }
 
 #[tokio::test]
+async fn tandang_routes_surface_cache_metadata_and_data() {
+    let markov_base_url = spawn_markov_stub_base_url().await;
+    let app = test_app_with_markov_base(markov_base_url);
+    let token = test_token("test-secret");
+
+    let profile_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/me/profile")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("profile request");
+    let profile_response = app
+        .clone()
+        .oneshot(profile_request)
+        .await
+        .expect("profile response");
+    assert_eq!(profile_response.status(), StatusCode::OK);
+    let profile_body = to_bytes(profile_response.into_body(), usize::MAX)
+        .await
+        .expect("profile body");
+    let profile_json: serde_json::Value =
+        serde_json::from_slice(&profile_body).expect("profile json");
+    assert!(
+        profile_json
+            .get("cache")
+            .and_then(|cache| cache.get("status"))
+            .and_then(|value| value.as_str())
+            .is_some()
+    );
+    assert_eq!(
+        profile_json
+            .get("data")
+            .and_then(|data| data.get("reputation"))
+            .and_then(|value| value.get("user_id")),
+        Some(&json!("markov-user-123"))
+    );
+    assert!(
+        profile_json
+            .get("data")
+            .and_then(|data| data.get("component_cache"))
+            .and_then(|cache| cache.get("reputation"))
+            .and_then(|cache| cache.get("status"))
+            .is_some()
+    );
+
+    let profile_second_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/me/profile")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("profile second request");
+    let profile_second_response = app
+        .clone()
+        .oneshot(profile_second_request)
+        .await
+        .expect("profile second response");
+    assert_eq!(profile_second_response.status(), StatusCode::OK);
+    let profile_second_body = to_bytes(profile_second_response.into_body(), usize::MAX)
+        .await
+        .expect("profile second body");
+    let profile_second_json: serde_json::Value =
+        serde_json::from_slice(&profile_second_body).expect("profile second json");
+    assert_eq!(
+        profile_second_json
+            .get("cache")
+            .and_then(|cache| cache.get("status")),
+        Some(&json!("hit"))
+    );
+
+    for endpoint in [
+        "/v1/tandang/skills/search?q=cleanup",
+        "/v1/tandang/por/requirements/delivery",
+        "/v1/tandang/por/triad-requirements/resolve/seed_to_define",
+        "/v1/tandang/reputation/leaderboard?limit=5",
+        "/v1/tandang/reputation/distribution",
+    ] {
+        let request = Request::builder()
+            .method("GET")
+            .uri(endpoint)
+            .header("authorization", format!("Bearer {token}"))
+            .body(Body::empty())
+            .expect("request");
+        let response = app.clone().oneshot(request).await.expect("response");
+        assert_eq!(response.status(), StatusCode::OK, "endpoint {endpoint}");
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body");
+        let parsed: serde_json::Value = serde_json::from_slice(&body).expect("json");
+        assert!(
+            parsed
+                .get("cache")
+                .and_then(|cache| cache.get("status"))
+                .is_some(),
+            "missing cache status for endpoint {endpoint}"
+        );
+        assert!(parsed.get("data").is_some(), "missing data for endpoint {endpoint}");
+    }
+}
+
+#[tokio::test]
 async fn metrics_endpoint_is_exposed() {
-    observability::init_metrics().expect("init metrics");
+    let _ = observability::init_metrics();
+    observability::register_markov_integration_error("test_reason");
     let app = test_app();
 
     let health_request = Request::builder()
@@ -2895,4 +3158,5 @@ async fn metrics_endpoint_is_exposed() {
         body.contains("gotong_api_http_requests_total")
             || body.contains("gotong_api_http_request_duration_seconds")
     );
+    assert!(body.contains("gotong_api_markov_integration_errors_total"));
 }
