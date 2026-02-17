@@ -10,8 +10,8 @@ use gotong_domain::{
     auth::Role,
     identity::ActorIdentity,
     jobs::{
-        ConceptVerificationPayload, JobDefaults, TTLCleanupPayload, WebhookRetryPayload,
-        backoff_ms, new_job, now_ms,
+        backoff_ms, new_job, now_ms, ConceptVerificationPayload, JobDefaults, TTLCleanupPayload,
+        WebhookRetryPayload,
     },
     moderation::{ModerationAutoReleaseCommand, ModerationService},
     ontology::OntologyConcept,
@@ -296,8 +296,11 @@ async fn run_webhook_backfill_mode(config: &AppConfig, args: &[String]) -> anyho
         None
     } else {
         Some(
-            RedisJobQueue::connect_with_prefix(&config.redis_url, config.worker_queue_prefix.clone())
-                .await?,
+            RedisJobQueue::connect_with_prefix(
+                &config.redis_url,
+                config.worker_queue_prefix.clone(),
+            )
+            .await?,
         )
     };
 
@@ -315,7 +318,8 @@ async fn run_webhook_backfill_mode(config: &AppConfig, args: &[String]) -> anyho
     );
 
     for line in reader.lines() {
-        let line = line.map_err(|err| anyhow::anyhow!("failed reading backfill file line: {err}"))?;
+        let line =
+            line.map_err(|err| anyhow::anyhow!("failed reading backfill file line: {err}"))?;
         let payload_line = line.trim();
         if payload_line.is_empty() {
             continue;
@@ -465,8 +469,11 @@ async fn run_webhook_replay_mode(config: &AppConfig, args: &[String]) -> anyhow:
         None
     } else {
         Some(
-            RedisJobQueue::connect_with_prefix(&config.redis_url, config.worker_queue_prefix.clone())
-                .await?,
+            RedisJobQueue::connect_with_prefix(
+                &config.redis_url,
+                config.worker_queue_prefix.clone(),
+            )
+            .await?,
         )
     };
 
@@ -711,15 +718,9 @@ impl Worker {
             observability::set_webhook_dead_letter_depth(0);
             return;
         };
-        match repo
-            .list(&WebhookOutboxListQuery {
-                status: Some(WebhookOutboxStatus::DeadLetter),
-                limit: 10_000,
-            })
-            .await
-        {
-            Ok(events) => {
-                observability::set_webhook_dead_letter_depth(events.len() as u64);
+        match repo.count_by_status(WebhookOutboxStatus::DeadLetter).await {
+            Ok(total) => {
+                observability::set_webhook_dead_letter_depth(total);
             }
             Err(err) => {
                 warn!(

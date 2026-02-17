@@ -1,6 +1,7 @@
 use crate::ports::BoxFuture;
 use crate::webhook::{
-    WebhookDeliveryLog, WebhookOutboxEvent, WebhookOutboxListQuery, WebhookOutboxUpdate,
+    WebhookDeliveryLog, WebhookOutboxEvent, WebhookOutboxListQuery, WebhookOutboxStatus,
+    WebhookOutboxUpdate,
 };
 
 use crate::DomainResult;
@@ -8,7 +9,7 @@ use crate::DomainResult;
 #[allow(clippy::needless_pass_by_value)]
 pub trait WebhookOutboxRepository: Send + Sync {
     fn create(&self, event: &WebhookOutboxEvent)
-    -> BoxFuture<'_, DomainResult<WebhookOutboxEvent>>;
+        -> BoxFuture<'_, DomainResult<WebhookOutboxEvent>>;
 
     fn get(&self, event_id: &str) -> BoxFuture<'_, DomainResult<Option<WebhookOutboxEvent>>>;
 
@@ -21,6 +22,8 @@ pub trait WebhookOutboxRepository: Send + Sync {
         &self,
         query: &WebhookOutboxListQuery,
     ) -> BoxFuture<'_, DomainResult<Vec<WebhookOutboxEvent>>>;
+
+    fn count_by_status(&self, status: WebhookOutboxStatus) -> BoxFuture<'_, DomainResult<u64>>;
 
     fn update(
         &self,

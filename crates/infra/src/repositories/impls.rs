@@ -154,6 +154,22 @@ impl WebhookOutboxRepository for InMemoryWebhookOutboxRepository {
         })
     }
 
+    fn count_by_status(
+        &self,
+        status: WebhookOutboxStatus,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<u64>> {
+        let events = self.events.clone();
+        Box::pin(async move {
+            let count = events
+                .read()
+                .await
+                .values()
+                .filter(|event| event.status == status)
+                .count();
+            Ok(count as u64)
+        })
+    }
+
     fn update(
         &self,
         event_id: &str,
@@ -213,6 +229,92 @@ impl WebhookOutboxRepository for InMemoryWebhookOutboxRepository {
             logs.sort_by(|left, right| left.attempt.cmp(&right.attempt));
             Ok(logs)
         })
+    }
+}
+
+#[cfg(test)]
+mod webhook_outbox_repository_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn valid_payload(event_id: &str, request_id: &str) -> serde_json::Value {
+        json!({
+            "event_id": event_id,
+            "event_type": "contribution_created",
+            "schema_version": "1",
+            "request_id": request_id,
+            "actor": {
+                "user_id": "user-123",
+                "username": "user-123-name"
+            },
+            "subject": {
+                "contribution_type": "task_completion",
+                "title": "test"
+            }
+        })
+    }
+
+    #[tokio::test]
+    async fn in_memory_webhook_outbox_count_by_status_tracks_dead_letter_depth() {
+        let repo = InMemoryWebhookOutboxRepository::new();
+
+        let first = WebhookOutboxEvent::new(valid_payload("evt-1", "req-1"), "req-1", "corr-1", 3)
+            .expect("create first event");
+        let second = WebhookOutboxEvent::new(valid_payload("evt-2", "req-2"), "req-2", "corr-2", 3)
+            .expect("create second event");
+
+        repo.create(&first).await.expect("persist first");
+        repo.create(&second).await.expect("persist second");
+
+        repo.update(
+            &first.event_id,
+            &WebhookOutboxUpdate {
+                status: WebhookOutboxStatus::DeadLetter,
+                attempts: 1,
+                max_attempts: first.max_attempts,
+                next_attempt_at_ms: None,
+                last_status_code: Some(500),
+                last_error: Some("upstream failed".to_string()),
+                request_id: None,
+                correlation_id: None,
+            },
+        )
+        .await
+        .expect("mark first as dead_letter");
+
+        let dead_letter = repo
+            .count_by_status(WebhookOutboxStatus::DeadLetter)
+            .await
+            .expect("count dead_letter after first update");
+        assert_eq!(dead_letter, 1);
+
+        repo.update(
+            &second.event_id,
+            &WebhookOutboxUpdate {
+                status: WebhookOutboxStatus::DeadLetter,
+                attempts: 2,
+                max_attempts: second.max_attempts,
+                next_attempt_at_ms: None,
+                last_status_code: Some(500),
+                last_error: Some("retry exhausted".to_string()),
+                request_id: None,
+                correlation_id: None,
+            },
+        )
+        .await
+        .expect("mark second as dead_letter");
+
+        let dead_letter = repo
+            .count_by_status(WebhookOutboxStatus::DeadLetter)
+            .await
+            .expect("count dead_letter after second update");
+        assert_eq!(dead_letter, 2);
+
+        let pending = repo
+            .count_by_status(WebhookOutboxStatus::Pending)
+            .await
+            .expect("count pending");
+        assert_eq!(pending, 0);
     }
 }
 
@@ -519,6 +621,35 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
                 .take(0)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             Self::decode_event_rows(rows)
+        })
+    }
+
+    fn count_by_status(
+        &self,
+        status: WebhookOutboxStatus,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<u64>> {
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query(
+                    "SELECT count() AS total FROM webhook_outbox_event WHERE status = $status GROUP ALL",
+                )
+                .bind(("status", status.as_str()))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let total = rows
+                .first()
+                .and_then(|row| row.get("total").or_else(|| row.get("count")))
+                .and_then(|value| {
+                    value
+                        .as_u64()
+                        .or_else(|| value.as_i64().and_then(|number| u64::try_from(number).ok()))
+                })
+                .unwrap_or(0);
+            Ok(total)
         })
     }
 

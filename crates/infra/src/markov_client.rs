@@ -100,7 +100,6 @@ impl CacheClass {
 
 #[derive(Debug, Clone, Copy)]
 enum TokenPolicy {
-    Optional,
     Required,
 }
 
@@ -232,7 +231,7 @@ impl MarkovReadClient {
         identity: &str,
     ) -> Result<CachedJson, MarkovClientError> {
         let path = format!("users/{identity}/reputation");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Optional)
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Required)
             .await
     }
 
@@ -241,7 +240,7 @@ impl MarkovReadClient {
         markov_user_id: &str,
     ) -> Result<CachedJson, MarkovClientError> {
         let path = format!("users/{markov_user_id}/tier");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Optional)
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Required)
             .await
     }
 
@@ -250,7 +249,7 @@ impl MarkovReadClient {
         markov_user_id: &str,
     ) -> Result<CachedJson, MarkovClientError> {
         let path = format!("users/{markov_user_id}/activity");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Optional)
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Required)
             .await
     }
 
@@ -259,7 +258,7 @@ impl MarkovReadClient {
         markov_user_id: &str,
     ) -> Result<CachedJson, MarkovClientError> {
         let path = format!("cv-hidup/{markov_user_id}");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Optional)
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Required)
             .await
     }
 
@@ -287,7 +286,7 @@ impl MarkovReadClient {
             "skills/search".to_string(),
             params,
             CacheClass::Gameplay,
-            TokenPolicy::Optional,
+            TokenPolicy::Required,
         )
         .await
     }
@@ -307,7 +306,7 @@ impl MarkovReadClient {
             path,
             Vec::new(),
             CacheClass::Gameplay,
-            TokenPolicy::Optional,
+            TokenPolicy::Required,
         )
         .await
     }
@@ -329,7 +328,7 @@ impl MarkovReadClient {
             path,
             Vec::new(),
             CacheClass::Gameplay,
-            TokenPolicy::Optional,
+            TokenPolicy::Required,
         )
         .await
     }
@@ -559,7 +558,7 @@ impl MarkovReadClient {
                 request = request.query(query_params);
             }
             match (&self.platform_token, token_policy) {
-                (Some(token), _) => {
+                (Some(token), TokenPolicy::Required) => {
                     request = request.header(PLATFORM_TOKEN_HEADER, token);
                 }
                 (None, TokenPolicy::Required) => {
@@ -567,7 +566,6 @@ impl MarkovReadClient {
                         "markov platform token is required but not configured".to_string(),
                     ));
                 }
-                (None, TokenPolicy::Optional) => {}
             }
 
             let response = match request.send().await {
