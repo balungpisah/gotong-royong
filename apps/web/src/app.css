@@ -1,0 +1,192 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+@import 'tailwindcss';
+
+:root {
+	/* Tanah Inti */
+	--c-tanah-gelap: #3e2723;
+	--c-tanah: #5d4037;
+	--c-kayu: #8d6e63;
+	--c-pasir: #a1887f;
+	--c-batu: #d7ccc8;
+	--c-kapas: #f5ede3;
+	--c-susu: #fffbf5;
+
+	/* Aksi (Api) */
+	--c-api: #c05621;
+	--c-api-terang: #d2691e;
+	--c-api-dalam: #a0461a;
+	--c-bara: #fff3e0;
+
+	/* Semantik */
+	--c-berhasil: #2e7d32;
+	--c-berhasil-lembut: #e8f5e9;
+	--c-peringatan: #e65100;
+	--c-peringatan-lembut: #fff3e0;
+	--c-bahaya: #c62828;
+	--c-bahaya-lembut: #ffebee;
+	--c-keterangan: #4e342e;
+	--c-keterangan-lembut: #efebe9;
+
+	/* Track Accents */
+	--t-tuntaskan: #c05621;
+	--t-tuntaskan-soft: #fff3e0;
+	--t-tuntaskan-muted: #ffecd2;
+	--t-wujudkan: #2e7d32;
+	--t-wujudkan-soft: #e8f5e9;
+	--t-wujudkan-muted: #c8e6c9;
+	--t-telusuri: #6a1b9a;
+	--t-telusuri-soft: #f3e5f5;
+	--t-telusuri-muted: #e1bee7;
+	--t-rayakan: #f57f17;
+	--t-rayakan-soft: #fff8e1;
+	--t-rayakan-muted: #ffecb3;
+	--t-musyawarah: #4e342e;
+	--t-musyawarah-soft: #efebe9;
+	--t-musyawarah-muted: #d7ccc8;
+
+	/* Vault */
+	--v-deep: #263238;
+	--v-surface: #37474f;
+	--v-mid: #546e7a;
+	--v-soft: #78909c;
+	--v-light: #b0bec5;
+	--v-wash: #eceff1;
+
+	/* Siaga */
+	--s-deep: #b71c1c;
+	--s-pulse: #d32f2f;
+	--s-accent: #ff5252;
+	--s-soft: #ffebee;
+	--s-border: #ffcdd2;
+
+	/* Tandang */
+	--c-tandang: #00695c;
+	--c-tandang-i: #f57f17;
+	--c-tandang-c: #00695c;
+	--c-tandang-j: #7b1fa2;
+
+	/* Typography */
+	--font-family: 'Nunito', -apple-system, sans-serif;
+	--fs-display: 32px;
+	--fs-h1: 26px;
+	--fs-h2: 20px;
+	--fs-h3: 16px;
+	--fs-body: 14px;
+	--fs-small: 12px;
+	--fs-caption: 11px;
+	--fs-micro: 9px;
+	--lh-tight: 1.2;
+	--lh-normal: 1.5;
+	--lh-relaxed: 1.7;
+	--fw-regular: 400;
+	--fw-semi: 600;
+	--fw-bold: 700;
+	--fw-extra: 800;
+
+	/* Spacing */
+	--sp-1: 4px;
+	--sp-2: 8px;
+	--sp-3: 12px;
+	--sp-4: 16px;
+	--sp-5: 20px;
+	--sp-6: 24px;
+	--sp-8: 32px;
+	--sp-10: 40px;
+	--sp-12: 48px;
+	--sp-16: 64px;
+
+	/* Radius */
+	--r-sm: 6px;
+	--r-md: 10px;
+	--r-lg: 14px;
+	--r-xl: 20px;
+	--r-full: 9999px;
+
+	/* Brown-tinted shadows */
+	--shadow-sm: 0 1px 4px rgba(62, 39, 35, 0.06);
+	--shadow-md: 0 2px 12px rgba(62, 39, 35, 0.08);
+	--shadow-lg: 0 4px 24px rgba(62, 39, 35, 0.12);
+	--shadow-xl: 0 8px 40px rgba(62, 39, 35, 0.16);
+}
+
+@theme {
+	--font-sans: var(--font-family);
+	--color-tanah-gelap: var(--c-tanah-gelap);
+	--color-tanah: var(--c-tanah);
+	--color-kayu: var(--c-kayu);
+	--color-pasir: var(--c-pasir);
+	--color-batu: var(--c-batu);
+	--color-kapas: var(--c-kapas);
+	--color-susu: var(--c-susu);
+	--color-api: var(--c-api);
+	--color-api-terang: var(--c-api-terang);
+	--color-api-dalam: var(--c-api-dalam);
+	--color-bara: var(--c-bara);
+	--color-berhasil: var(--c-berhasil);
+	--color-berhasil-lembut: var(--c-berhasil-lembut);
+	--color-peringatan: var(--c-peringatan);
+	--color-peringatan-lembut: var(--c-peringatan-lembut);
+	--color-bahaya: var(--c-bahaya);
+	--color-bahaya-lembut: var(--c-bahaya-lembut);
+	--color-keterangan: var(--c-keterangan);
+	--color-keterangan-lembut: var(--c-keterangan-lembut);
+	--color-tuntaskan: var(--t-tuntaskan);
+	--color-tuntaskan-soft: var(--t-tuntaskan-soft);
+	--color-tuntaskan-muted: var(--t-tuntaskan-muted);
+	--color-wujudkan: var(--t-wujudkan);
+	--color-wujudkan-soft: var(--t-wujudkan-soft);
+	--color-wujudkan-muted: var(--t-wujudkan-muted);
+	--color-telusuri: var(--t-telusuri);
+	--color-telusuri-soft: var(--t-telusuri-soft);
+	--color-telusuri-muted: var(--t-telusuri-muted);
+	--color-rayakan: var(--t-rayakan);
+	--color-rayakan-soft: var(--t-rayakan-soft);
+	--color-rayakan-muted: var(--t-rayakan-muted);
+	--color-musyawarah: var(--t-musyawarah);
+	--color-musyawarah-soft: var(--t-musyawarah-soft);
+	--color-musyawarah-muted: var(--t-musyawarah-muted);
+	--color-vault-deep: var(--v-deep);
+	--color-vault-surface: var(--v-surface);
+	--color-vault-mid: var(--v-mid);
+	--color-vault-soft: var(--v-soft);
+	--color-vault-light: var(--v-light);
+	--color-vault-wash: var(--v-wash);
+	--color-siaga-deep: var(--s-deep);
+	--color-siaga-pulse: var(--s-pulse);
+	--color-siaga-accent: var(--s-accent);
+	--color-siaga-soft: var(--s-soft);
+	--color-siaga-border: var(--s-border);
+	--color-tandang: var(--c-tandang);
+	--color-tandang-i: var(--c-tandang-i);
+	--color-tandang-c: var(--c-tandang-c);
+	--color-tandang-j: var(--c-tandang-j);
+	--spacing-1: var(--sp-1);
+	--spacing-2: var(--sp-2);
+	--spacing-3: var(--sp-3);
+	--spacing-4: var(--sp-4);
+	--spacing-5: var(--sp-5);
+	--spacing-6: var(--sp-6);
+	--spacing-8: var(--sp-8);
+	--spacing-10: var(--sp-10);
+	--spacing-12: var(--sp-12);
+	--spacing-16: var(--sp-16);
+	--radius-sm: var(--r-sm);
+	--radius-md: var(--r-md);
+	--radius-lg: var(--r-lg);
+	--radius-xl: var(--r-xl);
+	--radius-full: var(--r-full);
+	--shadow-sm: var(--shadow-sm);
+	--shadow-md: var(--shadow-md);
+	--shadow-lg: var(--shadow-lg);
+	--shadow-xl: var(--shadow-xl);
+}
+
+@layer base {
+	html,
+	body {
+		font-family: var(--font-family);
+		background: var(--c-susu);
+		color: var(--c-tanah-gelap);
+		line-height: var(--lh-normal);
+	}
+}
