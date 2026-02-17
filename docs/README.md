@@ -95,6 +95,8 @@ Canonical decision:
 ## External References
 
 - **Markov Engine Integration Guide**: [../tandang/markov-engine/docs/GOTONG-ROYONG-INTEGRATION-GUIDE.md](../../tandang/markov-engine/docs/GOTONG-ROYONG-INTEGRATION-GUIDE.md)
+- **Tandang Signal Mapping**: [architecture/tandang-signal-mapping.md](architecture/tandang-signal-mapping.md)
+- **Full Gotong ↔ Tandang Integration Spec**: [architecture/tandang-full-integration.md](architecture/tandang-full-integration.md)
 - **Markov Engine Adapter**: [../tandang/markov-engine/crates/infrastructure/src/adapters/gotong_royong.rs](../../tandang/markov-engine/crates/infrastructure/src/adapters/gotong_royong.rs)
 - **Test Payloads**: [../tandang/markov-engine/tests/fixtures/gotong_royong_payloads.json](../../tandang/markov-engine/tests/fixtures/gotong_royong_payloads.json)
 

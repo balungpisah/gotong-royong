@@ -2,22 +2,24 @@
 
 ## Overview
 
-Gotong Royong integrates with the Markov Credential Engine using a **Native Integration** pattern with webhook-based event publishing. This document details the technical architecture of this integration.
+Gotong Royong integrates with the Markov Credential Engine using a **Native + Trusted Platform** pattern with webhook-based event publishing and service-to-service read APIs. This document details the technical architecture of this integration.
 
-## Integration Mode: Native
+## Integration Mode: Native (Trusted Platform)
 
 **Native integration** means:
 - Gotong Royong has full control over its own database
 - Markov Engine does NOT directly access Gotong Royong's database
 - Events are published via webhooks to Markov Engine
-- Markov Engine processes events and calculates reputation
-- Gotong Royong queries reputation data via Markov API
+- Markov Engine processes events and calculates reputation and profiles
+- Gotong Royong queries reputation and profile data via Markov API using a platform service token
+- Gotong Royong users are auto-provisioned/linked in Markov using trusted platform identities
 
 **Advantages**:
 - Clear separation of concerns
 - Independent scaling of each system
 - Simplified security model (webhook signatures only)
 - Easier to version and deploy independently
+- Transparent user experience (no manual account linking)
 
 ## Integration Prerequisites
 
@@ -26,10 +28,13 @@ Before enabling production traffic between Gotong Royong and Markov:
 1. Configure a shared webhook secret in both systems.
    - Markov: `GOTONG_ROYONG_WEBHOOK_SECRET`
    - Gotong Royong: outbound webhook signer secret (must match Markov)
-2. Ensure each Gotong user is linked in Markov using platform identity format `gotong_royong:{user_id}`.
-3. Use Markov reputation endpoint `GET /api/v1/users/{id}/reputation`, where `{id}` is either:
-   - Markov UUID, or
-   - platform-scoped identity (for Gotong): `gotong_royong:{user_id}`
+2. Configure a platform service token for Gotong → Markov read APIs.
+3. Enable trusted-platform auto-linking for `gotong_royong` identities (Markov auto-creates verified links on first event).
+4. Use Markov read endpoints with platform-scoped identity `gotong_royong:{user_id}`:
+   - `GET /api/v1/users/{id}/reputation`
+   - `GET /api/v1/users/{id}/tier`
+   - `GET /api/v1/users/{id}/activity`
+   - `GET /api/v1/cv-hidup/{user_id}`
 
 ## Architecture Diagram
 
@@ -104,13 +109,13 @@ sequenceDiagram
 - Backoff: 1s, 2s, 4s, 8s, 16s
 - Dead letter queue after max retries
 
-### 2. Reputation Queries (Gotong Royong → Markov)
+### 2. Reputation + Profile Queries (Gotong Royong → Markov)
 
-**Purpose**: Display user reputation in Gotong Royong UI
+**Purpose**: Display user reputation, tier, activity, and CV hidup in Gotong Royong UI
 
 **Pattern**: Request-response with caching
 
-**Protocol**: HTTP GET with JWT authentication
+**Protocol**: HTTP GET with platform service authentication (JWT for end-user access remains supported)
 
 **Caching Strategy**:
 - Cache reputation data in Redis
@@ -190,7 +195,7 @@ class WebhookPublisher {
     const payload = JSON.stringify(event);
     const signature = this.computeSignature(payload);
 
-    const url = `${this.markovBaseUrl}/v1/platforms/gotong_royong/webhook`;
+    const url = `${this.markovBaseUrl}/api/v1/platforms/gotong_royong/webhook`;
 
     try {
       const response = await axios.post(url, payload, {

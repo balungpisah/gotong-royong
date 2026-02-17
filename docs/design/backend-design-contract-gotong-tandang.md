@@ -1,7 +1,7 @@
 # Gotong Royong Backend Design Preparation: Tandang-Compatible Contract
 
 **Date:** 2026-02-14  
-**Status:** Draft  
+**Status:** Current baseline  
 **Audience:** Backend engineers, API designers, AI implementers
 
 ## 1. Purpose
@@ -70,9 +70,10 @@ This includes:
 1. Primary URL: `POST /api/v1/platforms/gotong_royong/webhook`
 2. Method: `POST` only
 3. Required header: `X-GR-Signature: sha256=<hex>`
-4. Content-Type: `application/json`
-5. Success HTTP code: `200`
-6. Success body:
+4. Required header: `X-Request-ID: <request_id>` (must match payload `request_id`)
+5. Content-Type: `application/json`
+6. Success HTTP code: `200`
+7. Success body:
 ```json
 {
   "processed": 1,
@@ -89,8 +90,10 @@ This includes:
 ### 4.3 Idempotency
 
 1. Every outbound event must include `event_id`.
-2. `event_id` format: `evt_[a-f0-9]{16}`.
-3. Replayed `event_id` must return `200` and be treated as no-op to avoid double scoring.
+2. Every outbound event must include `schema_version` (positive integer or numeric string).
+3. Every outbound event must include `request_id` and it must match `X-Request-ID`.
+4. `event_id` format: `evt_[a-f0-9]{16}`.
+5. Replayed `event_id` must return `200` and be treated as no-op to avoid double scoring.
 
 ### 4.4 Error contract
 
@@ -111,10 +114,13 @@ This includes:
 
 #### Common top-level fields
 
-1. `event_type`
-2. `actor.user_id`
-3. `actor.username`
-4. `subject` object (shape depends on type)
+1. `event_id`
+2. `event_type`
+3. `schema_version`
+4. `request_id`
+5. `actor.user_id`
+6. `actor.username`
+7. `subject` object (shape depends on type)
 
 #### `contribution_created`
 
@@ -190,10 +196,9 @@ This includes:
 
 ## 7. Open questions
 
-1. Should `gotong_royong` expose `POST /platforms/gotong_royong/ingest` for service-account assisted writes or only webhooks?
+1. Should `gotong_royong` expose `POST /api/v1/platforms/gotong_royong/ingest` for service-account assisted writes or only webhooks?
 2. Is `proof.timestamp` retention policy fixed to 30 days across all PoR types or only witness attestations?
 3. Confirm whether `vouch_submitted.weight_hint` default should be hard-coded or mapped to platform-level policy.
-4. Confirm required `schema_version` field in payload envelope for `vouch_submitted` and `por_evidence`.
 
 ## 8. Delivery checklist for backend planning ticket
 
@@ -253,6 +258,12 @@ The best strategy is a **UI-driven, contract-first build list**:
 - [ ] Retryable/non-retryable response classification and DLQ handling.
   - Source: `docs/api/webhook-spec.md`
 - [ ] Platform metadata endpoint support for discovery (`/platforms/{platform_id}`).
+  - Source: `markov-engine/docs/API-PLATFORMS.md`
+- [ ] Trusted-platform auto-linking for `gotong_royong` identities (no manual user linking).
+  - Source: `markov-engine/docs/GOTONG-ROYONG-INTEGRATION-GUIDE.md`
+- [ ] Platform service token auth for Markov read APIs.
+  - Source: `markov-engine/docs/API-PLATFORMS.md`
+- [ ] Read integration for reputation, tier, activity, CV hidup, skills, and PoR status.
   - Source: `markov-engine/docs/API-PLATFORMS.md`
 
 #### D. AI-backed capabilities (Should, with fallback)
