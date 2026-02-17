@@ -1,42 +1,28 @@
-# sv
+# Gotong Web
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Frontend application for Gotong Royong using SvelteKit 2 + Svelte 5.
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
+## Local Commands
 
 ```sh
-# create a new project
-npx sv create my-app
+bun install
+bun run dev
+bun run check
+bun run lint
+bun run build
 ```
 
-To recreate this project with the same configuration:
+## Baseline Structure
 
-```sh
-# recreate this project
-bun x sv create --template minimal --types ts --add eslint prettier --no-download-check --install bun apps/web
+```text
+src/
+  routes/          # Route entries and layouts
+  lib/
+    api/           # API client and transport wrappers
+    components/    # Shared UI components
+    stores/        # Svelte stores and state modules
+    types/         # Shared TypeScript contracts
+    utils/         # Utility helpers
 ```
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+This structure is intentionally lightweight and will be expanded during the frontend foundation sprint.
