@@ -566,3 +566,5 @@ export const createApiClient = (config: ApiClientConfig = {}): ApiClient => {
 };
 
 export const apiClient = createApiClient();
+
+export * from './realtime';
