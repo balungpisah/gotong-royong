@@ -8,7 +8,8 @@
 3. **Visual reference:** [ADAPTIVE-PATH-MAP.md](./design/context/ADAPTIVE-PATH-MAP.md)
 4. **Design DNA:** [DESIGN-DNA-v0.1.md](./design/specs/DESIGN-DNA-v0.1.md)
 5. **AI layer:** [AI-SPEC-v0.2.md](./design/specs/AI-SPEC-v0.2.md)
-6. **UI/UX flows:** [UI-UX-SPEC-v0.5.md](./design/specs/UI-UX-SPEC-v0.5.md)
+6. **UI Guideline (SINGLE SOURCE OF TRUTH):** [UI-GUIDELINE-v1.0.md](./design/specs/UI-GUIDELINE-v1.0.md)
+7. ~~UI-UX-SPEC-v0.5.md~~ — ARCHIVED, superseded by UI-GUIDELINE-v1.0
 
 ## Canonical Files
 
@@ -18,9 +19,10 @@
 - [ADAPTIVE-PATH-MAP.md](./design/context/ADAPTIVE-PATH-MAP.md) — visual reference for adaptive path model
 
 ### Specs
+- **[UI-GUIDELINE-v1.0.md](./design/specs/UI-GUIDELINE-v1.0.md)** — UI single source of truth (Chat-First model)
 - [DESIGN-DNA-v0.1.md](./design/specs/DESIGN-DNA-v0.1.md)
 - [AI-SPEC-v0.2.md](./design/specs/AI-SPEC-v0.2.md)
-- [UI-UX-SPEC-v0.5.md](./design/specs/UI-UX-SPEC-v0.5.md)
+- ~~[UI-UX-SPEC-v0.5.md](./design/specs/UI-UX-SPEC-v0.5.md)~~ — ARCHIVED → [archive](./design/archive/ui-ux-spec-v0.5/)
 - [ADAPTIVE-PATH-SPEC-v0.1.md](./design/specs/ADAPTIVE-PATH-SPEC-v0.1.md)
 - [ADAPTIVE-PATH-ORCHESTRATION-v0.1.md](./design/specs/ADAPTIVE-PATH-ORCHESTRATION-v0.1.md)
 - [ENTRY-PATH-MATRIX-v0.1.md](./design/specs/ENTRY-PATH-MATRIX-v0.1.md) — eagle view of all 4 modes + Catatan Komunitas spec
