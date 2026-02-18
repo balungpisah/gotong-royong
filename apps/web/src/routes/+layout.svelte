@@ -10,6 +10,34 @@
 	import Users from '@lucide/svelte/icons/users';
 	import type { Component } from 'svelte';
 	import '../app.css';
+	import { setContext } from 'svelte';
+	import { createServices, SERVICES_KEY } from '$lib/services';
+	import {
+		WitnessStore,
+		UserStore,
+		NotificationStore,
+		TriageStore,
+		WITNESS_STORE_KEY,
+		USER_STORE_KEY,
+		NOTIFICATION_STORE_KEY,
+		TRIAGE_STORE_KEY
+	} from '$lib/stores';
+
+	// ---------------------------------------------------------------------------
+	// Service & Store initialization (mock-first, swap to API later)
+	// ---------------------------------------------------------------------------
+
+	const services = createServices();
+	const witnessStore = new WitnessStore(services.witness);
+	const userStore = new UserStore(services.user);
+	const notificationStore = new NotificationStore(services.notification);
+	const triageStore = new TriageStore(services.triage);
+
+	setContext(SERVICES_KEY, services);
+	setContext(WITNESS_STORE_KEY, witnessStore);
+	setContext(USER_STORE_KEY, userStore);
+	setContext(NOTIFICATION_STORE_KEY, notificationStore);
+	setContext(TRIAGE_STORE_KEY, triageStore);
 
 	let { children } = $props();
 
