@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
 	import { getWitnessStore } from '$lib/stores';
-	import { PulseActivityCard } from '$lib/components/shell';
+	import { PulseActivityCard } from '$lib/components/pulse';
 	import { Badge } from '$lib/components/ui/badge';
 	import type { BadgeVariant } from '$lib/components/ui/badge';
 	import Activity from '@lucide/svelte/icons/activity';

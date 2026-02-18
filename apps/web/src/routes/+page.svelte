@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages';
 	import { getWitnessStore, getNotificationStore } from '$lib/stores';
-	import { ChatInput, PulseActivityCard, WitnessDetailPanel } from '$lib/components/shell';
+	import { ChatInput } from '$lib/components/shell';
+	import { PulseActivityCard, WitnessDetailPanel } from '$lib/components/pulse';
 	import Activity from '@lucide/svelte/icons/activity';
 
 	const witnessStore = getWitnessStore();

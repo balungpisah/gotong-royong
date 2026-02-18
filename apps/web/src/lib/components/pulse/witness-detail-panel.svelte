@@ -3,7 +3,7 @@
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import { StatusIndicator, type StatusIndicatorStatus } from '$lib/components/ui/status-indicator';
 	import PhaseCarousel from './phase-carousel.svelte';
-	import ChatThread from './chat-thread.svelte';
+	import WitnessChatPanel from './witness-chat-panel.svelte';
 	import X from '@lucide/svelte/icons/x';
 	import UsersIcon from '@lucide/svelte/icons/users';
 
@@ -91,5 +91,5 @@
 	{/if}
 
 	<!-- Chat thread (bottom section, fills remaining space) -->
-	<ChatThread messages={detail.messages} onSend={onSendMessage} {sending} />
+	<WitnessChatPanel messages={detail.messages} onSend={onSendMessage} {sending} />
 </div>
