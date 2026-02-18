@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
 	import favicon from '$lib/assets/favicon.svg';
@@ -8,39 +8,25 @@
 	import House from '@lucide/svelte/icons/house';
 	import UserRound from '@lucide/svelte/icons/user-round';
 	import Users from '@lucide/svelte/icons/users';
+	import type { Component } from 'svelte';
 	import '../app.css';
 
 	let { children } = $props();
 
-	const navItems = [
-		{
-			href: '/beranda',
-			label: m.shell_nav_beranda,
-			icon: House
-		},
-		{
-			href: '/terlibat',
-			label: m.shell_nav_terlibat,
-			icon: Users
-		},
-		{
-			href: '/bantu',
-			label: m.shell_nav_bantu,
-			icon: HandHeart
-		},
-		{
-			href: '/notifikasi',
-			label: m.shell_nav_notifikasi,
-			icon: BellRing
-		},
-		{
-			href: '/profil',
-			label: m.shell_nav_profil,
-			icon: UserRound
-		}
-	] as const;
+	/**
+	 * Navigation items for the 5-tab bottom nav (UI Guideline §5.1).
+	 * Routes are string paths — pages will be created when the
+	 * block renderer system is built.
+	 */
+	const navItems: { href: string; label: () => string; icon: Component<{ class?: string }> }[] = [
+		{ href: '/beranda', label: m.shell_nav_beranda, icon: House },
+		{ href: '/terlibat', label: m.shell_nav_terlibat, icon: Users },
+		{ href: '/bantu', label: m.shell_nav_bantu, icon: HandHeart },
+		{ href: '/notifikasi', label: m.shell_nav_notifikasi, icon: BellRing },
+		{ href: '/profil', label: m.shell_nav_profil, icon: UserRound }
+	];
 
-	const loginPath = resolve('/masuk');
+	const loginPath = `${base}/masuk`;
 </script>
 
 <svelte:head>
@@ -61,7 +47,7 @@
 					class="mx-auto flex w-full max-w-screen-md items-center justify-between gap-3 px-4 py-3 md:max-w-none md:px-0"
 				>
 					<a
-						href={resolve('/beranda')}
+						href="{base}/beranda"
 						class="text-sm font-extrabold tracking-wide text-foreground uppercase"
 					>
 						{m.shell_brand_name()}
@@ -75,7 +61,7 @@
 					>
 						{#each navItems as item (item.href)}
 							{@const Icon = item.icon}
-							{@const resolvedHref = resolve(item.href)}
+							{@const resolvedHref = `${base}${item.href}`}
 							{@const active = page.url.pathname === resolvedHref}
 							<a
 								class={[
@@ -108,7 +94,7 @@
 			<div class="mx-auto grid max-w-screen-md grid-cols-5 px-2 py-2">
 				{#each navItems as item (item.href)}
 					{@const Icon = item.icon}
-					{@const resolvedHref = resolve(item.href)}
+					{@const resolvedHref = `${base}${item.href}`}
 					{@const active = page.url.pathname === resolvedHref}
 					<a
 						class={[
