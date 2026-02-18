@@ -7,6 +7,9 @@ import PartyPopper from '@lucide/svelte/icons/party-popper';
 import Users from '@lucide/svelte/icons/users';
 import Plus from '@lucide/svelte/icons/plus';
 import Tag from '@lucide/svelte/icons/tag';
+import Bookmark from '@lucide/svelte/icons/bookmark';
+import Bell from '@lucide/svelte/icons/bell';
+import Globe from '@lucide/svelte/icons/globe';
 import type { WellKnownTag } from '$lib/types';
 
 /**
@@ -21,7 +24,10 @@ const ICON_REGISTRY: Record<string, Component<{ class?: string }>> = {
 	'party-popper': PartyPopper,
 	users: Users,
 	plus: Plus,
-	tag: Tag
+	tag: Tag,
+	bookmark: Bookmark,
+	bell: Bell,
+	globe: Globe
 };
 
 /**

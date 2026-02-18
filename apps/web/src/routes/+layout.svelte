@@ -11,11 +11,15 @@
 		NotificationStore,
 		TriageStore,
 		NavigationStore,
+		FeedStore,
+		ThemeStore,
 		WITNESS_STORE_KEY,
 		USER_STORE_KEY,
 		NOTIFICATION_STORE_KEY,
 		TRIAGE_STORE_KEY,
-		NAVIGATION_STORE_KEY
+		NAVIGATION_STORE_KEY,
+		FEED_STORE_KEY,
+		THEME_STORE_KEY
 	} from '$lib/stores';
 	import { AppHeader, TabBar, AddTabSheet } from '$lib/components/shell';
 
@@ -29,6 +33,8 @@
 	const notificationStore = new NotificationStore(services.notification);
 	const triageStore = new TriageStore(services.triage);
 	const navigationStore = new NavigationStore();
+	const feedStore = new FeedStore();
+	const themeStore = new ThemeStore();
 
 	setContext(SERVICES_KEY, services);
 	setContext(WITNESS_STORE_KEY, witnessStore);
@@ -36,6 +42,8 @@
 	setContext(NOTIFICATION_STORE_KEY, notificationStore);
 	setContext(TRIAGE_STORE_KEY, triageStore);
 	setContext(NAVIGATION_STORE_KEY, navigationStore);
+	setContext(FEED_STORE_KEY, feedStore);
+	setContext(THEME_STORE_KEY, themeStore);
 
 	let { children } = $props();
 

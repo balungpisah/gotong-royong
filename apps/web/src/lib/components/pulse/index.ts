@@ -6,3 +6,9 @@ export { default as PlanProgressStrip } from './plan-progress-strip.svelte';
 export { default as ActionBanner } from './action-banner.svelte';
 export { default as PhaseDetailDrawer } from './phase-detail-drawer.svelte';
 export { default as PhaseNavigator } from './phase-navigator.svelte';
+
+// Feed system components
+export { default as FeedEventCard } from './feed-event-card.svelte';
+export { default as FeedFilterBar } from './feed-filter-bar.svelte';
+export { default as FeedSuggestionCard } from './feed-suggestion-card.svelte';
+export { default as EntityPill } from './entity-pill.svelte';

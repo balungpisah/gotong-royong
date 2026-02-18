@@ -1,17 +1,25 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages';
-	import { getWitnessStore, getNotificationStore } from '$lib/stores';
+	import { getWitnessStore, getNotificationStore, getFeedStore } from '$lib/stores';
 	import { ChatInput } from '$lib/components/shell';
-	import { PulseActivityCard, WitnessDetailPanel } from '$lib/components/pulse';
+	import {
+		PulseActivityCard,
+		WitnessDetailPanel,
+		FeedEventCard,
+		FeedSuggestionCard
+	} from '$lib/components/pulse';
 	import Activity from '@lucide/svelte/icons/activity';
 
 	const witnessStore = getWitnessStore();
 	const notificationStore = getNotificationStore();
+	const feedStore = getFeedStore();
 
 	// Load data on mount
 	$effect(() => {
 		witnessStore.loadList();
 		notificationStore.loadNotifications();
+		feedStore.loadFeed();
+		feedStore.loadSuggestions();
 	});
 
 	const sortedWitnesses = $derived(
@@ -147,28 +155,25 @@
 			<ChatInput />
 		</div>
 
-		<!-- Recent activity -->
+		<!-- Feed content -->
 		<section class="flex flex-1 flex-col gap-3">
-			<h2 class="text-[var(--fs-h3)] font-semibold text-foreground">
-				{m.pulse_recent_activity()}
-			</h2>
-
-			{#if witnessStore.listLoading}
+			{#if feedStore.loading}
 				<div class="flex flex-col gap-3">
 					{#each { length: 3 } as _}
 						<div class="animate-pulse rounded-xl border border-border/40 bg-muted/30 p-4">
-							<div class="h-4 w-3/4 rounded bg-muted"></div>
+							<div class="h-3 w-1/3 rounded bg-muted/60"></div>
+							<div class="mt-2 h-4 w-3/4 rounded bg-muted"></div>
 							<div class="mt-2 h-3 w-full rounded bg-muted/60"></div>
 							<div class="mt-1 h-3 w-2/3 rounded bg-muted/60"></div>
 							<div class="mt-3 flex gap-2">
-								<div class="h-5 w-16 rounded-full bg-muted/40"></div>
-								<div class="h-5 w-10 rounded bg-muted/40"></div>
+								<div class="h-5 w-5 rounded-full bg-muted/40"></div>
+								<div class="h-5 w-5 rounded-full bg-muted/40"></div>
 								<div class="h-5 w-10 rounded bg-muted/40"></div>
 							</div>
 						</div>
 					{/each}
 				</div>
-			{:else if sortedWitnesses.length === 0}
+			{:else if feedStore.filteredItems.length === 0}
 				<div
 					class="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/60 py-12 text-center"
 				>
@@ -178,22 +183,41 @@
 						<Activity class="size-6" />
 					</div>
 					<p class="max-w-xs text-sm text-muted-foreground">
-						{m.pulse_empty_state()}
+						{feedStore.filter === 'semua'
+							? m.pulse_empty_state()
+							: m.pulse_feed_empty_filter()}
 					</p>
 				</div>
 			{:else}
+				<!-- Onboarding suggestions (shown at top when available) -->
+				{#if feedStore.hasSuggestions && feedStore.filter === 'semua'}
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+					<div
+						onclick={(e) => e.stopPropagation()}
+						onkeydown={(e) => e.stopPropagation()}
+						role="group"
+						aria-label="Suggestions"
+					>
+						<FeedSuggestionCard
+							entities={feedStore.suggestedEntities}
+							onFollow={(id) => feedStore.toggleFollow(id)}
+							onFollowAll={() => feedStore.followAllSuggested()}
+						/>
+					</div>
+				{/if}
+
 				<div class="flex flex-col gap-3" role="list">
-					{#each sortedWitnesses as witness (witness.witness_id)}
-							<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+					{#each feedStore.filteredItems as item (item.witness_id)}
+						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 						<div
 							onclick={(e) => e.stopPropagation()}
 							onkeydown={(e) => e.stopPropagation()}
 							role="listitem"
 						>
-							<PulseActivityCard
-								{witness}
-								selected={selectedWitnessId === witness.witness_id}
-								onclick={() => selectWitness(witness.witness_id)}
+							<FeedEventCard
+								{item}
+								selected={selectedWitnessId === item.witness_id}
+								onclick={() => selectWitness(item.witness_id)}
 							/>
 						</div>
 					{/each}

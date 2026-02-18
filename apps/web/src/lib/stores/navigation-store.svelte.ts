@@ -13,7 +13,7 @@ export class NavigationStore {
 	// State
 	// ---------------------------------------------------------------------------
 	tabs = $state<TabConfig[]>([...DEFAULT_TABS]);
-	activeTabId = $state<string>('pulse');
+	activeTabId = $state<string>('feed-semua');
 	suggestions = $state<TagSuggestion[]>([]);
 	addPanelOpen = $state(false);
 
@@ -46,7 +46,7 @@ export class NavigationStore {
 		if (!tab || tab.pinned) return;
 		this.tabs = this.tabs.filter((t) => t.id !== tabId);
 		if (this.activeTabId === tabId) {
-			this.activeTabId = 'pulse';
+			this.activeTabId = 'feed-semua';
 		}
 	}
 

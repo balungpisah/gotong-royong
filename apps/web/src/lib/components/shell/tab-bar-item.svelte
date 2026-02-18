@@ -11,9 +11,10 @@
 		active?: boolean;
 		removable?: boolean;
 		onremove?: () => void;
+		onclick?: (e: MouseEvent) => void;
 	}
 
-	let { href, label, iconName, active = false, removable = false, onremove }: Props = $props();
+	let { href, label, iconName, active = false, removable = false, onremove, onclick }: Props = $props();
 
 	const Icon: Component<{ class?: string }> = $derived(resolveTabIcon(iconName));
 
@@ -56,6 +57,7 @@
 	class={tabVariants({ layout: 'mobile', state: active ? 'active' : 'inactive' }) +
 		' md:hidden group'}
 	aria-current={active ? 'page' : undefined}
+	onclick={onclick}
 >
 	<Icon class="size-4" />
 	<span>{label}</span>
@@ -67,6 +69,7 @@
 	class={tabVariants({ layout: 'desktop', state: active ? 'active' : 'inactive' }) +
 		' hidden md:inline-flex group'}
 	aria-current={active ? 'page' : undefined}
+	onclick={onclick}
 >
 	<Icon class="size-4" />
 	<span>{label}</span>

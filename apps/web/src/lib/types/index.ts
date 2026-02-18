@@ -95,6 +95,21 @@ export type { UserProfile, UserStats } from './user';
 // Domain aggregates — Notification
 export type { NotificationType, AppNotification } from './notification';
 
+// Domain aggregates — Feed
+export type {
+	FeedEventType,
+	FeedEvent,
+	UrgencyBadge,
+	FeedSource,
+	FeedFilter,
+	FeedItem,
+	FeedMemberPreview,
+	RepostFrame,
+	EntityType,
+	EntityTag,
+	FollowableEntity
+} from './feed';
+
 // ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------

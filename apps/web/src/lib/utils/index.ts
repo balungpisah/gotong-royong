@@ -13,6 +13,7 @@ export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;
 export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?: U | null };
 
 export { trackColors, trackBgClass, type TrackColorSet } from './track-colors';
+export { cardVariants, type CardStyle, type CardVariants } from './card-variants';
 export { renderMarkdown } from './markdown';
 export { resolveTabIcon, iconNameForTag } from './tab-icons';
 export {

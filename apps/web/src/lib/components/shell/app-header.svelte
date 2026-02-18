@@ -4,6 +4,7 @@
 	import { getNotificationStore, getUserStore } from '$lib/stores';
 	import BellRing from '@lucide/svelte/icons/bell-ring';
 	import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
+	import ThemeToggle from './theme-toggle.svelte';
 
 	const notificationStore = getNotificationStore();
 	const userStore = getUserStore();
@@ -39,6 +40,9 @@
 
 		<!-- Right actions -->
 		<div class="flex items-center gap-2">
+			<!-- Theme toggle -->
+			<ThemeToggle />
+
 			<!-- Notification bell -->
 			<a
 				href="{base}/notifikasi"

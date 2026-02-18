@@ -70,7 +70,7 @@ The context bar sits above the keyboard and visualizes AI's classification confi
 ```json
 {
   "entry_flow": "enum: community | vault | siaga",
-  "track": "enum: tuntaskan | wujudkan | telusuri | rayakan | musyawarah (only if community)",
+  "track": "string (AI-generated label, e.g. 'tuntaskan', 'wujudkan', or any contextually appropriate label; only if community)",
   "confidence": "float 0.0–1.0",
   "seed_type": "enum: Keresahan | Gagasan | Pertanyaan | Kabar Baik | Usul",
   "context_bar_state": "enum: listening | probing | leaning | ready | vault-ready | siaga-ready | split-ready | manual",
@@ -205,4 +205,3 @@ When user confirms classification and enters the entry flow:
 - **AI-01 also runs independently** at submission time if classification changes (e.g., Kabar reclassification).
 
 ---
-

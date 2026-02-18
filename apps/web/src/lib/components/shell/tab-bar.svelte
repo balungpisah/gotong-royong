@@ -1,24 +1,47 @@
 <script lang="ts">
 	import { base } from '$app/paths';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
-	import { getNavigationStore } from '$lib/stores';
+	import { getNavigationStore, getFeedStore } from '$lib/stores';
+	import type { TabConfig } from '$lib/types';
 	import TabBarItem from './tab-bar-item.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 
 	const navStore = getNavigationStore();
+	const feedStore = getFeedStore();
 
-	function hrefForTab(tab: { tag: string | null }): string {
+	function hrefForTab(tab: TabConfig): string {
+		// Feed tabs always point to root
+		if (tab.feedFilter) return `${base}/`;
+		// Tag tabs point to /t/{tag}
 		return tab.tag === null ? `${base}/` : `${base}/t/${tab.tag}`;
 	}
 
-	function isActive(tab: { tag: string | null }): boolean {
+	function isActive(tab: TabConfig): boolean {
+		// Feed tabs: active when this tab is the active tab AND we're on root
+		if (tab.feedFilter) {
+			return navStore.activeTabId === tab.id;
+		}
+		// Tag tabs: active by URL
 		const pathname = page.url.pathname;
 		if (tab.tag === null) {
-			// Pulse is active on root path
-			return pathname === `${base}/` || pathname === base || pathname === `${base}`;
+			return pathname === `${base}/` || pathname === base;
 		}
 		return pathname === `${base}/t/${tab.tag}`;
+	}
+
+	function handleTabClick(tab: TabConfig, e: MouseEvent) {
+		if (tab.feedFilter) {
+			e.preventDefault();
+			navStore.setActiveTab(tab.id);
+			feedStore.setFilter(tab.feedFilter);
+			// Navigate to root if we're not already there
+			const pathname = page.url.pathname;
+			if (pathname !== `${base}/` && pathname !== base) {
+				goto(`${base}/`);
+			}
+		}
 	}
 </script>
 
@@ -38,6 +61,7 @@
 				active={isActive(tab)}
 				removable={!tab.pinned}
 				onremove={() => navStore.removeTab(tab.id)}
+				onclick={(e) => handleTabClick(tab, e)}
 			/>
 		{/each}
 
@@ -67,6 +91,7 @@
 				active={isActive(tab)}
 				removable={!tab.pinned}
 				onremove={() => navStore.removeTab(tab.id)}
+				onclick={(e) => handleTabClick(tab, e)}
 			/>
 		{/each}
 
