@@ -1,5 +1,46 @@
 set dotenv-load := false
 
+web := "apps/web"
+
+# Default: list available recipes
+default:
+    @just --list
+
+# ── Web (SvelteKit) ──────────────────────────────────────────────────
+
+# Start web dev server
+dev:
+    cd {{web}} && npm run dev
+
+# Type-check web with svelte-check
+check:
+    cd {{web}} && npx svelte-check
+
+# Run web unit tests
+web-test:
+    cd {{web}} && npx vitest run
+
+# Production build web
+web-build:
+    cd {{web}} && npx vite build
+
+# Format web with prettier
+web-fmt:
+    cd {{web}} && npx prettier --write .
+
+# All web checks: type-check + test + build
+web-verify: check web-test web-build
+
+# Preview production build
+preview:
+    cd {{web}} && npx vite preview
+
+# Install web dependencies
+web-install:
+    cd {{web}} && npm install
+
+# ── Rust (API / Worker) ──────────────────────────────────────────────
+
 fmt:
 	cargo fmt
 
