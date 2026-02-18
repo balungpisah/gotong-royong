@@ -14,7 +14,14 @@
 					'bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 border shadow-xs',
 				secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-xs',
 				ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
-				link: 'text-primary underline-offset-4 hover:underline'
+				link: 'text-primary underline-offset-4 hover:underline',
+				'track-tuntaskan': 'bg-tuntaskan text-white hover:bg-tuntaskan/85 shadow-xs',
+				'track-wujudkan': 'bg-wujudkan text-white hover:bg-wujudkan/85 shadow-xs',
+				'track-telusuri': 'bg-telusuri text-white hover:bg-telusuri/85 shadow-xs',
+				'track-rayakan': 'bg-rayakan text-white hover:bg-rayakan/85 shadow-xs',
+				'track-musyawarah': 'bg-musyawarah text-white hover:bg-musyawarah/85 shadow-xs',
+				vault: 'bg-vault-deep text-white hover:bg-vault-surface shadow-xs',
+				siaga: 'bg-siaga-deep text-white hover:bg-siaga-pulse shadow-xs'
 			},
 			size: {
 				default: 'h-9 px-4 py-2 has-[>svg]:px-3',

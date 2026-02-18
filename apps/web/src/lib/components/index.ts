@@ -1,1 +1,2 @@
-export { default as PlaceholderPanel } from './app/placeholder-panel.svelte';
+// Component barrel exports
+// PlaceholderPanel removed — feature routes are now LLM-driven via JSON block primitives

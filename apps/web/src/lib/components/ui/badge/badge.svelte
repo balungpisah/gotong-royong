@@ -10,7 +10,23 @@
 					'bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 border-transparent',
 				destructive:
 					'bg-destructive [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/70 border-transparent text-white',
-				outline: 'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground'
+				outline: 'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
+				'track-tuntaskan': 'bg-tuntaskan border-transparent text-white',
+				'track-wujudkan': 'bg-wujudkan border-transparent text-white',
+				'track-telusuri': 'bg-telusuri border-transparent text-white',
+				'track-rayakan': 'bg-rayakan border-transparent text-white',
+				'track-musyawarah': 'bg-musyawarah border-transparent text-white',
+				success: 'bg-berhasil-lembut border-transparent text-berhasil',
+				warning: 'bg-peringatan-lembut border-transparent text-peringatan',
+				danger: 'bg-bahaya-lembut border-transparent text-bahaya',
+				info: 'bg-keterangan-lembut border-transparent text-keterangan',
+				step: 'bg-api border-transparent text-white',
+				'step-done': 'bg-berhasil-lembut border-transparent text-berhasil',
+				'step-future': 'bg-kapas border-transparent text-kayu',
+				rahasia: 'bg-tanah-gelap border-transparent text-white',
+				vault: 'bg-vault-deep border-transparent text-white',
+				siaga: 'bg-siaga-pulse border-transparent text-white animate-pulse',
+				confidence: 'bg-kapas border-transparent text-kayu'
 			}
 		},
 		defaultVariants: {
