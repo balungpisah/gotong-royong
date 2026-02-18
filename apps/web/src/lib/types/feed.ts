@@ -46,7 +46,7 @@ export type UrgencyBadge = 'baru' | 'voting' | 'selesai' | 'ramai';
 export type FeedSource = 'ikutan' | 'terlibat' | 'sekitar';
 
 /** Feed filter tab values. */
-export type FeedFilter = 'semua' | 'ikutan' | 'terlibat' | 'sekitar';
+export type FeedFilter = 'semua' | 'ikutan' | 'terlibat' | 'sekitar' | 'discover';
 
 /** A single feed card — one per witness, latest event as headline. */
 export interface FeedItem {
@@ -102,4 +102,73 @@ export interface FollowableEntity extends EntityTag {
 	description?: string;
 	witness_count: number;
 	follower_count: number;
+}
+
+// ── Polymorphic Feed Stream ──────────────────────────────────────
+
+/** Base for all feed stream items. */
+interface FeedStreamBase {
+	/** Unique ID for keying in {#each}. */
+	stream_id: string;
+	/** Timestamp for sorting. */
+	sort_timestamp: string;
+}
+
+/** A witness activity card (existing FeedItem, now tagged). */
+export interface FeedWitnessItem extends FeedStreamBase {
+	kind: 'witness';
+	data: FeedItem;
+}
+
+/** An inline system card (suggestions, tips, announcements). */
+export interface FeedSystemItem extends FeedStreamBase {
+	kind: 'system';
+	data: SystemCardData;
+}
+
+/** The polymorphic feed stream type. */
+export type FeedStreamItem = FeedWitnessItem | FeedSystemItem;
+
+// ── System Card Variants ─────────────────────────────────────────
+
+export type SystemCardVariant = 'suggestion' | 'tip' | 'milestone' | 'prompt';
+
+export interface SystemCardData {
+	variant: SystemCardVariant;
+	/** Icon emoji or Lucide icon name. */
+	icon: string;
+	/** Short headline. */
+	title: string;
+	/** Optional description. */
+	description?: string;
+	/** Dismissible? */
+	dismissible: boolean;
+	/** Variant-specific payload. */
+	payload: SuggestionPayload | TipPayload | MilestonePayload | PromptPayload;
+}
+
+/** Entity suggestion — "Ikuti RT 05 Menteng". */
+export interface SuggestionPayload {
+	variant: 'suggestion';
+	entities: FollowableEntity[];
+}
+
+/** Platform tip — "Tahukah kamu? Kamu bisa melampirkan bukti". */
+export interface TipPayload {
+	variant: 'tip';
+	tip_id: string;
+}
+
+/** Community milestone — "10 saksi selesai bulan ini!". */
+export interface MilestonePayload {
+	variant: 'milestone';
+	metric_label: string;
+	metric_value: string;
+}
+
+/** Engagement prompt — "Belum ada laporan di sekitarmu minggu ini". */
+export interface PromptPayload {
+	variant: 'prompt';
+	cta_label: string;
+	cta_action: string;
 }

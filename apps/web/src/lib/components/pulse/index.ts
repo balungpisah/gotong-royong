@@ -11,4 +11,6 @@ export { default as PhaseNavigator } from './phase-navigator.svelte';
 export { default as FeedEventCard } from './feed-event-card.svelte';
 export { default as FeedFilterBar } from './feed-filter-bar.svelte';
 export { default as FeedSuggestionCard } from './feed-suggestion-card.svelte';
+export { default as FeedSystemCard } from './feed-system-card.svelte';
+export { default as DiscoverView } from './discover-view.svelte';
 export { default as EntityPill } from './entity-pill.svelte';

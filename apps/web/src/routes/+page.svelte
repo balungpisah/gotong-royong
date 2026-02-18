@@ -6,7 +6,8 @@
 		PulseActivityCard,
 		WitnessDetailPanel,
 		FeedEventCard,
-		FeedSuggestionCard
+		FeedSystemCard,
+		DiscoverView
 	} from '$lib/components/pulse';
 	import Activity from '@lucide/svelte/icons/activity';
 
@@ -157,7 +158,18 @@
 
 		<!-- Feed content -->
 		<section class="flex flex-1 flex-col gap-3">
-			{#if feedStore.loading}
+			{#if feedStore.isDiscoverActive}
+				<!-- Discover view — dedicated entity discovery tab -->
+				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+				<div
+					onclick={(e) => e.stopPropagation()}
+					onkeydown={(e) => e.stopPropagation()}
+					role="group"
+					aria-label="Discover"
+				>
+					<DiscoverView />
+				</div>
+			{:else if feedStore.loading}
 				<div class="flex flex-col gap-3">
 					{#each { length: 3 } as _}
 						<div class="animate-pulse rounded-xl border border-border/40 bg-muted/30 p-4">
@@ -173,7 +185,7 @@
 						</div>
 					{/each}
 				</div>
-			{:else if feedStore.filteredItems.length === 0}
+			{:else if feedStore.filteredStream.length === 0}
 				<div
 					class="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/60 py-12 text-center"
 				>
@@ -189,36 +201,27 @@
 					</p>
 				</div>
 			{:else}
-				<!-- Onboarding suggestions (shown at top when available) -->
-				{#if feedStore.hasSuggestions && feedStore.filter === 'semua'}
-					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-					<div
-						onclick={(e) => e.stopPropagation()}
-						onkeydown={(e) => e.stopPropagation()}
-						role="group"
-						aria-label="Suggestions"
-					>
-						<FeedSuggestionCard
-							entities={feedStore.suggestedEntities}
-							onFollow={(id) => feedStore.toggleFollow(id)}
-							onFollowAll={() => feedStore.followAllSuggested()}
-						/>
-					</div>
-				{/if}
-
+				<!-- Polymorphic feed stream — witness cards + inline system cards -->
 				<div class="flex flex-col gap-3" role="list">
-					{#each feedStore.filteredItems as item (item.witness_id)}
+					{#each feedStore.filteredStream as streamItem (streamItem.stream_id)}
 						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 						<div
 							onclick={(e) => e.stopPropagation()}
 							onkeydown={(e) => e.stopPropagation()}
 							role="listitem"
 						>
-							<FeedEventCard
-								{item}
-								selected={selectedWitnessId === item.witness_id}
-								onclick={() => selectWitness(item.witness_id)}
-							/>
+							{#if streamItem.kind === 'witness'}
+								<FeedEventCard
+									item={streamItem.data}
+									selected={selectedWitnessId === streamItem.data.witness_id}
+									onclick={() => selectWitness(streamItem.data.witness_id)}
+								/>
+							{:else if streamItem.kind === 'system'}
+								<FeedSystemCard
+									card={streamItem.data}
+									onDismiss={() => feedStore.dismissCard(streamItem.stream_id)}
+								/>
+							{/if}
 						</div>
 					{/each}
 				</div>

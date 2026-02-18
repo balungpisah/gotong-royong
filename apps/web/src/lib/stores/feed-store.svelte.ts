@@ -3,10 +3,23 @@
  *
  * Uses Svelte 5 runes ($state, $derived) for reactive state management.
  * Currently mock-backed — will be swapped to a FeedService when backend is ready.
+ *
+ * The feed is now a **polymorphic stream** — it can contain both witness activity
+ * cards and inline system cards (suggestions, tips, milestones, prompts).
  */
 
-import type { FeedItem, FeedFilter, FollowableEntity } from '$lib/types';
-import { mockFeedItems, mockSuggestedEntities } from '$lib/fixtures';
+import type {
+	FeedItem,
+	FeedFilter,
+	FeedStreamItem,
+	FeedWitnessItem,
+	SystemCardData,
+	FollowableEntity
+} from '$lib/types';
+import { mockFeedItems, mockSuggestedEntities, mockSystemCards } from '$lib/fixtures';
+
+/** How often to inject a system card into the stream (every Nth witness item). */
+const SYSTEM_CARD_INTERVAL = 3;
 
 export class FeedStore {
 	// ---------------------------------------------------------------------------
@@ -14,9 +27,16 @@ export class FeedStore {
 	// ---------------------------------------------------------------------------
 
 	items = $state<FeedItem[]>([]);
+	systemCards = $state<SystemCardData[]>([]);
 	filter = $state<FeedFilter>('semua');
 	loading = $state(false);
 	error = $state<string | null>(null);
+
+	// ---------------------------------------------------------------------------
+	// Dismiss state
+	// ---------------------------------------------------------------------------
+
+	dismissed = $state<Set<string>>(new Set());
 
 	// ---------------------------------------------------------------------------
 	// Suggestion state (onboarding)
@@ -26,20 +46,77 @@ export class FeedStore {
 	suggestionsLoading = $state(false);
 
 	// ---------------------------------------------------------------------------
-	// Derived
+	// Derived — filtered witness items
 	// ---------------------------------------------------------------------------
 
 	filteredItems = $derived(
-		this.filter === 'semua'
+		this.filter === 'semua' || this.filter === 'discover'
 			? this.items
 			: this.items.filter((i) => i.source === this.filter)
 	);
+
+	// ---------------------------------------------------------------------------
+	// Derived — polymorphic stream (witness cards + system cards interleaved)
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Assembles the polymorphic feed stream:
+	 * - Wraps each FeedItem as FeedWitnessItem
+	 * - Injects system cards at intervals (only in 'semua' filter)
+	 * - Filters out dismissed system cards
+	 */
+	filteredStream = $derived.by((): FeedStreamItem[] => {
+		const witnessItems: FeedWitnessItem[] = this.filteredItems.map((item) => ({
+			stream_id: `w-${item.witness_id}`,
+			sort_timestamp: item.latest_event.timestamp,
+			kind: 'witness' as const,
+			data: item
+		}));
+
+		// System cards only appear in 'semua' tab
+		if (this.filter !== 'semua') {
+			return witnessItems;
+		}
+
+		// Interleave system cards (non-dismissed) into the stream
+		const availableCards = this.systemCards.filter(
+			(_, i) => !this.dismissed.has(`sys-${i}`)
+		);
+
+		const stream: FeedStreamItem[] = [];
+		let cardIndex = 0;
+
+		for (let i = 0; i < witnessItems.length; i++) {
+			stream.push(witnessItems[i]);
+
+			// Inject a system card after every Nth witness item
+			if (
+				(i + 1) % SYSTEM_CARD_INTERVAL === 0 &&
+				cardIndex < availableCards.length
+			) {
+				const card = availableCards[cardIndex];
+				const originalIndex = this.systemCards.indexOf(card);
+				stream.push({
+					stream_id: `sys-${originalIndex}`,
+					sort_timestamp: witnessItems[i].sort_timestamp,
+					kind: 'system' as const,
+					data: card
+				});
+				cardIndex++;
+			}
+		}
+
+		return stream;
+	});
 
 	/** Total number of items across all filters. */
 	totalCount = $derived(this.items.length);
 
 	/** Whether there are suggested entities to show (onboarding). */
 	hasSuggestions = $derived(this.suggestedEntities.length > 0);
+
+	/** Whether the discover tab is active. */
+	isDiscoverActive = $derived(this.filter === 'discover');
 
 	// ---------------------------------------------------------------------------
 	// Actions
@@ -56,6 +133,7 @@ export class FeedStore {
 			// Simulate network delay
 			await new Promise((resolve) => setTimeout(resolve, 400));
 			this.items = [...mockFeedItems];
+			this.systemCards = [...mockSystemCards];
 		} catch (err) {
 			this.error = err instanceof Error ? err.message : 'Gagal memuat feed';
 		} finally {
@@ -83,6 +161,11 @@ export class FeedStore {
 	/** Set the active feed filter tab. */
 	setFilter(f: FeedFilter) {
 		this.filter = f;
+	}
+
+	/** Dismiss a system card so it doesn't appear again. */
+	dismissCard(streamId: string) {
+		this.dismissed = new Set([...this.dismissed, streamId]);
 	}
 
 	/**

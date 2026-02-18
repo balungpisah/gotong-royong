@@ -10,7 +10,8 @@ import type {
 	FeedMemberPreview,
 	EntityTag,
 	FollowableEntity,
-	RepostFrame
+	RepostFrame,
+	SystemCardData
 } from '$lib/types';
 
 // ---------------------------------------------------------------------------
@@ -430,4 +431,51 @@ export const mockSuggestedEntities: FollowableEntity[] = [
 	mockSuggestedEntity2,
 	mockSuggestedEntity3,
 	mockSuggestedEntity4
+];
+
+// ---------------------------------------------------------------------------
+// System cards (inline platform cards for the polymorphic feed)
+// ---------------------------------------------------------------------------
+
+export const mockSystemCardSuggestion: SystemCardData = {
+	variant: 'suggestion',
+	icon: '💡',
+	title: 'Ikuti topik yang relevan',
+	description: 'Dapatkan update tentang isu yang Anda pedulikan.',
+	dismissible: true,
+	payload: {
+		variant: 'suggestion',
+		entities: [mockSuggestedEntity1, mockSuggestedEntity3]
+	}
+};
+
+export const mockSystemCardTip: SystemCardData = {
+	variant: 'tip',
+	icon: '📸',
+	title: 'Tahukah Anda?',
+	description: 'Anda bisa melampirkan foto dan video sebagai bukti untuk memperkuat laporan.',
+	dismissible: true,
+	payload: {
+		variant: 'tip',
+		tip_id: 'tip-evidence-upload'
+	}
+};
+
+export const mockSystemCardMilestone: SystemCardData = {
+	variant: 'milestone',
+	icon: '🎉',
+	title: 'Komunitas makin aktif!',
+	description: '10 saksi berhasil diselesaikan bulan ini oleh warga sekitar.',
+	dismissible: true,
+	payload: {
+		variant: 'milestone',
+		metric_label: 'Saksi selesai bulan ini',
+		metric_value: '10'
+	}
+};
+
+export const mockSystemCards: SystemCardData[] = [
+	mockSystemCardSuggestion,
+	mockSystemCardTip,
+	mockSystemCardMilestone
 ];

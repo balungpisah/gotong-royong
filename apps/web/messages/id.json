@@ -79,5 +79,14 @@
 	"pulse_feed_entity_follow": "Ikuti",
 	"pulse_feed_entity_following": "Mengikuti",
 	"pulse_feed_empty_filter": "Belum ada aktivitas di filter ini",
+	"pulse_discover_title": "Jelajahi",
+	"pulse_discover_suggested": "Disarankan untuk Anda",
+	"pulse_discover_trending": "Sedang Ramai",
+	"pulse_discover_nearby": "Di Sekitar Anda",
+	"pulse_discover_follow_all_group": "Ikuti semua",
+	"pulse_discover_empty": "Belum ada rekomendasi. Coba ikuti beberapa topik terlebih dahulu!",
+	"pulse_system_card_dismiss": "Tutup",
+	"pulse_system_card_tip_learn": "Pelajari",
+	"pulse_system_card_suggestion_follow": "Ikuti",
 	"shell_theme_toggle": "Ganti tema"
 }

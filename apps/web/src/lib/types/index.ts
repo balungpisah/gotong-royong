@@ -107,7 +107,16 @@ export type {
 	RepostFrame,
 	EntityType,
 	EntityTag,
-	FollowableEntity
+	FollowableEntity,
+	FeedWitnessItem,
+	FeedSystemItem,
+	FeedStreamItem,
+	SystemCardVariant,
+	SystemCardData,
+	SuggestionPayload,
+	TipPayload,
+	MilestonePayload,
+	PromptPayload
 } from './feed';
 
 // ---------------------------------------------------------------------------

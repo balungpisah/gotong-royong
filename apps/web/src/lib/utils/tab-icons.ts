@@ -10,6 +10,7 @@ import Tag from '@lucide/svelte/icons/tag';
 import Bookmark from '@lucide/svelte/icons/bookmark';
 import Bell from '@lucide/svelte/icons/bell';
 import Globe from '@lucide/svelte/icons/globe';
+import Compass from '@lucide/svelte/icons/compass';
 import type { WellKnownTag } from '$lib/types';
 
 /**
@@ -27,7 +28,8 @@ const ICON_REGISTRY: Record<string, Component<{ class?: string }>> = {
 	tag: Tag,
 	bookmark: Bookmark,
 	bell: Bell,
-	globe: Globe
+	globe: Globe,
+	compass: Compass
 };
 
 /**
