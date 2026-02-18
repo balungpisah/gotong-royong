@@ -55,6 +55,17 @@
 					</a>
 				{/each}
 			</div>
+			<div class="mt-4 border-t border-border pt-4">
+				<p class="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+					Stores
+				</p>
+				<a
+					href="/dev/stores"
+					class="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+				>
+					State Inspector
+				</a>
+			</div>
 		</nav>
 	</aside>
 
