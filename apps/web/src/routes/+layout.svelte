@@ -59,6 +59,10 @@
 	const isDevPage = $derived(
 		page.url.pathname === devPrefix || page.url.pathname.startsWith(`${devPrefix}/`)
 	);
+
+	// ---------------------------------------------------------------------------
+	// Detail-open awareness (used by child pages, no layout changes needed here)
+	// ---------------------------------------------------------------------------
 </script>
 
 <svelte:head>
@@ -85,7 +89,7 @@
 			<TabBar />
 
 			<main
-				class="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-6 pb-24 md:pb-8"
+				class="relative flex w-full flex-1 flex-col px-4 py-6 pb-24 md:pb-8"
 			>
 				{@render children()}
 			</main>
