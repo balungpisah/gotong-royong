@@ -78,8 +78,19 @@ export type {
 } from './triage';
 
 // LLM JSON contracts — AI Trigger Modes
+export type { TriggerMode, TriggerEvent, AiTouchPoint } from './trigger';
+
+// Domain aggregates — Witness
 export type {
-	TriggerMode,
-	TriggerEvent,
-	AiTouchPoint
-} from './trigger';
+	WitnessStatus,
+	WitnessMemberRole,
+	Witness,
+	WitnessDetail,
+	WitnessMember
+} from './witness';
+
+// Domain aggregates — User
+export type { UserProfile, UserStats } from './user';
+
+// Domain aggregates — Notification
+export type { NotificationType, AppNotification } from './notification';
