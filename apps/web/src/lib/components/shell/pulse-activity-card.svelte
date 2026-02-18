@@ -8,9 +8,11 @@
 
 	interface Props {
 		witness: Witness;
+		selected?: boolean;
+		onclick?: () => void;
 	}
 
-	let { witness }: Props = $props();
+	let { witness, selected = false, onclick }: Props = $props();
 
 	const statusMap: Record<string, StatusIndicatorStatus> = {
 		draft: 'done',
@@ -41,10 +43,26 @@
 		if (days < 7) return `${days}h lalu`;
 		return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (onclick && (e.key === 'Enter' || e.key === ' ')) {
+			e.preventDefault();
+			onclick();
+		}
+	}
 </script>
 
-<article
-	class="group rounded-xl border border-border/60 bg-card p-4 transition hover:border-border hover:shadow-sm"
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div
+	role={onclick ? 'button' : 'article'}
+	tabindex={onclick ? 0 : undefined}
+	onclick={onclick}
+	onkeydown={onclick ? handleKeydown : undefined}
+	class="group rounded-xl border p-4 transition {selected
+		? 'border-primary/40 bg-primary/5 shadow-sm'
+		: 'border-border/60 bg-card hover:border-border hover:shadow-sm'} {onclick
+		? 'cursor-pointer'
+		: ''}"
 >
 	<div class="flex items-start gap-3">
 		<div class="min-w-0 flex-1">
@@ -95,4 +113,4 @@
 			</div>
 		</div>
 	</div>
-</article>
+</div>
