@@ -4,3 +4,6 @@ export { default as TabBarItem } from './tab-bar-item.svelte';
 export { default as AddTabSheet } from './add-tab-sheet.svelte';
 export { default as ChatInput } from './chat-input.svelte';
 export { default as PulseActivityCard } from './pulse-activity-card.svelte';
+export { default as WitnessDetailPanel } from './witness-detail-panel.svelte';
+export { default as PhaseCarousel } from './phase-carousel.svelte';
+export { default as ChatThread } from './chat-thread.svelte';
