@@ -3,9 +3,6 @@
 	import { getWitnessStore, getNotificationStore } from '$lib/stores';
 	import { ChatInput, PulseActivityCard } from '$lib/components/shell';
 	import Activity from '@lucide/svelte/icons/activity';
-	import Flame from '@lucide/svelte/icons/flame';
-	import UsersIcon from '@lucide/svelte/icons/users';
-	import BellRing from '@lucide/svelte/icons/bell-ring';
 
 	const witnessStore = getWitnessStore();
 	const notificationStore = getNotificationStore();
@@ -38,44 +35,8 @@
 		</div>
 	</div>
 
-	<!-- Stats row -->
-	<div class="grid grid-cols-3 gap-3">
-		<div class="rounded-xl border border-border/60 bg-card p-3 text-center">
-			<div class="flex items-center justify-center gap-1.5 text-muted-foreground">
-				<Flame class="size-3.5" />
-				<span class="text-[var(--fs-caption)] font-medium uppercase tracking-wider">
-					{m.pulse_stats_active()}
-				</span>
-			</div>
-			<p class="mt-1 text-[var(--fs-h2)] font-bold text-foreground">
-				{witnessStore.activeWitnesses.length}
-			</p>
-		</div>
-
-		<div class="rounded-xl border border-border/60 bg-card p-3 text-center">
-			<div class="flex items-center justify-center gap-1.5 text-muted-foreground">
-				<UsersIcon class="size-3.5" />
-				<span class="text-[var(--fs-caption)] font-medium uppercase tracking-wider">
-					{m.pulse_stats_total()}
-				</span>
-			</div>
-			<p class="mt-1 text-[var(--fs-h2)] font-bold text-foreground">
-				{witnessStore.witnesses.length}
-			</p>
-		</div>
-
-		<div class="rounded-xl border border-border/60 bg-card p-3 text-center">
-			<div class="flex items-center justify-center gap-1.5 text-muted-foreground">
-				<BellRing class="size-3.5" />
-				<span class="text-[var(--fs-caption)] font-medium uppercase tracking-wider">
-					{m.pulse_stats_unread()}
-				</span>
-			</div>
-			<p class="mt-1 text-[var(--fs-h2)] font-bold text-foreground">
-				{notificationStore.unreadCount}
-			</p>
-		</div>
-	</div>
+	<!-- AI-00 triage entry -->
+	<ChatInput />
 
 	<!-- Recent activity -->
 	<section class="flex flex-1 flex-col gap-3">
@@ -119,7 +80,4 @@
 			</div>
 		{/if}
 	</section>
-
-	<!-- Chat input -->
-	<ChatInput />
 </div>

@@ -85,7 +85,7 @@
 			<TabBar />
 
 			<main
-				class="mx-auto flex w-full max-w-screen-md flex-1 flex-col px-4 py-6 pb-24 md:max-w-none md:px-0 md:pb-8"
+				class="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-6 pb-24 md:pb-8"
 			>
 				{@render children()}
 			</main>
