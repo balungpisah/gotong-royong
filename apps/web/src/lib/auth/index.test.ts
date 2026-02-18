@@ -14,29 +14,31 @@ import {
 describe('auth constants', () => {
 	it('uses stable baseline paths and cookie name', () => {
 		expect(LOGIN_PATH).toBe('/masuk');
-		expect(HOME_PATH).toBe('/beranda');
+		expect(HOME_PATH).toBe('/');
 		expect(SESSION_COOKIE_NAME).toBe('gr_session');
 		expect(AUTH_ROLES).toContain('admin');
 	});
 });
 
 describe('auth route helpers', () => {
-	it('detects protected routes including nested data requests', () => {
-		expect(isProtectedPath('/beranda')).toBe(true);
-		expect(isProtectedPath('/beranda/__data.json')).toBe(true);
+	it('detects protected routes including root and dynamic tag routes', () => {
+		expect(isProtectedPath('/')).toBe(true);
+		expect(isProtectedPath('/t/tuntaskan')).toBe(true);
+		expect(isProtectedPath('/notifikasi')).toBe(true);
+		expect(isProtectedPath('/profil')).toBe(true);
 		expect(isProtectedPath('/masuk')).toBe(false);
 	});
 
 	it('detects public-only login routes', () => {
 		expect(isPublicOnlyPath('/masuk')).toBe(true);
 		expect(isPublicOnlyPath('/masuk/__data.json')).toBe(true);
-		expect(isPublicOnlyPath('/beranda')).toBe(false);
+		expect(isPublicOnlyPath('/')).toBe(false);
 	});
 
 	it('returns required roles for guarded routes', () => {
 		expect(requiredRolesForPath('/admin')).toEqual(['admin', 'system']);
 		expect(requiredRolesForPath('/admin/users')).toEqual(['admin', 'system']);
-		expect(requiredRolesForPath('/beranda')).toBeNull();
+		expect(requiredRolesForPath('/')).toBeNull();
 	});
 });
 
