@@ -56,7 +56,7 @@
 </script>
 
 <!--
-	Sliding dual-column with fixed-width columns.
+	Sliding dual-column with fixed-width columns (desktop ≥lg).
 
 	Both feed and detail are always max-w-2xl (672px). They sit inside a
 	flex wrapper that is centered via mx-auto. The detail column transitions
@@ -64,13 +64,57 @@
 	naturally slides left as the wrapper grows to accommodate the detail.
 
 	Feed never changes size — only its position changes.
+
+	On mobile (<lg): feed is full-width, detail opens as a fixed overlay
+	with a semi-transparent backdrop.
 -->
+
+<!-- Mobile overlay — fixed full-screen panel, shown only on <lg when detail is open -->
+{#if showDetail}
+	<div class="fixed inset-x-0 top-[3.5rem] bottom-0 z-40 lg:hidden">
+		<!-- Backdrop — closes panel when clicked -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="absolute inset-0 bg-black/20 transition-opacity duration-200"
+			onclick={closeDetail}
+			onkeydown={(e) => { if (e.key === 'Escape') closeDetail(); }}
+			role="button"
+			tabindex="-1"
+			aria-label="Close detail panel"
+		></div>
+
+		<!-- Panel — slides up from bottom on mobile -->
+		<div
+			class="relative h-full overflow-hidden bg-card shadow-xl transition-transform duration-300 ease-out"
+		>
+			{#if isDetailOpen && witnessStore.current}
+				<WitnessDetailPanel
+					detail={witnessStore.current}
+					onClose={closeDetail}
+					onSendMessage={handleSendMessage}
+					sending={messageSending}
+				/>
+			{:else if isDetailLoading}
+				<div class="flex h-full items-center justify-center">
+					<div class="flex flex-col items-center gap-3 text-muted-foreground">
+						<div
+							class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"
+						></div>
+						<p class="text-xs">{m.pulse_loading_detail()}</p>
+					</div>
+				</div>
+			{/if}
+		</div>
+	</div>
+{/if}
+
 <div
-	class="mx-auto flex transition-all duration-[var(--dur-slow)] ease-[var(--ease-spring)]"
-	style="width: {showDetail ? 'calc(42rem + 42rem + 1.5rem)' : '42rem'};"
+	class="mx-auto flex px-4 transition-all duration-[var(--dur-slow)] ease-[var(--ease-spring)] lg:px-0"
+	style="width: {showDetail ? 'calc(42rem + 42rem + 1.5rem)' : '42rem'}; max-width: 100%;"
 >
-	<!-- Feed column — always 672px, never changes -->
-	<div class="w-[42rem] shrink-0 flex flex-col gap-6">
+	<!-- Feed column — full-width on mobile, fixed 672px on desktop -->
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div class="w-full lg:w-[42rem] shrink-0 flex flex-col gap-6" onclick={() => { if (showDetail) closeDetail(); }}>
 		<!-- Title row -->
 		<div class="flex items-center gap-3">
 			<div
@@ -86,7 +130,8 @@
 		</div>
 
 		<!-- AI-00 triage entry -->
-		<div>
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div onclick={(e) => e.stopPropagation()}>
 			<ChatInput />
 		</div>
 
@@ -127,11 +172,14 @@
 			{:else}
 				<div class="flex flex-col gap-3">
 					{#each sortedWitnesses as witness (witness.witness_id)}
-						<PulseActivityCard
-							{witness}
-							selected={selectedWitnessId === witness.witness_id}
-							onclick={() => selectWitness(witness.witness_id)}
-						/>
+						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+						<div onclick={(e) => e.stopPropagation()}>
+							<PulseActivityCard
+								{witness}
+								selected={selectedWitnessId === witness.witness_id}
+								onclick={() => selectWitness(witness.witness_id)}
+							/>
+						</div>
 					{/each}
 				</div>
 			{/if}
@@ -139,12 +187,13 @@
 	</div>
 
 	<!--
-		Detail column — always in the DOM. Transitions width from 0 → 42rem
-		and opacity from 0 → 1. overflow:hidden clips content when collapsed.
+		Detail column — desktop only (hidden on mobile, which uses the fixed overlay above).
+		Transitions width from 0 → 42rem and opacity from 0 → 1.
+		overflow:hidden clips content when collapsed.
 		The gap (margin-left) also transitions.
 	-->
 	<div
-		class="shrink-0 overflow-hidden transition-all duration-[var(--dur-slow)] ease-[var(--ease-spring)]"
+		class="hidden lg:block shrink-0 overflow-hidden transition-all duration-[var(--dur-slow)] ease-[var(--ease-spring)]"
 		style="width: {showDetail ? '42rem' : '0px'}; margin-left: {showDetail ? '1.5rem' : '0px'}; opacity: {showDetail ? '1' : '0'};"
 	>
 		<div
@@ -164,7 +213,7 @@
 						<div
 							class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"
 						></div>
-						<p class="text-xs">Memuat detail...</p>
+						<p class="text-xs">{m.pulse_loading_detail()}</p>
 					</div>
 				</div>
 			{/if}
