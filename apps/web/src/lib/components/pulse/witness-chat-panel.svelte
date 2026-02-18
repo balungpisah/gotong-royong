@@ -40,8 +40,11 @@
 </script>
 
 <div class="flex flex-1 flex-col overflow-hidden">
-	<!-- Messages area -->
-	<div bind:this={scrollContainer} class="flex-1 overflow-y-auto px-3 py-3">
+	<!-- Messages area — sunken conversation well -->
+	<div
+		bind:this={scrollContainer}
+		class="flex-1 overflow-y-auto bg-muted/20 px-3 py-3 shadow-[inset_0_4px_6px_-2px_rgba(0,0,0,0.06)]"
+	>
 		<ChatThread {messages} />
 	</div>
 

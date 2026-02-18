@@ -112,9 +112,16 @@
 	class="mx-auto flex px-4 transition-all duration-[var(--dur-slow)] ease-[var(--ease-spring)] lg:px-0"
 	style="width: {showDetail ? 'calc(42rem + 42rem + 1.5rem)' : '42rem'}; max-width: 100%;"
 >
-	<!-- Feed column — full-width on mobile, fixed 672px on desktop -->
-	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-	<div class="w-full lg:w-[42rem] shrink-0 flex flex-col gap-6" onclick={() => { if (showDetail) closeDetail(); }}>
+	<!-- Feed column — click anywhere to close detail panel (event delegation) -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<div
+		class="w-full lg:w-[42rem] shrink-0 flex flex-col gap-6"
+		onclick={() => { if (showDetail) closeDetail(); }}
+		onkeydown={(e) => { if (e.key === 'Escape' && showDetail) closeDetail(); }}
+		role="region"
+		tabindex="-1"
+		aria-label="Activity feed"
+	>
 		<!-- Title row -->
 		<div class="flex items-center gap-3">
 			<div
@@ -129,9 +136,14 @@
 			</div>
 		</div>
 
-		<!-- AI-00 triage entry -->
-		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-		<div onclick={(e) => e.stopPropagation()}>
+		<!-- AI-00 triage entry — stop click from closing detail -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
+			role="group"
+			aria-label="Chat input"
+		>
 			<ChatInput />
 		</div>
 
@@ -170,10 +182,14 @@
 					</p>
 				</div>
 			{:else}
-				<div class="flex flex-col gap-3">
+				<div class="flex flex-col gap-3" role="list">
 					{#each sortedWitnesses as witness (witness.witness_id)}
-						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-						<div onclick={(e) => e.stopPropagation()}>
+							<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+						<div
+							onclick={(e) => e.stopPropagation()}
+							onkeydown={(e) => e.stopPropagation()}
+							role="listitem"
+						>
 							<PulseActivityCard
 								{witness}
 								selected={selectedWitnessId === witness.witness_id}

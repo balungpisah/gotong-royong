@@ -6,3 +6,4 @@ export { default as EvidenceCard } from './evidence-card.svelte';
 export { default as GalangMessageRenderer } from './galang-message.svelte';
 export { default as VoteCardWrapper } from './vote-card-wrapper.svelte';
 export { default as DiffCardWrapper } from './diff-card-wrapper.svelte';
+export { default as CardEnvelope } from './card-envelope.svelte';

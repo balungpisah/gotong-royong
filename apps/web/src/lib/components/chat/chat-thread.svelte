@@ -1,32 +1,29 @@
 <script lang="ts">
 	import type { ChatMessage } from '$lib/types';
 	import ChatBubble from './chat-bubble.svelte';
-	import AiInlineCard from './ai-inline-card.svelte';
 	import SystemMessageRenderer from './system-message.svelte';
-	import EvidenceCard from './evidence-card.svelte';
-	import GalangMessageRenderer from './galang-message.svelte';
-	import VoteCardWrapper from './vote-card-wrapper.svelte';
-	import DiffCardWrapper from './diff-card-wrapper.svelte';
+	import CardEnvelope from './card-envelope.svelte';
 
 	let { messages }: { messages: ChatMessage[] } = $props();
+
+	// Find the index of the last card message (non-user, non-system) to expand it by default
+	const lastCardIndex = $derived.by(() => {
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const t = messages[i].type;
+			if (t !== 'user' && t !== 'system') return i;
+		}
+		return -1;
+	});
 </script>
 
 <div class="flex flex-col gap-3" data-slot="chat-thread">
-	{#each messages as message (message.message_id)}
+	{#each messages as message, i (message.message_id)}
 		{#if message.type === 'user'}
 			<ChatBubble {message} />
-		{:else if message.type === 'ai_card'}
-			<AiInlineCard {message} />
 		{:else if message.type === 'system'}
 			<SystemMessageRenderer {message} />
-		{:else if message.type === 'evidence'}
-			<EvidenceCard {message} />
-		{:else if message.type === 'galang'}
-			<GalangMessageRenderer {message} />
-		{:else if message.type === 'vote_card'}
-			<VoteCardWrapper {message} />
-		{:else if message.type === 'diff_card'}
-			<DiffCardWrapper {message} />
+		{:else}
+			<CardEnvelope {message} defaultExpanded={i === lastCardIndex} />
 		{/if}
 	{/each}
 </div>
