@@ -111,6 +111,20 @@
 	--shadow-lg: 0 4px 24px rgba(62, 39, 35, 0.12);
 	--shadow-xl: 0 8px 40px rgba(62, 39, 35, 0.16);
 
+	/* ─── Motion tokens ─── */
+	--ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+	--ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+	--ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+	--ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+
+	--dur-instant: 100ms;
+	--dur-fast: 150ms;
+	--dur-normal: 250ms;
+	--dur-slow: 400ms;
+	--dur-slower: 600ms;
+
+	--stagger-gap: 50ms;
+
 	/* shadcn semantic bridge */
 	--radius: var(--r-md);
 	--background: var(--c-susu);
@@ -281,11 +295,153 @@
 	--spacing-10: var(--sp-10);
 	--spacing-12: var(--sp-12);
 	--spacing-16: var(--sp-16);
+
+	/* Motion tokens for Tailwind */
+	--ease-spring: var(--ease-spring);
+	--ease-smooth: var(--ease-smooth);
+	--ease-bounce: var(--ease-bounce);
+	--ease-snappy: var(--ease-snappy);
+	--transition-timing-function-spring: var(--ease-spring);
+	--transition-timing-function-smooth: var(--ease-smooth);
+	--transition-timing-function-bounce: var(--ease-bounce);
+	--transition-timing-function-snappy: var(--ease-snappy);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Animation Foundation — reusable motion utilities
+ *
+ * Usage:  class="animate-fade-in"  or  class="animate-slide-up"
+ * Stagger: class="animate-fade-in [animation-delay:var(--stagger-gap)]"
+ *          or use the stagger utilities: class="stagger-1 animate-fade-in"
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Existing ── */
 
 @utility animate-blink {
 	animation: blink 1.5s ease-in-out infinite;
 }
+
+/* ── Fade ── */
+
+@utility animate-fade-in {
+	animation: fade-in var(--dur-normal) var(--ease-smooth) both;
+}
+
+@utility animate-fade-out {
+	animation: fade-out var(--dur-fast) var(--ease-smooth) both;
+}
+
+/* ── Slide ── */
+
+@utility animate-slide-up {
+	animation: slide-up var(--dur-normal) var(--ease-spring) both;
+}
+
+@utility animate-slide-down {
+	animation: slide-down var(--dur-normal) var(--ease-spring) both;
+}
+
+@utility animate-slide-left {
+	animation: slide-left var(--dur-normal) var(--ease-spring) both;
+}
+
+@utility animate-slide-right {
+	animation: slide-right var(--dur-normal) var(--ease-spring) both;
+}
+
+/* ── Scale ── */
+
+@utility animate-scale-in {
+	animation: scale-in var(--dur-normal) var(--ease-bounce) both;
+}
+
+@utility animate-scale-out {
+	animation: scale-out var(--dur-fast) var(--ease-smooth) both;
+}
+
+/* ── Expand / Collapse (for panels, drawers, accordions) ── */
+
+@utility animate-expand {
+	animation: expand var(--dur-slow) var(--ease-spring) both;
+}
+
+@utility animate-collapse {
+	animation: collapse var(--dur-normal) var(--ease-smooth) both;
+}
+
+/* ── Float (subtle idle movement — "alive" feel) ── */
+
+@utility animate-float {
+	animation: float 3s var(--ease-smooth) infinite;
+}
+
+@utility animate-pulse-soft {
+	animation: pulse-soft 2s var(--ease-smooth) infinite;
+}
+
+/* ── Stagger delay utilities ── */
+
+@utility stagger-1 {
+	animation-delay: calc(var(--stagger-gap) * 1);
+}
+@utility stagger-2 {
+	animation-delay: calc(var(--stagger-gap) * 2);
+}
+@utility stagger-3 {
+	animation-delay: calc(var(--stagger-gap) * 3);
+}
+@utility stagger-4 {
+	animation-delay: calc(var(--stagger-gap) * 4);
+}
+@utility stagger-5 {
+	animation-delay: calc(var(--stagger-gap) * 5);
+}
+@utility stagger-6 {
+	animation-delay: calc(var(--stagger-gap) * 6);
+}
+@utility stagger-7 {
+	animation-delay: calc(var(--stagger-gap) * 7);
+}
+@utility stagger-8 {
+	animation-delay: calc(var(--stagger-gap) * 8);
+}
+
+/* ── Duration modifiers ── */
+
+@utility motion-instant {
+	animation-duration: var(--dur-instant);
+}
+@utility motion-fast {
+	animation-duration: var(--dur-fast);
+}
+@utility motion-normal {
+	animation-duration: var(--dur-normal);
+}
+@utility motion-slow {
+	animation-duration: var(--dur-slow);
+}
+@utility motion-slower {
+	animation-duration: var(--dur-slower);
+}
+
+/* ── Easing modifiers ── */
+
+@utility motion-spring {
+	animation-timing-function: var(--ease-spring);
+}
+@utility motion-smooth {
+	animation-timing-function: var(--ease-smooth);
+}
+@utility motion-bounce {
+	animation-timing-function: var(--ease-bounce);
+}
+@utility motion-snappy {
+	animation-timing-function: var(--ease-snappy);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Keyframes
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
 @keyframes blink {
 	0%,
@@ -296,6 +452,155 @@
 		opacity: 0.3;
 	}
 }
+
+@keyframes fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes fade-out {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes slide-up {
+	from {
+		opacity: 0;
+		transform: translateY(12px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes slide-down {
+	from {
+		opacity: 0;
+		transform: translateY(-12px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes slide-left {
+	from {
+		opacity: 0;
+		transform: translateX(12px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes slide-right {
+	from {
+		opacity: 0;
+		transform: translateX(-12px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes scale-in {
+	from {
+		opacity: 0;
+		transform: scale(0.92);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes scale-out {
+	from {
+		opacity: 1;
+		transform: scale(1);
+	}
+	to {
+		opacity: 0;
+		transform: scale(0.92);
+	}
+}
+
+@keyframes expand {
+	from {
+		opacity: 0;
+		transform: scaleY(0);
+		transform-origin: top;
+	}
+	to {
+		opacity: 1;
+		transform: scaleY(1);
+		transform-origin: top;
+	}
+}
+
+@keyframes collapse {
+	from {
+		opacity: 1;
+		transform: scaleY(1);
+		transform-origin: top;
+	}
+	to {
+		opacity: 0;
+		transform: scaleY(0);
+		transform-origin: top;
+	}
+}
+
+@keyframes float {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-4px);
+	}
+}
+
+@keyframes pulse-soft {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.7;
+	}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Accessibility — respect user motion preferences
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Base layer
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
 @layer base {
 	* {

@@ -15,3 +15,22 @@ export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?:
 export { trackColors, trackBgClass, type TrackColorSet } from './track-colors';
 export { renderMarkdown } from './markdown';
 export { resolveTabIcon, iconNameForTag } from './tab-icons';
+export {
+	// Transitions
+	fadeUp,
+	fadeDown,
+	fadeLeft,
+	fadeRight,
+	fadeIn,
+	fadeOut,
+	scaleIn,
+	scaleOut,
+	slideVertical,
+	slideHorizontal,
+	// Actions
+	reveal,
+	// Helpers
+	staggerDelay,
+	DURATION,
+	EASING
+} from './transitions';
