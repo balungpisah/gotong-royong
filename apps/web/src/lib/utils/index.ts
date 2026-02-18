@@ -14,3 +14,4 @@ export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?:
 
 export { trackColors, trackBgClass, type TrackColorSet } from './track-colors';
 export { renderMarkdown } from './markdown';
+export { resolveTabIcon, iconNameForTag } from './tab-icons';

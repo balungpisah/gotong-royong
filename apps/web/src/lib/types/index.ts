@@ -94,3 +94,9 @@ export type { UserProfile, UserStats } from './user';
 
 // Domain aggregates — Notification
 export type { NotificationType, AppNotification } from './notification';
+
+// ---------------------------------------------------------------------------
+// Navigation
+// ---------------------------------------------------------------------------
+export type { NavigationTag, TabConfig, TagSuggestion, WellKnownTag } from './navigation';
+export { WELL_KNOWN_TAGS, DEFAULT_TABS } from './navigation';
