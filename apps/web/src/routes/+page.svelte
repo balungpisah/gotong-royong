@@ -156,28 +156,31 @@
 {/if}
 
 <!-- ── Desktop workspace — sidebar + feed + context ───────────────── -->
-<div class="mx-auto flex w-full items-start gap-4 px-4 lg:px-4">
+<div class="mx-auto w-full px-4 lg:px-4">
+
+	<!-- Title row — spans full width above both columns -->
+	<div class="flex items-center gap-3 mb-4">
+		<div
+			class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"
+		>
+			<Activity class="size-5" />
+		</div>
+		<div>
+			<h1 class="text-[var(--fs-h1)] font-bold leading-tight text-foreground">
+				{m.pulse_title()}
+			</h1>
+		</div>
+	</div>
+
+	<!-- Two-column layout — feed + context, tops aligned -->
+	<div class="flex w-full items-start gap-4">
 
 	<!-- ── LEFT: Feed column ──────────────────────────────────────── -->
 	<div
-		class="min-w-0 flex-1 flex flex-col gap-6"
+		class="min-w-0 flex-1 flex flex-col"
 		role="region"
 		aria-label="Activity feed"
 	>
-		<!-- Title row -->
-		<div class="flex items-center gap-3">
-			<div
-				class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"
-			>
-				<Activity class="size-5" />
-			</div>
-			<div>
-				<h1 class="text-[var(--fs-h1)] font-bold leading-tight text-foreground">
-					{m.pulse_title()}
-				</h1>
-			</div>
-		</div>
-
 		<!-- Feed content -->
 		<section class="flex flex-1 flex-col gap-3">
 			{#if feedStore.isDiscoverActive}
@@ -279,7 +282,8 @@
 		onClose={closeDetail}
 		onSendMessage={handleSendMessage}
 	/>
-</div>
+	</div><!-- /flex row -->
+</div><!-- /outer wrapper -->
 
 <style>
 	/*
