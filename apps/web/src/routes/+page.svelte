@@ -156,7 +156,7 @@
 {/if}
 
 <!-- ── Desktop workspace — sidebar + feed + context ───────────────── -->
-<div class="mx-auto flex w-full gap-4 px-4 lg:px-4">
+<div class="mx-auto flex w-full items-start gap-4 px-4 lg:px-4">
 
 	<!-- ── LEFT: Feed column ──────────────────────────────────────── -->
 	<div
