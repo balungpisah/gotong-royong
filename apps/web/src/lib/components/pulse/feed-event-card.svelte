@@ -137,32 +137,16 @@
 			: null
 	);
 
-	// ── Story Peek — smooth rolling ticker ─────────────────────────
-	// Simple: JS interval advances index, CSS transition does the roll.
-	// Messages duplicate msg[0] at the end for seamless wrap-around.
-	// Fixed 1.125rem line height = zero layout shift for any text length.
+	// ── Story Peek — continuous smooth scroll ───────────────────────
+	// Pure CSS animation scrolls a vertical strip of messages upward at
+	// a constant pace. The strip is duplicated for seamless loop wrap.
+	// 3-line window (54px) — long messages naturally get more reading time.
+	// Duration scales with message count: more messages = longer cycle.
+	// contain:strict isolates inner animation from masonry ResizeObserver.
 	const peekMessages = $derived(item.peek_messages ?? []);
 	const hasPeek = $derived(peekMessages.length >= 2);
-	let peekStep = $state(0);
-	let peekSmooth = $state(true);
-
-	$effect(() => {
-		if (!hasPeek) return;
-		const len = peekMessages.length;
-		const id = setInterval(() => {
-			const next = peekStep + 1;
-			peekSmooth = true;
-			peekStep = next;
-			// Scrolled to the duplicate of msg[0] → snap back after transition
-			if (next === len) {
-				setTimeout(() => {
-					peekSmooth = false;
-					peekStep = 0;
-				}, 500);
-			}
-		}, 3500);
-		return () => clearInterval(id);
-	});
+	// ~4s per message feels natural — long messages scroll through slowly
+	const peekDuration = $derived(peekMessages.length * 4);
 
 	// ── Time formatting ─────────────────────────────────────────────
 	function timeAgo(dateStr: string): string {
@@ -327,7 +311,7 @@
 			</div>
 		{/if}
 
-		<!-- ── Story Peek — carved inset, smooth rolling ticker ──── -->
+		<!-- ── Story Peek — carved inset, continuous smooth scroll ── -->
 		{#if hasPeek}
 			<div class="mt-3 -mx-5 border-y border-border/10 px-5 py-2"
 				style="background: color-mix(in srgb, {moodColor} 3%, transparent);
@@ -335,22 +319,23 @@
 						inset 0 -1px 2px 0 color-mix(in srgb, {moodColor} 5%, transparent);">
 				<div class="flex items-start gap-2">
 					<MessageCircleIcon class="mt-0.5 size-3 shrink-0 text-muted-foreground/40" />
-					<!-- Fixed-height clip — one line visible. contain:strict isolates
-					     from ResizeObserver so masonry never re-layouts during animation. -->
-					<div class="flex-1" style="height: 18px; overflow: hidden; contain: strict;">
-						<div style="will-change: transform; transform: translateY({-peekStep * 18}px);
-							{peekSmooth ? 'transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);' : ''}">
+					<!-- 3-line clipping window. contain:strict isolates from masonry. -->
+					<div class="flex-1" style="height: 54px; overflow: hidden; contain: strict;">
+						<!-- Vertical strip: messages × 2 for seamless loop.
+						     CSS animation scrolls -50% at constant speed. -->
+						<div class="peek-scroll" style="animation-duration: {peekDuration}s;">
 							{#each peekMessages as msg, i (i)}
-								<p class="truncate text-[11.5px]" style="height: 18px; line-height: 18px;">
+								<p class="text-[11.5px] leading-[1.5]" style="padding-bottom: 4px;">
 									<span class="font-semibold text-foreground/70">{msg.author}:</span>
 									<span class="text-foreground/55">{' '}{msg.text}</span>
 								</p>
 							{/each}
-							<!-- Duplicate msg[0] for seamless wrap -->
-							<p class="truncate text-[11.5px]" style="height: 18px; line-height: 18px;">
-								<span class="font-semibold text-foreground/70">{peekMessages[0].author}:</span>
-								<span class="text-foreground/55">{' '}{peekMessages[0].text}</span>
-							</p>
+							{#each peekMessages as msg, i (`dup-${i}`)}
+								<p class="text-[11.5px] leading-[1.5]" style="padding-bottom: 4px;">
+									<span class="font-semibold text-foreground/70">{msg.author}:</span>
+									<span class="text-foreground/55">{' '}{msg.text}</span>
+								</p>
+							{/each}
 						</div>
 					</div>
 				</div>

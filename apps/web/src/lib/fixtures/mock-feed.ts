@@ -153,9 +153,10 @@ export const mockFeedItem1: FeedItem = {
 	body: 'Warga Gang Melati mengeluh lampu jalan padam total sejak dua minggu lalu. Ibu-ibu takut pulang malam dari pasar. Pak Ahmad sudah lapor ke kelurahan tapi belum ada respon. "Anak saya harus lewat gang gelap setiap pulang les," katanya.',
 	active_now: 3,
 	peek_messages: [
-		{ author: 'Sari', text: 'Sudah foto buktinya tadi pagi, gelap banget.' },
-		{ author: 'Ahmad', text: 'Saya coba hubungi kelurahan lagi besok.' },
-		{ author: 'Budi', text: 'Gang sebelah juga mati, mungkin satu trafo.' }
+		{ author: 'Sari', text: 'Sudah foto buktinya tadi pagi, gelap banget. Saya kirim ke grup RT tapi belum ada yang respon sampai sekarang.' },
+		{ author: 'Ahmad', text: 'Saya coba hubungi kelurahan lagi besok pagi. Kemarin Pak Lurah bilang anggaran penerangan habis, tapi saya mau coba minta alokasi darurat karena ini sudah dua minggu lebih.' },
+		{ author: 'Budi', text: 'Gang sebelah juga mati, mungkin satu trafo.' },
+		{ author: 'Dewi', text: 'Ibu-ibu pengajian sudah kumpul tanda tangan 47 orang yang terdampak. Mau kita serahkan ke kelurahan bareng?' }
 	]
 };
 
@@ -186,9 +187,10 @@ export const mockFeedItem2: FeedItem = {
 	active_now: 5,
 	peek_messages: [
 		{ author: 'Dewi', text: 'Saya bisa bantu survei akhir pekan ini kalau cuaca bagus, tapi kalau hujan mungkin kita tunda ke minggu depan saja ya?' },
-		{ author: 'Rina', text: 'Pak RT sudah setuju koordinasi.' },
-		{ author: 'Ahmad', text: 'Siapa yang punya cangkul? Kita butuh 3.' },
-		{ author: 'Sari', text: 'Saya bawa dari rumah, sudah disiapkan.' }
+		{ author: 'Rina', text: 'Pak RT sudah setuju koordinasi. Beliau minta kita siapkan proposal sederhana dulu sebelum turun ke lapangan biar ada dokumentasinya.' },
+		{ author: 'Ahmad', text: 'Siapa yang punya cangkul? Kita butuh minimal 3 buat kerja bakti Sabtu.' },
+		{ author: 'Sari', text: 'Saya bawa dari rumah.' },
+		{ author: 'Budi', text: 'Kemarin saya lewat situ, lubangnya makin dalam. Motor saya hampir masuk. Tolong cepat ya sebelum ada korban.' }
 	]
 };
 
@@ -220,8 +222,9 @@ export const mockFeedItem3: FeedItem = {
 	body: 'Setelah 3 bulan negosiasi dengan pemilik lahan, akhirnya disepakati pinjam pakai selama 5 tahun. Tim survei Karang Taruna turun langsung mengukur dan memetakan. Rencananya ada area bermain anak, bangku lansia, dan kebun kecil yang dikelola bersama. Bu Rina bilang, "Ini mimpi warga sejak 2019."',
 	active_now: 2,
 	peek_messages: [
-		{ author: 'Rina', text: 'Ukuran lahan 12x20 meter, cukup luas!' },
-		{ author: 'Budi', text: 'Kalau ada kebun kecil, saya siap rawat.' }
+		{ author: 'Rina', text: 'Ukuran lahan 12x20 meter, cukup luas! Kita bisa bagi jadi 3 zona: bermain anak, bangku lansia, dan kebun komunitas.' },
+		{ author: 'Budi', text: 'Kalau ada kebun kecil, saya siap rawat setiap pagi sebelum kerja. Sudah pengalaman nanam sayur di belakang rumah.' },
+		{ author: 'Sari', text: 'Anak-anak SD sini butuh banget tempat main. Selama ini mereka main di jalan, bahaya.' }
 	]
 };
 
@@ -255,9 +258,9 @@ export const mockFeedItem4: FeedItem = {
 	quorum_target: 40,
 	quorum_current: 25,
 	peek_messages: [
-		{ author: 'Ahmad', text: 'Kenaikan 15% itu untuk apa saja?' },
-		{ author: 'Rina', text: 'Perbaikan got dan penerangan gang.' },
-		{ author: 'Dewi', text: 'Saya setuju, gang kita gelap banget.' }
+		{ author: 'Ahmad', text: 'Kenaikan 15% itu untuk apa saja? Minta rinciannya dong, jangan cuma angka total.' },
+		{ author: 'Rina', text: 'Perbaikan got dan penerangan gang. Detailnya ada di dokumen yang Pak Sekretaris upload kemarin.' },
+		{ author: 'Dewi', text: 'Saya setuju selama transparan. Tahun lalu iuran naik tapi laporannya tidak jelas, jadi kali ini saya minta ada laporan bulanan yang bisa dilihat semua warga.' }
 	]
 };
 
@@ -289,9 +292,10 @@ export const mockFeedItem5: FeedItem = {
 	body: 'Pak Budi mengambil sampel air di tiga titik berbeda sepanjang sungai. Di dekat pipa pembuangan pabrik, air berubah kecoklatan dengan bau menyengat. Warga nelayan hilir melaporkan ikan mati mengambang sejak bulan lalu. Data ini sudah dikirim ke Dinas Lingkungan Hidup.',
 	active_now: 4,
 	peek_messages: [
-		{ author: 'Budi', text: 'Sampel ketiga paling parah, baunya menyengat.' },
-		{ author: 'Ahmad', text: 'Nelayan bilang ikan mati sejak bulan lalu.' },
-		{ author: 'Dewi', text: 'Sudah kirim ke Dinas LH, tunggu respons.' }
+		{ author: 'Budi', text: 'Sampel ketiga paling parah, baunya menyengat sampai 50 meter dari sungai. Warga sekitar sudah mulai pakai masker kalau lewat situ.' },
+		{ author: 'Ahmad', text: 'Nelayan hilir bilang ikan mati mengambang sejak bulan lalu. Pendapatan mereka turun drastis, ada yang sudah pindah profesi.' },
+		{ author: 'Dewi', text: 'Sudah kirim ke Dinas LH, tunggu respons.' },
+		{ author: 'Rina', text: 'Saya punya kontak wartawan Kompas regional. Mau saya hubungi? Kalau masuk media biasanya pemerintah lebih cepat bergerak.' }
 	]
 };
 
@@ -351,8 +355,9 @@ export const mockFeedItem7: FeedItem = {
 	deadline: tsFuture(5 * 24 * 60),   // 5 days from now
 	deadline_label: 'Galang dana berakhir',
 	peek_messages: [
-		{ author: 'Sari', text: 'Pak Surya sudah bisa tidur di ruang tamu.' },
-		{ author: 'Rina', text: 'Tinggal 2,5 juta lagi, ayo semangat!' }
+		{ author: 'Sari', text: 'Pak Surya sudah bisa tidur di ruang tamu sementara, tapi kalau hujan deras tetap bocor juga. Kita harus cepat sebelum musim hujan puncak.' },
+		{ author: 'Rina', text: 'Tinggal 2,5 juta lagi, ayo semangat! Kalau masing-masing donasi 50 ribu, cuma butuh 50 orang lagi.' },
+		{ author: 'Ahmad', text: 'Tukang bangunan langganan saya bersedia kasih diskon material. Hubungi Pak Joko di 0812-xxx.' }
 	]
 };
 

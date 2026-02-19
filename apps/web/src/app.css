@@ -612,10 +612,26 @@
 	}
 }
 
-/* Story Peek — smooth rolling ticker.
- * JS interval advances peekStep; inline style does translateY + transition.
- * Duplicate of msg[0] appended at end for seamless loop-back.
- * Fixed line-height (1.125rem) = zero layout shift for any text length. */
+/* Story Peek — continuous smooth scroll ticker.
+ * The strip contains all messages × 2 (duplicated for seamless wrap).
+ * CSS animation scrolls -50% at constant linear speed, then loops.
+ * Duration set inline: messages.length × 4s.
+ * 3-line window (54px) — long messages naturally get more reading time
+ * because they take up more vertical space in the strip. */
+
+.peek-scroll {
+	will-change: transform;
+	animation: peek-scroll-up linear infinite;
+}
+
+.peek-scroll:hover {
+	animation-play-state: paused;
+}
+
+@keyframes peek-scroll-up {
+	from { transform: translateY(0); }
+	to   { transform: translateY(-50%); }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Accessibility — respect user motion preferences
