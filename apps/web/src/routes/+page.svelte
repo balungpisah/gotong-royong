@@ -7,7 +7,8 @@
 		WitnessDetailPanel,
 		FeedEventCard,
 		FeedSystemCard,
-		DiscoverView
+		DiscoverView,
+		ContextBox
 	} from '$lib/components/pulse';
 	import Activity from '@lucide/svelte/icons/activity';
 	import Masonry from 'svelte-bricks';
@@ -37,9 +38,15 @@
 	let selectedWitnessId = $state<string | null>(null);
 	let messageSending = $state(false);
 
+	// Future: profile state for polymorphic context box
+	let selectedUserId = $state<string | null>(null);
+
 	const isDetailOpen = $derived(selectedWitnessId !== null && witnessStore.current !== null);
 	const isDetailLoading = $derived(selectedWitnessId !== null && witnessStore.detailLoading);
 	const showDetail = $derived(isDetailOpen || isDetailLoading);
+
+	// Context box active signal: external triggers that should open it
+	const contextActive = $derived(showDetail || selectedUserId !== null);
 
 	function selectWitness(witnessId: string) {
 		if (selectedWitnessId === witnessId) {
@@ -53,6 +60,7 @@
 	function closeDetail() {
 		selectedWitnessId = null;
 		witnessStore.current = null;
+		selectedUserId = null;
 	}
 
 	async function handleSendMessage(content: string) {
@@ -78,20 +86,30 @@
 </script>
 
 <!--
-	Master-detail with GPU-composited transitions (desktop ≥lg).
+	50/50 Workspace Layout (desktop ≥lg).
 
-	Layout: feed column (flex-1) + fixed-position detail panel on the right.
-	The detail panel slides in via transform: translateX (GPU-composited, no
-	layout reflow). Feed column doesn't move — it just has a right margin
-	that's always present on lg+ so the detail has a reserved landing zone.
+	Two in-flow regions side by side:
+	  LEFT  — masonry feed (flex-1, scrolls with page)
+	  RIGHT — ContextBox (50%, sticky, scrolls internally, tabbed)
 
-	On mobile (<lg): detail opens as a fixed overlay with backdrop.
+	The ContextBox is polymorphic with 3 tabs:
+	  📋 Project   — witness detail (WitnessDetailPanel)
+	  👤 Self      — person profile (SelfProfile)
+	  🏘 Community — community pulse dashboard (CommunityPulse)
+
+	Pin toggle: when pinned, ContextBox stays visible with Community as default.
+	When unpinned, it collapses and masonry goes full-width.
+
+	AnimatePresence (via svelte-motion) handles smooth enter/exit.
+	Masonry naturally reflows columns when its container width changes.
+
+	On mobile (<lg): context box opens as a full-screen overlay with backdrop.
 -->
 
-<!-- Mobile overlay — fixed full-screen panel, shown only on <lg when detail is open -->
+<!-- ── Mobile overlay — full-screen panel, <lg only ──────────────── -->
 {#if showDetail}
 	<div class="fixed inset-x-0 top-[3.5rem] bottom-0 z-40 lg:hidden">
-		<!-- Backdrop — closes panel when clicked -->
+		<!-- Backdrop -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="absolute inset-0 bg-black/20 transition-opacity duration-200"
@@ -102,7 +120,7 @@
 			aria-label="Close detail panel"
 		></div>
 
-		<!-- Panel — slides in from right on mobile -->
+		<!-- Panel -->
 		<div
 			class="absolute inset-y-0 right-0 w-full max-w-lg overflow-hidden border-l border-border/60 bg-card shadow-lg
 				transition-transform duration-300 ease-[var(--ease-spring)]"
@@ -118,9 +136,7 @@
 			{:else if isDetailLoading}
 				<div class="flex h-full items-center justify-center">
 					<div class="flex flex-col items-center gap-3 text-muted-foreground">
-						<div
-							class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"
-						></div>
+						<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
 						<p class="text-xs">{m.pulse_loading_detail()}</p>
 					</div>
 				</div>
@@ -129,18 +145,13 @@
 	</div>
 {/if}
 
-<div
-	class="mx-auto flex w-full px-4 lg:px-0 transition-[margin] duration-300 ease-[var(--ease-spring)]
-		{showDetail ? 'lg:mr-[43rem]' : 'lg:mr-0'}"
->
-	<!-- Feed column — click anywhere to close detail panel (event delegation) -->
-	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<!-- ── Desktop workspace — 50/50 flex layout ─────────────────────── -->
+<div class="mx-auto flex w-full gap-4 px-4 lg:px-6">
+
+	<!-- ── LEFT: Feed column ──────────────────────────────────────── -->
 	<div
 		class="min-w-0 flex-1 flex flex-col gap-6"
-		onclick={() => { if (showDetail) closeDetail(); }}
-		onkeydown={(e) => { if (e.key === 'Escape' && showDetail) closeDetail(); }}
 		role="region"
-		tabindex="-1"
 		aria-label="Activity feed"
 	>
 		<!-- Title row -->
@@ -157,32 +168,18 @@
 			</div>
 		</div>
 
-		<!-- AI-00 triage entry — stop click from closing detail -->
-		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-		<div
-			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => e.stopPropagation()}
-			role="group"
-			aria-label="Chat input"
-		>
+		<!-- AI-00 triage entry -->
+		<div role="group" aria-label="Chat input">
 			<ChatInput />
 		</div>
 
 		<!-- Feed content -->
 		<section class="flex flex-1 flex-col gap-3">
 			{#if feedStore.isDiscoverActive}
-				<!-- Discover view — dedicated entity discovery tab -->
-				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-				<div
-					onclick={(e) => e.stopPropagation()}
-					onkeydown={(e) => e.stopPropagation()}
-					role="group"
-					aria-label="Discover"
-				>
+				<div role="group" aria-label="Discover">
 					<DiscoverView />
 				</div>
 			{:else if feedStore.loading}
-				<!-- Masonry loading skeletons with variable heights -->
 				<Masonry
 					items={skeletonItems}
 					getId={(item) => item.id}
@@ -224,14 +221,7 @@
 					</p>
 				</div>
 			{:else}
-				<!-- Masonry feed stream — witness cards + inline system cards -->
-				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-				<div
-					onclick={(e) => e.stopPropagation()}
-					onkeydown={(e) => e.stopPropagation()}
-					role="list"
-					aria-label="Feed"
-				>
+				<div role="list" aria-label="Feed">
 					<Masonry
 						items={feedStore.filteredStream}
 						getId={(item) => item.stream_id}
@@ -260,48 +250,28 @@
 			{/if}
 		</section>
 	</div>
-</div>
 
-<!--
-	Detail panel — desktop only. Fixed position on the right side of the viewport.
-	Slides in via GPU-composited transform: translateX. Zero layout reflow.
-	Opacity fades in parallel for a polished entrance.
--->
-<div
-	class="hidden lg:block fixed top-[3.5rem] right-0 bottom-0 z-30
-		transition-[transform,opacity] duration-300 ease-[var(--ease-spring)]
-		will-change-[transform,opacity]"
-	style="width: 42rem; transform: translateX({showDetail ? '0' : '100%'}); opacity: {showDetail ? '1' : '0'}; pointer-events: {showDetail ? 'auto' : 'none'};"
->
-	<div
-		class="flex h-full w-full flex-col overflow-hidden border-l border-border/60 bg-card shadow-lg"
-	>
-		{#if isDetailOpen && witnessStore.current}
-			<WitnessDetailPanel
-				detail={witnessStore.current}
-				onClose={closeDetail}
-				onSendMessage={handleSendMessage}
-				sending={messageSending}
-			/>
-		{:else if isDetailLoading}
-			<div class="flex flex-1 items-center justify-center">
-				<div class="flex flex-col items-center gap-3 text-muted-foreground">
-					<div
-						class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"
-					></div>
-					<p class="text-xs">{m.pulse_loading_detail()}</p>
-				</div>
-			</div>
-		{/if}
-	</div>
+	<!-- ── RIGHT: Context box — tabbed sticky workspace ────────────── -->
+	<!-- ContextBox handles its own visibility via pin state + active prop.
+	     AnimatePresence inside ContextBox handles smooth enter/exit.
+	     The component renders nothing when invisible (no DOM footprint). -->
+	<ContextBox
+		witnessDetail={witnessStore.current}
+		detailLoading={witnessStore.detailLoading}
+		messageSending={messageSending}
+		active={contextActive}
+		selectedUserId={selectedUserId}
+		onClose={closeDetail}
+		onSendMessage={handleSendMessage}
+	/>
 </div>
 
 <style>
 	/*
 	 * Masonry grid-item containment — prevents cards with wide intrinsic
 	 * content (chip bar, story peek -mx-5) from expanding beyond their
-	 * column. The grid items are direct children of .col created by
-	 * svelte-bricks; overflow:hidden clips them to column width.
+	 * column. contain:inline-size constrains layout width while preserving
+	 * visual overflow (pulse-glow box-shadows).
 	 */
 	:global(.masonry-col-constrain > *) {
 		contain: inline-size;
