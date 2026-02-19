@@ -1,9 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
-	import { motion, AnimatePresence } from '@humanspeak/svelte-motion';
 	import { fly, fade } from 'svelte/transition';
-	import Pin from '@lucide/svelte/icons/pin';
-	import PinOff from '@lucide/svelte/icons/pin-off';
 	import ClipboardList from '@lucide/svelte/icons/clipboard-list';
 	import User from '@lucide/svelte/icons/user';
 	import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
@@ -54,20 +50,12 @@
 	// State
 	// ---------------------------------------------------------------------------
 
-	const STORAGE_KEY = 'gr-context-pinned';
-
 	/** Which tab is currently active */
-	let activeTab = $state<ContextTab>('community');
-
-	/** Whether the context box is pinned (stays open when detail closes) */
-	let pinned = $state(loadPinState());
+	let activeTab = $state<ContextTab>('project');
 
 	// ---------------------------------------------------------------------------
 	// Derived
 	// ---------------------------------------------------------------------------
-
-	/** Context box is visible when: pinned, OR external trigger is active */
-	const isVisible = $derived(pinned || active);
 
 	/** Whether we have witness detail content to show */
 	const hasWitnessDetail = $derived(witnessDetail !== null);
@@ -100,13 +88,6 @@
 		}
 	});
 
-	// When detail closes while pinned, fall back to community
-	$effect(() => {
-		if (pinned && !witnessDetail && !selectedUserId && (activeTab === 'project' || activeTab === 'self')) {
-			activeTab = 'community';
-		}
-	});
-
 	// ---------------------------------------------------------------------------
 	// Actions
 	// ---------------------------------------------------------------------------
@@ -115,71 +96,30 @@
 		if (tab === activeTab) return;
 		activeTab = tab;
 	}
-
-	function togglePin() {
-		pinned = !pinned;
-		savePinState(pinned);
-		// If unpinning, always close detail so parent can reset state
-		if (!pinned) {
-			onClose();
-		}
-	}
-
-	function handleClose() {
-		if (pinned) {
-			// Pinned: close detail, fall back to community
-			activeTab = 'community';
-			onClose();
-		} else {
-			onClose();
-		}
-	}
-
-	// ---------------------------------------------------------------------------
-	// localStorage persistence
-	// ---------------------------------------------------------------------------
-
-	function loadPinState(): boolean {
-		if (!browser) return false;
-		try {
-			return localStorage.getItem(STORAGE_KEY) === 'true';
-		} catch {
-			return false;
-		}
-	}
-
-	function savePinState(value: boolean) {
-		if (!browser) return;
-		try {
-			localStorage.setItem(STORAGE_KEY, String(value));
-		} catch {
-			// Ignore storage errors
-		}
-	}
 </script>
 
 <!--
 	ContextBox — polymorphic workspace panel (right side of 50/50 layout).
 
 	Three tabs:
-	  📋 Project  — witness detail (WitnessDetailPanel)
-	  👤 Self     — person profile (SelfProfile)
+	  📋 Project   — witness detail (WitnessDetailPanel)
+	  👤 Self      — person profile (SelfProfile)
 	  🏘 Community — community pulse dashboard (CommunityPulse)
 
-	Pin toggle: when pinned, context box stays visible even when no detail is selected.
-	When pinned and nothing selected, falls back to Community tab.
+	Appears when `active` prop is true (card click / profile select).
+	X button fully closes the panel.
 
 	Outer container uses Svelte built-in transition (fly) for enter/exit.
-	Tab content uses svelte-motion AnimatePresence for crossfade switching.
+	Tab content uses fly transitions for tab switching.
 -->
 
-{#if isVisible}
+{#if active}
 	<div
 		class="context-box hidden lg:flex flex-col
 			rounded-xl border border-border/20 bg-card shadow-sm"
 		transition:fly={{ x: 24, duration: 250 }}
 	>
-		<!-- Tab bar + pin -->
+		<!-- Tab bar + close -->
 		<div class="flex items-center border-b border-border/20 px-2 pt-2">
 			<!-- Tabs -->
 			<div class="flex flex-1 gap-0.5">
@@ -202,27 +142,12 @@
 				{/each}
 			</div>
 
-			<!-- Pin + Close buttons -->
-			<div class="flex items-center gap-0.5 pb-1">
-				<motion.button
-					class="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors
-						{pinned ? 'bg-primary/10 text-primary' : 'hover:bg-muted hover:text-foreground'}"
-					onclick={togglePin}
-					aria-label={pinned ? 'Lepas pin' : 'Pin panel'}
-					whileTap={{ scale: 0.9 }}
-					whileHover={{ scale: 1.05 }}
-				>
-					{#if pinned}
-						<Pin class="size-3.5" />
-					{:else}
-						<PinOff class="size-3.5" />
-					{/if}
-				</motion.button>
-
+			<!-- Close button -->
+			<div class="flex items-center pb-1">
 				<button
 					class="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors
 						hover:bg-muted hover:text-foreground"
-					onclick={handleClose}
+					onclick={onClose}
 					aria-label="Tutup panel"
 				>
 					<X class="size-3.5" />
@@ -240,7 +165,7 @@
 					{#if hasWitnessDetail && witnessDetail}
 						<WitnessDetailPanel
 							detail={witnessDetail}
-							onClose={handleClose}
+							onClose={onClose}
 							onSendMessage={onSendMessage}
 							sending={messageSending}
 						/>
