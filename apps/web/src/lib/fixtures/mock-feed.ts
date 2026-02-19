@@ -120,6 +120,10 @@ const entitySembako: EntityTag = {
 // Individual feed items
 // ---------------------------------------------------------------------------
 
+/** Returns an ISO timestamp N minutes in the FUTURE. */
+const tsFuture = (minutesAhead: number): string =>
+	new Date(now + minutesAhead * 60 * 1000).toISOString();
+
 /** 1. Created — PHOTO + LONG BODY — angry, with evidence photo */
 export const mockFeedItem1: FeedItem = {
 	witness_id: 'witness-feed-001',
@@ -146,7 +150,13 @@ export const mockFeedItem1: FeedItem = {
 	sentiment: 'angry',
 	intensity: 4,
 	cover_url: 'https://images.unsplash.com/photo-1504472478235-9bc48ba4d60f?w=600&h=400&fit=crop',
-	body: 'Warga Gang Melati mengeluh lampu jalan padam total sejak dua minggu lalu. Ibu-ibu takut pulang malam dari pasar. Pak Ahmad sudah lapor ke kelurahan tapi belum ada respon. "Anak saya harus lewat gang gelap setiap pulang les," katanya.'
+	body: 'Warga Gang Melati mengeluh lampu jalan padam total sejak dua minggu lalu. Ibu-ibu takut pulang malam dari pasar. Pak Ahmad sudah lapor ke kelurahan tapi belum ada respon. "Anak saya harus lewat gang gelap setiap pulang les," katanya.',
+	active_now: 3,
+	peek_messages: [
+		{ author: 'Sari', text: 'Sudah foto buktinya tadi pagi, gelap banget.' },
+		{ author: 'Ahmad', text: 'Saya coba hubungi kelurahan lagi besok.' },
+		{ author: 'Budi', text: 'Gang sebelah juga mati, mungkin satu trafo.' }
+	]
 };
 
 /** 2. Joined — BARE CARD — short, punchy, no photo no body */
@@ -172,7 +182,14 @@ export const mockFeedItem2: FeedItem = {
 	source: 'terlibat',
 	hook_line: '12 orang turun tangan.',
 	sentiment: 'hopeful',
-	intensity: 3
+	intensity: 3,
+	active_now: 5,
+	peek_messages: [
+		{ author: 'Dewi', text: 'Saya bisa bantu survei akhir pekan ini kalau cuaca bagus, tapi kalau hujan mungkin kita tunda ke minggu depan saja ya?' },
+		{ author: 'Rina', text: 'Pak RT sudah setuju koordinasi.' },
+		{ author: 'Ahmad', text: 'Siapa yang punya cangkul? Kita butuh 3.' },
+		{ author: 'Sari', text: 'Saya bawa dari rumah, sudah disiapkan.' }
+	]
 };
 
 /** 3. Checkpoint — BODY ONLY — longer story, no photo */
@@ -200,7 +217,12 @@ export const mockFeedItem3: FeedItem = {
 	hook_line: 'Lahan di Jl. Kenari cocok — survei selesai.',
 	sentiment: 'hopeful',
 	intensity: 3,
-	body: 'Setelah 3 bulan negosiasi dengan pemilik lahan, akhirnya disepakati pinjam pakai selama 5 tahun. Tim survei Karang Taruna turun langsung mengukur dan memetakan. Rencananya ada area bermain anak, bangku lansia, dan kebun kecil yang dikelola bersama. Bu Rina bilang, "Ini mimpi warga sejak 2019."'
+	body: 'Setelah 3 bulan negosiasi dengan pemilik lahan, akhirnya disepakati pinjam pakai selama 5 tahun. Tim survei Karang Taruna turun langsung mengukur dan memetakan. Rencananya ada area bermain anak, bangku lansia, dan kebun kecil yang dikelola bersama. Bu Rina bilang, "Ini mimpi warga sejak 2019."',
+	active_now: 2,
+	peek_messages: [
+		{ author: 'Rina', text: 'Ukuran lahan 12x20 meter, cukup luas!' },
+		{ author: 'Budi', text: 'Kalau ada kebun kecil, saya siap rawat.' }
+	]
 };
 
 /** 4. Vote opened — BARE CARD — no photo, no body, just the vote hook */
@@ -226,7 +248,17 @@ export const mockFeedItem4: FeedItem = {
 	source: 'ikutan',
 	hook_line: 'Anggaran naik 15% — setuju atau tidak?',
 	sentiment: 'curious',
-	intensity: 4
+	intensity: 4,
+	active_now: 8,
+	deadline: tsFuture(47 * 60),       // ~47 hours from now (under 2 days)
+	deadline_label: 'Voting ditutup',
+	quorum_target: 40,
+	quorum_current: 25,
+	peek_messages: [
+		{ author: 'Ahmad', text: 'Kenaikan 15% itu untuk apa saja?' },
+		{ author: 'Rina', text: 'Perbaikan got dan penerangan gang.' },
+		{ author: 'Dewi', text: 'Saya setuju, gang kita gelap banget.' }
+	]
 };
 
 /** 5. Evidence — PHOTO + BODY — damning river pollution evidence */
@@ -254,7 +286,13 @@ export const mockFeedItem5: FeedItem = {
 	sentiment: 'angry',
 	intensity: 5,
 	cover_url: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600&h=400&fit=crop',
-	body: 'Pak Budi mengambil sampel air di tiga titik berbeda sepanjang sungai. Di dekat pipa pembuangan pabrik, air berubah kecoklatan dengan bau menyengat. Warga nelayan hilir melaporkan ikan mati mengambang sejak bulan lalu. Data ini sudah dikirim ke Dinas Lingkungan Hidup.'
+	body: 'Pak Budi mengambil sampel air di tiga titik berbeda sepanjang sungai. Di dekat pipa pembuangan pabrik, air berubah kecoklatan dengan bau menyengat. Warga nelayan hilir melaporkan ikan mati mengambang sejak bulan lalu. Data ini sudah dikirim ke Dinas Lingkungan Hidup.',
+	active_now: 4,
+	peek_messages: [
+		{ author: 'Budi', text: 'Sampel ketiga paling parah, baunya menyengat.' },
+		{ author: 'Ahmad', text: 'Nelayan bilang ikan mati sejak bulan lalu.' },
+		{ author: 'Dewi', text: 'Sudah kirim ke Dinas LH, tunggu respons.' }
+	]
 };
 
 /** 6. Resolved — PHOTO ONLY — celebratory community moment, no body */
@@ -308,7 +346,14 @@ export const mockFeedItem7: FeedItem = {
 	hook_line: 'Rp 7,5 juta terkumpul — tinggal 25% lagi.',
 	sentiment: 'hopeful',
 	intensity: 4,
-	body: 'Pak Surya, 72 tahun, tinggal sendirian di rumah yang atapnya sudah bocor di mana-mana. Musim hujan kemarin plafon kamar tidurnya runtuh. Tetangga mulai galang dana setelah melihat kondisinya. Dalam 3 minggu, 32 orang sudah menyumbang. Sisa Rp 2,5 juta lagi untuk beli material atap baru.'
+	body: 'Pak Surya, 72 tahun, tinggal sendirian di rumah yang atapnya sudah bocor di mana-mana. Musim hujan kemarin plafon kamar tidurnya runtuh. Tetangga mulai galang dana setelah melihat kondisinya. Dalam 3 minggu, 32 orang sudah menyumbang. Sisa Rp 2,5 juta lagi untuk beli material atap baru.',
+	active_now: 1,
+	deadline: tsFuture(5 * 24 * 60),   // 5 days from now
+	deadline_label: 'Galang dana berakhir',
+	peek_messages: [
+		{ author: 'Sari', text: 'Pak Surya sudah bisa tidur di ruang tamu.' },
+		{ author: 'Rina', text: 'Tinggal 2,5 juta lagi, ayo semangat!' }
+	]
 };
 
 /** 8. Community note — BARE CARD — quick curiosity question */

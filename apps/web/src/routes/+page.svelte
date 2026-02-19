@@ -186,9 +186,9 @@
 				<Masonry
 					items={skeletonItems}
 					getId={(item) => item.id}
-					minColWidth={240}
-					maxColWidth={380}
-					gap={20}
+					minColWidth={260}
+					maxColWidth={340}
+					gap={16}
 					animate={false}
 				>
 					{#snippet children({ item })}
@@ -235,9 +235,9 @@
 					<Masonry
 						items={feedStore.filteredStream}
 						getId={(item) => item.stream_id}
-						minColWidth={240}
-						maxColWidth={380}
-						gap={20}
+						minColWidth={260}
+						maxColWidth={340}
+						gap={16}
 						animate={true}
 					>
 						{#snippet children({ item: streamItem })}

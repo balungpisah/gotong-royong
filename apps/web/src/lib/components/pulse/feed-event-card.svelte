@@ -8,6 +8,9 @@
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import BookmarkIcon from '@lucide/svelte/icons/bookmark';
 	import ZapIcon from '@lucide/svelte/icons/zap';
+	import ClockIcon from '@lucide/svelte/icons/clock';
+	import RadioIcon from '@lucide/svelte/icons/radio';
+	import MessageCircleIcon from '@lucide/svelte/icons/message-circle';
 
 	interface Props {
 		item: FeedItem;
@@ -101,6 +104,66 @@
 		: 'cool'
 	);
 
+	// ── Pulse glow — card "breathes" when people are active ────────
+	const isAlive = $derived((item.active_now ?? 0) > 0);
+
+	// ── Countdown — real deadline urgency ───────────────────────────
+	function getCountdown(deadline: string | undefined): { label: string; urgency: 'chill' | 'warm' | 'hot' } | null {
+		if (!deadline) return null;
+		const remaining = new Date(deadline).getTime() - Date.now();
+		if (remaining <= 0) return { label: 'Berakhir!', urgency: 'hot' };
+		const hours = Math.floor(remaining / 3600000);
+		const minutes = Math.floor((remaining % 3600000) / 60000);
+		if (hours >= 48) {
+			const days = Math.floor(hours / 24);
+			return { label: `${days} hari lagi`, urgency: 'chill' };
+		}
+		if (hours >= 24) return { label: `${hours}j ${minutes}m`, urgency: 'warm' };
+		if (hours >= 1) return { label: `${hours}j ${minutes}m`, urgency: 'hot' };
+		return { label: `${minutes}m lagi`, urgency: 'hot' };
+	}
+
+	const countdown = $derived(getCountdown(item.deadline));
+
+	// ── Quorum progress ────────────────────────────────────────────
+	const quorumPercent = $derived(
+		item.quorum_target && item.quorum_current
+			? Math.min(100, Math.round((item.quorum_current / item.quorum_target) * 100))
+			: null
+	);
+	const quorumRemaining = $derived(
+		item.quorum_target && item.quorum_current
+			? Math.max(0, item.quorum_target - item.quorum_current)
+			: null
+	);
+
+	// ── Story Peek — smooth rolling ticker ─────────────────────────
+	// Simple: JS interval advances index, CSS transition does the roll.
+	// Messages duplicate msg[0] at the end for seamless wrap-around.
+	// Fixed 1.125rem line height = zero layout shift for any text length.
+	const peekMessages = $derived(item.peek_messages ?? []);
+	const hasPeek = $derived(peekMessages.length >= 2);
+	let peekStep = $state(0);
+	let peekSmooth = $state(true);
+
+	$effect(() => {
+		if (!hasPeek) return;
+		const len = peekMessages.length;
+		const id = setInterval(() => {
+			const next = peekStep + 1;
+			peekSmooth = true;
+			peekStep = next;
+			// Scrolled to the duplicate of msg[0] → snap back after transition
+			if (next === len) {
+				setTimeout(() => {
+					peekSmooth = false;
+					peekStep = 0;
+				}, 500);
+			}
+		}, 3500);
+		return () => clearInterval(id);
+	});
+
 	// ── Time formatting ─────────────────────────────────────────────
 	function timeAgo(dateStr: string): string {
 		const now = Date.now();
@@ -135,10 +198,11 @@
 			? 'border border-border/40 ring-1 ring-primary/10'
 			: 'border border-border/20 hover:border-border/40'}
 		{onclick ? 'cursor-pointer' : ''}
+		{isAlive && !selected ? 'animate-pulse-glow' : ''}
 		bg-card"
-	style="box-shadow: {selected ? selectedShadow : restShadow};"
-	onmouseenter={(e) => { if (!selected) e.currentTarget.style.boxShadow = hoverShadow; }}
-	onmouseleave={(e) => { if (!selected) e.currentTarget.style.boxShadow = restShadow; }}
+	style="--pulse-color: {moodColor}; box-shadow: {selected ? selectedShadow : isAlive ? 'none' : restShadow};"
+	onmouseenter={(e) => { if (!selected && !isAlive) e.currentTarget.style.boxShadow = hoverShadow; }}
+	onmouseleave={(e) => { if (!selected && !isAlive) e.currentTarget.style.boxShadow = restShadow; }}
 >
 	<!-- ── Cover image — edge-to-edge, optional ──────────────────── -->
 	{#if item.cover_url}
@@ -154,19 +218,59 @@
 	<!-- ── Card body ─────────────────────────────────────────────── -->
 	<div class="px-5 pt-4 pb-5">
 
-		<!-- Top row: urgency badge + event emoji -->
-		<div class="mb-3 flex items-center justify-between">
+		<!-- Top row: urgency badge + live indicator + event emoji -->
+		<div class="mb-3 flex items-center gap-1.5">
 			{#if item.urgency}
 				<Badge variant={urgencyVariantMap[item.urgency]} class="text-[9px] px-1.5 py-0">
 					{urgencyLabelMap[item.urgency]()}
 				</Badge>
-			{:else}
-				<span></span>
 			{/if}
+
+			{#if isAlive}
+				<span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600">
+					<span class="relative flex size-1.5">
+						<span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+						<span class="relative inline-flex size-1.5 rounded-full bg-emerald-500"></span>
+					</span>
+					{item.active_now} aktif
+				</span>
+			{/if}
+
+			<span class="flex-1"></span>
+
 			<span class="text-base select-none opacity-50">
 				{eventEmojiMap[item.latest_event.event_type] ?? '📌'}
 			</span>
 		</div>
+
+		<!-- Countdown + quorum strip — real deadline urgency -->
+		{#if countdown || quorumPercent !== null}
+			<div class="mb-3 flex flex-col gap-1.5">
+				{#if countdown}
+					<div class="flex items-center gap-1.5">
+						<ClockIcon class="size-3 {countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-amber-500' : 'text-muted-foreground/60'}" />
+						<span class="text-[10px] font-semibold
+							{countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-amber-600' : 'text-muted-foreground/70'}">
+							{item.deadline_label ?? 'Berakhir'}: {countdown.label}
+						</span>
+					</div>
+				{/if}
+				{#if quorumPercent !== null}
+					<div class="flex items-center gap-2">
+						<div class="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/60">
+							<div
+								class="h-full rounded-full transition-all duration-500
+									{quorumPercent >= 75 ? 'bg-emerald-500' : quorumPercent >= 50 ? 'bg-amber-500' : 'bg-primary'}"
+								style="width: {quorumPercent}%"
+							></div>
+						</div>
+						<span class="shrink-0 text-[9px] font-medium text-muted-foreground/60">
+							{quorumRemaining} orang lagi
+						</span>
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Repost attribution -->
 		{#if item.repost}
@@ -223,79 +327,114 @@
 			</div>
 		{/if}
 
-		<!-- ── Footer ────────────────────────────────────────────── -->
-		<div class="mt-4 flex items-center gap-2">
-			<!-- Avatar stack -->
-			{#if item.members_preview.length > 0}
-				<div class="flex -space-x-1.5">
-					{#each item.members_preview.slice(0, 4) as member (member.user_id)}
-						{#if member.avatar_url}
-							<img
-								src={member.avatar_url}
-								alt={member.name}
-								class="size-5 rounded-full border-[1.5px] border-card object-cover"
-							/>
-						{:else}
-							<span
-								class="flex size-5 items-center justify-center rounded-full border-[1.5px] border-card bg-muted text-[8px] font-medium text-muted-foreground"
-							>
-								{member.name.charAt(0)}
-							</span>
-						{/if}
-					{/each}
+		<!-- ── Story Peek — carved inset, smooth rolling ticker ──── -->
+		{#if hasPeek}
+			<div class="mt-3 -mx-5 border-y border-border/10 px-5 py-2"
+				style="background: color-mix(in srgb, {moodColor} 3%, transparent);
+					box-shadow: inset 0 2px 4px -1px color-mix(in srgb, {moodColor} 8%, transparent),
+						inset 0 -1px 2px 0 color-mix(in srgb, {moodColor} 5%, transparent);">
+				<div class="flex items-start gap-2">
+					<MessageCircleIcon class="mt-0.5 size-3 shrink-0 text-muted-foreground/40" />
+					<!-- Fixed-height clip — one line visible. contain:strict isolates
+					     from ResizeObserver so masonry never re-layouts during animation. -->
+					<div class="flex-1" style="height: 18px; overflow: hidden; contain: strict;">
+						<div style="will-change: transform; transform: translateY({-peekStep * 18}px);
+							{peekSmooth ? 'transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);' : ''}">
+							{#each peekMessages as msg, i (i)}
+								<p class="truncate text-[11.5px]" style="height: 18px; line-height: 18px;">
+									<span class="font-semibold text-foreground/70">{msg.author}:</span>
+									<span class="text-foreground/55">{' '}{msg.text}</span>
+								</p>
+							{/each}
+							<!-- Duplicate msg[0] for seamless wrap -->
+							<p class="truncate text-[11.5px]" style="height: 18px; line-height: 18px;">
+								<span class="font-semibold text-foreground/70">{peekMessages[0].author}:</span>
+								<span class="text-foreground/55">{' '}{peekMessages[0].text}</span>
+							</p>
+						</div>
+					</div>
 				</div>
-			{/if}
+			</div>
+		{/if}
 
-			<!-- Member count -->
-			<span class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
-				<UsersIcon class="size-2.5" />
-				{item.member_count}
-			</span>
+		<!-- ── Footer — two-row layout for breathing room ─────── -->
+		<div class="mt-4 flex flex-col gap-2">
+			<!-- Row 1: avatar stack + social stats -->
+			<div class="flex items-center gap-2">
+				<!-- Avatar stack -->
+				{#if item.members_preview.length > 0}
+					<div class="flex -space-x-1.5">
+						{#each item.members_preview.slice(0, 4) as member (member.user_id)}
+							{#if member.avatar_url}
+								<img
+									src={member.avatar_url}
+									alt={member.name}
+									class="size-5 rounded-full border-[1.5px] border-card object-cover"
+								/>
+							{:else}
+								<span
+									class="flex size-5 items-center justify-center rounded-full border-[1.5px] border-card bg-muted text-[8px] font-medium text-muted-foreground"
+								>
+									{member.name.charAt(0)}
+								</span>
+							{/if}
+						{/each}
+					</div>
+				{/if}
 
-			<!-- Activity heat -->
-			{#if activityHeat !== 'cool'}
-				<span
-					class="inline-flex items-center gap-0.5 text-[10px] font-medium
-						{activityHeat === 'hot' ? 'text-destructive/80' : 'text-amber-500/80'}"
-				>
-					<FlameIcon class="size-2.5" />
-					{activityHeat === 'hot' ? 'Ramai' : 'Aktif'}
+				<!-- Member count -->
+				<span class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+					<UsersIcon class="size-2.5" />
+					{item.member_count}
 				</span>
-			{/if}
 
-			<!-- Collapsed count -->
-			{#if item.collapsed_count > 0}
-				<span class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/40">
-					<ZapIcon class="size-2.5" />
-					+{item.collapsed_count}
-				</span>
-			{/if}
+				<!-- Activity heat -->
+				{#if activityHeat !== 'cool'}
+					<span
+						class="inline-flex items-center gap-0.5 text-[10px] font-medium
+							{activityHeat === 'hot' ? 'text-destructive/80' : 'text-amber-500/80'}"
+					>
+						<FlameIcon class="size-2.5" />
+						{activityHeat === 'hot' ? 'Ramai' : 'Aktif'}
+					</span>
+				{/if}
 
-			<div class="flex-1"></div>
+				<!-- Collapsed count -->
+				{#if item.collapsed_count > 0}
+					<span class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/40">
+						<ZapIcon class="size-2.5" />
+						+{item.collapsed_count}
+					</span>
+				{/if}
+			</div>
 
-			<!-- Source -->
-			{#if item.source}
-				<span class="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40">
-					{sourceLabel[item.source] ?? item.source}
-				</span>
-			{/if}
+			<!-- Row 2: source label + hover actions (right-aligned) -->
+			<div class="flex items-center gap-2">
+				{#if item.source}
+					<span class="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40">
+						{sourceLabel[item.source] ?? item.source}
+					</span>
+				{/if}
 
-			<!-- Hover actions -->
-			<div class="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-				<button
-					class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-muted/60 hover:text-foreground"
-					onclick={(e) => e.stopPropagation()}
-					aria-label="Pantau"
-				>
-					<EyeIcon class="size-3" />
-				</button>
-				<button
-					class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-muted/60 hover:text-foreground"
-					onclick={(e) => e.stopPropagation()}
-					aria-label="Simpan"
-				>
-					<BookmarkIcon class="size-3" />
-				</button>
+				<div class="flex-1"></div>
+
+				<!-- Hover actions -->
+				<div class="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+					<button
+						class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-muted/60 hover:text-foreground"
+						onclick={(e) => e.stopPropagation()}
+						aria-label="Pantau"
+					>
+						<EyeIcon class="size-3" />
+					</button>
+					<button
+						class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-muted/60 hover:text-foreground"
+						onclick={(e) => e.stopPropagation()}
+						aria-label="Simpan"
+					>
+						<BookmarkIcon class="size-3" />
+					</button>
+				</div>
 			</div>
 		</div>
 	</div>

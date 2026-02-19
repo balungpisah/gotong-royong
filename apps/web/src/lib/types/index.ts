@@ -116,7 +116,8 @@ export type {
 	SuggestionPayload,
 	TipPayload,
 	MilestonePayload,
-	PromptPayload
+	PromptPayload,
+	PeekMessage
 } from './feed';
 
 // ---------------------------------------------------------------------------

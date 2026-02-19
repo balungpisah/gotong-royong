@@ -379,6 +379,12 @@
 	animation: pulse-soft 2s var(--ease-smooth) infinite;
 }
 
+/* ── Pulse Glow — breathing shadow for "alive" cards (Phase 1 Engagement) ── */
+
+@utility animate-pulse-glow {
+	animation: pulse-glow 2.4s var(--ease-smooth) infinite;
+}
+
 /* ── Stagger delay utilities ── */
 
 @utility stagger-1 {
@@ -582,6 +588,34 @@
 		opacity: 0.7;
 	}
 }
+
+/* Pulse Glow — breathing shadow expansion for "alive" feed cards.
+ * The --pulse-color CSS var is set inline by the card component
+ * (derived from sentiment/track color). The shadow expands and
+ * contracts — a visible heartbeat that says "something is happening."
+ *
+ * V4 refined: gentle but perceptible.
+ * Resting: tight, subtle glow (12%/15%).
+ * Peak: soft glow (20%/28%) + no vertical lift.
+ * The spread difference (8px → 16px) creates a calm "breathing" feel. */
+@keyframes pulse-glow {
+	0%,
+	100% {
+		box-shadow:
+			0 1px 3px 0 color-mix(in srgb, var(--pulse-color, var(--c-api)) 12%, transparent),
+			0 2px 8px -1px color-mix(in srgb, var(--pulse-color, var(--c-api)) 15%, transparent);
+	}
+	50% {
+		box-shadow:
+			0 2px 8px 1px color-mix(in srgb, var(--pulse-color, var(--c-api)) 20%, transparent),
+			0 4px 16px -2px color-mix(in srgb, var(--pulse-color, var(--c-api)) 28%, transparent);
+	}
+}
+
+/* Story Peek — smooth rolling ticker.
+ * JS interval advances peekStep; inline style does translateY + transition.
+ * Duplicate of msg[0] appended at end for seamless loop-back.
+ * Fixed line-height (1.125rem) = zero layout shift for any text length. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Accessibility — respect user motion preferences

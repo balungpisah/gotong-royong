@@ -80,6 +80,22 @@ export interface FeedItem {
 	/** AI-summarized narrative from the saksi conversation. Massaged for
 	 *  civility while preserving emotional intensity. 2-4 sentences. */
 	body?: string;
+
+	// ── Engagement: Story Peek (Phase 3) ────────────────────────
+	/** Recent conversation snippets for the auto-rotating peek strip. */
+	peek_messages?: PeekMessage[];
+
+	// ── Engagement: Pulse & Urgency (Phase 1) ────────────────────
+	/** Number of users currently active on this witness (last 30 min). */
+	active_now?: number;
+	/** Real deadline ISO timestamp — voting close, phase end, etc. */
+	deadline?: string;
+	/** Label explaining the deadline, e.g. "Voting ditutup", "Fase berakhir". */
+	deadline_label?: string;
+	/** Quorum: how many participants needed for a threshold. */
+	quorum_target?: number;
+	/** Quorum: how many participants currently. */
+	quorum_current?: number;
 }
 
 /** Preview of a witness member for the avatar stack (max 5). */
@@ -88,6 +104,16 @@ export interface FeedMemberPreview {
 	name: string;
 	avatar_url?: string;
 	role: WitnessMemberRole;
+}
+
+// ── Peek Messages (Phase 3 — Story Peek) ─────────────────────────
+
+/** A single chat message shown in the auto-rotating peek strip. */
+export interface PeekMessage {
+	/** Display name of the message author. */
+	author: string;
+	/** Short message text (will be truncated to ~80 chars on card). */
+	text: string;
 }
 
 // ── Repost Frame (brag rights) ────────────────────────────────────

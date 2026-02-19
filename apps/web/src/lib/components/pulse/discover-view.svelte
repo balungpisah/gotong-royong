@@ -91,8 +91,8 @@
 			items={[...masonryItems, ...placeholderItems]}
 			getId={(item) => item.id}
 			minColWidth={260}
-			maxColWidth={380}
-			gap={12}
+			maxColWidth={340}
+			gap={16}
 			animate={true}
 		>
 			{#snippet children({ item })}
