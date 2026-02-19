@@ -3,7 +3,6 @@
 	import { m } from '$lib/paraglide/messages';
 	import { getFeedStore } from '$lib/stores';
 	import X from '@lucide/svelte/icons/x';
-
 	interface Props {
 		card: SystemCardData;
 		onDismiss?: () => void;
@@ -22,7 +21,7 @@
 	};
 </script>
 
-<div class="rounded-lg border border-border/40 bg-muted/20 p-3">
+<div class="rounded-lg border border-border/30 bg-muted/20 p-3">
 	<!-- Header row -->
 	<div class="flex items-start justify-between gap-2">
 		<div class="flex items-center gap-2 min-w-0">

@@ -79,7 +79,7 @@
 </nav>
 
 <!-- Desktop horizontal pill bar -->
-<nav class="hidden border-t border-border/60 md:block">
+<nav class="hidden border-t border-border/40 md:block">
 	<div
 		class="mx-auto flex w-full max-w-screen-xl items-center gap-2 px-6 py-2"
 	>

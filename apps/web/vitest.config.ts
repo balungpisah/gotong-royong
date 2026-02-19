@@ -6,6 +6,9 @@ export default mergeConfig(
 	defineConfig({
 		test: {
 			environment: 'node',
+			deps: {
+				inline: ['svelte-bricks']
+			},
 			include: ['src/**/*.test.ts'],
 			exclude: ['tests/e2e/**']
 		}

@@ -28,9 +28,11 @@
 	interface Props {
 		message: CardMessage;
 		defaultExpanded?: boolean;
+		/** 'phase' = filled dot colored by state, 'minor' = hollow dark grey ring */
+		dotVariant?: 'phase' | 'minor';
 	}
 
-	let { message, defaultExpanded = false }: Props = $props();
+	let { message, defaultExpanded = false, dotVariant = 'minor' }: Props = $props();
 
 	let expanded = $state(false);
 
@@ -164,30 +166,53 @@
 	});
 
 	const Icon = $derived(config.icon);
+
+	// ---------------------------------------------------------------------------
+	// Dot styling — phase blocks get filled color, minor blocks get hollow ring
+	// ---------------------------------------------------------------------------
+	const dotClass = $derived.by((): string => {
+		if (dotVariant === 'phase') {
+			// Filled dot — color reflects state of the block
+			switch (config.actionVariant) {
+				case 'success':
+					return 'bg-berhasil';
+				case 'warning':
+					return 'bg-peringatan';
+				case 'danger':
+					return 'bg-bahaya';
+				default:
+					return 'bg-primary/60';
+			}
+		}
+		// Minor block — hollow ring, dark grey
+		return 'ring-1 ring-muted-foreground/40';
+	});
 </script>
 
 <div class="flex flex-col" data-slot="card-envelope" data-card-type={message.type}>
-	<!-- Handlebar — always visible -->
+	<!-- Handlebar — always visible, italic text style -->
 	<button
 		type="button"
 		onclick={toggle}
-		class="flex w-full items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-1.5 text-left transition hover:bg-muted/40"
+		class="group flex w-full items-center gap-1.5 py-0.5 text-left transition"
 	>
-		<Icon class="size-3.5 shrink-0 text-muted-foreground" />
-		<span class="min-w-0 flex-1 truncate text-xs font-medium italic text-muted-foreground">
+		<!-- Timeline dot — sits on top of the vertical line behind it -->
+		<div class="relative z-10 size-2 shrink-0 rounded-full bg-background {dotClass}"></div>
+		<Icon class="size-3 shrink-0 text-muted-foreground/50" />
+		<span class="min-w-0 flex-1 truncate text-xs italic text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
 			{config.title}
 		</span>
 		{#if config.metric}
-			<span class="shrink-0 text-[10px] italic text-muted-foreground">{config.metric}</span>
+			<span class="shrink-0 text-[10px] italic text-muted-foreground/50">{config.metric}</span>
 		{/if}
 		{#if config.actionLabel}
 			<Badge variant={config.actionVariant} class="shrink-0 text-[9px]">
 				{config.actionLabel}
 			</Badge>
 		{/if}
-		<span class="shrink-0 text-[9px] text-muted-foreground/60">{timeStr}</span>
+		<span class="shrink-0 text-[9px] text-muted-foreground/40">{timeStr}</span>
 		<ChevronDown
-			class="size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 {expanded
+			class="size-3 shrink-0 text-muted-foreground/40 transition-transform duration-150 {expanded
 				? 'rotate-180'
 				: ''}"
 		/>

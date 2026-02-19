@@ -106,7 +106,7 @@
 	<!-- Compact card — always in document flow to hold space -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="cursor-pointer rounded-2xl border border-primary/15 bg-card p-3 shadow-md ring-1 ring-primary/5 transition-all hover:shadow-lg hover:ring-primary/10"
+		class="cursor-pointer rounded-2xl border border-primary/20 bg-card p-3 ring-1 ring-primary/8 transition-all hover:border-primary/40 hover:ring-primary/15 hover:shadow-sm"
 		class:invisible={expanded}
 		onclick={expand}
 		onkeydown={(e) => e.key === 'Enter' && expand()}
@@ -136,7 +136,7 @@
 
 	<!-- Expanded panel — absolutely positioned, overlays feed -->
 	<div
-		class="absolute inset-x-0 top-0 z-40 flex flex-col rounded-2xl border border-primary/15 bg-card shadow-xl ring-1 ring-primary/10 transition-all duration-300 ease-out"
+		class="absolute inset-x-0 top-0 z-40 flex flex-col rounded-2xl border border-primary/15 bg-card shadow-lg ring-1 ring-primary/10 transition-all duration-300 ease-out"
 		class:opacity-0={!expanded}
 		class:pointer-events-none={!expanded}
 		class:scale-y-95={!expanded}

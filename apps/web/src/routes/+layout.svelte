@@ -89,7 +89,7 @@
 	</div>
 {:else}
 	<!-- App shell: header + content + dynamic tab bar -->
-	<div class="min-h-dvh bg-background text-foreground">
+	<div class="min-h-dvh bg-background text-foreground quadrille-bg">
 		<div class="mx-auto flex min-h-dvh w-full max-w-screen-xl flex-col md:px-6">
 			<AppHeader />
 

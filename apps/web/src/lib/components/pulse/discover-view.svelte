@@ -3,7 +3,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { getFeedStore } from '$lib/stores';
 	import Compass from '@lucide/svelte/icons/compass';
-
+	import Masonry from 'svelte-bricks';
 	const feedStore = getFeedStore();
 
 	const iconMap: Record<EntityType, string> = {
@@ -33,6 +33,21 @@
 		return groups;
 	});
 
+	/** Flattened array for Masonry keying. */
+	const masonryItems = $derived(
+		[...groupedEntities()].map(([entityType, entities]) => ({
+			id: entityType,
+			entityType,
+			entities
+		}))
+	);
+
+	/** Placeholder cards for the masonry grid. */
+	const placeholderItems = [
+		{ id: 'trending', emoji: '🔥', label: () => m.pulse_discover_trending() },
+		{ id: 'nearby', emoji: '📍', label: () => m.pulse_discover_nearby() }
+	];
+
 	function followAllInGroup(entities: FollowableEntity[]) {
 		for (const e of entities) {
 			if (!e.followed) {
@@ -59,7 +74,7 @@
 	{#if feedStore.suggestedEntities.length === 0}
 		<!-- Empty state -->
 		<div
-			class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/60 py-12 text-center"
+			class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/40 bg-muted/10 py-12 text-center"
 		>
 			<div
 				class="flex size-12 items-center justify-center rounded-full bg-muted/50 text-muted-foreground"
@@ -71,69 +86,74 @@
 			</p>
 		</div>
 	{:else}
-		<!-- Entity groups -->
-		{#each [...groupedEntities()] as [entityType, entities] (entityType)}
-			<section class="rounded-xl border border-border/60 bg-card p-4">
-				<!-- Group header -->
-				<div class="flex items-center justify-between gap-2">
-					<h3 class="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-						<span>{iconMap[entityType]}</span>
-						<span>{labelMap[entityType]}</span>
-					</h3>
-					{#if entities.some((e) => !e.followed)}
-						<button
-							onclick={() => followAllInGroup(entities)}
-							class="text-[10px] font-semibold text-primary hover:underline"
-						>
-							{m.pulse_discover_follow_all_group()}
-						</button>
-					{/if}
-				</div>
-
-				<!-- Entity list -->
-				<div class="mt-3 space-y-2.5">
-					{#each entities as entity (entity.entity_id)}
-						<div class="flex items-center justify-between gap-3">
-							<div class="min-w-0 flex-1">
-								<p class="truncate text-sm font-medium text-foreground">
-									{entity.label}
-								</p>
-								{#if entity.description}
-									<p class="mt-0.5 truncate text-[10px] text-muted-foreground">
-										{entity.description}
-									</p>
-								{/if}
-								<p class="text-[10px] text-muted-foreground/70">
-									{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {entity.follower_count} pengikut
-								</p>
-							</div>
-
-							<button
-								onclick={() => feedStore.toggleFollow(entity.entity_id)}
-								class="shrink-0 rounded-full px-3 py-1 text-[10px] font-semibold transition-colors
-									{entity.followed
-									? 'bg-primary/10 text-primary'
-									: 'bg-primary text-primary-foreground hover:bg-primary/90'}"
-							>
-								{entity.followed ? m.pulse_feed_entity_following() : m.pulse_feed_entity_follow()}
-							</button>
+		<!-- Masonry entity groups -->
+		<Masonry
+			items={[...masonryItems, ...placeholderItems]}
+			getId={(item) => item.id}
+			minColWidth={260}
+			maxColWidth={380}
+			gap={12}
+			animate={true}
+		>
+			{#snippet children({ item })}
+				{#if 'entityType' in item}
+					<section class="rounded-xl border border-border/50 bg-card p-4">
+						<!-- Group header -->
+						<div class="flex items-center justify-between gap-2">
+							<h3 class="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+								<span>{iconMap[item.entityType]}</span>
+								<span>{labelMap[item.entityType]}</span>
+							</h3>
+							{#if item.entities.some((e) => !e.followed)}
+								<button
+									onclick={() => followAllInGroup(item.entities)}
+									class="text-[10px] font-semibold text-primary hover:underline"
+								>
+									{m.pulse_discover_follow_all_group()}
+								</button>
+							{/if}
 						</div>
-					{/each}
-				</div>
-			</section>
-		{/each}
 
-		<!-- Future sections (placeholder) -->
-		<section class="rounded-xl border border-dashed border-border/40 bg-muted/10 p-4 text-center">
-			<p class="text-[11px] text-muted-foreground/60">
-				🔥 {m.pulse_discover_trending()} — segera hadir
-			</p>
-		</section>
+						<!-- Entity list -->
+						<div class="mt-3 space-y-2.5">
+							{#each item.entities as entity (entity.entity_id)}
+								<div class="flex items-center justify-between gap-3">
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-sm font-medium text-foreground">
+											{entity.label}
+										</p>
+										{#if entity.description}
+											<p class="mt-0.5 truncate text-[10px] text-muted-foreground">
+												{entity.description}
+											</p>
+										{/if}
+										<p class="text-[10px] text-muted-foreground/70">
+											{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {entity.follower_count} pengikut
+										</p>
+									</div>
 
-		<section class="rounded-xl border border-dashed border-border/40 bg-muted/10 p-4 text-center">
-			<p class="text-[11px] text-muted-foreground/60">
-				📍 {m.pulse_discover_nearby()} — segera hadir
-			</p>
-		</section>
+									<button
+										onclick={() => feedStore.toggleFollow(entity.entity_id)}
+										class="shrink-0 rounded-full px-3 py-1 text-[10px] font-semibold transition-colors
+											{entity.followed
+											? 'bg-primary/10 text-primary'
+											: 'bg-primary text-primary-foreground hover:bg-primary/90'}"
+									>
+										{entity.followed ? m.pulse_feed_entity_following() : m.pulse_feed_entity_follow()}
+									</button>
+								</div>
+							{/each}
+						</div>
+					</section>
+				{:else}
+					<!-- Placeholder cards (trending, nearby) -->
+					<section class="rounded-xl border border-dashed border-border/40 bg-muted/10 p-4 text-center">
+						<p class="text-[11px] text-muted-foreground/60">
+							{item.emoji} {item.label()} — segera hadir
+						</p>
+					</section>
+				{/if}
+			{/snippet}
+		</Masonry>
 	{/if}
 </div>

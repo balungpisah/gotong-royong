@@ -4,7 +4,6 @@
 	import { m } from '$lib/paraglide/messages';
 	import EntityPill from './entity-pill.svelte';
 	import UsersIcon from '@lucide/svelte/icons/users';
-
 	interface Props {
 		item: FeedItem;
 		selected?: boolean;
@@ -78,11 +77,11 @@
 	tabindex={onclick ? 0 : undefined}
 	onclick={onclick}
 	onkeydown={onclick ? handleKeydown : undefined}
-	class="group rounded-xl border p-4 transition {selected
-		? 'border-primary/40 bg-primary/5 shadow-sm'
-		: 'border-border/60 bg-card hover:border-border hover:shadow-sm'} {onclick
-		? 'cursor-pointer'
-		: ''}"
+	class="group rounded-xl p-4 transition
+		{selected
+			? 'border border-primary/50 bg-primary/5 shadow-sm'
+			: 'border border-border/50 bg-card hover:border-border hover:shadow-sm'}
+		{onclick ? 'cursor-pointer' : ''}"
 >
 	<!-- Repost header -->
 	{#if item.repost}
@@ -122,13 +121,13 @@
 	</div>
 
 	<!-- Witness title -->
-	<h3 class="mt-1.5 text-sm font-semibold text-foreground line-clamp-1">
+	<h3 class="mt-1.5 text-sm font-semibold text-foreground line-clamp-2">
 		{item.title}
 	</h3>
 
 	<!-- Snippet -->
 	{#if item.latest_event.snippet}
-		<p class="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2">
+		<p class="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-3">
 			{item.latest_event.snippet}
 		</p>
 	{/if}

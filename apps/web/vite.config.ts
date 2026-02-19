@@ -15,6 +15,12 @@ const sensitiveRouteDenylist = [
 ];
 
 export default defineConfig({
+	optimizeDeps: {
+		include: ['svelte-bricks']
+	},
+	ssr: {
+		noExternal: ['svelte-bricks']
+	},
 	plugins: [
 		paraglideVitePlugin({
 			project: './project.inlang',

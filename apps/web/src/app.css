@@ -610,8 +610,29 @@
 	html,
 	body {
 		font-family: var(--font-family);
-		background: var(--background);
+		background-color: var(--background);
 		color: var(--foreground);
 		line-height: var(--lh-normal);
+	}
+
+	/* ── Quadrille paper background ─────────────────────────────
+	 * Faint grid texture on the app background — gives a sense
+	 * of surface & cohesion instead of flat emptiness.
+	 * Applied via .quadrille-bg utility on the app-shell wrapper
+	 * (not body — child divs with bg-background would cover it).
+	 * Uses the earthy brown palette (tanah-gelap #3e2723) so
+	 * the grid feels warm and natural.
+	 * ────────────────────────────────────────────────────────── */
+	.quadrille-bg {
+		--grid-color: rgba(62, 39, 35, 0.10);
+		background-image:
+			linear-gradient(var(--grid-color) 1px, transparent 1px),
+			linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+		background-size: 24px 24px;
+	}
+
+	/* Dark mode: use vault-light (#b0bec5) tinted grid */
+	:is(.dark) .quadrille-bg {
+		--grid-color: rgba(176, 190, 197, 0.10);
 	}
 }

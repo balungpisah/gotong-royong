@@ -6,7 +6,6 @@
 	import WitnessChatPanel from './witness-chat-panel.svelte';
 	import X from '@lucide/svelte/icons/x';
 	import UsersIcon from '@lucide/svelte/icons/users';
-
 	interface Props {
 		detail: WitnessDetail;
 		onClose: () => void;
@@ -37,8 +36,8 @@
 </script>
 
 <div class="flex h-full flex-col overflow-hidden">
-	<!-- Status zone — header + navigator, pinned top with shadow -->
-	<div class="relative z-10 shrink-0 bg-card shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08)]">
+	<!-- Status zone — header + navigator, pinned top -->
+	<div class="relative z-10 shrink-0 border-b border-border/40 bg-card">
 		<!-- Panel header -->
 		<div class="flex items-center gap-3 px-4 py-3">
 			<div class="min-w-0 flex-1">

@@ -10,6 +10,7 @@
 		DiscoverView
 	} from '$lib/components/pulse';
 	import Activity from '@lucide/svelte/icons/activity';
+	import Masonry from 'svelte-bricks';
 
 	const witnessStore = getWitnessStore();
 	const notificationStore = getNotificationStore();
@@ -62,6 +63,18 @@
 			messageSending = false;
 		}
 	}
+
+	// ---------------------------------------------------------------------------
+	// Masonry skeleton items (variable heights for visual preview)
+	// ---------------------------------------------------------------------------
+	const skeletonItems = [
+		{ id: 1, h: 130 },
+		{ id: 2, h: 160 },
+		{ id: 3, h: 110 },
+		{ id: 4, h: 180 },
+		{ id: 5, h: 140 },
+		{ id: 6, h: 120 }
+	];
 </script>
 
 <!--
@@ -94,7 +107,7 @@
 
 		<!-- Panel — slides up from bottom on mobile -->
 		<div
-			class="relative h-full overflow-hidden bg-card shadow-xl transition-transform duration-300 ease-out"
+			class="relative h-full overflow-hidden border-l border-border/60 bg-card shadow-lg transition-transform duration-300 ease-out"
 		>
 			{#if isDetailOpen && witnessStore.current}
 				<WitnessDetailPanel
@@ -170,9 +183,20 @@
 					<DiscoverView />
 				</div>
 			{:else if feedStore.loading}
-				<div class="flex flex-col gap-3">
-					{#each { length: 3 } as _}
-						<div class="animate-pulse rounded-xl border border-border/40 bg-muted/30 p-4">
+				<!-- Masonry loading skeletons with variable heights -->
+				<Masonry
+					items={skeletonItems}
+					getId={(item) => item.id}
+					minColWidth={280}
+					maxColWidth={400}
+					gap={12}
+					animate={false}
+				>
+					{#snippet children({ item })}
+						<div
+							class="animate-pulse rounded-xl border border-border/50 bg-card p-4"
+							style="min-height: {item.h}px"
+						>
 							<div class="h-3 w-1/3 rounded bg-muted/60"></div>
 							<div class="mt-2 h-4 w-3/4 rounded bg-muted"></div>
 							<div class="mt-2 h-3 w-full rounded bg-muted/60"></div>
@@ -183,11 +207,11 @@
 								<div class="h-5 w-10 rounded bg-muted/40"></div>
 							</div>
 						</div>
-					{/each}
-				</div>
+					{/snippet}
+				</Masonry>
 			{:else if feedStore.filteredStream.length === 0}
 				<div
-					class="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/60 py-12 text-center"
+					class="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/40 bg-muted/10 py-12 text-center"
 				>
 					<div
 						class="flex size-12 items-center justify-center rounded-full bg-muted/50 text-muted-foreground"
@@ -201,15 +225,23 @@
 					</p>
 				</div>
 			{:else}
-				<!-- Polymorphic feed stream — witness cards + inline system cards -->
-				<div class="flex flex-col gap-3" role="list">
-					{#each feedStore.filteredStream as streamItem (streamItem.stream_id)}
-						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-						<div
-							onclick={(e) => e.stopPropagation()}
-							onkeydown={(e) => e.stopPropagation()}
-							role="listitem"
-						>
+				<!-- Masonry feed stream — witness cards + inline system cards -->
+				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+				<div
+					onclick={(e) => e.stopPropagation()}
+					onkeydown={(e) => e.stopPropagation()}
+					role="list"
+					aria-label="Feed"
+				>
+					<Masonry
+						items={feedStore.filteredStream}
+						getId={(item) => item.stream_id}
+						minColWidth={280}
+						maxColWidth={400}
+						gap={12}
+						animate={true}
+					>
+						{#snippet children({ item: streamItem })}
 							{#if streamItem.kind === 'witness'}
 								<FeedEventCard
 									item={streamItem.data}
@@ -222,8 +254,8 @@
 									onDismiss={() => feedStore.dismissCard(streamItem.stream_id)}
 								/>
 							{/if}
-						</div>
-					{/each}
+						{/snippet}
+					</Masonry>
 				</div>
 			{/if}
 		</section>
@@ -240,7 +272,7 @@
 		style="width: {showDetail ? '42rem' : '0px'}; margin-left: {showDetail ? '1.5rem' : '0px'}; opacity: {showDetail ? '1' : '0'};"
 	>
 		<div
-			class="sticky top-[5.5rem] flex w-[42rem] flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-lg"
+			class="sticky top-[5.5rem] flex w-[42rem] flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-md"
 			style="height: calc(100dvh - 7rem);"
 		>
 			{#if isDetailOpen && witnessStore.current}
