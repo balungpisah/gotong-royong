@@ -37,6 +37,41 @@ export interface FeedEvent {
 	snippet?: string;
 }
 
+// ── Tandang Signal Types (Phase 2) ────────────────────────────────
+
+/** The 5 explicit chip types shown on feed cards.
+ *  Each maps to a tandang reputation signal (I/C/J).
+ *  Contextual PoR wording is resolved at render time based on card type. */
+export type SignalChipType =
+	| 'vouch'       // 🤝 Saya Vouch — positive trust signal → I+C
+	| 'skeptis'     // 🤔 Skeptis — healthy doubt signal → J
+	| 'saksi'        // 👁️ PoR chip — contextual: Saya Saksi / Sudah Beres / Bukti Valid → I
+	| 'bagus'       // 👍 Bagus — quality upvote → C
+	| 'perlu_dicek' // ⚠️ Perlu Dicek — quality flag → I+J
+	| 'inline_vote'; // 🗳️ Ya/Tidak — inline voting (vote_opened cards only)
+
+/** Current user's relation to this witness/entity.
+ *  Populated from tandang query: GET /user/{uid}/relation/{entity_id} */
+export interface MyRelation {
+	vouched: boolean;
+	vouch_type?: 'positive' | 'skeptical' | 'conditional' | 'mentorship';
+	witnessed: boolean;
+	flagged: boolean;
+	quality_voted: boolean;
+	vote_cast?: 'yes' | 'no';
+}
+
+/** Aggregate signal counts for social proof display.
+ *  Populated from tandang query: GET /entity/{id}/signals */
+export interface SignalCounts {
+	vouch_positive: number;
+	vouch_skeptical: number;
+	witness_count: number;
+	quality_avg: number;
+	quality_votes: number;
+	flags: number;
+}
+
 // ── Feed Item (one per witness in the feed) ───────────────────────
 
 /** Urgency badge type for visual priority. */
@@ -84,6 +119,12 @@ export interface FeedItem {
 	// ── Engagement: Story Peek (Phase 3) ────────────────────────
 	/** Recent conversation snippets for the auto-rotating peek strip. */
 	peek_messages?: PeekMessage[];
+
+	// ── Tandang Signals (Phase 2) ────────────────────────────────
+	/** Current user's relation to this entity (from tandang). */
+	my_relation?: MyRelation;
+	/** Aggregate signal counts for social proof (from tandang). */
+	signal_counts?: SignalCounts;
 
 	// ── Engagement: Pulse & Urgency (Phase 1) ────────────────────
 	/** Number of users currently active on this witness (last 30 min). */

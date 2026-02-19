@@ -11,6 +11,7 @@
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import RadioIcon from '@lucide/svelte/icons/radio';
 	import MessageCircleIcon from '@lucide/svelte/icons/message-circle';
+	import SignalChipBar from './signal-chip-bar.svelte';
 
 	interface Props {
 		item: FeedItem;
@@ -200,7 +201,7 @@
 	{/if}
 
 	<!-- ── Card body ─────────────────────────────────────────────── -->
-	<div class="px-5 pt-4 pb-5">
+	<div class="px-5 pt-4 pb-5 min-w-0 overflow-hidden">
 
 		<!-- Top row: urgency badge + live indicator + event emoji -->
 		<div class="mb-3 flex items-center gap-1.5">
@@ -339,6 +340,18 @@
 						</div>
 					</div>
 				</div>
+			</div>
+		{/if}
+
+		<!-- ── Signal Chip Bar — tandang-backed action chips ───── -->
+		{#if item.signal_counts || item.my_relation}
+			<div class="mt-3">
+				<SignalChipBar
+					eventType={item.latest_event.event_type}
+					myRelation={item.my_relation}
+					signalCounts={item.signal_counts}
+					{moodColor}
+				/>
 			</div>
 		{/if}
 

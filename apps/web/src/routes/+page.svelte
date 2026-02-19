@@ -239,6 +239,7 @@
 						maxColWidth={340}
 						gap={16}
 						animate={true}
+						columnClass="masonry-col-constrain"
 					>
 						{#snippet children({ item: streamItem })}
 							{#if streamItem.kind === 'witness'}
@@ -294,3 +295,16 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	/*
+	 * Masonry grid-item containment — prevents cards with wide intrinsic
+	 * content (chip bar, story peek -mx-5) from expanding beyond their
+	 * column. The grid items are direct children of .col created by
+	 * svelte-bricks; overflow:hidden clips them to column width.
+	 */
+	:global(.masonry-col-constrain > *) {
+		contain: inline-size;
+		min-width: 0;
+	}
+</style>

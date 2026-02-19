@@ -117,7 +117,10 @@ export type {
 	TipPayload,
 	MilestonePayload,
 	PromptPayload,
-	PeekMessage
+	PeekMessage,
+	SignalChipType,
+	MyRelation,
+	SignalCounts
 } from './feed';
 
 // ---------------------------------------------------------------------------

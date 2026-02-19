@@ -11,7 +11,9 @@ import type {
 	EntityTag,
 	FollowableEntity,
 	RepostFrame,
-	SystemCardData
+	SystemCardData,
+	MyRelation,
+	SignalCounts
 } from '$lib/types';
 
 // ---------------------------------------------------------------------------
@@ -152,6 +154,21 @@ export const mockFeedItem1: FeedItem = {
 	cover_url: 'https://images.unsplash.com/photo-1504472478235-9bc48ba4d60f?w=600&h=400&fit=crop',
 	body: 'Warga Gang Melati mengeluh lampu jalan padam total sejak dua minggu lalu. Ibu-ibu takut pulang malam dari pasar. Pak Ahmad sudah lapor ke kelurahan tapi belum ada respon. "Anak saya harus lewat gang gelap setiap pulang les," katanya.',
 	active_now: 3,
+	// Tandang signals: user witnessed this problem, 2 vouches, 1 skeptic
+	my_relation: {
+		vouched: false,
+		witnessed: true,
+		flagged: false,
+		quality_voted: false
+	},
+	signal_counts: {
+		vouch_positive: 2,
+		vouch_skeptical: 1,
+		witness_count: 5,
+		quality_avg: 0,
+		quality_votes: 0,
+		flags: 0
+	},
 	peek_messages: [
 		{ author: 'Sari', text: 'Sudah foto buktinya tadi pagi, gelap banget. Saya kirim ke grup RT tapi belum ada yang respon sampai sekarang.' },
 		{ author: 'Ahmad', text: 'Saya coba hubungi kelurahan lagi besok pagi. Kemarin Pak Lurah bilang anggaran penerangan habis, tapi saya mau coba minta alokasi darurat karena ini sudah dua minggu lebih.' },
@@ -185,6 +202,22 @@ export const mockFeedItem2: FeedItem = {
 	sentiment: 'hopeful',
 	intensity: 3,
 	active_now: 5,
+	// Tandang signals: user vouched positive, many vouches, good quality
+	my_relation: {
+		vouched: true,
+		vouch_type: 'positive',
+		witnessed: false,
+		flagged: false,
+		quality_voted: true
+	},
+	signal_counts: {
+		vouch_positive: 8,
+		vouch_skeptical: 0,
+		witness_count: 3,
+		quality_avg: 4.2,
+		quality_votes: 6,
+		flags: 0
+	},
 	peek_messages: [
 		{ author: 'Dewi', text: 'Saya bisa bantu survei akhir pekan ini kalau cuaca bagus, tapi kalau hujan mungkin kita tunda ke minggu depan saja ya?' },
 		{ author: 'Rina', text: 'Pak RT sudah setuju koordinasi. Beliau minta kita siapkan proposal sederhana dulu sebelum turun ke lapangan biar ada dokumentasinya.' },
@@ -221,6 +254,21 @@ export const mockFeedItem3: FeedItem = {
 	intensity: 3,
 	body: 'Setelah 3 bulan negosiasi dengan pemilik lahan, akhirnya disepakati pinjam pakai selama 5 tahun. Tim survei Karang Taruna turun langsung mengukur dan memetakan. Rencananya ada area bermain anak, bangku lansia, dan kebun kecil yang dikelola bersama. Bu Rina bilang, "Ini mimpi warga sejak 2019."',
 	active_now: 2,
+	// Tandang signals: user hasn't interacted, moderate community signals
+	my_relation: {
+		vouched: false,
+		witnessed: false,
+		flagged: false,
+		quality_voted: false
+	},
+	signal_counts: {
+		vouch_positive: 5,
+		vouch_skeptical: 2,
+		witness_count: 7,
+		quality_avg: 3.8,
+		quality_votes: 4,
+		flags: 0
+	},
 	peek_messages: [
 		{ author: 'Rina', text: 'Ukuran lahan 12x20 meter, cukup luas! Kita bisa bagi jadi 3 zona: bermain anak, bangku lansia, dan kebun komunitas.' },
 		{ author: 'Budi', text: 'Kalau ada kebun kecil, saya siap rawat setiap pagi sebelum kerja. Sudah pengalaman nanam sayur di belakang rumah.' },
@@ -253,6 +301,23 @@ export const mockFeedItem4: FeedItem = {
 	sentiment: 'curious',
 	intensity: 4,
 	active_now: 8,
+	// Tandang signals: user voted yes, high community engagement
+	my_relation: {
+		vouched: true,
+		vouch_type: 'positive',
+		witnessed: false,
+		flagged: false,
+		quality_voted: true,
+		vote_cast: 'yes'
+	},
+	signal_counts: {
+		vouch_positive: 15,
+		vouch_skeptical: 3,
+		witness_count: 0,
+		quality_avg: 4.5,
+		quality_votes: 12,
+		flags: 1
+	},
 	deadline: tsFuture(47 * 60),       // ~47 hours from now (under 2 days)
 	deadline_label: 'Voting ditutup',
 	quorum_target: 40,
@@ -291,6 +356,22 @@ export const mockFeedItem5: FeedItem = {
 	cover_url: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600&h=400&fit=crop',
 	body: 'Pak Budi mengambil sampel air di tiga titik berbeda sepanjang sungai. Di dekat pipa pembuangan pabrik, air berubah kecoklatan dengan bau menyengat. Warga nelayan hilir melaporkan ikan mati mengambang sejak bulan lalu. Data ini sudah dikirim ke Dinas Lingkungan Hidup.',
 	active_now: 4,
+	// Tandang signals: user is skeptical, contentious evidence with flags
+	my_relation: {
+		vouched: true,
+		vouch_type: 'skeptical',
+		witnessed: false,
+		flagged: false,
+		quality_voted: true
+	},
+	signal_counts: {
+		vouch_positive: 3,
+		vouch_skeptical: 4,
+		witness_count: 2,
+		quality_avg: 3.1,
+		quality_votes: 8,
+		flags: 3
+	},
 	peek_messages: [
 		{ author: 'Budi', text: 'Sampel ketiga paling parah, baunya menyengat sampai 50 meter dari sungai. Warga sekitar sudah mulai pakai masker kalau lewat situ.' },
 		{ author: 'Ahmad', text: 'Nelayan hilir bilang ikan mati mengambang sejak bulan lalu. Pendapatan mereka turun drastis, ada yang sudah pindah profesi.' },
@@ -323,7 +404,23 @@ export const mockFeedItem6: FeedItem = {
 	hook_line: 'Air mengalir lagi. 18 warga berkontribusi.',
 	sentiment: 'celebratory',
 	intensity: 2,
-	cover_url: 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=600&h=300&fit=crop'
+	cover_url: 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=600&h=300&fit=crop',
+	// Tandang signals: user confirmed resolution, high trust, lots of witnesses
+	my_relation: {
+		vouched: true,
+		vouch_type: 'positive',
+		witnessed: true,
+		flagged: false,
+		quality_voted: true
+	},
+	signal_counts: {
+		vouch_positive: 14,
+		vouch_skeptical: 0,
+		witness_count: 11,
+		quality_avg: 4.8,
+		quality_votes: 15,
+		flags: 0
+	}
 };
 
 /** 7. Galang milestone — BODY ONLY — fundraising story */
@@ -352,6 +449,22 @@ export const mockFeedItem7: FeedItem = {
 	intensity: 4,
 	body: 'Pak Surya, 72 tahun, tinggal sendirian di rumah yang atapnya sudah bocor di mana-mana. Musim hujan kemarin plafon kamar tidurnya runtuh. Tetangga mulai galang dana setelah melihat kondisinya. Dalam 3 minggu, 32 orang sudah menyumbang. Sisa Rp 2,5 juta lagi untuk beli material atap baru.',
 	active_now: 1,
+	// Tandang signals: user vouched, moderate engagement
+	my_relation: {
+		vouched: true,
+		vouch_type: 'positive',
+		witnessed: false,
+		flagged: false,
+		quality_voted: false
+	},
+	signal_counts: {
+		vouch_positive: 20,
+		vouch_skeptical: 1,
+		witness_count: 4,
+		quality_avg: 4.0,
+		quality_votes: 9,
+		flags: 0
+	},
 	deadline: tsFuture(5 * 24 * 60),   // 5 days from now
 	deadline_label: 'Galang dana berakhir',
 	peek_messages: [
@@ -385,7 +498,16 @@ export const mockFeedItem8: FeedItem = {
 	source: 'sekitar',
 	hook_line: 'Beras naik Rp 2.000/kg — siapa lagi yang lihat?',
 	sentiment: 'curious',
-	intensity: 2
+	intensity: 2,
+	// Tandang signals: fresh report, no user interaction, minimal signals
+	signal_counts: {
+		vouch_positive: 1,
+		vouch_skeptical: 0,
+		witness_count: 1,
+		quality_avg: 0,
+		quality_votes: 0,
+		flags: 0
+	}
 };
 
 /** 9. Repost — PHOTO + BODY — community building work in progress */
@@ -420,7 +542,22 @@ export const mockFeedItem9: FeedItem = {
 	sentiment: 'hopeful',
 	intensity: 3,
 	cover_url: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&h=400&fit=crop',
-	body: 'Warga RT 07 gotong royong mengumpulkan material bekas untuk pos ronda baru. Semen, pasir, dan bata sudah ditumpuk di lokasi. Akhir pekan ini mulai kerja bakti — sudah ada 9 relawan yang siap turun.'
+	body: 'Warga RT 07 gotong royong mengumpulkan material bekas untuk pos ronda baru. Semen, pasir, dan bata sudah ditumpuk di lokasi. Akhir pekan ini mulai kerja bakti — sudah ada 9 relawan yang siap turun.',
+	// Tandang signals: user quality voted, healthy community trust
+	my_relation: {
+		vouched: false,
+		witnessed: false,
+		flagged: false,
+		quality_voted: true
+	},
+	signal_counts: {
+		vouch_positive: 6,
+		vouch_skeptical: 0,
+		witness_count: 3,
+		quality_avg: 4.3,
+		quality_votes: 7,
+		flags: 0
+	}
 };
 
 /** 10. Created with repost — PHOTO ONLY — visual evidence of trash, no body */
@@ -452,7 +589,22 @@ export const mockFeedItem10: FeedItem = {
 	hook_line: 'Makin parah setelah hujan — sampah meluap.',
 	sentiment: 'angry',
 	intensity: 4,
-	cover_url: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=600&h=350&fit=crop'
+	cover_url: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=600&h=350&fit=crop',
+	// Tandang signals: user flagged this, some skepticism in community
+	my_relation: {
+		vouched: false,
+		witnessed: true,
+		flagged: true,
+		quality_voted: false
+	},
+	signal_counts: {
+		vouch_positive: 2,
+		vouch_skeptical: 2,
+		witness_count: 4,
+		quality_avg: 2.5,
+		quality_votes: 3,
+		flags: 2
+	}
 };
 
 // ---------------------------------------------------------------------------
