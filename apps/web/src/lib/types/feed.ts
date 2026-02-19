@@ -63,6 +63,23 @@ export interface FeedItem {
 	urgency?: UrgencyBadge;
 	source: FeedSource;
 	repost?: RepostFrame;
+
+	// ── LLM-enriched card fields (extracted during triage) ──────
+	/** The hook — a punchy editorial 1-liner that makes the reader curious. */
+	hook_line?: string;
+	/** The most emotionally resonant sentence from the conversation. */
+	pull_quote?: string;
+	/** Emotional mood for visual styling. */
+	sentiment?: 'angry' | 'hopeful' | 'urgent' | 'celebratory' | 'sad' | 'curious' | 'fun';
+	/** Conversation heat level (1–5). */
+	intensity?: number;
+
+	// ── Rich media & narrative ───────────────────────────────────
+	/** Cover image URL — photo evidence, location shot, or community photo. */
+	cover_url?: string;
+	/** AI-summarized narrative from the saksi conversation. Massaged for
+	 *  civility while preserving emotional intensity. 2-4 sentences. */
+	body?: string;
 }
 
 /** Preview of a witness member for the avatar stack (max 5). */

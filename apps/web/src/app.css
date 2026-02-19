@@ -127,7 +127,7 @@
 
 	/* shadcn semantic bridge */
 	--radius: var(--r-md);
-	--background: var(--c-susu);
+	--background: var(--c-kapas);
 	--foreground: var(--c-tanah-gelap);
 	--card: var(--c-susu);
 	--card-foreground: var(--c-tanah-gelap);

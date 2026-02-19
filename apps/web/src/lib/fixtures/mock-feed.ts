@@ -120,7 +120,7 @@ const entitySembako: EntityTag = {
 // Individual feed items
 // ---------------------------------------------------------------------------
 
-/** 1. Created — new witness, BARU urgency, from Ikutan */
+/** 1. Created — PHOTO + LONG BODY — angry, with evidence photo */
 export const mockFeedItem1: FeedItem = {
 	witness_id: 'witness-feed-001',
 	title: 'Lampu Jalan Mati di Gang Melati',
@@ -141,10 +141,15 @@ export const mockFeedItem1: FeedItem = {
 	members_preview: [memberAhmad],
 	entity_tags: [entityRT05, entityInfrastruktur],
 	urgency: 'baru',
-	source: 'ikutan'
+	source: 'ikutan',
+	hook_line: 'Sudah 2 minggu, gelap total.',
+	sentiment: 'angry',
+	intensity: 4,
+	cover_url: 'https://images.unsplash.com/photo-1504472478235-9bc48ba4d60f?w=600&h=400&fit=crop',
+	body: 'Warga Gang Melati mengeluh lampu jalan padam total sejak dua minggu lalu. Ibu-ibu takut pulang malam dari pasar. Pak Ahmad sudah lapor ke kelurahan tapi belum ada respon. "Anak saya harus lewat gang gelap setiap pulang les," katanya.'
 };
 
-/** 2. Joined — someone joined as relawan, from Terlibat */
+/** 2. Joined — BARE CARD — short, punchy, no photo no body */
 export const mockFeedItem2: FeedItem = {
 	witness_id: 'witness-feed-002',
 	title: 'Jalan Rusak Jl. Mawar RT 05',
@@ -164,10 +169,13 @@ export const mockFeedItem2: FeedItem = {
 	member_count: 12,
 	members_preview: [memberAhmad, memberSari, memberBudi, memberRina, memberDewi],
 	entity_tags: [entityRT05, entityInfrastruktur],
-	source: 'terlibat'
+	source: 'terlibat',
+	hook_line: '12 orang turun tangan.',
+	sentiment: 'hopeful',
+	intensity: 3
 };
 
-/** 3. Checkpoint — phase progress, from Terlibat */
+/** 3. Checkpoint — BODY ONLY — longer story, no photo */
 export const mockFeedItem3: FeedItem = {
 	witness_id: 'witness-feed-003',
 	title: 'Pembangunan Taman Warga RW 03',
@@ -188,10 +196,14 @@ export const mockFeedItem3: FeedItem = {
 	member_count: 15,
 	members_preview: [memberRina, memberSari, memberAhmad, memberBudi],
 	entity_tags: [entityRW03, entityKarangTaruna],
-	source: 'terlibat'
+	source: 'terlibat',
+	hook_line: 'Lahan di Jl. Kenari cocok — survei selesai.',
+	sentiment: 'hopeful',
+	intensity: 3,
+	body: 'Setelah 3 bulan negosiasi dengan pemilik lahan, akhirnya disepakati pinjam pakai selama 5 tahun. Tim survei Karang Taruna turun langsung mengukur dan memetakan. Rencananya ada area bermain anak, bangku lansia, dan kebun kecil yang dikelola bersama. Bu Rina bilang, "Ini mimpi warga sejak 2019."'
 };
 
-/** 4. Vote opened — VOTING urgency, from Ikutan */
+/** 4. Vote opened — BARE CARD — no photo, no body, just the vote hook */
 export const mockFeedItem4: FeedItem = {
 	witness_id: 'witness-feed-004',
 	title: 'Musyawarah Anggaran RT 05 2025',
@@ -211,10 +223,13 @@ export const mockFeedItem4: FeedItem = {
 	members_preview: [memberAhmad, memberRina, memberBudi, memberSari],
 	entity_tags: [entityRT05],
 	urgency: 'voting',
-	source: 'ikutan'
+	source: 'ikutan',
+	hook_line: 'Anggaran naik 15% — setuju atau tidak?',
+	sentiment: 'curious',
+	intensity: 4
 };
 
-/** 5. Evidence — bukti submitted, from Terlibat */
+/** 5. Evidence — PHOTO + BODY — damning river pollution evidence */
 export const mockFeedItem5: FeedItem = {
 	witness_id: 'witness-feed-005',
 	title: 'Penyelidikan Limbah Pabrik Sungai Ciliwung',
@@ -234,10 +249,15 @@ export const mockFeedItem5: FeedItem = {
 	member_count: 7,
 	members_preview: [memberBudi, memberAhmad, memberDewi],
 	entity_tags: [entityLingkungan],
-	source: 'terlibat'
+	source: 'terlibat',
+	hook_line: 'Air sungai berubah warna di titik buangan.',
+	sentiment: 'angry',
+	intensity: 5,
+	cover_url: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600&h=400&fit=crop',
+	body: 'Pak Budi mengambil sampel air di tiga titik berbeda sepanjang sungai. Di dekat pipa pembuangan pabrik, air berubah kecoklatan dengan bau menyengat. Warga nelayan hilir melaporkan ikan mati mengambang sejak bulan lalu. Data ini sudah dikirim ke Dinas Lingkungan Hidup.'
 };
 
-/** 6. Resolved — SELESAI urgency, from Ikutan */
+/** 6. Resolved — PHOTO ONLY — celebratory community moment, no body */
 export const mockFeedItem6: FeedItem = {
 	witness_id: 'witness-feed-006',
 	title: 'Perbaikan Pipa Air PDAM Blok C',
@@ -257,10 +277,14 @@ export const mockFeedItem6: FeedItem = {
 	members_preview: [memberRina, memberAhmad, memberSari, memberBudi, memberDewi],
 	entity_tags: [entityRT05, entityInfrastruktur],
 	urgency: 'selesai',
-	source: 'ikutan'
+	source: 'ikutan',
+	hook_line: 'Air mengalir lagi. 18 warga berkontribusi.',
+	sentiment: 'celebratory',
+	intensity: 2,
+	cover_url: 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=600&h=300&fit=crop'
 };
 
-/** 7. Galang milestone — crowdfund hit target, from Sekitar */
+/** 7. Galang milestone — BODY ONLY — fundraising story */
 export const mockFeedItem7: FeedItem = {
 	witness_id: 'witness-feed-007',
 	title: 'Galang Dana Bedah Rumah Pak Surya',
@@ -280,10 +304,14 @@ export const mockFeedItem7: FeedItem = {
 	members_preview: [memberSari, memberRina, memberDewi],
 	entity_tags: [entityRW03],
 	urgency: 'ramai',
-	source: 'sekitar'
+	source: 'sekitar',
+	hook_line: 'Rp 7,5 juta terkumpul — tinggal 25% lagi.',
+	sentiment: 'hopeful',
+	intensity: 4,
+	body: 'Pak Surya, 72 tahun, tinggal sendirian di rumah yang atapnya sudah bocor di mana-mana. Musim hujan kemarin plafon kamar tidurnya runtuh. Tetangga mulai galang dana setelah melihat kondisinya. Dalam 3 minggu, 32 orang sudah menyumbang. Sisa Rp 2,5 juta lagi untuk beli material atap baru.'
 };
 
-/** 8. Community note — from Sekitar */
+/** 8. Community note — BARE CARD — quick curiosity question */
 export const mockFeedItem8: FeedItem = {
 	witness_id: 'witness-feed-008',
 	title: 'Harga Beras Naik di Pasar Menteng',
@@ -304,10 +332,13 @@ export const mockFeedItem8: FeedItem = {
 	member_count: 4,
 	members_preview: [memberSari, memberAhmad],
 	entity_tags: [entitySembako],
-	source: 'sekitar'
+	source: 'sekitar',
+	hook_line: 'Beras naik Rp 2.000/kg — siapa lagi yang lihat?',
+	sentiment: 'curious',
+	intensity: 2
 };
 
-/** 9. Repost — role repost framing (brag rights), from Ikutan */
+/** 9. Repost — PHOTO + BODY — community building work in progress */
 export const mockFeedItem9: FeedItem = {
 	witness_id: 'witness-feed-009',
 	title: 'Renovasi Pos Ronda RT 07',
@@ -334,10 +365,15 @@ export const mockFeedItem9: FeedItem = {
 		reposter_avatar: 'https://placehold.co/40x40/2E7D32/white?text=SD',
 		reposter_role: 'relawan',
 		action_verb: 'bergabung sebagai Relawan'
-	}
+	},
+	hook_line: 'Material sudah tiba — renovasi akhir pekan ini.',
+	sentiment: 'hopeful',
+	intensity: 3,
+	cover_url: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&h=400&fit=crop',
+	body: 'Warga RT 07 gotong royong mengumpulkan material bekas untuk pos ronda baru. Semen, pasir, dan bata sudah ditumpuk di lokasi. Akhir pekan ini mulai kerja bakti — sudah ada 9 relawan yang siap turun.'
 };
 
-/** 10. Created with repost — pelapor brag right, from Ikutan */
+/** 10. Created with repost — PHOTO ONLY — visual evidence of trash, no body */
 export const mockFeedItem10: FeedItem = {
 	witness_id: 'witness-feed-010',
 	title: 'Sampah Menumpuk di Pinggir Kali Baru',
@@ -362,7 +398,11 @@ export const mockFeedItem10: FeedItem = {
 		reposter_name: 'Budi Santoso',
 		reposter_role: 'pelapor',
 		action_verb: 'melaporkan'
-	}
+	},
+	hook_line: 'Makin parah setelah hujan — sampah meluap.',
+	sentiment: 'angry',
+	intensity: 4,
+	cover_url: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=600&h=350&fit=crop'
 };
 
 // ---------------------------------------------------------------------------

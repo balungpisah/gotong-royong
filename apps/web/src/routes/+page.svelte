@@ -68,27 +68,24 @@
 	// Masonry skeleton items (variable heights for visual preview)
 	// ---------------------------------------------------------------------------
 	const skeletonItems = [
-		{ id: 1, h: 130 },
-		{ id: 2, h: 160 },
-		{ id: 3, h: 110 },
-		{ id: 4, h: 180 },
-		{ id: 5, h: 140 },
-		{ id: 6, h: 120 }
+		{ id: 1, h: 260 },
+		{ id: 2, h: 320 },
+		{ id: 3, h: 240 },
+		{ id: 4, h: 340 },
+		{ id: 5, h: 280 },
+		{ id: 6, h: 250 }
 	];
 </script>
 
 <!--
-	Sliding dual-column with fixed-width columns (desktop ≥lg).
+	Master-detail with GPU-composited transitions (desktop ≥lg).
 
-	Both feed and detail are always max-w-2xl (672px). They sit inside a
-	flex wrapper that is centered via mx-auto. The detail column transitions
-	its width from 0 → 672px. Because the wrapper is centered, the feed
-	naturally slides left as the wrapper grows to accommodate the detail.
+	Layout: feed column (flex-1) + fixed-position detail panel on the right.
+	The detail panel slides in via transform: translateX (GPU-composited, no
+	layout reflow). Feed column doesn't move — it just has a right margin
+	that's always present on lg+ so the detail has a reserved landing zone.
 
-	Feed never changes size — only its position changes.
-
-	On mobile (<lg): feed is full-width, detail opens as a fixed overlay
-	with a semi-transparent backdrop.
+	On mobile (<lg): detail opens as a fixed overlay with backdrop.
 -->
 
 <!-- Mobile overlay — fixed full-screen panel, shown only on <lg when detail is open -->
@@ -105,9 +102,11 @@
 			aria-label="Close detail panel"
 		></div>
 
-		<!-- Panel — slides up from bottom on mobile -->
+		<!-- Panel — slides in from right on mobile -->
 		<div
-			class="relative h-full overflow-hidden border-l border-border/60 bg-card shadow-lg transition-transform duration-300 ease-out"
+			class="absolute inset-y-0 right-0 w-full max-w-lg overflow-hidden border-l border-border/60 bg-card shadow-lg
+				transition-transform duration-300 ease-[var(--ease-spring)]"
+			style="transform: translateX(0);"
 		>
 			{#if isDetailOpen && witnessStore.current}
 				<WitnessDetailPanel
@@ -131,13 +130,13 @@
 {/if}
 
 <div
-	class="mx-auto flex px-4 transition-all duration-[var(--dur-slow)] ease-[var(--ease-spring)] lg:px-0"
-	style="width: {showDetail ? 'calc(42rem + 42rem + 1.5rem)' : '42rem'}; max-width: 100%;"
+	class="mx-auto flex w-full px-4 lg:px-0 transition-[margin] duration-300 ease-[var(--ease-spring)]
+		{showDetail ? 'lg:mr-[43rem]' : 'lg:mr-0'}"
 >
 	<!-- Feed column — click anywhere to close detail panel (event delegation) -->
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
-		class="w-full lg:w-[42rem] shrink-0 flex flex-col gap-6"
+		class="min-w-0 flex-1 flex flex-col gap-6"
 		onclick={() => { if (showDetail) closeDetail(); }}
 		onkeydown={(e) => { if (e.key === 'Escape' && showDetail) closeDetail(); }}
 		role="region"
@@ -187,9 +186,9 @@
 				<Masonry
 					items={skeletonItems}
 					getId={(item) => item.id}
-					minColWidth={280}
-					maxColWidth={400}
-					gap={12}
+					minColWidth={240}
+					maxColWidth={380}
+					gap={20}
 					animate={false}
 				>
 					{#snippet children({ item })}
@@ -236,9 +235,9 @@
 					<Masonry
 						items={feedStore.filteredStream}
 						getId={(item) => item.stream_id}
-						minColWidth={280}
-						maxColWidth={400}
-						gap={12}
+						minColWidth={240}
+						maxColWidth={380}
+						gap={20}
 						animate={true}
 					>
 						{#snippet children({ item: streamItem })}
@@ -260,38 +259,38 @@
 			{/if}
 		</section>
 	</div>
+</div>
 
-	<!--
-		Detail column — desktop only (hidden on mobile, which uses the fixed overlay above).
-		Transitions width from 0 → 42rem and opacity from 0 → 1.
-		overflow:hidden clips content when collapsed.
-		The gap (margin-left) also transitions.
-	-->
+<!--
+	Detail panel — desktop only. Fixed position on the right side of the viewport.
+	Slides in via GPU-composited transform: translateX. Zero layout reflow.
+	Opacity fades in parallel for a polished entrance.
+-->
+<div
+	class="hidden lg:block fixed top-[3.5rem] right-0 bottom-0 z-30
+		transition-[transform,opacity] duration-300 ease-[var(--ease-spring)]
+		will-change-[transform,opacity]"
+	style="width: 42rem; transform: translateX({showDetail ? '0' : '100%'}); opacity: {showDetail ? '1' : '0'}; pointer-events: {showDetail ? 'auto' : 'none'};"
+>
 	<div
-		class="hidden lg:block shrink-0 overflow-hidden transition-all duration-[var(--dur-slow)] ease-[var(--ease-spring)]"
-		style="width: {showDetail ? '42rem' : '0px'}; margin-left: {showDetail ? '1.5rem' : '0px'}; opacity: {showDetail ? '1' : '0'};"
+		class="flex h-full w-full flex-col overflow-hidden border-l border-border/60 bg-card shadow-lg"
 	>
-		<div
-			class="sticky top-[5.5rem] flex w-[42rem] flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-md"
-			style="height: calc(100dvh - 7rem);"
-		>
-			{#if isDetailOpen && witnessStore.current}
-				<WitnessDetailPanel
-					detail={witnessStore.current}
-					onClose={closeDetail}
-					onSendMessage={handleSendMessage}
-					sending={messageSending}
-				/>
-			{:else if isDetailLoading}
-				<div class="flex flex-1 items-center justify-center">
-					<div class="flex flex-col items-center gap-3 text-muted-foreground">
-						<div
-							class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"
-						></div>
-						<p class="text-xs">{m.pulse_loading_detail()}</p>
-					</div>
+		{#if isDetailOpen && witnessStore.current}
+			<WitnessDetailPanel
+				detail={witnessStore.current}
+				onClose={closeDetail}
+				onSendMessage={handleSendMessage}
+				sending={messageSending}
+			/>
+		{:else if isDetailLoading}
+			<div class="flex flex-1 items-center justify-center">
+				<div class="flex flex-col items-center gap-3 text-muted-foreground">
+					<div
+						class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"
+					></div>
+					<p class="text-xs">{m.pulse_loading_detail()}</p>
 				</div>
-			{/if}
-		</div>
+			</div>
+		{/if}
 	</div>
 </div>
