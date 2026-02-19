@@ -106,21 +106,31 @@
 	<!-- Compact card — always in document flow to hold space -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="cursor-pointer rounded-2xl border border-primary/20 bg-card p-3 ring-1 ring-primary/8 transition-all hover:border-primary/40 hover:ring-primary/15 hover:shadow-sm"
+		class="triage-card cursor-pointer rounded-2xl border-2 border-primary/40 p-3.5 transition-all hover:border-primary/60 hover:shadow-lg"
 		class:invisible={expanded}
 		onclick={expand}
 		onkeydown={(e) => e.key === 'Enter' && expand()}
 		role="button"
 		tabindex="0"
 	>
-		<div class="flex items-center gap-2">
-			<div class="flex size-8 items-center justify-center rounded-full bg-primary/10">
-				<Sparkles class="size-3.5 text-primary" />
-			</div>
-			<span class="flex-1 text-sm text-muted-foreground">
-				{m.shell_chat_placeholder()}
+		<!-- "Mulai di sini" badge -->
+		<div class="mb-2.5">
+			<span class="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold tracking-wide text-primary-foreground uppercase">
+				<Sparkles class="size-2.5" />
+				Mulai di sini
 			</span>
-			<ChevronDown class="size-4 text-muted-foreground/50" />
+		</div>
+
+		<div class="flex items-center gap-2.5">
+			<div class="flex size-9 items-center justify-center rounded-xl bg-primary/15">
+				<Sparkles class="size-4 text-primary" />
+			</div>
+			<div class="flex-1 min-w-0">
+				<p class="text-[13px] font-semibold text-foreground leading-tight">Ceritakan kejadian</p>
+				<p class="mt-0.5 text-[11px] text-muted-foreground truncate">
+					Ketuk untuk mulai laporan...
+				</p>
+			</div>
 		</div>
 	</div>
 
@@ -134,13 +144,12 @@
 		onkeydown={() => {}}
 	></div>
 
-	<!-- Expanded panel — absolutely positioned, overlays feed -->
+	<!-- Expanded panel — fixed centered overlay for focused writing -->
 	<div
-		class="absolute inset-x-0 top-0 z-40 flex flex-col rounded-2xl border border-primary/15 bg-card shadow-lg ring-1 ring-primary/10 transition-all duration-300 ease-out"
+		class="triage-panel fixed inset-0 z-40 m-auto flex flex-col rounded-2xl border border-primary/15 bg-card shadow-2xl ring-1 ring-primary/10 transition-all duration-300 ease-out"
 		class:opacity-0={!expanded}
 		class:pointer-events-none={!expanded}
-		class:scale-y-95={!expanded}
-		style="max-height: {expanded ? '70vh' : '0px'}; transform-origin: top;"
+		class:scale-95={!expanded}
 	>
 		<!-- Header -->
 		<div class="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
@@ -167,7 +176,7 @@
 		</div>
 
 		<!-- Messages area -->
-		<div class="flex-1 overflow-y-auto px-4 py-3" style="min-height: 360px;">
+		<div class="flex-1 overflow-y-auto px-4 py-3">
 			{#if messages.length === 0}
 				<div class="flex flex-col items-center justify-center gap-2 py-8 text-center">
 					<div class="flex size-10 items-center justify-center rounded-full bg-primary/10">
@@ -286,3 +295,44 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	/* Triage card — gradient bg + breathing glow for prominence */
+	.triage-card {
+		background: linear-gradient(
+			135deg,
+			oklch(from var(--color-primary) l c h / 0.06) 0%,
+			oklch(from var(--color-card) l c h / 1) 70%
+		);
+		animation: triage-glow 3s ease-in-out infinite;
+	}
+
+	@keyframes triage-glow {
+		0%, 100% {
+			box-shadow: 0 0 0 0 oklch(from var(--color-primary) l c h / 0);
+		}
+		50% {
+			box-shadow: 0 0 16px 3px oklch(from var(--color-primary) l c h / 0.15);
+		}
+	}
+
+	.triage-card:hover {
+		animation: none;
+		box-shadow: 0 0 20px 4px oklch(from var(--color-primary) l c h / 0.12);
+	}
+
+	/* Expanded panel — fixed centered, large overlay */
+	.triage-panel {
+		width: min(640px, 92vw);
+		height: min(80vh, 720px);
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		margin: auto;
+	}
+
+	.triage-panel.scale-95 {
+		transform: scale(0.95);
+	}
+</style>

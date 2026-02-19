@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { fly, fade } from 'svelte/transition';
+	import { cubicOut, cubicIn } from 'svelte/easing';
 	import ClipboardList from '@lucide/svelte/icons/clipboard-list';
 	import User from '@lucide/svelte/icons/user';
 	import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
@@ -117,7 +118,8 @@
 	<div
 		class="context-box hidden lg:flex flex-col
 			rounded-xl border border-border/20 bg-card shadow-sm"
-		transition:fly={{ x: 24, duration: 250 }}
+		in:fly={{ x: 120, duration: 300, easing: cubicOut }}
+		out:fly={{ x: 120, duration: 250, easing: cubicIn }}
 	>
 		<!-- Tab bar + close -->
 		<div class="flex items-center border-b border-border/20 px-2 pt-2">
@@ -216,7 +218,7 @@
 	.context-box {
 		position: sticky;
 		top: 4.5rem;
-		width: 50%;
+		width: 45%;
 		flex-shrink: 0;
 		height: calc(100vh - 5.5rem);
 		overflow: hidden;

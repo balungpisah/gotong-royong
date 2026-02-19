@@ -21,7 +21,7 @@
 		FEED_STORE_KEY,
 		THEME_STORE_KEY
 	} from '$lib/stores';
-	import { AppHeader, TabBar, AddTabSheet } from '$lib/components/shell';
+	import { AppHeader, AppSidebar, TabBar, AddTabSheet } from '$lib/components/shell';
 
 	// ---------------------------------------------------------------------------
 	// Service & Store initialization (mock-first, swap to API later)
@@ -88,22 +88,23 @@
 		{@render children()}
 	</div>
 {:else}
-	<!-- App shell: header + content + dynamic tab bar -->
-	<div class="min-h-dvh bg-background text-foreground quadrille-bg">
-		<div class="mx-auto flex min-h-dvh w-full max-w-screen-xl flex-col md:px-6">
+	<!-- App shell: sidebar (fixed) + header + content -->
+	<div class="min-h-dvh bg-background text-foreground quadrille-bg lg:pl-[68px]">
+		<!-- Desktop left sidebar — fixed to left edge of viewport -->
+		<AppSidebar />
+
+		<div class="mx-auto flex min-h-dvh w-full max-w-screen-xl flex-col">
 			<AppHeader />
 
-			<!-- Desktop tab bar (below header) -->
-			<TabBar />
-
 			<main
-				class="relative flex w-full flex-1 flex-col px-4 py-6 pb-24 md:pb-8"
+				class="relative flex w-full min-w-0 flex-1 flex-col px-4 py-6 pb-24 lg:pb-8"
 			>
 				{@render children()}
 			</main>
 		</div>
 
-		<!-- Mobile bottom tab bar is rendered inside TabBar component -->
+		<!-- Mobile bottom tab bar (< lg) -->
+		<TabBar />
 		<AddTabSheet />
 	</div>
 {/if}

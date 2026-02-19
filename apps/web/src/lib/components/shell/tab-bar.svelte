@@ -47,7 +47,7 @@
 
 <!-- Mobile bottom tab bar -->
 <nav
-	class="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:hidden"
+	class="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 lg:hidden"
 >
 	<div
 		class="mx-auto grid max-w-screen-md px-2 py-2"
@@ -78,32 +78,4 @@
 	</div>
 </nav>
 
-<!-- Desktop horizontal pill bar -->
-<nav class="hidden border-t border-border/40 md:block">
-	<div
-		class="mx-auto flex w-full max-w-screen-xl items-center gap-2 px-6 py-2"
-	>
-		{#each navStore.tabs as tab (tab.id)}
-			<TabBarItem
-				href={hrefForTab(tab)}
-				label={tab.label}
-				iconName={tab.iconName}
-				active={isActive(tab)}
-				removable={!tab.pinned}
-				onremove={() => navStore.removeTab(tab.id)}
-				onclick={(e) => handleTabClick(tab, e)}
-			/>
-		{/each}
-
-		<!-- Add tab button -->
-		<button
-			type="button"
-			onclick={() => navStore.openAddPanel()}
-			class="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-			aria-label={m.shell_nav_add_tab()}
-		>
-			<Plus class="size-4" />
-			<span>{m.shell_nav_add_tab()}</span>
-		</button>
-	</div>
-</nav>
+<!-- Desktop: navigation handled by AppSidebar (hidden here) -->
