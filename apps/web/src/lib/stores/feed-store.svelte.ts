@@ -16,6 +16,7 @@ import type {
 	SystemCardData,
 	FollowableEntity
 } from '$lib/types';
+import { shouldAutoMonitor } from '$lib/types/feed';
 import { mockFeedItems, mockSuggestedEntities, mockSystemCards } from '$lib/fixtures';
 
 /** How often to inject a system card into the stream (every Nth witness item). */
@@ -52,8 +53,13 @@ export class FeedStore {
 	filteredItems = $derived(
 		this.filter === 'semua' || this.filter === 'discover'
 			? this.items
-			: this.items.filter((i) => i.source === this.filter)
+			: this.filter === 'pantauan'
+				? this.items.filter((i) => i.monitored)
+				: this.items.filter((i) => i.source === this.filter)
 	);
+
+	/** Number of monitored witnesses. */
+	monitoredCount = $derived(this.items.filter((i) => i.monitored).length);
 
 	// ---------------------------------------------------------------------------
 	// Derived — polymorphic stream (witness cards + system cards interleaved)
@@ -161,6 +167,45 @@ export class FeedStore {
 	/** Set the active feed filter tab. */
 	setFilter(f: FeedFilter) {
 		this.filter = f;
+	}
+
+	/**
+	 * Toggle monitor (pantau) state for a witness.
+	 * TODO: Replace with API call when backend is ready.
+	 */
+	toggleMonitor(witnessId: string) {
+		this.items = this.items.map((item) =>
+			item.witness_id === witnessId ? { ...item, monitored: !item.monitored } : item
+		);
+	}
+
+	/**
+	 * Auto-monitor a witness after an engagement action.
+	 *
+	 * Call this after vouch, witness, flag, vote, or evidence actions.
+	 * Uses the shouldAutoMonitor() contract to determine eligibility.
+	 * Only sets monitored=true (never removes — that's the user's choice).
+	 *
+	 * TODO: When backend is ready, this logic moves server-side.
+	 * The backend will auto-INSERT into user_monitors on qualifying actions.
+	 */
+	autoMonitorOnAction(witnessId: string, updatedRelation: Partial<import('$lib/types').MyRelation>) {
+		this.items = this.items.map((item) => {
+			if (item.witness_id !== witnessId) return item;
+
+			// Merge the new relation fields with existing
+			const merged = { ...item.my_relation, ...updatedRelation } as import('$lib/types').MyRelation;
+
+			// Check if this action qualifies for auto-pantau
+			const shouldMonitor = shouldAutoMonitor(merged);
+
+			return {
+				...item,
+				my_relation: merged,
+				// Only auto-set to true, never auto-remove
+				monitored: item.monitored || shouldMonitor
+			};
+		});
 	}
 
 	/** Dismiss a system card so it doesn't appear again. */

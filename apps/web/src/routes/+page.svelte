@@ -11,6 +11,7 @@
 		ContextBox
 	} from '$lib/components/pulse';
 	import Activity from '@lucide/svelte/icons/activity';
+	import EyeIcon from '@lucide/svelte/icons/eye';
 	import Masonry from 'svelte-bricks';
 
 	const witnessStore = getWitnessStore();
@@ -75,6 +76,21 @@
 	// ---------------------------------------------------------------------------
 	// Masonry skeleton items (variable heights for visual preview)
 	// ---------------------------------------------------------------------------
+	// ---------------------------------------------------------------------------
+	// Masonry stream with triage card prepended
+	// ---------------------------------------------------------------------------
+
+	type TriageItem = { stream_id: string; kind: 'triage'; sort_timestamp: string };
+	type MasonryItem = import('$lib/types').FeedStreamItem | TriageItem;
+
+	const triageEntry: TriageItem = {
+		stream_id: '__triage__',
+		kind: 'triage',
+		sort_timestamp: '9999-12-31T00:00:00Z' // always sorts first
+	};
+
+	const masonryStream = $derived<MasonryItem[]>([triageEntry, ...feedStore.filteredStream]);
+
 	const skeletonItems = [
 		{ id: 1, h: 260 },
 		{ id: 2, h: 320 },
@@ -86,24 +102,18 @@
 </script>
 
 <!--
-	50/50 Workspace Layout (desktop ≥lg).
+	3-Column Workspace Layout (desktop ≥lg):
+	  SIDEBAR (60px, in layout) — collapsible app nav
+	  FEED    (flex-1)          — masonry feed, scrolls with page
+	  CONTEXT (50%)             — ContextBox, sticky, tabbed
 
-	Two in-flow regions side by side:
-	  LEFT  — masonry feed (flex-1, scrolls with page)
-	  RIGHT — ContextBox (50%, sticky, scrolls internally, tabbed)
+	ContextBox tabs:
+	  📋 Laporan   — witness detail (WitnessDetailPanel)
+	  👤 Profil    — person profile (SelfProfile)
+	  🏘 Komunitas — community pulse dashboard (CommunityPulse)
 
-	The ContextBox is polymorphic with 3 tabs:
-	  📋 Project   — witness detail (WitnessDetailPanel)
-	  👤 Self      — person profile (SelfProfile)
-	  🏘 Community — community pulse dashboard (CommunityPulse)
-
-	Pin toggle: when pinned, ContextBox stays visible with Community as default.
-	When unpinned, it collapses and masonry goes full-width.
-
-	AnimatePresence (via svelte-motion) handles smooth enter/exit.
-	Masonry naturally reflows columns when its container width changes.
-
-	On mobile (<lg): context box opens as a full-screen overlay with backdrop.
+	On mobile (<lg): sidebar hidden, bottom TabBar used.
+	ContextBox opens as full-screen overlay with backdrop.
 -->
 
 <!-- ── Mobile overlay — full-screen panel, <lg only ──────────────── -->
@@ -145,8 +155,8 @@
 	</div>
 {/if}
 
-<!-- ── Desktop workspace — 50/50 flex layout ─────────────────────── -->
-<div class="mx-auto flex w-full gap-4 px-4 lg:px-6">
+<!-- ── Desktop workspace — sidebar + feed + context ───────────────── -->
+<div class="mx-auto flex w-full gap-4 px-4 lg:px-4">
 
 	<!-- ── LEFT: Feed column ──────────────────────────────────────── -->
 	<div
@@ -166,11 +176,6 @@
 					{m.pulse_title()}
 				</h1>
 			</div>
-		</div>
-
-		<!-- AI-00 triage entry -->
-		<div role="group" aria-label="Chat input">
-			<ChatInput />
 		</div>
 
 		<!-- Feed content -->
@@ -212,31 +217,41 @@
 					<div
 						class="flex size-12 items-center justify-center rounded-full bg-muted/50 text-muted-foreground"
 					>
-						<Activity class="size-6" />
+						{#if feedStore.filter === 'pantauan'}
+							<EyeIcon class="size-6" />
+						{:else}
+							<Activity class="size-6" />
+						{/if}
 					</div>
 					<p class="max-w-xs text-sm text-muted-foreground">
 						{feedStore.filter === 'semua'
 							? m.pulse_empty_state()
-							: m.pulse_feed_empty_filter()}
+							: feedStore.filter === 'pantauan'
+								? m.pulse_feed_empty_pantauan()
+								: m.pulse_feed_empty_filter()}
 					</p>
 				</div>
 			{:else}
 				<div role="list" aria-label="Feed">
 					<Masonry
-						items={feedStore.filteredStream}
+						items={masonryStream}
 						getId={(item) => item.stream_id}
 						minColWidth={260}
 						maxColWidth={340}
 						gap={16}
 						animate={true}
+						duration={300}
 						columnClass="masonry-col-constrain"
 					>
 						{#snippet children({ item: streamItem })}
-							{#if streamItem.kind === 'witness'}
+							{#if streamItem.kind === 'triage'}
+								<ChatInput />
+							{:else if streamItem.kind === 'witness'}
 								<FeedEventCard
 									item={streamItem.data}
 									selected={selectedWitnessId === streamItem.data.witness_id}
 									onclick={() => selectWitness(streamItem.data.witness_id)}
+									onToggleMonitor={() => feedStore.toggleMonitor(streamItem.data.witness_id)}
 								/>
 							{:else if streamItem.kind === 'system'}
 								<FeedSystemCard
@@ -277,4 +292,5 @@
 		contain: inline-size;
 		min-width: 0;
 	}
+
 </style>

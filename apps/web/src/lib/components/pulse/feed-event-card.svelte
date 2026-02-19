@@ -17,9 +17,10 @@
 		item: FeedItem;
 		selected?: boolean;
 		onclick?: () => void;
+		onToggleMonitor?: () => void;
 	}
 
-	let { item, selected = false, onclick }: Props = $props();
+	let { item, selected = false, onclick, onToggleMonitor }: Props = $props();
 
 	// ── Sentiment → shadow color (design-system tokens only) ────────
 	// Maps the LLM-extracted mood to a CSS custom property. The color
@@ -416,12 +417,16 @@
 
 				<div class="flex-1"></div>
 
-				<!-- Hover actions -->
-				<div class="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+				<!-- Hover actions (pantau: faint when idle, full on hover/active) -->
+				<div class="flex items-center gap-0.5 {item.monitored ? '' : 'opacity-30'} transition-opacity duration-150 group-hover:opacity-100">
 					<button
-						class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-muted/60 hover:text-foreground"
-						onclick={(e) => e.stopPropagation()}
-						aria-label="Pantau"
+						class="inline-flex items-center justify-center rounded-md p-1 transition
+							{item.monitored
+								? 'text-primary bg-primary/10 hover:bg-primary/20'
+								: 'text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground'}"
+						onclick={(e) => { e.stopPropagation(); onToggleMonitor?.(); }}
+						aria-label={item.monitored ? 'Berhenti pantau' : 'Pantau'}
+						title={item.monitored ? 'Berhenti pantau' : 'Pantau'}
 					>
 						<EyeIcon class="size-3" />
 					</button>

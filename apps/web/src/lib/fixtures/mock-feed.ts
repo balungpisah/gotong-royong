@@ -154,6 +154,8 @@ export const mockFeedItem1: FeedItem = {
 	cover_url: 'https://images.unsplash.com/photo-1504472478235-9bc48ba4d60f?w=600&h=400&fit=crop',
 	body: 'Warga Gang Melati mengeluh lampu jalan padam total sejak dua minggu lalu. Ibu-ibu takut pulang malam dari pasar. Pak Ahmad sudah lapor ke kelurahan tapi belum ada respon. "Anak saya harus lewat gang gelap setiap pulang les," katanya.',
 	active_now: 3,
+	// Auto-pantau: user is saksi (witnessed: true)
+	monitored: true,
 	// Tandang signals: user witnessed this problem, 2 vouches, 1 skeptic
 	my_relation: {
 		vouched: false,
@@ -202,6 +204,8 @@ export const mockFeedItem2: FeedItem = {
 	sentiment: 'hopeful',
 	intensity: 3,
 	active_now: 5,
+	// Auto-pantau: user vouched (positive)
+	monitored: true,
 	// Tandang signals: user vouched positive, many vouches, good quality
 	my_relation: {
 		vouched: true,
@@ -301,6 +305,8 @@ export const mockFeedItem4: FeedItem = {
 	sentiment: 'curious',
 	intensity: 4,
 	active_now: 8,
+	// Auto-pantau: user vouched + voted
+	monitored: true,
 	// Tandang signals: user voted yes, high community engagement
 	my_relation: {
 		vouched: true,
@@ -356,6 +362,8 @@ export const mockFeedItem5: FeedItem = {
 	cover_url: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600&h=400&fit=crop',
 	body: 'Pak Budi mengambil sampel air di tiga titik berbeda sepanjang sungai. Di dekat pipa pembuangan pabrik, air berubah kecoklatan dengan bau menyengat. Warga nelayan hilir melaporkan ikan mati mengambang sejak bulan lalu. Data ini sudah dikirim ke Dinas Lingkungan Hidup.',
 	active_now: 4,
+	// Auto-pantau: user vouched (skeptical)
+	monitored: true,
 	// Tandang signals: user is skeptical, contentious evidence with flags
 	my_relation: {
 		vouched: true,
@@ -405,6 +413,8 @@ export const mockFeedItem6: FeedItem = {
 	sentiment: 'celebratory',
 	intensity: 2,
 	cover_url: 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=600&h=300&fit=crop',
+	// Auto-pantau: user vouched + saksi
+	monitored: true,
 	// Tandang signals: user confirmed resolution, high trust, lots of witnesses
 	my_relation: {
 		vouched: true,
@@ -449,6 +459,8 @@ export const mockFeedItem7: FeedItem = {
 	intensity: 4,
 	body: 'Pak Surya, 72 tahun, tinggal sendirian di rumah yang atapnya sudah bocor di mana-mana. Musim hujan kemarin plafon kamar tidurnya runtuh. Tetangga mulai galang dana setelah melihat kondisinya. Dalam 3 minggu, 32 orang sudah menyumbang. Sisa Rp 2,5 juta lagi untuk beli material atap baru.',
 	active_now: 1,
+	// Auto-pantau: user vouched (positive)
+	monitored: true,
 	// Tandang signals: user vouched, moderate engagement
 	my_relation: {
 		vouched: true,
@@ -590,6 +602,8 @@ export const mockFeedItem10: FeedItem = {
 	sentiment: 'angry',
 	intensity: 4,
 	cover_url: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=600&h=350&fit=crop',
+	// Auto-pantau: user is saksi + flagged
+	monitored: true,
 	// Tandang signals: user flagged this, some skepticism in community
 	my_relation: {
 		vouched: false,

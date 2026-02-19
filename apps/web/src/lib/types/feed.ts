@@ -81,7 +81,7 @@ export type UrgencyBadge = 'baru' | 'voting' | 'selesai' | 'ramai';
 export type FeedSource = 'ikutan' | 'terlibat' | 'sekitar';
 
 /** Feed filter tab values. */
-export type FeedFilter = 'semua' | 'ikutan' | 'terlibat' | 'sekitar' | 'discover';
+export type FeedFilter = 'semua' | 'ikutan' | 'terlibat' | 'sekitar' | 'pantauan' | 'discover';
 
 /** A single feed card — one per witness, latest event as headline. */
 export interface FeedItem {
@@ -133,6 +133,10 @@ export interface FeedItem {
 	deadline?: string;
 	/** Label explaining the deadline, e.g. "Voting ditutup", "Fase berakhir". */
 	deadline_label?: string;
+
+	// ── Pantau (Monitor/Watchlist) ───────────────────────────────
+	/** Whether the current user is monitoring this witness. Client-side toggle. */
+	monitored?: boolean;
 	/** Quorum: how many participants needed for a threshold. */
 	quorum_target?: number;
 	/** Quorum: how many participants currently. */
@@ -255,4 +259,103 @@ export interface PromptPayload {
 	variant: 'prompt';
 	cta_label: string;
 	cta_action: string;
+}
+
+// ── Auto-Pantau Contract ─────────────────────────────────────────
+//
+// Defines which user actions automatically trigger monitoring.
+// The backend MUST auto-set `monitored = true` when ANY of these
+// conditions are met. The frontend uses the same rules for
+// client-side seed data and optimistic UI.
+//
+// Design rationale: any action that costs social capital or effort
+// should auto-monitor. Lightweight actions (e.g. "Bagus" quality
+// upvote) remain manual-only.
+// ─────────────────────────────────────────────────────────────────
+
+/** The 7 user actions that trigger automatic monitoring. */
+export type AutoPantauTrigger =
+	| 'created'        // User created the witness
+	| 'joined'         // User joined (any role)
+	| 'vouched'        // User vouched (any vouch_type: positive, skeptical, conditional, mentorship)
+	| 'witnessed'      // User is a saksi (eyewitness)
+	| 'flagged'        // User flagged (perlu_dicek)
+	| 'evidence'       // User submitted evidence
+	| 'voted';         // User voted (yes or no)
+
+/** Actions that do NOT auto-monitor (manual eye-icon tap only). */
+// - quality_voted (Bagus 👍) — too lightweight, would flood Pantauan
+// - viewing / scrolling — no signal of interest
+
+/**
+ * Determines whether a feed item should be auto-monitored based on
+ * the current user's relation to it.
+ *
+ * Used by:
+ * - Backend: after any qualifying action → INSERT INTO user_monitors
+ * - Frontend (mock): seed data enrichment
+ * - Frontend (live): optimistic UI after engagement actions
+ */
+export function shouldAutoMonitor(relation?: MyRelation): boolean {
+	if (!relation) return false;
+	return (
+		relation.vouched ||       // covers all vouch_types incl. skeptical
+		relation.witnessed ||     // saksi
+		relation.flagged ||       // perlu_dicek
+		relation.vote_cast != null // voted yes or no
+	);
+}
+
+/**
+ * Backend API contract for the user_monitors table.
+ *
+ * ```sql
+ * CREATE TABLE user_monitors (
+ *   user_id    UUID REFERENCES users(id),
+ *   witness_id UUID REFERENCES witnesses(id),
+ *   auto       BOOLEAN DEFAULT false,
+ *   created_at TIMESTAMPTZ DEFAULT now(),
+ *   PRIMARY KEY (user_id, witness_id)
+ * );
+ * ```
+ */
+export interface UserMonitorRecord {
+	user_id: string;
+	witness_id: string;
+	/** true = system auto-set (user joined/vouched/etc), false = manual eye-icon tap */
+	auto: boolean;
+	created_at: string;
+}
+
+// ── Feed API Contract ────────────────────────────────────────────
+//
+// These types define the expected request/response shape for the
+// feed list endpoint. The backend MUST sort items by `sort_timestamp`
+// descending (newest first). The client prepends the triage card
+// locally — it never comes from the backend.
+//
+// Endpoint: GET /api/feed
+// ─────────────────────────────────────────────────────────────────
+
+/** Request params for the feed list endpoint. */
+export interface FeedListRequest {
+	/** Filter by source layer. Omit or 'semua' for all sources. */
+	filter?: FeedFilter;
+	/** Cursor-based pagination — ISO timestamp of the last item seen.
+	 *  Backend returns items with sort_timestamp < cursor. */
+	cursor?: string;
+	/** Max items per page. Default 20, max 50. */
+	limit?: number;
+}
+
+/** Response shape for the feed list endpoint. */
+export interface FeedListResponse {
+	/** Feed items, sorted by sort_timestamp DESC (newest first).
+	 *  The backend MUST guarantee this sort order. */
+	items: FeedStreamItem[];
+	/** Cursor for the next page — sort_timestamp of the last item.
+	 *  Null when there are no more items. */
+	next_cursor: string | null;
+	/** Whether more items exist beyond the current page. */
+	has_more: boolean;
 }

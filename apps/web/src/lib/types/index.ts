@@ -120,8 +120,13 @@ export type {
 	PeekMessage,
 	SignalChipType,
 	MyRelation,
-	SignalCounts
+	SignalCounts,
+	FeedListRequest,
+	FeedListResponse,
+	AutoPantauTrigger,
+	UserMonitorRecord
 } from './feed';
+export { shouldAutoMonitor } from './feed';
 
 // ---------------------------------------------------------------------------
 // Navigation
