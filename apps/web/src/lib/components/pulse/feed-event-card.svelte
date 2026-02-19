@@ -7,6 +7,7 @@
 	import FlameIcon from '@lucide/svelte/icons/flame';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import BookmarkIcon from '@lucide/svelte/icons/bookmark';
+	import Share2Icon from '@lucide/svelte/icons/share-2';
 	import ZapIcon from '@lucide/svelte/icons/zap';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import RadioIcon from '@lucide/svelte/icons/radio';
@@ -18,9 +19,10 @@
 		selected?: boolean;
 		onclick?: () => void;
 		onToggleMonitor?: () => void;
+		onShare?: () => void;
 	}
 
-	let { item, selected = false, onclick, onToggleMonitor }: Props = $props();
+	let { item, selected = false, onclick, onToggleMonitor, onShare }: Props = $props();
 
 	// ── Sentiment → shadow color (design-system tokens only) ────────
 	// Maps the LLM-extracted mood to a CSS custom property. The color
@@ -436,6 +438,14 @@
 						aria-label="Simpan"
 					>
 						<BookmarkIcon class="size-3" />
+					</button>
+					<button
+						class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-primary/10 hover:text-primary"
+						onclick={(e) => { e.stopPropagation(); onShare?.(); }}
+						aria-label="Bagikan"
+						title="Bagikan"
+					>
+						<Share2Icon class="size-3" />
 					</button>
 				</div>
 			</div>

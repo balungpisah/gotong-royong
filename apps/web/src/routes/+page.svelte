@@ -13,6 +13,7 @@
 	import Activity from '@lucide/svelte/icons/activity';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import Masonry from 'svelte-bricks';
+	import { shareFeedItem } from '$lib/utils/share';
 
 	const witnessStore = getWitnessStore();
 	const notificationStore = getNotificationStore();
@@ -255,6 +256,7 @@
 									selected={selectedWitnessId === streamItem.data.witness_id}
 									onclick={() => selectWitness(streamItem.data.witness_id)}
 									onToggleMonitor={() => feedStore.toggleMonitor(streamItem.data.witness_id)}
+									onShare={() => shareFeedItem(streamItem.data)}
 								/>
 							{:else if streamItem.kind === 'system'}
 								<FeedSystemCard
