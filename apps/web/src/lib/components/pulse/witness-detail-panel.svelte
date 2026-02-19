@@ -8,7 +8,7 @@
 	import UsersIcon from '@lucide/svelte/icons/users';
 	interface Props {
 		detail: WitnessDetail;
-		onClose: () => void;
+		onClose?: () => void;
 		onSendMessage?: (content: string) => void;
 		sending?: boolean;
 	}
@@ -62,6 +62,7 @@
 					</span>
 				</div>
 			</div>
+			{#if onClose}
 			<button
 				onclick={onClose}
 				class="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
@@ -69,6 +70,7 @@
 			>
 				<X class="size-4" />
 			</button>
+		{/if}
 		</div>
 
 		<!-- Phase navigator — collapsible handlebar + horizontal phase carousel -->

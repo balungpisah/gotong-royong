@@ -65,7 +65,7 @@
 	// ---------------------------------------------------------------------------
 
 	const tabs: { id: ContextTab; label: string; icon: typeof ClipboardList }[] = [
-		{ id: 'project', label: 'Proyek', icon: ClipboardList },
+		{ id: 'project', label: 'Laporan', icon: ClipboardList },
 		{ id: 'self', label: 'Profil', icon: User },
 		{ id: 'community', label: 'Komunitas', icon: BarChart3 },
 	];
@@ -165,7 +165,6 @@
 					{#if hasWitnessDetail && witnessDetail}
 						<WitnessDetailPanel
 							detail={witnessDetail}
-							onClose={onClose}
 							onSendMessage={onSendMessage}
 							sending={messageSending}
 						/>
