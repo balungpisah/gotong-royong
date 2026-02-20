@@ -1,6 +1,16 @@
 # Rust build artifacts
 /target
 
+# Node / pnpm
+node_modules/
+
+# SvelteKit generated
+.svelte-kit/
+
+# Playwright
+.playwright-cli/
+test-results/
+
 # macOS
 .DS_Store
 
