@@ -75,7 +75,7 @@
 			<div class="mt-2 grid grid-cols-3 gap-2">
 				<div class="rounded-lg bg-muted/20 p-2.5 text-center">
 					<p class="text-[var(--fs-h2)] font-bold text-foreground">12</p>
-					<p class="text-[10px] text-muted-foreground">Laporan</p>
+					<p class="text-[10px] text-muted-foreground">Tandang</p>
 				</div>
 				<div class="rounded-lg bg-muted/20 p-2.5 text-center">
 					<p class="text-[var(--fs-h2)] font-bold text-foreground">8</p>
