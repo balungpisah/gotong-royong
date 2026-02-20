@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { fade, fly } from 'svelte/transition';
 	import { cubicOut, cubicIn } from 'svelte/easing';
 
 	/** Slide-fade: translateX + opacity only, no layout changes.
@@ -36,6 +37,8 @@
 	interface Props {
 		/** Witness detail data (when project tab is active) */
 		witnessDetail: import('$lib/types').WitnessDetail | null;
+		/** The selected feed item (for pinned card header in detail panel) */
+		feedItem?: import('$lib/types').FeedItem | null;
 		/** Whether witness detail is loading */
 		detailLoading?: boolean;
 		/** Whether a message is being sent */
@@ -44,6 +47,10 @@
 		onClose: () => void;
 		/** Callback to send a message in witness chat */
 		onSendMessage: (content: string) => void;
+		/** Callback to invoke AI Stempel evaluation */
+		onStempel?: () => void;
+		/** Whether Stempel is currently processing */
+		stempeling?: boolean;
 		/** Whether the context box should be visible (external trigger) */
 		active?: boolean;
 		/** Selected user ID for self-profile tab */
@@ -52,10 +59,13 @@
 
 	let {
 		witnessDetail = null,
+		feedItem = null,
 		detailLoading = false,
 		messageSending = false,
 		onClose,
 		onSendMessage,
+		onStempel,
+		stempeling = false,
 		active = false,
 		selectedUserId = null,
 	}: Props = $props();
@@ -339,8 +349,11 @@
 					{#if hasWitnessDetail && witnessDetail}
 						<WitnessDetailPanel
 							detail={witnessDetail}
+							{feedItem}
 							onSendMessage={onSendMessage}
+							{onStempel}
 							sending={messageSending}
+							{stempeling}
 						/>
 					{:else if detailLoading}
 						<div class="flex h-full items-center justify-center">

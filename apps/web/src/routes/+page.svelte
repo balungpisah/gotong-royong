@@ -14,6 +14,8 @@
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import Masonry from 'svelte-bricks';
 	import { shareFeedItem } from '$lib/utils/share';
+	import type { ChatMessage, AiCardMessage, SystemMessage } from '$lib/types';
+	import type { ListBlock } from '$lib/types/blocks';
 
 	const witnessStore = getWitnessStore();
 	const notificationStore = getNotificationStore();
@@ -39,6 +41,7 @@
 
 	let selectedWitnessId = $state<string | null>(null);
 	let messageSending = $state(false);
+	let stempeling = $state(false);
 
 	// Future: profile state for polymorphic context box
 	let selectedUserId = $state<string | null>(null);
@@ -49,6 +52,15 @@
 
 	// Context box active signal: external triggers that should open it
 	const contextActive = $derived(showDetail || selectedUserId !== null);
+
+	// The selected feed item — used for pinned card header in detail panel
+	const selectedFeedItem = $derived.by(() => {
+		if (!selectedWitnessId) return null;
+		const match = feedStore.filteredStream
+			.filter((s): s is import('$lib/types').FeedStreamItem & { kind: 'witness' } => s.kind === 'witness')
+			.find((s) => s.data.witness_id === selectedWitnessId);
+		return match?.data ?? null;
+	});
 
 	function selectWitness(witnessId: string) {
 		if (selectedWitnessId === witnessId) {
@@ -72,6 +84,57 @@
 		} finally {
 			messageSending = false;
 		}
+	}
+
+	function handleStempel() {
+		if (stempeling || !witnessStore.current) return;
+		stempeling = true;
+
+		// Simulate AI evaluation delay (2 seconds)
+		setTimeout(() => {
+			if (!witnessStore.current) {
+				stempeling = false;
+				return;
+			}
+
+			const now = new Date().toISOString();
+			const witnessId = witnessStore.current.witness_id;
+
+			const stempelBlock: ListBlock = {
+				type: 'list',
+				id: 'stempel-eval-001',
+				display: 'checklist',
+				title: 'Evaluasi Fase: Penggalangan Dana',
+				items: [
+					{ id: 'se-1', label: 'Target dana ditetapkan', status: 'completed', source: 'ai', locked_fields: [] },
+					{ id: 'se-2', label: 'Minimal 3 kontributor', status: 'completed', source: 'ai', locked_fields: [] },
+					{ id: 'se-3', label: 'Bukti transfer/kuitansi diunggah', status: 'open', source: 'ai', locked_fields: [] },
+					{ id: 'se-4', label: 'Rencana pencairan disetujui voting', status: 'open', source: 'ai', locked_fields: [] }
+				]
+			};
+
+			const aiCard: AiCardMessage = {
+				message_id: `stempel-${Date.now()}`,
+				timestamp: now,
+				witness_id: witnessId,
+				type: 'ai_card',
+				blocks: [stempelBlock],
+				badge: 'ringkasan',
+				title: '✦ Hasil Stempel — 2/4 terpenuhi'
+			};
+
+			const checkpoint: SystemMessage = {
+				message_id: `sys-stempel-${Date.now()}`,
+				timestamp: now,
+				witness_id: witnessId,
+				type: 'system',
+				subtype: 'checkpoint_completed',
+				content: '✦ Stempel: 2 dari 4 langkah terpenuhi — lanjutkan diskusi'
+			};
+
+			witnessStore.current.messages = [...witnessStore.current.messages, aiCard, checkpoint];
+			stempeling = false;
+		}, 2000);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -140,9 +203,12 @@
 			{#if isDetailOpen && witnessStore.current}
 				<WitnessDetailPanel
 					detail={witnessStore.current}
+					feedItem={selectedFeedItem}
 					onClose={closeDetail}
 					onSendMessage={handleSendMessage}
+					onStempel={handleStempel}
 					sending={messageSending}
+					{stempeling}
 				/>
 			{:else if isDetailLoading}
 				<div class="flex h-full items-center justify-center">
@@ -158,20 +224,6 @@
 
 <!-- ── Desktop workspace — sidebar + feed + context ───────────────── -->
 <div class="mx-auto w-full px-4 lg:px-4">
-
-	<!-- Title row — spans full width above both columns -->
-	<div class="flex items-center gap-3 mb-4">
-		<div
-			class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"
-		>
-			<Activity class="size-5" />
-		</div>
-		<div>
-			<h1 class="text-[var(--fs-h1)] font-bold leading-tight text-foreground">
-				{m.pulse_title()}
-			</h1>
-		</div>
-	</div>
 
 	<!-- Two-column layout — feed + context, tops aligned -->
 	<div class="flex w-full items-start gap-4">
@@ -277,12 +329,15 @@
 	     The component renders nothing when invisible (no DOM footprint). -->
 	<ContextBox
 		witnessDetail={witnessStore.current}
+		feedItem={selectedFeedItem}
 		detailLoading={witnessStore.detailLoading}
 		messageSending={messageSending}
 		active={contextActive}
 		selectedUserId={selectedUserId}
 		onClose={closeDetail}
 		onSendMessage={handleSendMessage}
+		onStempel={handleStempel}
+		{stempeling}
 	/>
 	</div><!-- /flex row -->
 </div><!-- /outer wrapper -->

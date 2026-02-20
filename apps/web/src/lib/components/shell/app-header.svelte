@@ -3,6 +3,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { getNotificationStore, getUserStore } from '$lib/stores';
 	import BellRing from '@lucide/svelte/icons/bell-ring';
+	import Activity from '@lucide/svelte/icons/activity';
 	import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
 	import ThemeToggle from './theme-toggle.svelte';
 	import Tip from '$lib/components/ui/tip.svelte';
@@ -26,13 +27,19 @@
 	<div
 		class="mx-auto flex w-full max-w-screen-md items-center justify-between gap-3 px-4 py-3 md:max-w-screen-xl md:px-6"
 	>
-		<!-- Brand -->
-		<a
-			href="{base}/"
-			class="text-sm font-extrabold tracking-wide text-foreground uppercase"
-		>
-			{m.shell_brand_name()}
-		</a>
+		<!-- Brand + Detak Komunitas -->
+		<div class="flex items-center gap-2.5">
+			<a
+				href="{base}/"
+				class="text-sm font-extrabold tracking-wide text-foreground uppercase"
+			>
+				{m.shell_brand_name()}
+			</a>
+			<div class="flex items-center gap-1.5 text-primary/70">
+				<Activity class="size-3.5" />
+				<span class="text-xs font-medium tracking-wide">Detak Komunitas</span>
+			</div>
+		</div>
 
 		<!-- Tagline (desktop only) -->
 		<p class="hidden flex-1 text-center text-sm text-muted-foreground md:block">
