@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages';
 	import { getTriageStore } from '$lib/stores';
+	import Tip from '$lib/components/ui/tip.svelte';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import SendHorizontal from '@lucide/svelte/icons/send-horizontal';
 	import X from '@lucide/svelte/icons/x';
@@ -164,15 +165,17 @@
 					</span>
 				{/if}
 			</div>
-			<button
-				type="button"
-				onclick={collapse}
-				class="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
-				aria-label="Tutup"
-				tabindex={expanded ? 0 : -1}
-			>
-				<X class="size-4" />
-			</button>
+			<Tip text="Tutup">
+				<button
+					type="button"
+					onclick={collapse}
+					class="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+					aria-label="Tutup"
+					tabindex={expanded ? 0 : -1}
+				>
+					<X class="size-4" />
+				</button>
+			</Tip>
 		</div>
 
 		<!-- Messages area -->
@@ -275,22 +278,24 @@
 					></textarea>
 				</div>
 
-				<button
-					type="button"
-					onclick={handleSubmit}
-					disabled={!canSend}
-					tabindex={expanded ? 0 : -1}
-					class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-					aria-label={m.shell_chat_send()}
-				>
-					{#if triageStore.loading}
-						<div
-							class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-						></div>
-					{:else}
-						<SendHorizontal class="size-4" />
-					{/if}
-				</button>
+				<Tip text={m.shell_chat_send()}>
+					<button
+						type="button"
+						onclick={handleSubmit}
+						disabled={!canSend}
+						tabindex={expanded ? 0 : -1}
+						class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+						aria-label={m.shell_chat_send()}
+					>
+						{#if triageStore.loading}
+							<div
+								class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+							></div>
+						{:else}
+							<SendHorizontal class="size-4" />
+						{/if}
+					</button>
+				</Tip>
 			</div>
 		</div>
 	</div>

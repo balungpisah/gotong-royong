@@ -13,15 +13,18 @@
 		NavigationStore,
 		FeedStore,
 		ThemeStore,
+		PreferencesStore,
 		WITNESS_STORE_KEY,
 		USER_STORE_KEY,
 		NOTIFICATION_STORE_KEY,
 		TRIAGE_STORE_KEY,
 		NAVIGATION_STORE_KEY,
 		FEED_STORE_KEY,
-		THEME_STORE_KEY
+		THEME_STORE_KEY,
+		PREFERENCES_STORE_KEY
 	} from '$lib/stores';
 	import { AppHeader, AppSidebar, TabBar, AddTabSheet } from '$lib/components/shell';
+	import { TooltipProvider } from '$lib/components/ui/tooltip';
 
 	// ---------------------------------------------------------------------------
 	// Service & Store initialization (mock-first, swap to API later)
@@ -35,6 +38,7 @@
 	const navigationStore = new NavigationStore();
 	const feedStore = new FeedStore();
 	const themeStore = new ThemeStore();
+	const preferencesStore = new PreferencesStore();
 
 	setContext(SERVICES_KEY, services);
 	setContext(WITNESS_STORE_KEY, witnessStore);
@@ -44,6 +48,7 @@
 	setContext(NAVIGATION_STORE_KEY, navigationStore);
 	setContext(FEED_STORE_KEY, feedStore);
 	setContext(THEME_STORE_KEY, themeStore);
+	setContext(PREFERENCES_STORE_KEY, preferencesStore);
 
 	let { children } = $props();
 
@@ -77,6 +82,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+<TooltipProvider delayDuration={300}>
 {#if isLoginPage}
 	<!-- Login: minimal centered layout -->
 	<main class="mx-auto flex min-h-dvh w-full max-w-screen-md px-4 py-6">
@@ -108,3 +114,4 @@
 		<AddTabSheet />
 	</div>
 {/if}
+</TooltipProvider>

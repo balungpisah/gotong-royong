@@ -9,6 +9,7 @@
 	import CommunityPulse from './community-pulse.svelte';
 	import SelfProfile from './self-profile.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import Tip from '$lib/components/ui/tip.svelte';
 
 	// ---------------------------------------------------------------------------
 	// Types
@@ -126,34 +127,38 @@
 			<!-- Tabs -->
 			<div class="flex flex-1 gap-0.5">
 				{#each tabs as tab}
-					<button
-						class="tab-button"
-						class:tab-active={activeTab === tab.id}
-						onclick={() => switchTab(tab.id)}
-						aria-label="Tab {tab.label}"
-					>
-						<tab.icon class="size-3.5" />
-						<span class="text-[var(--fs-caption)]">{tab.label}</span>
-						{#if activeTab === tab.id}
-							<div
-								class="tab-indicator"
-								transition:fade={{ duration: 150 }}
-							></div>
-						{/if}
-					</button>
+					<Tip text={tab.label}>
+						<button
+							class="tab-button"
+							class:tab-active={activeTab === tab.id}
+							onclick={() => switchTab(tab.id)}
+							aria-label="Tab {tab.label}"
+						>
+							<tab.icon class="size-3.5" />
+							<span class="text-[var(--fs-caption)]">{tab.label}</span>
+							{#if activeTab === tab.id}
+								<div
+									class="tab-indicator"
+									transition:fade={{ duration: 150 }}
+								></div>
+							{/if}
+						</button>
+					</Tip>
 				{/each}
 			</div>
 
 			<!-- Close button -->
 			<div class="flex items-center pb-1">
-				<button
-					class="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors
-						hover:bg-muted hover:text-foreground"
-					onclick={onClose}
-					aria-label="Tutup panel"
-				>
-					<X class="size-3.5" />
-				</button>
+				<Tip text="Tutup panel">
+					<button
+						class="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors
+							hover:bg-muted hover:text-foreground"
+						onclick={onClose}
+						aria-label="Tutup panel"
+					>
+						<X class="size-3.5" />
+					</button>
+				</Tip>
 			</div>
 		</div>
 

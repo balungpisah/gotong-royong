@@ -5,6 +5,7 @@
 	import BellRing from '@lucide/svelte/icons/bell-ring';
 	import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
 	import ThemeToggle from './theme-toggle.svelte';
+	import Tip from '$lib/components/ui/tip.svelte';
 
 	const notificationStore = getNotificationStore();
 	const userStore = getUserStore();
@@ -44,22 +45,25 @@
 			<ThemeToggle />
 
 			<!-- Notification bell -->
-			<a
-				href="{base}/notifikasi"
-				class="relative inline-flex items-center justify-center rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-				aria-label={m.shell_nav_notifikasi()}
-			>
-				<BellRing class="size-5" />
-				{#if notificationStore.hasUnread}
-					<span
-						class="absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white"
-					>
-						{notificationStore.unreadCount > 9 ? '9+' : notificationStore.unreadCount}
-					</span>
-				{/if}
-			</a>
+			<Tip text={m.shell_nav_notifikasi()}>
+				<a
+					href="{base}/notifikasi"
+					class="relative inline-flex items-center justify-center rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+					aria-label={m.shell_nav_notifikasi()}
+				>
+					<BellRing class="size-5" />
+					{#if notificationStore.hasUnread}
+						<span
+							class="absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white"
+						>
+							{notificationStore.unreadCount > 9 ? '9+' : notificationStore.unreadCount}
+						</span>
+					{/if}
+				</a>
+			</Tip>
 
 			<!-- User avatar -->
+			<Tip text={m.shell_nav_profil()}>
 			<a
 				href="{base}/profil"
 				class="rounded-full ring-2 ring-transparent transition hover:ring-primary/30"
@@ -74,6 +78,7 @@
 					</AvatarFallback>
 				</Avatar>
 			</a>
+			</Tip>
 		</div>
 	</div>
 </header>

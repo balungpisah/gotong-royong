@@ -4,15 +4,13 @@
 	import { m } from '$lib/paraglide/messages';
 	import EntityPill from './entity-pill.svelte';
 	import UsersIcon from '@lucide/svelte/icons/users';
-	import FlameIcon from '@lucide/svelte/icons/flame';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import BookmarkIcon from '@lucide/svelte/icons/bookmark';
 	import Share2Icon from '@lucide/svelte/icons/share-2';
-	import ZapIcon from '@lucide/svelte/icons/zap';
 	import ClockIcon from '@lucide/svelte/icons/clock';
-	import RadioIcon from '@lucide/svelte/icons/radio';
 	import MessageCircleIcon from '@lucide/svelte/icons/message-circle';
 	import SignalChipBar from './signal-chip-bar.svelte';
+	import Tip from '$lib/components/ui/tip.svelte';
 
 	interface Props {
 		item: FeedItem;
@@ -94,20 +92,6 @@
 		community_note:   '📝'
 	};
 
-	// ── Source label ────────────────────────────────────────────────
-	const sourceLabel: Record<string, string> = {
-		ikutan:   'Ikutan',
-		terlibat: 'Terlibat',
-		sekitar:  'Sekitar'
-	};
-
-	// ── Activity heat ──────────────────────────────────────────────
-	const activityHeat = $derived(
-		item.collapsed_count > 5 ? 'hot'
-		: item.collapsed_count > 2 ? 'warm'
-		: 'cool'
-	);
-
 	// ── Pulse glow — card "breathes" when people are active ────────
 	const isAlive = $derived((item.active_now ?? 0) > 0);
 
@@ -151,6 +135,8 @@
 	const hasPeek = $derived(peekMessages.length >= 2);
 	// ~4s per message feels natural — long messages scroll through slowly
 	const peekDuration = $derived(peekMessages.length * 4);
+	// Click-to-expand: toggle between compact (54px / ~3 lines) and tall (140px / ~8 lines)
+	let peekExpanded = $state(false);
 
 	// ── Time formatting ─────────────────────────────────────────────
 	function timeAgo(dateStr: string): string {
@@ -206,7 +192,7 @@
 	<!-- ── Card body ─────────────────────────────────────────────── -->
 	<div class="px-5 pt-4 pb-5 min-w-0 overflow-hidden">
 
-		<!-- Top row: urgency badge + live indicator + event emoji -->
+		<!-- Top row: urgency badge (with live count merged) + event emoji -->
 		<div class="mb-3 flex items-center gap-1.5">
 			{#if item.urgency}
 				<Badge variant={urgencyVariantMap[item.urgency]} class="text-[9px] px-1.5 py-0">
@@ -215,7 +201,7 @@
 			{/if}
 
 			{#if isAlive}
-				<span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600">
+				<span class="inline-flex items-center gap-1 text-[9px] font-medium text-emerald-600">
 					<span class="relative flex size-1.5">
 						<span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
 						<span class="relative inline-flex size-1.5 rounded-full bg-emerald-500"></span>
@@ -306,25 +292,27 @@
 			</p>
 		{/if}
 
-		<!-- Entity pills -->
-		{#if item.entity_tags.length > 0}
-			<div class="mt-3 flex flex-wrap gap-1.5">
-				{#each item.entity_tags as tag (tag.entity_id)}
-					<EntityPill {tag} />
-				{/each}
-			</div>
-		{/if}
-
 		<!-- ── Story Peek — carved inset, continuous smooth scroll ── -->
+		<!-- Click to toggle between compact (54px) and expanded (140px).
+		     Scroll keeps running in both states. -->
 		{#if hasPeek}
-			<div class="mt-3 -mx-5 border-y border-border/10 px-5 py-2"
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="mt-3 -mx-5 cursor-pointer border-y border-border/10 px-5 py-2 transition-colors hover:bg-muted/30"
 				style="background: color-mix(in srgb, {moodColor} 3%, transparent);
 					box-shadow: inset 0 2px 4px -1px color-mix(in srgb, {moodColor} 8%, transparent),
-						inset 0 -1px 2px 0 color-mix(in srgb, {moodColor} 5%, transparent);">
+						inset 0 -1px 2px 0 color-mix(in srgb, {moodColor} 5%, transparent);"
+				onclick={(e) => { e.stopPropagation(); peekExpanded = !peekExpanded; }}
+				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); peekExpanded = !peekExpanded; } }}
+			>
 				<div class="flex items-start gap-2">
 					<MessageCircleIcon class="mt-0.5 size-3 shrink-0 text-muted-foreground/40" />
-					<!-- 3-line clipping window. contain:strict isolates from masonry. -->
-					<div class="flex-1" style="height: 54px; overflow: hidden; contain: strict;">
+					<!-- Clipping window. Height transitions smoothly between states.
+					     contain:strict isolates inner animation from masonry ResizeObserver. -->
+					<div
+						class="flex-1 overflow-hidden transition-[height] duration-300 ease-out"
+						style="height: {peekExpanded ? 140 : 54}px; contain: strict;"
+					>
 						<!-- Vertical strip: messages × 2 for seamless loop.
 						     CSS animation scrolls -50% at constant speed. -->
 						<div class="peek-scroll" style="animation-duration: {peekDuration}s;">
@@ -346,9 +334,18 @@
 			</div>
 		{/if}
 
-		<!-- ── Signal Chip Bar — tandang-backed action chips ───── -->
+		<!-- ── Row 1: Entity pills (followable context) ────────────── -->
+		{#if item.entity_tags.length > 0}
+			<div class="mt-3 flex flex-wrap items-center gap-1.5">
+				{#each item.entity_tags as tag (tag.entity_id)}
+					<EntityPill {tag} />
+				{/each}
+			</div>
+		{/if}
+
+		<!-- ── Row 2: Signal chips (icon-only, full-row expandable) ── -->
 		{#if item.signal_counts || item.my_relation}
-			<div class="mt-3">
+			<div class="mt-2">
 				<SignalChipBar
 					eventType={item.latest_event.event_type}
 					myRelation={item.my_relation}
@@ -358,69 +355,40 @@
 			</div>
 		{/if}
 
-		<!-- ── Footer — two-row layout for breathing room ─────── -->
-		<div class="mt-4 flex flex-col gap-2">
-			<!-- Row 1: avatar stack + social stats -->
-			<div class="flex items-center gap-2">
-				<!-- Avatar stack -->
-				{#if item.members_preview.length > 0}
-					<div class="flex -space-x-1.5">
-						{#each item.members_preview.slice(0, 4) as member (member.user_id)}
-							{#if member.avatar_url}
-								<img
-									src={member.avatar_url}
-									alt={member.name}
-									class="size-5 rounded-full border-[1.5px] border-card object-cover"
-								/>
-							{:else}
-								<span
-									class="flex size-5 items-center justify-center rounded-full border-[1.5px] border-card bg-muted text-[8px] font-medium text-muted-foreground"
-								>
-									{member.name.charAt(0)}
-								</span>
-							{/if}
-						{/each}
-					</div>
-				{/if}
+		<!-- ── Footer — avatar stack + member count + actions ─── -->
+		<div class="mt-4 flex items-center gap-2">
+			<!-- Avatar stack -->
+			{#if item.members_preview.length > 0}
+				<div class="flex -space-x-1.5">
+					{#each item.members_preview.slice(0, 4) as member (member.user_id)}
+						{#if member.avatar_url}
+							<img
+								src={member.avatar_url}
+								alt={member.name}
+								class="size-5 rounded-full border-[1.5px] border-card object-cover"
+							/>
+						{:else}
+							<span
+								class="flex size-5 items-center justify-center rounded-full border-[1.5px] border-card bg-muted text-[8px] font-medium text-muted-foreground"
+							>
+								{member.name.charAt(0)}
+							</span>
+						{/if}
+					{/each}
+				</div>
+			{/if}
 
-				<!-- Member count -->
-				<span class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
-					<UsersIcon class="size-2.5" />
-					{item.member_count}
-				</span>
+			<!-- Member count -->
+			<span class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+				<UsersIcon class="size-2.5" />
+				{item.member_count}
+			</span>
 
-				<!-- Activity heat -->
-				{#if activityHeat !== 'cool'}
-					<span
-						class="inline-flex items-center gap-0.5 text-[10px] font-medium
-							{activityHeat === 'hot' ? 'text-destructive/80' : 'text-amber-500/80'}"
-					>
-						<FlameIcon class="size-2.5" />
-						{activityHeat === 'hot' ? 'Ramai' : 'Aktif'}
-					</span>
-				{/if}
+			<div class="flex-1"></div>
 
-				<!-- Collapsed count -->
-				{#if item.collapsed_count > 0}
-					<span class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/40">
-						<ZapIcon class="size-2.5" />
-						+{item.collapsed_count}
-					</span>
-				{/if}
-			</div>
-
-			<!-- Row 2: source label + hover actions (right-aligned) -->
-			<div class="flex items-center gap-2">
-				{#if item.source}
-					<span class="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40">
-						{sourceLabel[item.source] ?? item.source}
-					</span>
-				{/if}
-
-				<div class="flex-1"></div>
-
-				<!-- Hover actions (pantau: faint when idle, full on hover/active) -->
-				<div class="flex items-center gap-0.5 {item.monitored ? '' : 'opacity-30'} transition-opacity duration-150 group-hover:opacity-100">
+			<!-- Actions (pantau: faint when idle, full on hover/active) -->
+			<div class="flex items-center gap-0.5 {item.monitored ? '' : 'opacity-30'} transition-opacity duration-150 group-hover:opacity-100">
+				<Tip text={item.monitored ? 'Berhenti pantau' : 'Pantau'}>
 					<button
 						class="inline-flex items-center justify-center rounded-md p-1 transition
 							{item.monitored
@@ -428,10 +396,11 @@
 								: 'text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground'}"
 						onclick={(e) => { e.stopPropagation(); onToggleMonitor?.(); }}
 						aria-label={item.monitored ? 'Berhenti pantau' : 'Pantau'}
-						title={item.monitored ? 'Berhenti pantau' : 'Pantau'}
 					>
 						<EyeIcon class="size-3" />
 					</button>
+				</Tip>
+				<Tip text="Simpan">
 					<button
 						class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-muted/60 hover:text-foreground"
 						onclick={(e) => e.stopPropagation()}
@@ -439,15 +408,16 @@
 					>
 						<BookmarkIcon class="size-3" />
 					</button>
+				</Tip>
+				<Tip text="Bagikan">
 					<button
 						class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-primary/10 hover:text-primary"
 						onclick={(e) => { e.stopPropagation(); onShare?.(); }}
 						aria-label="Bagikan"
-						title="Bagikan"
 					>
 						<Share2Icon class="size-3" />
 					</button>
-				</div>
+				</Tip>
 			</div>
 		</div>
 	</div>

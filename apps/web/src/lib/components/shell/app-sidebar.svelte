@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
-	import { getNavigationStore, getFeedStore, getNotificationStore, getUserStore, getThemeStore } from '$lib/stores';
+	import { getNavigationStore, getFeedStore, getNotificationStore, getUserStore, getThemeStore, getPreferencesStore } from '$lib/stores';
 	import { resolveTabIcon } from '$lib/utils';
 	import type { TabConfig } from '$lib/types';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -13,12 +13,15 @@
 	import Moon from '@lucide/svelte/icons/moon';
 	import Monitor from '@lucide/svelte/icons/monitor';
 	import X from '@lucide/svelte/icons/x';
+	import CircleHelp from '@lucide/svelte/icons/circle-help';
+	import Tip from '$lib/components/ui/tip.svelte';
 
 	const navStore = getNavigationStore();
 	const feedStore = getFeedStore();
 	const notificationStore = getNotificationStore();
 	const userStore = getUserStore();
 	const themeStore = getThemeStore();
+	const prefsStore = getPreferencesStore();
 
 	const themeIconMap = { light: Sun, dark: Moon, system: Monitor } as const;
 	const ThemeIcon = $derived(themeIconMap[themeStore.mode]);
@@ -91,13 +94,13 @@
 		{#each navStore.tabs as tab (tab.id)}
 			{@const Icon = resolveTabIcon(tab.iconName)}
 			{@const active = isActive(tab)}
+			<Tip text={tab.label} side="right">
 			<a
 				href={hrefForTab(tab)}
 				class="sidebar-item group"
 				class:sidebar-item-active={active}
 				aria-current={active ? 'page' : undefined}
 				onclick={(e) => { e.stopPropagation(); handleTabClick(tab, e); }}
-				title={expanded ? undefined : tab.label}
 			>
 				<span class="sidebar-icon">
 					<Icon class="size-5" />
@@ -119,21 +122,23 @@
 					</button>
 				{/if}
 			</a>
+			</Tip>
 		{/each}
 
 		<!-- Add tab button -->
+		<Tip text={m.shell_nav_add_tab()} side="right">
 		<button
 			type="button"
 			class="sidebar-item sidebar-item-muted"
 			onclick={(e) => { e.stopPropagation(); navStore.openAddPanel(); }}
 			aria-label={m.shell_nav_add_tab()}
-			title={expanded ? undefined : m.shell_nav_add_tab()}
 		>
 			<span class="sidebar-icon">
 				<Plus class="size-5" />
 			</span>
 			<span class="sidebar-label">{m.shell_nav_add_tab()}</span>
 		</button>
+		</Tip>
 	</div>
 
 	<!-- Separator -->
@@ -142,12 +147,12 @@
 	<!-- Bottom section: app nav -->
 	<div class="flex flex-col gap-0.5 pb-3 pt-1">
 		<!-- Notifications -->
+		<Tip text={m.shell_nav_notifikasi()} side="right">
 		<a
 			href="{base}/notifikasi"
 			class="sidebar-item sidebar-item-muted"
 			onclick={(e) => e.stopPropagation()}
 			aria-label={m.shell_nav_notifikasi()}
-			title={expanded ? undefined : m.shell_nav_notifikasi()}
 		>
 			<span class="sidebar-icon">
 				<BellRing class="size-5" />
@@ -159,34 +164,52 @@
 				</span>
 			{/if}
 		</a>
+		</Tip>
 
 		<!-- Profile -->
+		<Tip text={m.shell_nav_profil()} side="right">
 		<a
 			href="{base}/profil"
 			class="sidebar-item sidebar-item-muted"
 			onclick={(e) => e.stopPropagation()}
 			aria-label={m.shell_nav_profil()}
-			title={expanded ? undefined : m.shell_nav_profil()}
 		>
 			<span class="sidebar-icon">
 				<User class="size-5" />
 			</span>
 			<span class="sidebar-label">{userStore.displayName}</span>
 		</a>
+		</Tip>
 
 		<!-- Theme toggle -->
+		<Tip text="Ganti tema" side="right">
 		<button
 			type="button"
 			class="sidebar-item sidebar-item-muted"
 			onclick={(e) => { e.stopPropagation(); themeStore.toggle(); }}
 			aria-label="Toggle tema"
-			title={expanded ? undefined : 'Tema'}
 		>
 			<span class="sidebar-icon">
 				<ThemeIcon class="size-5" />
 			</span>
 			<span class="sidebar-label">Tema</span>
 		</button>
+		</Tip>
+
+		<!-- Tooltip toggle -->
+		<Tip text={prefsStore.showTooltips ? 'Tooltip aktif' : 'Tooltip nonaktif'} side="right">
+		<button
+			type="button"
+			class="sidebar-item sidebar-item-muted"
+			onclick={(e) => { e.stopPropagation(); prefsStore.toggleTooltips(); }}
+			aria-label={prefsStore.showTooltips ? 'Tooltip aktif' : 'Tooltip nonaktif'}
+		>
+			<span class="sidebar-icon">
+				<CircleHelp class="size-5 transition-opacity {prefsStore.showTooltips ? '' : 'opacity-40'}" />
+			</span>
+			<span class="sidebar-label">{prefsStore.showTooltips ? 'Tooltip aktif' : 'Tooltip mati'}</span>
+		</button>
+		</Tip>
 
 	</div>
 </nav>
