@@ -1,6 +1,18 @@
 <script lang="ts">
-	import { fly, fade } from 'svelte/transition';
 	import { cubicOut, cubicIn } from 'svelte/easing';
+
+	/** Slide-fade: translateX + opacity only, no layout changes.
+	 *  The box keeps its full flex:1 width throughout. */
+	function slideFade(
+		_node: Element,
+		{ duration = 300, easing = cubicOut, x = 60 }: { duration?: number; easing?: (t: number) => number; x?: number } = {}
+	) {
+		return {
+			duration,
+			easing,
+			css: (t: number) => `transform: translateX(${(1 - t) * x}px); opacity: ${t}`
+		};
+	}
 	import ClipboardList from '@lucide/svelte/icons/clipboard-list';
 	import User from '@lucide/svelte/icons/user';
 	import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
@@ -218,7 +230,7 @@
 </script>
 
 <!--
-	ContextBox — polymorphic workspace panel (right side of 50/50 layout).
+	ContextBox — polymorphic workspace panel (right half of 50/50 layout).
 
 	Three tabs rendered as a rolling sentence:
 	  AKU [connector] TANDANG [connector] KOMUNITAS
@@ -236,8 +248,8 @@
 	<div
 		class="context-box hidden lg:flex flex-col
 			rounded-xl border border-border/20 bg-card shadow-sm"
-		in:fly={{ x: 120, duration: 300, easing: cubicOut }}
-		out:fly={{ x: 120, duration: 250, easing: cubicIn }}
+		in:slideFade={{ duration: 300, easing: cubicOut, x: 60 }}
+		out:slideFade={{ duration: 200, easing: cubicIn, x: 60 }}
 	>
 		<!-- Sentence tab bar — civic affirmation
 		     Grid anchors AKU / TANDANG / KOMUNITAS in fixed columns.
@@ -372,14 +384,14 @@
 	/*
 	 * Context box — right-side workspace region.
 	 * Sticky: stays in viewport while masonry scrolls.
-	 * 45% width of parent flex container.
+	 * 50% width of parent flex container — clean half-split with feed.
+	 * Enables symmetrical layout transitions (e.g. history mode swap).
 	 * Internal scroll per tab content (absolute positioned).
 	 */
 	.context-box {
 		position: sticky;
 		top: 4.5rem;
-		width: 45%;
-		flex-shrink: 0;
+		flex: 1;
 		height: calc(100vh - 5.5rem);
 		overflow: hidden;
 	}

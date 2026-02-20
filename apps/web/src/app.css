@@ -665,6 +665,12 @@
 		line-height: var(--lh-normal);
 	}
 
+	/* Always reserve scrollbar space so layout never shifts when
+	   content height changes (e.g. context box open/close). */
+	html {
+		scrollbar-gutter: stable;
+	}
+
 	/* ── Quadrille paper background ─────────────────────────────
 	 * Faint grid texture on the app background — gives a sense
 	 * of surface & cohesion instead of flat emptiness.

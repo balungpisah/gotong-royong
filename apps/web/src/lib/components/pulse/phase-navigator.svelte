@@ -12,6 +12,13 @@
 	import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
 	import ClipboardCheck from '@lucide/svelte/icons/clipboard-check';
 	import MapPin from '@lucide/svelte/icons/map-pin';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import Trophy from '@lucide/svelte/icons/trophy';
+	import Eye from '@lucide/svelte/icons/eye';
+	import EyeOff from '@lucide/svelte/icons/eye-off';
+	import User from '@lucide/svelte/icons/user';
+	import Bot from '@lucide/svelte/icons/bot';
+	import Settings from '@lucide/svelte/icons/settings';
 
 	interface Props {
 		phases: Phase[];
@@ -74,6 +81,9 @@
 		focusedPhase?.checkpoints.filter((cp) => cp.status === 'completed').length ?? 0
 	);
 	const focusedTotal = $derived(focusedPhase?.checkpoints.length ?? 0);
+	const focusedPercent = $derived(
+		focusedTotal > 0 ? Math.round((focusedCompleted / focusedTotal) * 100) : 0
+	);
 
 	// Action counts for the handlebar hint
 	const blockedCount = $derived(
@@ -83,6 +93,40 @@
 		phases
 			.flatMap((p) => p.checkpoints ?? [])
 			.filter((c) => c.evidence_required === true && c.status !== 'completed').length
+	);
+
+	// ---------------------------------------------------------------------------
+	// CD1: Epic Meaning — chapter-style narrative
+	// ---------------------------------------------------------------------------
+
+	/** Story chapter label — "Bab 1 dari 3" */
+	const chapterLabel = $derived(
+		`Bab ${focusedIndex + 1} dari ${phases.length}`
+	);
+
+	/** Narrative status line — gives emotional weight to the current phase state */
+	const narrativeStatus = $derived.by(() => {
+		if (!focusedPhase) return '';
+		switch (focusedPhase.status) {
+			case 'completed':
+				return '✨ Bab ini sudah dituntaskan';
+			case 'active':
+				return '📖 Sedang berjalan…';
+			case 'blocked':
+				return '🚧 Butuh aksi untuk melanjutkan';
+			case 'planned':
+				return '🔮 Menanti giliran';
+			default:
+				return '';
+		}
+	});
+
+	// ---------------------------------------------------------------------------
+	// CD7: Curiosity — is the focused phase a future/locked one?
+	// ---------------------------------------------------------------------------
+
+	const isFuturePhase = $derived(
+		focusedPhase?.status === 'planned' || focusedPhase?.status === 'skipped'
 	);
 
 	// ---------------------------------------------------------------------------
@@ -172,6 +216,33 @@
 		}
 	}
 
+	/** CD4: Ownership — source tag icon */
+	function getSourceIcon(source: string): typeof User {
+		switch (source) {
+			case 'human':
+				return User;
+			case 'ai':
+				return Bot;
+			case 'system':
+				return Settings;
+			default:
+				return Circle;
+		}
+	}
+
+	function getSourceLabel(source: string): string {
+		switch (source) {
+			case 'human':
+				return 'Dari warga';
+			case 'ai':
+				return 'Saran AI';
+			case 'system':
+				return 'Sistem';
+			default:
+				return source;
+		}
+	}
+
 	function getDotClass(phase: Phase, index: number): string {
 		if (index === focusedIndex) {
 			return 'bg-primary ring-2 ring-primary/30 scale-125';
@@ -183,6 +254,12 @@
 			return 'bg-bahaya';
 		}
 		return 'bg-muted-foreground/30';
+	}
+
+	/** Phase dot label for story dots — shows chapter number or check mark */
+	function getDotContent(phase: Phase, index: number): string {
+		if (phase.status === 'completed') return '✓';
+		return `${index + 1}`;
 	}
 </script>
 
@@ -211,7 +288,7 @@
 			/>
 		</button>
 
-		<!-- Expanded: horizontal phase carousel -->
+		<!-- Expanded: story-style phase carousel -->
 		{#if expanded}
 			<div class="pt-1" transition:slide={{ duration: 150 }}>
 				<div class="rounded-lg border border-border/40 bg-muted/10">
@@ -256,15 +333,29 @@
 							</button>
 						{/if}
 
-						<!-- Current phase card — slides in horizontally, height adapts naturally -->
+						<!-- Current phase card — slides in horizontally -->
 						{#if focusedPhase}
 							{#key focusedIndex}
 								<div
 									class="mx-4 transition-[min-height] duration-200 ease-out"
 									in:fly={{ x: direction * 200, duration: 200 }}
 								>
+									<!-- CD1: Chapter header with narrative framing -->
+									<div class="mb-1 flex items-center gap-1.5">
+										<span class="font-['Caveat'] text-[11px] text-muted-foreground/60">
+											{chapterLabel}
+										</span>
+									</div>
+
 									<!-- Phase title + status -->
-									<div class="mb-1.5 flex items-center gap-2">
+									<div class="mb-1 flex items-center gap-2">
+										{#if focusedPhase.status === 'completed'}
+											<Trophy class="size-3.5 text-berhasil" />
+										{:else if isFuturePhase}
+											<EyeOff class="size-3.5 text-muted-foreground/40" />
+										{:else}
+											<Eye class="size-3.5 text-primary" />
+										{/if}
 										<span class="text-xs font-semibold text-foreground">
 											{focusedPhase.title}
 										</span>
@@ -273,18 +364,51 @@
 										</Badge>
 									</div>
 
+									<!-- Narrative status line -->
+									{#if narrativeStatus}
+										<p class="mb-1.5 text-[10px] text-muted-foreground/70">
+											{narrativeStatus}
+										</p>
+									{/if}
+
 									<!-- Objective -->
 									{#if focusedPhase.objective}
-										<p class="mb-2 text-[11px] italic text-muted-foreground">
+										<p class="mb-2 text-[11px] italic text-muted-foreground {isFuturePhase ? 'blur-[2px] select-none' : ''}">
 											{focusedPhase.objective}
 										</p>
 									{/if}
 
-									<!-- Checkpoints list -->
-									{#if focusedPhase.checkpoints.length > 0}
+									<!-- CD2: Per-phase mini progress bar -->
+									{#if focusedTotal > 0 && !isFuturePhase}
+										<div class="mb-2 flex items-center gap-2">
+											<div class="relative h-1 flex-1 overflow-hidden rounded-full bg-muted">
+												<div
+													class="h-full rounded-full transition-all duration-300 {focusedPhase.status === 'completed' ? 'bg-berhasil' : 'bg-primary'}"
+													style="width: {focusedPercent}%"
+												></div>
+											</div>
+											<span class="text-[9px] tabular-nums text-muted-foreground">
+												{focusedCompleted}/{focusedTotal}
+											</span>
+										</div>
+									{/if}
+
+									<!-- CD2: Celebration banner for completed phases -->
+									{#if focusedPhase.status === 'completed'}
+										<div class="mb-2 flex items-center gap-1.5 rounded-md bg-berhasil/10 px-2 py-1">
+											<Sparkles class="size-3 text-berhasil animate-pulse" />
+											<span class="text-[10px] font-medium text-berhasil">
+												Bab ini berhasil dituntaskan oleh warga!
+											</span>
+										</div>
+									{/if}
+
+									<!-- Checkpoints list — with CD4 source ownership tags -->
+									{#if focusedPhase.checkpoints.length > 0 && !isFuturePhase}
 										<ul class="flex flex-col gap-1.5">
 											{#each focusedPhase.checkpoints as cp}
 												{@const { icon: Icon, colorClass } = getCheckpointIconAndColor(cp.status)}
+												{@const SourceIcon = getSourceIcon(cp.source)}
 												{@const completed = cp.status === 'completed'}
 												<li class="flex items-start gap-2 text-xs">
 													<Icon class="mt-0.5 size-3.5 shrink-0 {colorClass}" />
@@ -302,6 +426,10 @@
 															</p>
 														{/if}
 													</div>
+													<!-- CD4: Source ownership tag -->
+													<span class="mt-0.5 inline-flex shrink-0 items-center gap-0.5 text-[8px] text-muted-foreground/50" title={getSourceLabel(cp.source)}>
+														<SourceIcon class="size-2.5" />
+													</span>
 													{#if cp.evidence_required && cp.status !== 'completed'}
 														<Badge variant="warning" class="shrink-0 text-[9px]">
 															<ClipboardCheck class="mr-0.5 size-2.5" />
@@ -312,17 +440,32 @@
 											{/each}
 										</ul>
 									{/if}
+
+									<!-- CD7: Future phase mystery view -->
+									{#if isFuturePhase}
+										<div class="flex flex-col items-center gap-1 py-3 text-center">
+											<Lock class="size-5 text-muted-foreground/30" />
+											<span class="text-[10px] text-muted-foreground/50">
+												Selesaikan bab sebelumnya untuk membuka
+											</span>
+											{#if focusedTotal > 0}
+												<span class="text-[9px] text-muted-foreground/30">
+													{focusedTotal} langkah menanti
+												</span>
+											{/if}
+										</div>
+									{/if}
 								</div>
 							{/key}
 						{/if}
 					</div>
 
-					<!-- Phase dot indicators -->
-					<div class="flex items-center justify-center gap-2 px-3 pb-2">
+					<!-- Story dot indicators — chapter-style numbered dots -->
+					<div class="flex items-center justify-center gap-1 px-3 pb-2">
 						{#each phases as phase, index}
 							<button
 								type="button"
-								class="flex size-5 items-center justify-center focus:outline-none"
+								class="flex items-center justify-center focus:outline-none"
 								onclick={() => {
 								if (index !== focusedIndex) {
 									direction = index > focusedIndex ? 1 : -1;
@@ -332,8 +475,24 @@
 								aria-label={phase.title}
 							>
 								<div
-									class="h-2 w-2 rounded-full transition-all duration-200 {getDotClass(phase, index)}"
-								></div>
+									class="flex size-5 items-center justify-center rounded-full text-[8px] font-bold transition-all duration-200 {index === focusedIndex
+										? 'bg-primary text-primary-foreground ring-2 ring-primary/30 scale-110'
+										: phase.status === 'completed'
+											? 'bg-berhasil/20 text-berhasil'
+											: phase.status === 'blocked'
+												? 'bg-bahaya/20 text-bahaya'
+												: 'bg-muted text-muted-foreground/50'}"
+								>
+									{getDotContent(phase, index)}
+								</div>
+								<!-- Connector line between dots -->
+								{#if index < phases.length - 1}
+									<div
+										class="mx-0.5 h-px w-3 {phase.status === 'completed'
+											? 'bg-berhasil/40'
+											: 'bg-border/40'}"
+									></div>
+								{/if}
 							</button>
 						{/each}
 					</div>
