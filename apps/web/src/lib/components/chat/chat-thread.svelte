@@ -1,7 +1,6 @@
 <script lang="ts">
-	import type { ChatMessage } from '$lib/types';
+	import type { ChatMessage, SystemMessage } from '$lib/types';
 	import ChatBubble from './chat-bubble.svelte';
-	import SystemMessageRenderer from './system-message.svelte';
 	import CardEnvelope from './card-envelope.svelte';
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -27,26 +26,26 @@
 		onboardingExpanded = !onboardingExpanded;
 	}
 
-	// Find the index of the last card message (non-user, non-system) to expand it by default
+	// Find the index of the last block message (non-user) to expand it by default
 	const lastCardIndex = $derived.by(() => {
 		for (let i = messages.length - 1; i >= 0; i--) {
-			const t = messages[i].type;
-			if (t !== 'user' && t !== 'system') return i;
+			if (messages[i].type !== 'user') return i;
 		}
 		return -1;
 	});
 
-	/** Is this a card/block type (not user bubble, not system pill)? */
-	function isBlock(message: ChatMessage): boolean {
-		return message.type !== 'user' && message.type !== 'system';
-	}
-
-	/** Phase blocks = major phase actions (vote, diff). Minor = everything else. */
+	/** Phase blocks = major phase actions (vote, diff, system phase events). Minor = everything else. */
 	function getDotVariant(message: ChatMessage): 'phase' | 'minor' {
 		switch (message.type) {
 			case 'vote_card':
 			case 'diff_card':
 				return 'phase';
+			case 'system': {
+				const sub = (message as SystemMessage).subtype;
+				if (sub === 'phase_completed' || sub === 'checkpoint_completed' || sub === 'phase_activated')
+					return 'phase';
+				return 'minor';
+			}
 			default:
 				return 'minor';
 		}
@@ -111,10 +110,6 @@
 				{#if message.type === 'user'}
 					<div class="pl-5">
 						<ChatBubble {message} />
-					</div>
-				{:else if message.type === 'system'}
-					<div class="pl-5">
-						<SystemMessageRenderer {message} />
 					</div>
 				{:else}
 					<CardEnvelope {message} defaultExpanded={i === lastCardIndex} dotVariant={getDotVariant(message)} />

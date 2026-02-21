@@ -5,6 +5,6 @@
 	let { message }: { message: DiffCardMessage } = $props();
 </script>
 
-<div class="py-1" data-slot="diff-card-wrapper">
-	<DiffCardRenderer diff={message.diff} />
+<div data-slot="diff-card-wrapper">
+	<DiffCardRenderer diff={message.diff} bare />
 </div>

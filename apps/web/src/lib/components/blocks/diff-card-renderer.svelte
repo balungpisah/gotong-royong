@@ -10,7 +10,7 @@
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 
-	let { diff, ondiffaction }: { diff: DiffCard; ondiffaction?: (action: DiffAction) => void } = $props();
+	let { diff, ondiffaction, bare = false }: { diff: DiffCard; ondiffaction?: (action: DiffAction) => void; bare?: boolean } = $props();
 
 	let showEvidence = $state(false);
 
@@ -23,7 +23,7 @@
 	};
 </script>
 
-<div class="flex flex-col gap-3 rounded-lg border border-dashed border-api/40 bg-api/5 p-4" data-slot="diff-card">
+<div class={cn('flex flex-col gap-3', !bare && 'rounded-lg border border-dashed border-api/40 bg-api/5 p-4')} data-slot="diff-card">
 	<!-- Header -->
 	<div class="flex items-start justify-between gap-2">
 		<div>

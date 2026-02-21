@@ -5,7 +5,7 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import CheckCircle from '@lucide/svelte/icons/circle-check';
 
-	let { block, onvote }: { block: VoteBlock; onvote?: (optionId: string) => void } = $props();
+	let { block, onvote, bare = false }: { block: VoteBlock; onvote?: (optionId: string) => void; bare?: boolean } = $props();
 
 	const quorumPercent = $derived(Math.round((block.total_voted / block.total_eligible) * 100));
 	const quorumTarget = $derived(Math.round(block.quorum * 100));
@@ -26,7 +26,7 @@
 	};
 </script>
 
-<div class="flex flex-col gap-3 rounded-lg border border-border bg-card p-4" data-slot="vote-block">
+<div class={cn('flex flex-col gap-3', !bare && 'rounded-lg border border-border bg-card p-4')} data-slot="vote-block">
 	<div class="flex items-start justify-between gap-2">
 		<p class="text-sm font-bold text-foreground">{block.question}</p>
 		<Badge variant="info" class="shrink-0 text-[10px]">{voteTypeLabels[block.vote_type] || block.vote_type}</Badge>

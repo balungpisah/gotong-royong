@@ -6,7 +6,8 @@
 		DiffCardMessage,
 		VoteCardMessage,
 		EvidenceMessage,
-		GalangMessage
+		GalangMessage,
+		SystemMessage
 	} from '$lib/types';
 	import { Badge } from '$lib/components/ui/badge';
 	import { m } from '$lib/paraglide/messages';
@@ -21,9 +22,16 @@
 	import FileCheck from '@lucide/svelte/icons/file-check';
 	import Coins from '@lucide/svelte/icons/coins';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import CircleCheck from '@lucide/svelte/icons/circle-check';
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
+	import Trophy from '@lucide/svelte/icons/trophy';
+	import UserPlus from '@lucide/svelte/icons/user-plus';
+	import Shield from '@lucide/svelte/icons/shield';
+	import FileText from '@lucide/svelte/icons/file-text';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import type { Component } from 'svelte';
 
-	type CardMessage = AiCardMessage | DiffCardMessage | VoteCardMessage | EvidenceMessage | GalangMessage;
+	type CardMessage = AiCardMessage | DiffCardMessage | VoteCardMessage | EvidenceMessage | GalangMessage | SystemMessage;
 
 	interface Props {
 		message: CardMessage;
@@ -67,6 +75,20 @@
 		contribution: 'Kontribusi',
 		disbursement: 'Pencairan',
 		milestone: 'Tonggak'
+	};
+
+	// ---------------------------------------------------------------------------
+	// System message icon mapping
+	// ---------------------------------------------------------------------------
+	const subtypeIcons: Record<string, Component<{ class?: string }>> = {
+		checkpoint_completed: CircleCheck,
+		phase_activated: ArrowRight,
+		phase_completed: Trophy,
+		vote_result: BarChart3,
+		member_joined: UserPlus,
+		role_assigned: Shield,
+		plan_updated: FileText,
+		galang_transaction: Coins
 	};
 
 	// ---------------------------------------------------------------------------
@@ -160,6 +182,11 @@
 					actionVariant: msg.subtype === 'contribution' ? 'success' : msg.subtype === 'disbursement' ? 'warning' : 'info'
 				};
 			}
+			case 'system': {
+				const msg = message as SystemMessage;
+				const icon = subtypeIcons[msg.subtype] || ArrowRight;
+				return { icon, title: msg.content, metric: '', actionLabel: '', actionVariant: 'secondary' };
+			}
 			default:
 				return { icon: Bot, title: '', metric: '', actionLabel: '', actionVariant: 'secondary' };
 		}
@@ -172,6 +199,15 @@
 	// ---------------------------------------------------------------------------
 	const dotClass = $derived.by((): string => {
 		if (dotVariant === 'phase') {
+			// System messages get their own color logic
+			if (message.type === 'system') {
+				const sub = (message as SystemMessage).subtype;
+				if (sub === 'phase_completed' || sub === 'checkpoint_completed')
+					return 'bg-berhasil';
+				if (sub === 'phase_activated')
+					return 'bg-primary/60';
+				return 'bg-muted-foreground/40';
+			}
 			// Filled dot — color reflects state of the block
 			switch (config.actionVariant) {
 				case 'success':
@@ -218,20 +254,24 @@
 		/>
 	</button>
 
-	<!-- Expanded content -->
+	<!-- Expanded content — unified Ruang Interaksi style wrapper -->
 	{#if expanded}
-		<div class="pt-1" transition:slide={{ duration: 150 }}>
-			{#if message.type === 'ai_card'}
-				<AiInlineCard message={message as AiCardMessage} />
-			{:else if message.type === 'diff_card'}
-				<DiffCardWrapper message={message as DiffCardMessage} />
-			{:else if message.type === 'vote_card'}
-				<VoteCardWrapper message={message as VoteCardMessage} />
-			{:else if message.type === 'evidence'}
-				<EvidenceCard message={message as EvidenceMessage} />
-			{:else if message.type === 'galang'}
-				<GalangMessageRenderer message={message as GalangMessage} />
-			{/if}
+		<div class="pl-5 pt-1" transition:slide={{ duration: 150 }}>
+			<div class="space-y-2.5 rounded-lg border border-border/40 bg-card/60 px-3 py-2.5 text-[10.5px] leading-relaxed text-muted-foreground">
+				{#if message.type === 'system'}
+					<p>{(message as SystemMessage).content}</p>
+				{:else if message.type === 'ai_card'}
+					<AiInlineCard message={message as AiCardMessage} />
+				{:else if message.type === 'diff_card'}
+					<DiffCardWrapper message={message as DiffCardMessage} />
+				{:else if message.type === 'vote_card'}
+					<VoteCardWrapper message={message as VoteCardMessage} />
+				{:else if message.type === 'evidence'}
+					<EvidenceCard message={message as EvidenceMessage} />
+				{:else if message.type === 'galang'}
+					<GalangMessageRenderer message={message as GalangMessage} />
+				{/if}
+			</div>
 		</div>
 	{/if}
 </div>
