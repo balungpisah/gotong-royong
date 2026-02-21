@@ -11,6 +11,7 @@
 	import MessageCircleIcon from '@lucide/svelte/icons/message-circle';
 	import SignalChipBar from './signal-chip-bar.svelte';
 	import Tip from '$lib/components/ui/tip.svelte';
+	import { getMoodColor, moodShadow } from '$lib/utils/mood-color';
 
 	interface Props {
 		item: FeedItem;
@@ -22,36 +23,8 @@
 
 	let { item, selected = false, onclick, onToggleMonitor, onShare }: Props = $props();
 
-	// ── Sentiment → shadow color (design-system tokens only) ────────
-	// Maps the LLM-extracted mood to a CSS custom property. The color
-	// shows as a soft glow shadow around the card — felt before seen.
-	const sentimentColorMap: Record<string, string> = {
-		angry:       'var(--c-bahaya)',         // #c62828 danger red
-		hopeful:     'var(--c-berhasil)',        // #2e7d32 success green
-		urgent:      'var(--c-peringatan)',      // #e65100 warning orange
-		celebratory: 'var(--t-rayakan)',         // #f57f17 celebration gold
-		sad:         'var(--v-mid)',             // #546e7a muted slate
-		curious:     'var(--t-telusuri)',        // #6a1b9a explore purple
-		fun:         'var(--c-api-terang)'       // #d2691e warm amber
-	};
-
-	// Fallback: track-hint based color (legacy, kept for cards without sentiment)
-	const trackColorMap: Record<string, string> = {
-		tuntaskan:  'var(--t-tuntaskan)',
-		wujudkan:   'var(--t-wujudkan)',
-		telusuri:   'var(--t-telusuri)',
-		rayakan:    'var(--t-rayakan)',
-		musyawarah: 'var(--t-musyawarah)'
-	};
-
-	// Resolve: sentiment-first → track-fallback → neutral
-	const moodColor = $derived(
-		item.sentiment
-			? (sentimentColorMap[item.sentiment] ?? 'var(--c-batu)')
-			: item.track_hint
-				? (trackColorMap[item.track_hint] ?? 'var(--c-batu)')
-				: 'var(--c-batu)'
-	);
+	// ── Mood color (shared utility) ─────────────────────────────────
+	const moodColor = $derived(getMoodColor(item.sentiment, item.track_hint));
 
 	// ── Shadow styles — colored glow from mood ──────────────────────
 	// Resting: very soft 20% opacity glow. Hover: lifts + 30% glow.
@@ -61,9 +34,7 @@
 	const hoverShadow = $derived(
 		`0 2px 6px 0 color-mix(in srgb, ${moodColor} 18%, transparent), 0 8px 20px -4px color-mix(in srgb, ${moodColor} 28%, transparent)`
 	);
-	const selectedShadow = $derived(
-		`0 2px 8px 0 color-mix(in srgb, ${moodColor} 25%, transparent), 0 8px 24px -4px color-mix(in srgb, ${moodColor} 35%, transparent)`
-	);
+	const selectedShadow = $derived(moodShadow(moodColor));
 
 	// ── Urgency badge mapping ───────────────────────────────────────
 	const urgencyVariantMap: Record<UrgencyBadge, BadgeVariant> = {
@@ -169,7 +140,7 @@
 	onkeydown={onclick ? handleKeydown : undefined}
 	class="group relative overflow-hidden rounded-xl transition-all duration-200
 		{selected
-			? 'border border-border/40 ring-1 ring-primary/10'
+			? 'border border-border/50'
 			: 'border border-border/20 hover:border-border/40'}
 		{onclick ? 'cursor-pointer' : ''}
 		{isAlive && !selected ? 'animate-pulse-glow' : ''}

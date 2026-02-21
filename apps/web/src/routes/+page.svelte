@@ -53,6 +53,17 @@
 	// Context box active signal: external triggers that should open it
 	const contextActive = $derived(showDetail || selectedUserId !== null);
 
+	// Suppress masonry FLIP animation when context box opens/closes
+	// to prevent card size flash during column reflow.
+	// On subsequent clicks (context already open), FLIP stays enabled for smooth reorder.
+	let masonryAnimate = $state(true);
+	$effect(() => {
+		const _ = contextActive; // track open/close transitions
+		masonryAnimate = false;
+		const timer = setTimeout(() => { masonryAnimate = true; }, 50);
+		return () => clearTimeout(timer);
+	});
+
 	// The selected feed item — used for pinned card header in detail panel
 	const selectedFeedItem = $derived.by(() => {
 		if (!selectedWitnessId) return null;
@@ -153,7 +164,18 @@
 		sort_timestamp: '9999-12-31T00:00:00Z' // always sorts first
 	};
 
-	const masonryStream = $derived<MasonryItem[]>([triageEntry, ...feedStore.filteredStream]);
+	// When a card is selected, move it to the front so masonry FLIP-animates it to the top.
+	const masonryStream = $derived.by<MasonryItem[]>(() => {
+		const stream = feedStore.filteredStream;
+		if (!selectedWitnessId) return [triageEntry, ...stream];
+
+		const idx = stream.findIndex(
+			(s) => s.kind === 'witness' && s.data.witness_id === selectedWitnessId
+		);
+		if (idx <= 0) return [triageEntry, ...stream];
+
+		return [triageEntry, stream[idx], ...stream.slice(0, idx), ...stream.slice(idx + 1)];
+	});
 
 	const skeletonItems = [
 		{ id: 1, h: 260 },
@@ -295,7 +317,7 @@
 						minColWidth={260}
 						maxColWidth={340}
 						gap={16}
-						animate={true}
+						animate={masonryAnimate}
 						duration={300}
 						columnClass="masonry-col-constrain"
 					>

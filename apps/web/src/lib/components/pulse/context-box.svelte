@@ -23,6 +23,7 @@
 	import SelfProfile from './self-profile.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import Tip from '$lib/components/ui/tip.svelte';
+	import { getMoodColor, moodShadow } from '$lib/utils/mood-color';
 
 	// ---------------------------------------------------------------------------
 	// Types
@@ -83,6 +84,21 @@
 
 	/** Whether we have witness detail content to show */
 	const hasWitnessDetail = $derived(witnessDetail !== null);
+
+	// ---------------------------------------------------------------------------
+	// Mood color — visual link to selected card
+	// ---------------------------------------------------------------------------
+
+	/** Derive mood color from the selected feed item (null when on self/community tabs) */
+	const moodColor = $derived(
+		feedItem ? getMoodColor(feedItem.sentiment, feedItem.track_hint) : null
+	);
+
+	/** Raised shadow matching the selected card's glow */
+	const panelShadow = $derived(
+		moodColor ? moodShadow(moodColor) : undefined
+	);
+
 
 	// ---------------------------------------------------------------------------
 	// Rolling sentence tab system
@@ -257,7 +273,9 @@
 {#if active}
 	<div
 		class="context-box hidden lg:flex flex-col
-			rounded-xl border border-border/20 bg-card shadow-sm"
+			rounded-xl border bg-card
+			{moodColor ? 'border-border/50' : 'border-border/20 shadow-sm'}"
+		style:box-shadow={panelShadow}
 		in:slideFade={{ duration: 300, easing: cubicOut, x: 60 }}
 		out:slideFade={{ duration: 200, easing: cubicIn, x: 60 }}
 	>
@@ -407,6 +425,7 @@
 		flex: 1;
 		height: calc(100vh - 5.5rem);
 		overflow: hidden;
+		transition: box-shadow 300ms ease, border-color 300ms ease;
 	}
 
 	/* ── Sentence bar: grid anchors AKU / TANDANG / KOMUNITAS ── */
