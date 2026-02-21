@@ -14,6 +14,7 @@
 		FeedStore,
 		ThemeStore,
 		PreferencesStore,
+		CommunityStore,
 		WITNESS_STORE_KEY,
 		USER_STORE_KEY,
 		NOTIFICATION_STORE_KEY,
@@ -21,7 +22,8 @@
 		NAVIGATION_STORE_KEY,
 		FEED_STORE_KEY,
 		THEME_STORE_KEY,
-		PREFERENCES_STORE_KEY
+		PREFERENCES_STORE_KEY,
+		COMMUNITY_STORE_KEY
 	} from '$lib/stores';
 	import { AppHeader, AppSidebar, TabBar, AddTabSheet } from '$lib/components/shell';
 	import { TooltipProvider } from '$lib/components/ui/tooltip';
@@ -39,6 +41,7 @@
 	const feedStore = new FeedStore();
 	const themeStore = new ThemeStore();
 	const preferencesStore = new PreferencesStore();
+	const communityStore = new CommunityStore();
 
 	setContext(SERVICES_KEY, services);
 	setContext(WITNESS_STORE_KEY, witnessStore);
@@ -49,6 +52,7 @@
 	setContext(FEED_STORE_KEY, feedStore);
 	setContext(THEME_STORE_KEY, themeStore);
 	setContext(PREFERENCES_STORE_KEY, preferencesStore);
+	setContext(COMMUNITY_STORE_KEY, communityStore);
 
 	let { children } = $props();
 
@@ -59,6 +63,7 @@
 	$effect(() => {
 		userStore.loadCurrentUser();
 		notificationStore.loadNotifications();
+		communityStore.loadCommunityData();
 	});
 
 	// ---------------------------------------------------------------------------

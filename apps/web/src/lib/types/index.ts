@@ -90,7 +90,7 @@ export type {
 } from './witness';
 
 // Domain aggregates — User
-export type { UserProfile, UserStats } from './user';
+export type { UserProfile, UserStats, TandangSignals, OctalysisScores, ActivityItem } from './user';
 
 // Domain aggregates — Notification
 export type { NotificationType, AppNotification } from './notification';
@@ -127,6 +127,14 @@ export type {
 	UserMonitorRecord
 } from './feed';
 export { shouldAutoMonitor } from './feed';
+
+// Domain aggregates — Community
+export type {
+	CommunityStats,
+	ParticipationDataPoint,
+	CommunitySignalSummary,
+	CommunityActivityItem
+} from './community';
 
 // ---------------------------------------------------------------------------
 // Navigation

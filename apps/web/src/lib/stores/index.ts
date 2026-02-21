@@ -19,6 +19,7 @@ export { NavigationStore } from './navigation-store.svelte';
 export { FeedStore } from './feed-store.svelte';
 export { ThemeStore } from './theme-store.svelte';
 export { PreferencesStore } from './preferences-store.svelte';
+export { CommunityStore } from './community-store.svelte';
 
 // ---------------------------------------------------------------------------
 // Import types for context helpers
@@ -32,6 +33,7 @@ import type { NavigationStore } from './navigation-store.svelte';
 import type { FeedStore } from './feed-store.svelte';
 import type { ThemeStore } from './theme-store.svelte';
 import type { PreferencesStore } from './preferences-store.svelte';
+import type { CommunityStore } from './community-store.svelte';
 
 // ---------------------------------------------------------------------------
 // Context keys
@@ -45,6 +47,7 @@ export const NAVIGATION_STORE_KEY = Symbol('navigation-store');
 export const FEED_STORE_KEY = Symbol('feed-store');
 export const THEME_STORE_KEY = Symbol('theme-store');
 export const PREFERENCES_STORE_KEY = Symbol('preferences-store');
+export const COMMUNITY_STORE_KEY = Symbol('community-store');
 
 // ---------------------------------------------------------------------------
 // Typed context getters (for use in components)
@@ -88,4 +91,9 @@ export function getThemeStore(): ThemeStore {
 /** Get the PreferencesStore from component context. */
 export function getPreferencesStore(): PreferencesStore {
 	return getContext<PreferencesStore>(PREFERENCES_STORE_KEY);
+}
+
+/** Get the CommunityStore from component context. */
+export function getCommunityStore(): CommunityStore {
+	return getContext<CommunityStore>(COMMUNITY_STORE_KEY);
 }

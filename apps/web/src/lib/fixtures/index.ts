@@ -5,3 +5,4 @@ export * from './mock-plan';
 export * from './mock-witnesses';
 export * from './mock-users';
 export * from './mock-notifications';
+export * from './mock-community';
