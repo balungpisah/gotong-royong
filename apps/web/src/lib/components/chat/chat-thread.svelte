@@ -5,13 +5,14 @@
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { safeSlide as slide } from '$lib/utils/safe-slide';
+	import { untrack } from 'svelte';
 
 	let { messages }: { messages: ChatMessage[] } = $props();
 
 	// Onboarding card — expanded by default, auto-collapses once when first
 	// system message arrives, but manual toggle always works after that.
 	const hasSystemMessage = $derived(messages.some((m) => m.type === 'system'));
-	let onboardingExpanded = $state(!hasSystemMessage);
+	let onboardingExpanded = $state(!untrack(() => hasSystemMessage));
 	let autoCollapsed = $state(false);
 
 	// Auto-collapse once when the first system message arrives
