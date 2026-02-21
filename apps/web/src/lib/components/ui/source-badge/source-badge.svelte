@@ -43,6 +43,6 @@
 	class={cn(sourceBadgeVariants({ source }), className)}
 	{...restProps}
 >
-	<span class="text-[11px]">{icons[source]}</span>
+	<span class="text-xs">{icons[source]}</span>
 	<span>{source === 'ai' ? 'AI' : source === 'human' ? 'Manual' : 'Sistem'}</span>
 </span>

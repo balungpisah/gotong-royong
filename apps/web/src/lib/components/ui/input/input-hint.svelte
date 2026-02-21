@@ -13,7 +13,7 @@
 <p
 	bind:this={ref}
 	data-slot="input-hint"
-	class={cn('text-[11px] text-kayu', className)}
+	class={cn('text-xs text-kayu', className)}
 	{...restProps}
 >
 	{@render children?.()}

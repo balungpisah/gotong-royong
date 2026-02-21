@@ -5,7 +5,7 @@
 		slots: {
 			wrapper: 'inline-flex items-center gap-1.5',
 			dot: 'size-2 shrink-0 rounded-full',
-			label: 'text-[11px] font-bold'
+			label: 'text-xs font-bold'
 		},
 		variants: {
 			status: {

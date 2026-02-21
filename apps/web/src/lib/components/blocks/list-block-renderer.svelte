@@ -109,7 +109,7 @@
 			<div class="rounded-lg border border-border bg-card p-3">
 				<p class="text-sm font-medium">{item.label}</p>
 				<div class="mt-2 flex items-center gap-2">
-					<Badge variant={item.status === 'completed' ? 'success' : 'secondary'} class="text-[11px]">
+					<Badge variant={item.status === 'completed' ? 'success' : 'secondary'} class="text-xs">
 						{item.status}
 					</Badge>
 					<SourceBadge source={item.source} />

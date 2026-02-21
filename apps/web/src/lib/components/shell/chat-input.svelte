@@ -116,7 +116,7 @@
 	>
 		<!-- "Mulai di sini" badge -->
 		<div class="mb-2.5">
-			<span class="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold tracking-wide text-primary-foreground uppercase">
+			<span class="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold tracking-wide text-primary-foreground uppercase">
 				<Sparkles class="size-2.5" />
 				Mulai di sini
 			</span>
@@ -128,7 +128,7 @@
 			</div>
 			<div class="flex-1 min-w-0">
 				<p class="text-[13px] font-semibold text-foreground leading-tight">Ceritakan kejadian</p>
-				<p class="mt-0.5 text-[11px] text-muted-foreground truncate">
+				<p class="mt-0.5 text-xs text-muted-foreground truncate">
 					Ketuk untuk mulai laporan...
 				</p>
 			</div>
@@ -159,7 +159,7 @@
 				<span class="font-medium">AI-00 Triage</span>
 				{#if triageStore.confidence}
 					<span
-						class="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+						class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
 					>
 						{triageStore.confidence.label}
 					</span>

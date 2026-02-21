@@ -52,7 +52,7 @@
 	{#if !message.is_self}
 		<div class="relative shrink-0">
 			<Avatar class="size-8 ring-2 ring-offset-1 ring-offset-background" style="--tw-ring-color: {avatarRingColor}">
-				<AvatarFallback class="text-[11px]">{initials}</AvatarFallback>
+				<AvatarFallback class="text-xs">{initials}</AvatarFallback>
 			</Avatar>
 			<!-- Role dot on avatar -->
 			{#if message.author.role}
@@ -65,7 +65,7 @@
 	<div class={cn('max-w-[75%] flex flex-col gap-1', message.is_self ? 'items-end' : 'items-start')}>
 		{#if !message.is_self}
 			<div class="flex items-center gap-1.5">
-				<span class="text-[11px] font-medium text-muted-foreground">{message.author.name}</span>
+				<span class="text-xs font-medium text-muted-foreground">{message.author.name}</span>
 				<!-- CD5: Role badge -->
 				{#if message.author.role}
 					<span class="rounded px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider {roleColors[message.author.role] ?? 'bg-muted text-muted-foreground'}">

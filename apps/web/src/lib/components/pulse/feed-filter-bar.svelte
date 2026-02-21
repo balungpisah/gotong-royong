@@ -29,7 +29,7 @@
 			onclick={() => onFilterChange(filter.key)}
 		>
 			{#if filter.icon}
-				<span class="text-[11px]">{filter.icon}</span>
+				<span class="text-xs">{filter.icon}</span>
 			{/if}
 			{filter.labelKey()}
 		</button>

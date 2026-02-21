@@ -63,7 +63,7 @@
 			<button
 				onclick={handleStempel}
 				disabled={stempeling}
-				class="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-primary/30 bg-primary/5 px-2 text-[11px] font-medium text-primary transition hover:bg-primary/10 active:scale-[0.97] disabled:opacity-50"
+				class="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-primary/30 bg-primary/5 px-2 text-xs font-medium text-primary transition hover:bg-primary/10 active:scale-[0.97] disabled:opacity-50"
 				aria-label="Stempel — minta AI evaluasi kemajuan fase"
 			>
 				{#if stempeling}

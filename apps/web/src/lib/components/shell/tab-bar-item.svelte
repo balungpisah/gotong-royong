@@ -23,7 +23,7 @@
 		variants: {
 			layout: {
 				mobile:
-					'flex-col gap-1 rounded-lg px-2 py-2 text-[11px]',
+					'flex-col gap-1 rounded-lg px-2 py-2 text-xs',
 				desktop:
 					'gap-2 rounded-full px-3 py-2 text-sm'
 			},

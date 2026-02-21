@@ -93,7 +93,7 @@
 										{cp.title}
 									</span>
 									{#if cp.description}
-										<p class="mt-0.5 text-[11px] text-muted-foreground">{cp.description}</p>
+										<p class="mt-0.5 text-xs text-muted-foreground">{cp.description}</p>
 									{/if}
 								</div>
 								{#if cp.evidence_required}

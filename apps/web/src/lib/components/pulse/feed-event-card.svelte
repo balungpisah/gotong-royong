@@ -194,7 +194,7 @@
 				{#if countdown}
 					<div class="flex items-center gap-1.5">
 						<ClockIcon class="size-3 {countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-amber-500' : 'text-muted-foreground/60'}" />
-						<span class="text-[11px] font-semibold
+						<span class="text-xs font-semibold
 							{countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-amber-600' : 'text-muted-foreground/70'}">
 							{item.deadline_label ?? 'Berakhir'}: {countdown.label}
 						</span>
@@ -219,7 +219,7 @@
 
 		<!-- Repost attribution -->
 		{#if item.repost}
-			<p class="mb-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
+			<p class="mb-2.5 flex items-center gap-1.5 text-xs text-muted-foreground/70">
 				{#if item.repost.reposter_avatar}
 					<img src={item.repost.reposter_avatar} alt="" class="inline-block size-4 rounded-full" />
 				{/if}
@@ -246,9 +246,9 @@
 
 		<!-- Event meta — verb + time -->
 		<div class="mt-2 flex items-center gap-1.5">
-			<span class="text-[11px] text-muted-foreground/60">{item.latest_event.verb}</span>
-			<span class="text-[11px] text-muted-foreground/25">·</span>
-			<span class="text-[11px] text-muted-foreground/45">{timeAgo(item.latest_event.timestamp)}</span>
+			<span class="text-xs text-muted-foreground/60">{item.latest_event.verb}</span>
+			<span class="text-xs text-muted-foreground/25">·</span>
+			<span class="text-xs text-muted-foreground/45">{timeAgo(item.latest_event.timestamp)}</span>
 		</div>
 
 		<!-- Body — AI-summarized narrative from the saksi conversation -->
@@ -350,7 +350,7 @@
 			{/if}
 
 			<!-- Member count -->
-			<span class="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground/60">
+			<span class="inline-flex items-center gap-0.5 text-xs text-muted-foreground/60">
 				<UsersIcon class="size-2.5" />
 				{item.member_count}
 			</span>

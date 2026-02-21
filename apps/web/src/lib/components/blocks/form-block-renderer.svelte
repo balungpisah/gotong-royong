@@ -17,7 +17,7 @@
 	{#each block.fields as field (field.id)}
 		<div class="flex flex-col gap-1.5">
 			<div class="flex items-center gap-2">
-				<label for={field.id} class="text-[11px] font-bold uppercase tracking-wide text-foreground">
+				<label for={field.id} class="text-xs font-bold uppercase tracking-wide text-foreground">
 					{field.label}
 				</label>
 				<SourceBadge source={field.source} />

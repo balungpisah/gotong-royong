@@ -69,7 +69,7 @@
 		<button
 			type="button"
 			onclick={() => navStore.openAddPanel()}
-			class="inline-flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+			class="inline-flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
 			aria-label={m.shell_nav_add_tab()}
 		>
 			<Plus class="size-4" />

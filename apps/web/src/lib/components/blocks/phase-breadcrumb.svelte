@@ -50,7 +50,7 @@
 						)}
 					></div>
 					<span class={cn(
-						'max-w-[60px] truncate text-[11px] font-medium',
+						'max-w-[60px] truncate text-xs font-medium',
 						phase.status === 'active' ? 'text-api' : phase.status === 'completed' ? 'text-berhasil' : 'text-muted-foreground'
 					)}>
 						{phase.title}

@@ -68,9 +68,9 @@
 							<ProtectedBadge />
 						{/if}
 					</div>
-					<p class="text-[11px] text-muted-foreground">{item.path}</p>
+					<p class="text-xs text-muted-foreground">{item.path}</p>
 					{#if item.operation === 'modify' && item.old_value !== undefined}
-						<div class="mt-1 flex items-center gap-2 text-[11px]">
+						<div class="mt-1 flex items-center gap-2 text-xs">
 							<span class="rounded bg-bahaya-lembut px-1 text-bahaya line-through">{String(item.old_value)}</span>
 							<span>→</span>
 							<span class="rounded bg-berhasil-lembut px-1 text-berhasil">{String(item.new_value)}</span>

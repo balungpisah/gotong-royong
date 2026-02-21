@@ -239,7 +239,7 @@
 			{config.title}
 		</span>
 		{#if config.metric}
-			<span class="shrink-0 text-[11px] italic text-muted-foreground/50">{config.metric}</span>
+			<span class="shrink-0 text-xs italic text-muted-foreground/50">{config.metric}</span>
 		{/if}
 		{#if config.actionLabel}
 			<Badge variant={config.actionVariant} class="shrink-0 text-[10px]">
@@ -257,7 +257,7 @@
 	<!-- Expanded content — unified Ruang Interaksi style wrapper -->
 	{#if expanded}
 		<div class="pl-5 pt-1" transition:slide={{ duration: 150 }}>
-			<div class="space-y-2.5 rounded-lg border border-border/40 bg-card/60 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+			<div class="space-y-2.5 rounded-lg border border-border/40 bg-card/60 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
 				{#if message.type === 'system'}
 					<p>{(message as SystemMessage).content}</p>
 				{:else if message.type === 'ai_card'}

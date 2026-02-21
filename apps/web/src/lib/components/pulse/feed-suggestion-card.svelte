@@ -35,18 +35,18 @@
 						<span class="truncate text-sm font-medium text-foreground">{entity.label}</span>
 					</div>
 					{#if entity.description}
-						<p class="mt-0.5 truncate text-[11px] text-muted-foreground">
+						<p class="mt-0.5 truncate text-xs text-muted-foreground">
 							{entity.description}
 						</p>
 					{/if}
-					<p class="text-[11px] text-muted-foreground/70">
+					<p class="text-xs text-muted-foreground/70">
 						{entity.witness_count} aktivitas · {entity.follower_count} pengikut
 					</p>
 				</div>
 
 				<button
 					onclick={() => onFollow(entity.entity_id)}
-					class="shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors
+					class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors
 						{entity.followed
 						? 'bg-primary/10 text-primary'
 						: 'bg-primary text-primary-foreground hover:bg-primary/90'}"

@@ -13,7 +13,7 @@
 <label
 	bind:this={ref}
 	data-slot="input-label"
-	class={cn('text-[11px] font-bold uppercase tracking-wide text-tanah', className)}
+	class={cn('text-xs font-bold uppercase tracking-wide text-tanah', className)}
 	{...restProps}
 >
 	{@render children?.()}

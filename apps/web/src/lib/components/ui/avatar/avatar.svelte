@@ -6,7 +6,7 @@
 		variants: {
 			size: {
 				xs: 'size-5 text-[10px]',
-				sm: 'size-7 text-[11px]',
+				sm: 'size-7 text-xs',
 				md: 'size-9 text-[13px]',
 				lg: 'size-12 text-[17px]',
 				xl: 'size-16 text-[22px]'

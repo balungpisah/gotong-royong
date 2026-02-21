@@ -67,7 +67,7 @@
 		</div>
 		<div>
 			<h2 class="text-base font-bold text-foreground">{m.pulse_discover_title()}</h2>
-			<p class="text-[11px] text-muted-foreground">{m.pulse_discover_suggested()}</p>
+			<p class="text-xs text-muted-foreground">{m.pulse_discover_suggested()}</p>
 		</div>
 	</div>
 
@@ -107,7 +107,7 @@
 							{#if item.entities.some((e) => !e.followed)}
 								<button
 									onclick={() => followAllInGroup(item.entities)}
-									class="text-[11px] font-semibold text-primary hover:underline"
+									class="text-xs font-semibold text-primary hover:underline"
 								>
 									{m.pulse_discover_follow_all_group()}
 								</button>
@@ -123,18 +123,18 @@
 											{entity.label}
 										</p>
 										{#if entity.description}
-											<p class="mt-0.5 truncate text-[11px] text-muted-foreground">
+											<p class="mt-0.5 truncate text-xs text-muted-foreground">
 												{entity.description}
 											</p>
 										{/if}
-										<p class="text-[11px] text-muted-foreground/70">
+										<p class="text-xs text-muted-foreground/70">
 											{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {entity.follower_count} pengikut
 										</p>
 									</div>
 
 									<button
 										onclick={() => feedStore.toggleFollow(entity.entity_id)}
-										class="shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors
+										class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors
 											{entity.followed
 											? 'bg-primary/10 text-primary'
 											: 'bg-primary text-primary-foreground hover:bg-primary/90'}"
@@ -148,7 +148,7 @@
 				{:else}
 					<!-- Placeholder cards (trending, nearby) -->
 					<section class="rounded-xl border border-dashed border-border/40 bg-muted/10 p-4 text-center">
-						<p class="text-[11px] text-muted-foreground/60">
+						<p class="text-xs text-muted-foreground/60">
 							{item.emoji} {item.label()} — segera hadir
 						</p>
 					</section>

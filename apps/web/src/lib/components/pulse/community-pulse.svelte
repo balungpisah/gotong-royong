@@ -113,7 +113,7 @@
 					</motion.div>
 				{/each}
 			</div>
-			<div class="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
+			<div class="mt-1.5 flex justify-between text-xs text-muted-foreground">
 				<span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
 			</div>
 		</motion.div>
@@ -136,7 +136,7 @@
 						<div class="mt-0.5 size-2 shrink-0 rounded-full bg-primary/50"></div>
 						<div class="min-w-0 flex-1">
 							<p class="text-[var(--fs-caption)] leading-relaxed text-foreground/80">{item.text}</p>
-							<p class="mt-0.5 text-[11px] text-muted-foreground">{item.time} lalu</p>
+							<p class="mt-0.5 text-xs text-muted-foreground">{item.time} lalu</p>
 						</div>
 					</div>
 				{/each}

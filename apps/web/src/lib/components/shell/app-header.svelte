@@ -61,7 +61,7 @@
 					<BellRing class="size-5" />
 					{#if notificationStore.hasUnread}
 						<span
-							class="absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full bg-destructive text-[11px] font-bold text-white"
+							class="absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-white"
 						>
 							{notificationStore.unreadCount > 9 ? '9+' : notificationStore.unreadCount}
 						</span>

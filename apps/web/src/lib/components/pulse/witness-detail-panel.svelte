@@ -199,7 +199,7 @@
 									<p class="text-[13px] font-bold leading-snug text-foreground line-clamp-2">
 										{feedItem.hook_line}
 									</p>
-									<p class="mt-0.5 text-[11px] leading-snug text-muted-foreground/70 line-clamp-1">
+									<p class="mt-0.5 text-xs leading-snug text-muted-foreground/70 line-clamp-1">
 										{feedItem.title}
 									</p>
 								{:else}
@@ -248,9 +248,9 @@
 						>
 							<span class="flex items-center gap-1.5">
 								<UsersIcon class="size-3 text-muted-foreground" />
-								<span class="text-[11px] font-semibold text-foreground">Ikhtisar</span>
+								<span class="text-xs font-semibold text-foreground">Ikhtisar</span>
 							</span>
-							<span class="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+							<span class="flex items-center gap-1.5 text-xs text-muted-foreground/60">
 								<span>👥 {memberCount}</span>
 								<span>💬 {detail.message_count}</span>
 								<ChevronDown
@@ -280,7 +280,7 @@
 										{:else}
 											<Circle class="size-3 text-muted-foreground/40" />
 										{/if}
-										<span class="truncate text-[11px] {i === currentPhaseIndex ? 'font-semibold text-foreground' : 'text-muted-foreground'}">
+										<span class="truncate text-xs {i === currentPhaseIndex ? 'font-semibold text-foreground' : 'text-muted-foreground'}">
 											{phase.title}
 										</span>
 									</span>
@@ -326,8 +326,8 @@
 				{#if expandedItem === 'overview'}
 					<!-- Overview: aggregate stats -->
 					<div class="space-y-1.5">
-						<p class="drawer-title text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Ikhtisar</p>
-						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+						<p class="drawer-title text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ikhtisar</p>
+						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 							<span class="inline-flex items-center gap-1">
 								<UsersIcon class="size-3" />
 								{memberCount} anggota
@@ -353,7 +353,7 @@
 					{@const counts = checkpointCounts(phase)}
 					<div class="space-y-2">
 						<div class="drawer-title flex items-center justify-between">
-							<p class="text-[11px] font-semibold text-foreground">
+							<p class="text-xs font-semibold text-foreground">
 								{phase.title}
 							</p>
 							<span class="text-[10px] tabular-nums text-muted-foreground">
@@ -365,7 +365,7 @@
 						{/if}
 						<ul class="space-y-1">
 							{#each phase.checkpoints as cp (cp.checkpoint_id)}
-								<li class="flex items-start gap-1.5 text-[11px]">
+								<li class="flex items-start gap-1.5 text-xs">
 									{#if cp.status === 'completed'}
 										<Check class="mt-0.5 size-3 shrink-0 text-green-600" />
 										<span class="text-muted-foreground line-through">{cp.title}</span>

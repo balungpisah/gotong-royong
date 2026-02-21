@@ -84,7 +84,7 @@
 				{#if witness.track_hint}
 					<Badge
 						variant={trackVariantMap[witness.track_hint] ?? 'secondary'}
-						class="text-[11px]"
+						class="text-xs"
 					>
 						{witness.track_hint}
 					</Badge>
@@ -101,7 +101,7 @@
 				</span>
 
 				{#if witness.unread_count > 0}
-					<Badge variant="destructive" class="text-[11px]">
+					<Badge variant="destructive" class="text-xs">
 						{witness.unread_count} baru
 					</Badge>
 				{/if}

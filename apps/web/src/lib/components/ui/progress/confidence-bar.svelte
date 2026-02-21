@@ -32,6 +32,6 @@
 		></div>
 	</div>
 	{#if showLabel}
-		<span class="text-[11px] font-semibold text-kayu">{percentage}%</span>
+		<span class="text-xs font-semibold text-kayu">{percentage}%</span>
 	{/if}
 </div>

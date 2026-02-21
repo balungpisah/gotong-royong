@@ -113,7 +113,7 @@
 								: 'bg-muted-foreground/30'}"
 					></span>
 					{#if i === activeIndex}
-						<span class="text-[11px] font-medium text-primary">
+						<span class="text-xs font-medium text-primary">
 							{i + 1}/{phases.length}
 						</span>
 					{/if}
@@ -163,7 +163,7 @@
 							: currentPhase.status === 'blocked'
 								? 'danger'
 								: 'secondary'}
-					class="shrink-0 text-[11px]"
+					class="shrink-0 text-xs"
 				>
 					{currentPhase.status}
 				</Badge>
@@ -194,7 +194,7 @@
 										{cp.title}
 									</span>
 									{#if cp.description}
-										<p class="mt-0.5 text-[11px] text-muted-foreground">
+										<p class="mt-0.5 text-xs text-muted-foreground">
 											{cp.description}
 										</p>
 									{/if}

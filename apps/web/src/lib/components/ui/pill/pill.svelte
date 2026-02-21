@@ -2,7 +2,7 @@
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	export const pillVariants = tv({
-		base: 'inline-flex w-fit shrink-0 items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold whitespace-nowrap transition-colors [&>svg]:pointer-events-none [&>svg]:size-3',
+		base: 'inline-flex w-fit shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-bold whitespace-nowrap transition-colors [&>svg]:pointer-events-none [&>svg]:size-3',
 		variants: {
 			variant: {
 				default: 'bg-kapas text-tanah',
