@@ -10,7 +10,7 @@
 	 */
 
 	import type { FeedEventType, MyRelation, SignalCounts } from '$lib/types';
-	import { slide } from 'svelte/transition';
+	import { safeSlide as slide } from '$lib/utils/safe-slide';
 	import { quintOut } from 'svelte/easing';
 	import HandshakeIcon from '@lucide/svelte/icons/handshake';
 	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';

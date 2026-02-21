@@ -15,7 +15,7 @@
 	import CircleDot from '@lucide/svelte/icons/circle-dot';
 	import Lock from '@lucide/svelte/icons/lock';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import { slide } from 'svelte/transition';
+	import { safeSlide as slide } from '$lib/utils/safe-slide';
 
 	interface Props {
 		detail: WitnessDetail;

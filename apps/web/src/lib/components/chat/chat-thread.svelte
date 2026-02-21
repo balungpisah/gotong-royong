@@ -4,7 +4,7 @@
 	import CardEnvelope from './card-envelope.svelte';
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import { slide } from 'svelte/transition';
+	import { safeSlide as slide } from '$lib/utils/safe-slide';
 
 	let { messages }: { messages: ChatMessage[] } = $props();
 

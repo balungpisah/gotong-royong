@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { slide, fly } from 'svelte/transition';
+	import { fly } from 'svelte/transition';
+	import { safeSlide as slide } from '$lib/utils/safe-slide';
 	import type { Phase } from '$lib/types';
 	import { Badge } from '$lib/components/ui/badge';
 	import { m } from '$lib/paraglide/messages';

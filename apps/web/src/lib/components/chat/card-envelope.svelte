@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { slide } from 'svelte/transition';
+	import { safeSlide as slide } from '$lib/utils/safe-slide';
 	import type {
 		ChatMessage,
 		AiCardMessage,
