@@ -41,7 +41,7 @@
 
 	<!-- Description -->
 	{#if card.description}
-		<p class="mt-1 text-[10px] leading-relaxed text-muted-foreground">{card.description}</p>
+		<p class="mt-1 text-[11px] leading-relaxed text-muted-foreground">{card.description}</p>
 	{/if}
 
 	<!-- Variant-specific content -->
@@ -50,31 +50,31 @@
 			{#each card.payload.entities as entity (entity.entity_id)}
 				<button
 					onclick={() => feedStore.toggleFollow(entity.entity_id)}
-					class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors
+					class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors
 						{entity.followed
 						? 'bg-primary/10 text-primary'
 						: 'bg-background border border-border/60 text-foreground hover:border-primary/40 hover:text-primary'}"
 				>
-					<span class="text-[9px]">{iconMap[entity.entity_type] ?? '📌'}</span>
+					<span class="text-[10px]">{iconMap[entity.entity_type] ?? '📌'}</span>
 					<span>{entity.label}</span>
 					{#if !entity.followed}
-						<span class="text-[9px] text-primary">+</span>
+						<span class="text-[10px] text-primary">+</span>
 					{/if}
 				</button>
 			{/each}
 		</div>
 	{:else if card.payload.variant === 'tip'}
-		<button class="mt-2 text-[10px] font-semibold text-primary hover:underline">
+		<button class="mt-2 text-[11px] font-semibold text-primary hover:underline">
 			{m.pulse_system_card_tip_learn()} →
 		</button>
 	{:else if card.payload.variant === 'milestone'}
 		<div class="mt-2 flex items-baseline gap-1.5">
 			<span class="text-lg font-bold text-primary">{card.payload.metric_value}</span>
-			<span class="text-[10px] text-muted-foreground">{card.payload.metric_label}</span>
+			<span class="text-[11px] text-muted-foreground">{card.payload.metric_label}</span>
 		</div>
 	{:else if card.payload.variant === 'prompt'}
 		<button
-			class="mt-2 rounded-md bg-primary px-3 py-1 text-[10px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+			class="mt-2 rounded-md bg-primary px-3 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
 		>
 			{card.payload.cta_label}
 		</button>

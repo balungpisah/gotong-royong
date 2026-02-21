@@ -52,7 +52,7 @@
 	{#if !message.is_self}
 		<div class="relative shrink-0">
 			<Avatar class="size-8 ring-2 ring-offset-1 ring-offset-background" style="--tw-ring-color: {avatarRingColor}">
-				<AvatarFallback class="text-[10px]">{initials}</AvatarFallback>
+				<AvatarFallback class="text-[11px]">{initials}</AvatarFallback>
 			</Avatar>
 			<!-- Role dot on avatar -->
 			{#if message.author.role}
@@ -65,16 +65,16 @@
 	<div class={cn('max-w-[75%] flex flex-col gap-1', message.is_self ? 'items-end' : 'items-start')}>
 		{#if !message.is_self}
 			<div class="flex items-center gap-1.5">
-				<span class="text-[10px] font-medium text-muted-foreground">{message.author.name}</span>
+				<span class="text-[11px] font-medium text-muted-foreground">{message.author.name}</span>
 				<!-- CD5: Role badge -->
 				{#if message.author.role}
-					<span class="rounded px-1 py-0.5 text-[7px] font-bold uppercase tracking-wider {roleColors[message.author.role] ?? 'bg-muted text-muted-foreground'}">
+					<span class="rounded px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider {roleColors[message.author.role] ?? 'bg-muted text-muted-foreground'}">
 						{roleLabels[message.author.role] ?? message.author.role}
 					</span>
 				{/if}
 				<!-- CD5: Tier stars -->
 				{#if tierDisplay}
-					<span class="text-[8px] text-peringatan/70" title="Tier {message.author.tier}">
+					<span class="text-[10px] text-peringatan/70" title="Tier {message.author.tier}">
 						{tierDisplay}
 					</span>
 				{/if}
@@ -97,6 +97,6 @@
 				{/each}
 			</div>
 		{/if}
-		<span class="text-[9px] text-muted-foreground">{timeStr}</span>
+		<span class="text-[10px] text-muted-foreground">{timeStr}</span>
 	</div>
 </div>

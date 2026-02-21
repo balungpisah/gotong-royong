@@ -166,13 +166,13 @@
 		<!-- Top row: urgency badge (with live count merged) + event emoji -->
 		<div class="mb-3 flex items-center gap-1.5">
 			{#if item.urgency}
-				<Badge variant={urgencyVariantMap[item.urgency]} class="text-[9px] px-1.5 py-0">
+				<Badge variant={urgencyVariantMap[item.urgency]} class="text-[10px] px-1.5 py-0">
 					{urgencyLabelMap[item.urgency]()}
 				</Badge>
 			{/if}
 
 			{#if isAlive}
-				<span class="inline-flex items-center gap-1 text-[9px] font-medium text-emerald-600">
+				<span class="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600">
 					<span class="relative flex size-1.5">
 						<span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
 						<span class="relative inline-flex size-1.5 rounded-full bg-emerald-500"></span>
@@ -194,7 +194,7 @@
 				{#if countdown}
 					<div class="flex items-center gap-1.5">
 						<ClockIcon class="size-3 {countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-amber-500' : 'text-muted-foreground/60'}" />
-						<span class="text-[10px] font-semibold
+						<span class="text-[11px] font-semibold
 							{countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-amber-600' : 'text-muted-foreground/70'}">
 							{item.deadline_label ?? 'Berakhir'}: {countdown.label}
 						</span>
@@ -209,7 +209,7 @@
 								style="width: {quorumPercent}%"
 							></div>
 						</div>
-						<span class="shrink-0 text-[9px] font-medium text-muted-foreground/60">
+						<span class="shrink-0 text-[10px] font-medium text-muted-foreground/60">
 							{quorumRemaining} orang lagi
 						</span>
 					</div>
@@ -247,8 +247,8 @@
 		<!-- Event meta — verb + time -->
 		<div class="mt-2 flex items-center gap-1.5">
 			<span class="text-[11px] text-muted-foreground/60">{item.latest_event.verb}</span>
-			<span class="text-[10px] text-muted-foreground/25">·</span>
-			<span class="text-[10px] text-muted-foreground/45">{timeAgo(item.latest_event.timestamp)}</span>
+			<span class="text-[11px] text-muted-foreground/25">·</span>
+			<span class="text-[11px] text-muted-foreground/45">{timeAgo(item.latest_event.timestamp)}</span>
 		</div>
 
 		<!-- Body — AI-summarized narrative from the saksi conversation -->
@@ -340,7 +340,7 @@
 							/>
 						{:else}
 							<span
-								class="flex size-5 items-center justify-center rounded-full border-[1.5px] border-card bg-muted text-[8px] font-medium text-muted-foreground"
+								class="flex size-5 items-center justify-center rounded-full border-[1.5px] border-card bg-muted text-[10px] font-medium text-muted-foreground"
 							>
 								{member.name.charAt(0)}
 							</span>
@@ -350,7 +350,7 @@
 			{/if}
 
 			<!-- Member count -->
-			<span class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+			<span class="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground/60">
 				<UsersIcon class="size-2.5" />
 				{item.member_count}
 			</span>

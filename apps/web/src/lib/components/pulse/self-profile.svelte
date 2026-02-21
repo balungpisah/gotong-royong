@@ -75,15 +75,15 @@
 			<div class="mt-2 grid grid-cols-3 gap-2">
 				<div class="rounded-lg bg-muted/20 p-2.5 text-center">
 					<p class="text-[var(--fs-h2)] font-bold text-foreground">12</p>
-					<p class="text-[10px] text-muted-foreground">Tandang</p>
+					<p class="text-[11px] text-muted-foreground">Tandang</p>
 				</div>
 				<div class="rounded-lg bg-muted/20 p-2.5 text-center">
 					<p class="text-[var(--fs-h2)] font-bold text-foreground">8</p>
-					<p class="text-[10px] text-muted-foreground">Saksi</p>
+					<p class="text-[11px] text-muted-foreground">Saksi</p>
 				</div>
 				<div class="rounded-lg bg-muted/20 p-2.5 text-center">
 					<p class="text-[var(--fs-h2)] font-bold text-foreground">5</p>
-					<p class="text-[10px] text-muted-foreground">Resolusi</p>
+					<p class="text-[11px] text-muted-foreground">Resolusi</p>
 				</div>
 			</div>
 		</motion.div>
@@ -150,7 +150,7 @@
 								style="width: {drive.score}%; opacity: {0.4 + (drive.score / 100) * 0.6}"
 							></div>
 						</div>
-						<span class="w-6 text-right text-[10px] font-medium text-foreground">{drive.score}</span>
+						<span class="w-6 text-right text-[11px] font-medium text-foreground">{drive.score}</span>
 					</div>
 				{/each}
 			</div>
@@ -174,7 +174,7 @@
 						<div class="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/40"></div>
 						<div>
 							<p class="text-[var(--fs-caption)] leading-relaxed text-foreground/80">{activity.text}</p>
-							<p class="text-[10px] text-muted-foreground">{activity.time}</p>
+							<p class="text-[11px] text-muted-foreground">{activity.time}</p>
 						</div>
 					</div>
 				{/each}

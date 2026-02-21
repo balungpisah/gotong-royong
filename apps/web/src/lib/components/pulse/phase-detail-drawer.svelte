@@ -62,7 +62,7 @@
 		>
 			<div class="flex items-center gap-2">
 				<span class="text-xs font-medium text-foreground">{phase.title}</span>
-				<Badge variant={phaseBadgeVariant} class="text-[9px]">
+				<Badge variant={phaseBadgeVariant} class="text-[10px]">
 					{phase.status}
 				</Badge>
 			</div>
@@ -93,11 +93,11 @@
 										{cp.title}
 									</span>
 									{#if cp.description}
-										<p class="mt-0.5 text-[10px] text-muted-foreground">{cp.description}</p>
+										<p class="mt-0.5 text-[11px] text-muted-foreground">{cp.description}</p>
 									{/if}
 								</div>
 								{#if cp.evidence_required}
-									<Badge variant="warning" class="shrink-0 text-[9px]">bukti</Badge>
+									<Badge variant="warning" class="shrink-0 text-[10px]">bukti</Badge>
 								{/if}
 							</li>
 						{/each}

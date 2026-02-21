@@ -32,15 +32,15 @@
 	<div class="flex flex-col gap-2">
 		<div class="flex items-start justify-between gap-2">
 			<h2 class="text-base font-bold text-foreground">{plan.title}</h2>
-			<Badge variant="secondary" class="shrink-0 text-[9px]">v{plan.version}</Badge>
+			<Badge variant="secondary" class="shrink-0 text-[10px]">v{plan.version}</Badge>
 		</div>
 		<p class="text-sm text-muted-foreground">{plan.summary}</p>
 		<div class="flex flex-wrap gap-2">
 			{#if plan.track_hint}
-				<Badge variant={`track-${plan.track_hint}` as any} class="text-[9px]">{plan.track_hint}</Badge>
+				<Badge variant={`track-${plan.track_hint}` as any} class="text-[10px]">{plan.track_hint}</Badge>
 			{/if}
 			{#if plan.seed_hint}
-				<Badge variant="confidence" class="text-[9px]">{seedHintLabels[plan.seed_hint] || plan.seed_hint}</Badge>
+				<Badge variant="confidence" class="text-[10px]">{seedHintLabels[plan.seed_hint] || plan.seed_hint}</Badge>
 			{/if}
 		</div>
 	</div>

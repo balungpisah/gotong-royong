@@ -222,12 +222,12 @@
 						<div class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
 							<StatusIndicator status={statusMap[detail.status] ?? 'active'} />
 							{#if detail.track_hint}
-								<Badge variant={trackVariantMap[detail.track_hint] ?? 'secondary'} class="text-[9px]">
+								<Badge variant={trackVariantMap[detail.track_hint] ?? 'secondary'} class="text-[10px]">
 									{detail.track_hint}
 								</Badge>
 							{/if}
 							{#if rahasiaDisplay.show}
-								<Badge variant={rahasiaDisplay.variant} class="text-[9px]">
+								<Badge variant={rahasiaDisplay.variant} class="text-[10px]">
 									<ShieldAlert class="mr-0.5 size-2.5" />
 									{rahasiaDisplay.label}
 								</Badge>
@@ -250,7 +250,7 @@
 								<UsersIcon class="size-3 text-muted-foreground" />
 								<span class="text-[11px] font-semibold text-foreground">Ikhtisar</span>
 							</span>
-							<span class="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+							<span class="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
 								<span>👥 {memberCount}</span>
 								<span>💬 {detail.message_count}</span>
 								<ChevronDown
@@ -284,7 +284,7 @@
 											{phase.title}
 										</span>
 									</span>
-									<span class="shrink-0 text-[9px] tabular-nums text-muted-foreground/50">
+									<span class="shrink-0 text-[10px] tabular-nums text-muted-foreground/50">
 										{counts.done}/{counts.total}
 									</span>
 								</button>
@@ -326,8 +326,8 @@
 				{#if expandedItem === 'overview'}
 					<!-- Overview: aggregate stats -->
 					<div class="space-y-1.5">
-						<p class="drawer-title text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Ikhtisar</p>
-						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+						<p class="drawer-title text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Ikhtisar</p>
+						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
 							<span class="inline-flex items-center gap-1">
 								<UsersIcon class="size-3" />
 								{memberCount} anggota
@@ -342,7 +342,7 @@
 							</span>
 						</div>
 						{#if detail.unread_count > 0}
-							<Badge variant="danger" class="text-[9px]">
+							<Badge variant="danger" class="text-[10px]">
 								{detail.unread_count} pesan baru
 							</Badge>
 						{/if}
@@ -353,19 +353,19 @@
 					{@const counts = checkpointCounts(phase)}
 					<div class="space-y-2">
 						<div class="drawer-title flex items-center justify-between">
-							<p class="text-[10px] font-semibold text-foreground">
+							<p class="text-[11px] font-semibold text-foreground">
 								{phase.title}
 							</p>
-							<span class="text-[9px] tabular-nums text-muted-foreground">
+							<span class="text-[10px] tabular-nums text-muted-foreground">
 								{counts.done}/{counts.total}{counts.blocked > 0 ? ` · ${counts.blocked} terblokir` : ''}
 							</span>
 						</div>
 						{#if phase.objective}
-							<p class="text-[9px] leading-relaxed text-muted-foreground/70">{phase.objective}</p>
+							<p class="text-[10px] leading-relaxed text-muted-foreground/70">{phase.objective}</p>
 						{/if}
 						<ul class="space-y-1">
 							{#each phase.checkpoints as cp (cp.checkpoint_id)}
-								<li class="flex items-start gap-1.5 text-[10px]">
+								<li class="flex items-start gap-1.5 text-[11px]">
 									{#if cp.status === 'completed'}
 										<Check class="mt-0.5 size-3 shrink-0 text-green-600" />
 										<span class="text-muted-foreground line-through">{cp.title}</span>

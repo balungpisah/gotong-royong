@@ -9,16 +9,13 @@
  */
 
 import {
-	fly,
-	fade,
-	scale,
-	slide,
 	type FlyParams,
 	type FadeParams,
 	type ScaleParams,
 	type SlideParams,
 	type TransitionConfig
 } from 'svelte/transition';
+import { safeFly as fly, safeFade as fade, safeScale as scale, safeSlide as slide } from './safe-slide';
 import { cubicOut, quintOut, backOut } from 'svelte/easing';
 
 // ─── Duration presets (match CSS custom properties) ──────────────────────────

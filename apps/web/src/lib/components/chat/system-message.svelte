@@ -76,8 +76,8 @@
 			<Sparkles class="size-3 text-berhasil animate-pulse" />
 		{/if}
 		<Icon class="size-3 {iconClass}" />
-		<span class="text-[10px] {textClass}">{message.content}</span>
-		<span class="text-[9px] text-muted-foreground/60">{timeStr}</span>
+		<span class="text-[11px] {textClass}">{message.content}</span>
+		<span class="text-[10px] text-muted-foreground/60">{timeStr}</span>
 		<!-- CD2: Party icon after celebration text -->
 		{#if message.subtype === 'phase_completed'}
 			<PartyPopper class="size-3 text-berhasil" />

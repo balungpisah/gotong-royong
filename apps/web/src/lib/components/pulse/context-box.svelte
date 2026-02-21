@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fade, fly } from 'svelte/transition';
+	import { safeFade as fade, safeFly as fly } from '$lib/utils/safe-slide';
 	import { cubicOut, cubicIn } from 'svelte/easing';
 
 	/** Slide-fade: translateX + opacity only, no layout changes.

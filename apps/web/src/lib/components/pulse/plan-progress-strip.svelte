@@ -54,7 +54,7 @@
 					style="width: {progressPercent}%"
 				></div>
 			</div>
-			<span class="text-muted-foreground shrink-0 text-[10px]">
+			<span class="text-muted-foreground shrink-0 text-[11px]">
 				{completedCheckpoints}/{totalCheckpoints}
 			</span>
 		</div>
@@ -68,7 +68,7 @@
 					onclick={() => handleDotClick(index)}
 				>
 					<div class="h-2.5 w-2.5 rounded-full transition-all duration-200 {getDotClass(phase, index)}"></div>
-					<span class="text-muted-foreground max-w-[8ch] truncate text-[9px] leading-tight">
+					<span class="text-muted-foreground max-w-[8ch] truncate text-[10px] leading-tight">
 						{phase.title}
 					</span>
 				</button>

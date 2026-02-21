@@ -2,7 +2,7 @@
 	import { tv } from 'tailwind-variants';
 
 	export const sourceBadgeVariants = tv({
-		base: 'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+		base: 'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
 		variants: {
 			source: {
 				ai: 'bg-api/10 text-api',
@@ -43,6 +43,6 @@
 	class={cn(sourceBadgeVariants({ source }), className)}
 	{...restProps}
 >
-	<span class="text-[10px]">{icons[source]}</span>
+	<span class="text-[11px]">{icons[source]}</span>
 	<span>{source === 'ai' ? 'AI' : source === 'human' ? 'Manual' : 'Sistem'}</span>
 </span>

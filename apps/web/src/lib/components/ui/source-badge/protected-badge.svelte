@@ -14,7 +14,7 @@
 	bind:this={ref}
 	data-slot="protected-badge"
 	class={cn(
-		'inline-flex items-center gap-1 rounded-full bg-peringatan-lembut px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-peringatan',
+		'inline-flex items-center gap-1 rounded-full bg-peringatan-lembut px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-peringatan',
 		className
 	)}
 	{...restProps}

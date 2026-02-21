@@ -1,24 +1,44 @@
-import { slide, type SlideParams } from 'svelte/transition';
-import type { TransitionConfig } from 'svelte/transition';
+import {
+	slide,
+	fly,
+	fade,
+	scale,
+	type SlideParams,
+	type FlyParams,
+	type FadeParams,
+	type ScaleParams,
+	type TransitionConfig
+} from 'svelte/transition';
 
 /**
- * Wrapper around Svelte's `slide` transition that guards against NaN values
- * in keyframe properties (height, padding, margin, etc.).
+ * Wraps a Svelte transition function to sanitize NaN values in its CSS keyframes.
  *
- * This happens when `getComputedStyle` returns values that `parseFloat` can't
- * parse before the element has a measured layout.
+ * Svelte 5 measures element dimensions via getComputedStyle and passes them to
+ * the Web Animations API. When an element has no measurable layout yet (e.g.
+ * entering the DOM inside a conditional block), parseFloat returns NaN, producing
+ * console errors like "Invalid keyframe value for property height: NaNpx".
+ *
+ * This wrapper intercepts the css() output and replaces NaN with 0.
  */
-export function safeSlide(node: Element, params?: SlideParams): TransitionConfig {
-	const result = slide(node, params);
-	const originalCss = result.css;
+function wrapTransition<P>(
+	fn: (node: Element, params?: P) => TransitionConfig
+): (node: Element, params?: P) => TransitionConfig {
+	return (node: Element, params?: P): TransitionConfig => {
+		const result = fn(node, params);
+		const originalCss = result.css;
 
-	if (originalCss) {
-		result.css = (t: number, u: number) => {
-			const css = originalCss(t, u);
-			// Replace any NaN values (e.g. "height: NaNpx") with 0
-			return css.replace(/NaN/g, '0');
-		};
-	}
+		if (originalCss) {
+			result.css = (t: number, u: number) => {
+				const css = originalCss(t, u);
+				return css.replace(/NaN/g, '0');
+			};
+		}
 
-	return result;
+		return result;
+	};
 }
+
+export const safeSlide = wrapTransition<SlideParams>(slide);
+export const safeFly = wrapTransition<FlyParams>(fly);
+export const safeFade = wrapTransition<FadeParams>(fade);
+export const safeScale = wrapTransition<ScaleParams>(scale);

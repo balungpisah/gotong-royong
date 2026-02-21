@@ -29,7 +29,7 @@
 <div class={cn('flex flex-col gap-3', !bare && 'rounded-lg border border-border bg-card p-4')} data-slot="vote-block">
 	<div class="flex items-start justify-between gap-2">
 		<p class="text-sm font-bold text-foreground">{block.question}</p>
-		<Badge variant="info" class="shrink-0 text-[10px]">{voteTypeLabels[block.vote_type] || block.vote_type}</Badge>
+		<Badge variant="info" class="shrink-0 text-[11px]">{voteTypeLabels[block.vote_type] || block.vote_type}</Badge>
 	</div>
 
 	<div class="flex flex-col gap-2">

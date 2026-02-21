@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fly } from 'svelte/transition';
+	import { safeFly as fly } from '$lib/utils/safe-slide';
 	import { safeSlide as slide } from '$lib/utils/safe-slide';
 	import type { Phase } from '$lib/types';
 	import { Badge } from '$lib/components/ui/badge';
@@ -277,9 +277,9 @@
 				{handlebarTitle}
 			</span>
 			{#if handlebarMeta}
-				<span class="shrink-0 text-[10px] text-muted-foreground">{handlebarMeta}</span>
+				<span class="shrink-0 text-[11px] text-muted-foreground">{handlebarMeta}</span>
 			{/if}
-			<Badge variant={handlebarBadgeVariant} class="shrink-0 text-[9px]">
+			<Badge variant={handlebarBadgeVariant} class="shrink-0 text-[10px]">
 				{m.pulse_nav_phase({ num: focusedIndex + 1 })} {m.pulse_nav_of_total({ total: phases.length })}
 			</Badge>
 			<ChevronDown
@@ -301,7 +301,7 @@
 								style="width: {progressPercent}%"
 							></div>
 						</div>
-						<span class="shrink-0 text-[10px] text-muted-foreground">
+						<span class="shrink-0 text-[11px] text-muted-foreground">
 							{completedCheckpoints}/{totalCheckpoints}
 						</span>
 					</div>
@@ -360,14 +360,14 @@
 										<span class="text-xs font-semibold text-foreground">
 											{focusedPhase.title}
 										</span>
-										<Badge variant={handlebarBadgeVariant} class="text-[9px]">
+										<Badge variant={handlebarBadgeVariant} class="text-[10px]">
 											{focusedPhase.status}
 										</Badge>
 									</div>
 
 									<!-- Narrative status line -->
 									{#if narrativeStatus}
-										<p class="mb-1.5 text-[10px] text-muted-foreground/70">
+										<p class="mb-1.5 text-[11px] text-muted-foreground/70">
 											{narrativeStatus}
 										</p>
 									{/if}
@@ -388,7 +388,7 @@
 													style="width: {focusedPercent}%"
 												></div>
 											</div>
-											<span class="text-[9px] tabular-nums text-muted-foreground">
+											<span class="text-[10px] tabular-nums text-muted-foreground">
 												{focusedCompleted}/{focusedTotal}
 											</span>
 										</div>
@@ -398,7 +398,7 @@
 									{#if focusedPhase.status === 'completed'}
 										<div class="mb-2 flex items-center gap-1.5 rounded-md bg-berhasil/10 px-2 py-1">
 											<Sparkles class="size-3 text-berhasil animate-pulse" />
-											<span class="text-[10px] font-medium text-berhasil">
+											<span class="text-[11px] font-medium text-berhasil">
 												Bab ini berhasil dituntaskan oleh warga!
 											</span>
 										</div>
@@ -422,17 +422,17 @@
 															{cp.title}
 														</span>
 														{#if cp.description}
-															<p class="mt-0.5 text-[10px] text-muted-foreground">
+															<p class="mt-0.5 text-[11px] text-muted-foreground">
 																{cp.description}
 															</p>
 														{/if}
 													</div>
 													<!-- CD4: Source ownership tag -->
-													<span class="mt-0.5 inline-flex shrink-0 items-center gap-0.5 text-[8px] text-muted-foreground/50" title={getSourceLabel(cp.source)}>
+													<span class="mt-0.5 inline-flex shrink-0 items-center gap-0.5 text-[10px] text-muted-foreground/50" title={getSourceLabel(cp.source)}>
 														<SourceIcon class="size-2.5" />
 													</span>
 													{#if cp.evidence_required && cp.status !== 'completed'}
-														<Badge variant="warning" class="shrink-0 text-[9px]">
+														<Badge variant="warning" class="shrink-0 text-[10px]">
 															<ClipboardCheck class="mr-0.5 size-2.5" />
 															{m.pulse_nav_evidence()}
 														</Badge>
@@ -446,11 +446,11 @@
 									{#if isFuturePhase}
 										<div class="flex flex-col items-center gap-1 py-3 text-center">
 											<Lock class="size-5 text-muted-foreground/30" />
-											<span class="text-[10px] text-muted-foreground/50">
+											<span class="text-[11px] text-muted-foreground/50">
 												Selesaikan bab sebelumnya untuk membuka
 											</span>
 											{#if focusedTotal > 0}
-												<span class="text-[9px] text-muted-foreground/30">
+												<span class="text-[10px] text-muted-foreground/30">
 													{focusedTotal} langkah menanti
 												</span>
 											{/if}
@@ -476,7 +476,7 @@
 								aria-label={phase.title}
 							>
 								<div
-									class="flex size-5 items-center justify-center rounded-full text-[8px] font-bold transition-all duration-200 {index === focusedIndex
+									class="flex size-5 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-200 {index === focusedIndex
 										? 'bg-primary text-primary-foreground ring-2 ring-primary/30 scale-110'
 										: phase.status === 'completed'
 											? 'bg-berhasil/20 text-berhasil'

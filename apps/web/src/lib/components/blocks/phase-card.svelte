@@ -46,7 +46,7 @@
 	<div class="flex items-center justify-between gap-2 border-b border-border/50 px-4 py-3">
 		<div class="flex items-center gap-2">
 			<h4 class="text-sm font-bold text-foreground">{phase.title}</h4>
-			<Badge variant={statusVariant(phase.status)} class="text-[9px]">{phase.status}</Badge>
+			<Badge variant={statusVariant(phase.status)} class="text-[10px]">{phase.status}</Badge>
 		</div>
 		<SourceBadge source={phase.source} />
 	</div>

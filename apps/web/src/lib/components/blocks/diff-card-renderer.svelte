@@ -32,7 +32,7 @@
 				{diff.items.length} perubahan · {diff.target_type}
 			</p>
 		</div>
-		<Badge variant="default" class="shrink-0 text-[9px]">🤖 AI</Badge>
+		<Badge variant="default" class="shrink-0 text-[10px]">🤖 AI</Badge>
 	</div>
 
 	<!-- Evidence (collapsible) -->
@@ -68,9 +68,9 @@
 							<ProtectedBadge />
 						{/if}
 					</div>
-					<p class="text-[10px] text-muted-foreground">{item.path}</p>
+					<p class="text-[11px] text-muted-foreground">{item.path}</p>
 					{#if item.operation === 'modify' && item.old_value !== undefined}
-						<div class="mt-1 flex items-center gap-2 text-[10px]">
+						<div class="mt-1 flex items-center gap-2 text-[11px]">
 							<span class="rounded bg-bahaya-lembut px-1 text-bahaya line-through">{String(item.old_value)}</span>
 							<span>→</span>
 							<span class="rounded bg-berhasil-lembut px-1 text-berhasil">{String(item.new_value)}</span>

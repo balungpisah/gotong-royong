@@ -22,7 +22,7 @@
 	);
 
 	const pillClass = $derived(
-		`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] leading-tight transition-colors ${
+		`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[11px] leading-tight transition-colors ${
 			tag.followed
 				? 'border-primary/30 bg-primary/5 text-primary'
 				: 'border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted/50'
@@ -38,7 +38,7 @@
 </script>
 
 {#snippet pillContent()}
-	<span class="text-[9px]">{iconMap[tag.entity_type] ?? '📌'}</span>
+	<span class="text-[10px]">{iconMap[tag.entity_type] ?? '📌'}</span>
 	<span class="max-w-[8rem] truncate">{tag.label}</span>
 {/snippet}
 
