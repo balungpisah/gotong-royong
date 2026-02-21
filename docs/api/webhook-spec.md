@@ -76,65 +76,6 @@ hex_hash = hex_encode(signature)
 
 **Important**: Compute signature over the **raw request body bytes**, not a parsed/serialized version.
 
-### Example: Signature Computation (Python)
-
-```python
-import hmac
-import hashlib
-import json
-
-webhook_secret = "your-webhook-secret-32-chars"
-payload = {
-    "event_type": "contribution_created",
-    "actor": {"user_id": "user123", "username": "alice"},
-    "subject": {"contribution_type": "task_completion", "title": "Test"}
-}
-
-# Serialize to JSON (compact, no extra whitespace)
-payload_bytes = json.dumps(payload, separators=(',', ':')).encode('utf-8')
-
-# Compute HMAC-SHA256
-signature = hmac.new(
-    webhook_secret.encode('utf-8'),
-    payload_bytes,
-    hashlib.sha256
-).hexdigest()
-
-# Add to header
-headers = {
-    'Content-Type': 'application/json',
-    'X-GR-Signature': f'sha256={signature}'
-}
-```
-
-### Example: Signature Computation (Node.js)
-
-```javascript
-const crypto = require('crypto');
-
-const webhookSecret = 'your-webhook-secret-32-chars';
-const payload = {
-  event_type: 'contribution_created',
-  actor: { user_id: 'user123', username: 'alice' },
-  subject: { contribution_type: 'task_completion', title: 'Test' }
-};
-
-// Serialize to JSON
-const payloadBytes = JSON.stringify(payload);
-
-// Compute HMAC-SHA256
-const signature = crypto
-  .createHmac('sha256', webhookSecret)
-  .update(payloadBytes)
-  .digest('hex');
-
-// Add to header
-const headers = {
-  'Content-Type': 'application/json',
-  'X-GR-Signature': `sha256=${signature}`
-};
-```
-
 ### Example: Signature Computation (Rust)
 
 ```rust
@@ -309,54 +250,55 @@ delay = min(base_delay * (2 ^ attempt), max_delay)
 | 4 | 4s | 7s |
 | 5 | 8s | 15s |
 
-### Example: Retry Logic (Node.js)
+### Example: Retry Logic (Rust)
 
-```javascript
-async function sendWebhookWithRetry(url, payload, signature, maxAttempts = 5) {
-  let attempt = 0;
-  let lastError;
+```rust
+use reqwest::StatusCode;
+use std::time::Duration;
+use tokio::time::sleep;
 
-  while (attempt < maxAttempts) {
-    try {
-      const response = await axios.post(url, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-GR-Signature': signature,
-        },
-        timeout: 10000, // 10 second timeout
-      });
+async fn send_webhook_with_retry(
+    client: &reqwest::Client,
+    url: &str,
+    payload: &str,
+    signature: &str,
+    max_attempts: u32,
+) -> Result<serde_json::Value, Error> {
+    let mut last_error = None;
 
-      if (response.status === 200) {
-        return response.data; // Success
-      }
-    } catch (error) {
-      lastError = error;
-      const status = error.response?.status;
+    for attempt in 0..max_attempts {
+        match client
+            .post(url)
+            .header("Content-Type", "application/json")
+            .header("X-GR-Signature", signature)
+            .body(payload.to_owned())
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => {
+                return Ok(response.json().await?);
+            }
+            Ok(response) => {
+                let status = response.status();
+                // Don't retry on permanent failures
+                if status == StatusCode::BAD_REQUEST || status == StatusCode::UNAUTHORIZED {
+                    return Err(Error::PermanentFailure(status));
+                }
+                last_error = Some(Error::HttpStatus(status));
+            }
+            Err(e) => {
+                last_error = Some(Error::Request(e));
+            }
+        }
 
-      // Don't retry on permanent failures
-      if (status === 400 || status === 401) {
-        throw error;
-      }
-
-      // Don't retry on last attempt
-      if (attempt === maxAttempts - 1) {
-        break;
-      }
-
-      // Calculate backoff delay
-      const delay = Math.min(1000 * Math.pow(2, attempt), 60000);
-      console.log(`Webhook failed (attempt ${attempt + 1}), retrying in ${delay}ms`);
-      await sleep(delay);
+        if attempt < max_attempts - 1 {
+            let delay_secs = std::cmp::min(1u64 << attempt, 60);
+            tracing::warn!(attempt, delay_secs, "Webhook delivery failed, retrying");
+            sleep(Duration::from_secs(delay_secs)).await;
+        }
     }
 
-    attempt++;
-  }
-
-  throw new Error(`Webhook failed after ${maxAttempts} attempts: ${lastError.message}`);
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+    Err(last_error.unwrap_or(Error::MaxRetriesExceeded))
 }
 ```
 
@@ -389,18 +331,12 @@ Include a unique `event_id` in the payload:
 
 **Pattern**: `evt_{random_string}`
 
-**Generation** (Node.js):
-```javascript
-const crypto = require('crypto');
-const eventId = `evt_${crypto.randomBytes(8).toString('hex')}`;
+**Generation** (Rust):
+```rust
+use rand::Rng;
+let random_bytes: [u8; 8] = rand::thread_rng().gen();
+let event_id = format!("evt_{}", hex::encode(random_bytes));
 // Example: evt_a1b2c3d4e5f6789a
-```
-
-**Generation** (Python):
-```python
-import secrets
-event_id = f"evt_{secrets.token_hex(8)}"
-# Example: evt_a1b2c3d4e5f6789a
 ```
 
 ## Rate Limiting
@@ -441,17 +377,10 @@ Set a reasonable timeout to prevent hanging connections:
 
 **Recommended**: 10 seconds
 
-```javascript
-// Node.js
-axios.post(url, payload, { timeout: 10000 });
-
-// Python
-requests.post(url, json=payload, timeout=10.0)
-
-// Rust
-reqwest::Client::builder()
+```rust
+let client = reqwest::Client::builder()
     .timeout(Duration::from_secs(10))
-    .build()
+    .build()?;
 ```
 
 ### Server Timeout
@@ -467,16 +396,14 @@ If processing takes longer:
 
 ### Keep-Alive
 
-Reuse HTTP connections for better performance:
+Reuse HTTP connections for better performance. `reqwest` enables connection pooling by default — use a single `reqwest::Client` instance for all webhook deliveries:
 
-```javascript
-// Node.js
-const axiosInstance = axios.create({
-  baseURL: 'https://api.markov.local',
-  timeout: 10000,
-  httpAgent: new http.Agent({ keepAlive: true }),
-  httpsAgent: new https.Agent({ keepAlive: true }),
-});
+```rust
+// Build once at application startup, then clone the Arc for each task
+let client = reqwest::Client::builder()
+    .timeout(Duration::from_secs(10))
+    .pool_max_idle_per_host(5)
+    .build()?;
 ```
 
 ### TLS Version
@@ -518,37 +445,44 @@ curl -X POST "$MARKOV_URL" \
 
 ### Mock Server
 
-For local development, run a mock Markov server:
+For integration tests, use `wiremock` to mock the Markov server:
 
-```javascript
-// mock-markov-server.js
-const express = require('express');
-const crypto = require('crypto');
+```rust
+use wiremock::{MockServer, Mock, ResponseTemplate};
+use wiremock::matchers::{method, path, header_exists};
 
-const app = express();
-app.use(express.json());
+#[tokio::test]
+async fn webhook_delivery_retries_on_500() {
+    let mock_server = MockServer::start().await;
 
-const WEBHOOK_SECRET = process.env.GOTONG_ROYONG_WEBHOOK_SECRET || 'test-secret';
+    // First call returns 500, second returns 200
+    Mock::given(method("POST"))
+        .and(path("/v1/platforms/gotong_royong/webhook"))
+        .and(header_exists("X-GR-Signature"))
+        .respond_with(ResponseTemplate::new(500))
+        .up_to_n_times(1)
+        .mount(&mock_server)
+        .await;
 
-app.post('/v1/platforms/gotong_royong/webhook', (req, res) => {
-  const signature = req.headers['x-gr-signature'];
-  const payload = JSON.stringify(req.body);
+    Mock::given(method("POST"))
+        .and(path("/v1/platforms/gotong_royong/webhook"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({ "processed": 1, "results": [] })
+        ))
+        .mount(&mock_server)
+        .await;
 
-  // Verify signature
-  const expectedSig = crypto
-    .createHmac('sha256', WEBHOOK_SECRET)
-    .update(payload)
-    .digest('hex');
+    let client = reqwest::Client::new();
+    let result = send_webhook_with_retry(
+        &client,
+        &format!("{}/v1/platforms/gotong_royong/webhook", mock_server.uri()),
+        r#"{"event_type":"contribution_created"}"#,
+        "sha256=testhash",
+        5,
+    ).await;
 
-  if (signature !== `sha256=${expectedSig}`) {
-    return res.status(401).json({ error: 'Invalid signature' });
-  }
-
-  console.log('Received event:', req.body.event_type);
-  res.json({ processed: 1, results: [{ type: req.body.event_type }] });
-});
-
-app.listen(3000, () => console.log('Mock Markov server running on port 3000'));
+    assert!(result.is_ok());
+}
 ```
 
 ## Security Best Practices

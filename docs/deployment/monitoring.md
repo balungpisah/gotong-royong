@@ -38,82 +38,72 @@ This document specifies the monitoring, observability, and alerting requirements
 | `file_uploads_total` | Counter | File uploads |
 | `file_upload_size_bytes` | Histogram | Upload size |
 
-### Implementation (Node.js with prom-client)
+### Implementation (Rust with `metrics` + `metrics-exporter-prometheus`)
 
-```javascript
-const promClient = require('prom-client');
+```rust
+// Cargo.toml dependencies:
+// metrics = "0.22"
+// metrics-exporter-prometheus = "0.13"
+// axum = "0.7"
 
-// Create metrics registry
-const register = new promClient.Registry();
+use metrics::{counter, gauge, histogram, describe_counter, describe_gauge, describe_histogram};
+use metrics_exporter_prometheus::PrometheusBuilder;
+use axum::{Router, routing::get, response::IntoResponse};
 
-// Default metrics (CPU, memory, etc.)
-promClient.collectDefaultMetrics({ register });
+pub fn setup_metrics() -> Router {
+    // Install Prometheus exporter
+    PrometheusBuilder::new()
+        .install_recorder()
+        .expect("Failed to install Prometheus recorder");
 
-// Custom metrics
-const httpRequestsTotal = new promClient.Counter({
-  name: 'http_requests_total',
-  help: 'Total HTTP requests',
-  labelNames: ['method', 'route', 'status_code'],
-  registers: [register],
-});
+    // Register metric descriptions
+    describe_counter!("http_requests_total", "Total HTTP requests");
+    describe_histogram!("http_request_duration_seconds", "HTTP request latency");
+    describe_counter!(
+        "gotong_worker_webhook_delivery_total",
+        "Total webhook delivery attempts"
+    );
+    describe_histogram!(
+        "gotong_worker_webhook_delivery_duration_ms",
+        "Webhook delivery duration in milliseconds"
+    );
+    describe_gauge!(
+        "gotong_worker_webhook_dead_letter_total",
+        "Current dead-letter queue depth"
+    );
+    describe_gauge!("db_connections_active", "Active database connections");
 
-const httpRequestDuration = new promClient.Histogram({
-  name: 'http_request_duration_seconds',
-  help: 'HTTP request latency',
-  labelNames: ['method', 'route'],
-  buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5],
-  registers: [register],
-});
+    Router::new().route("/metrics", get(metrics_handler))
+}
 
-const webhookDeliveryTotal = new promClient.Counter({
-  name: 'gotong_worker_webhook_delivery_total',
-  help: 'Total webhook delivery attempts',
-  labelNames: ['result', 'status_code'],
-  registers: [register],
-});
+async fn metrics_handler() -> impl IntoResponse {
+    let handle = metrics_exporter_prometheus::PrometheusHandle::current();
+    handle.render()
+}
 
-const webhookDeliveryDurationMs = new promClient.Histogram({
-  name: 'gotong_worker_webhook_delivery_duration_ms',
-  help: 'Webhook delivery duration in milliseconds',
-  labelNames: ['result', 'status_code'],
-  registers: [register],
-});
+// Axum middleware for request tracking
+pub async fn track_request_metrics<B>(
+    req: axum::http::Request<B>,
+    next: axum::middleware::Next<B>,
+) -> axum::response::Response {
+    let method = req.method().to_string();
+    let path = req.uri().path().to_string();
+    let start = std::time::Instant::now();
 
-const webhookDeadLetterDepth = new promClient.Gauge({
-  name: 'gotong_worker_webhook_dead_letter_total',
-  help: 'Current dead-letter queue depth',
-  registers: [register],
-});
+    let response = next.run(req).await;
 
-const dbConnectionsActive = new promClient.Gauge({
-  name: 'db_connections_active',
-  help: 'Active database connections',
-  registers: [register],
-});
+    let duration = start.elapsed().as_secs_f64();
+    let status = response.status().as_u16().to_string();
 
-// Metrics endpoint
-app.get('/metrics', async (req, res) => {
-  res.set('Content-Type', register.contentType);
-  res.end(await register.metrics());
-});
+    counter!("http_requests_total", "method" => method.clone(), "route" => path.clone(), "status_code" => status).increment(1);
+    histogram!("http_request_duration_seconds", "method" => method, "route" => path).record(duration);
 
-// Middleware to track requests
-app.use((req, res, next) => {
-  const start = Date.now();
-
-  res.on('finish', () => {
-    const duration = (Date.now() - start) / 1000;
-
-    httpRequestsTotal.labels(req.method, req.route?.path || req.path, res.statusCode).inc();
-    httpRequestDuration.labels(req.method, req.route?.path || req.path).observe(duration);
-  });
-
-  next();
-});
+    response
+}
 
 // Track webhook deliveries
-async function sendWebhook(event) {
-  webhookDeliveryTotal.labels(event.event_type).inc();
+async fn send_webhook(event: &WebhookEvent) -> Result<(), WebhookError> {
+    counter!("gotong_worker_webhook_delivery_total", "event_type" => event.event_type.clone()).increment(1);
 
   try {
     await deliverWebhook(event);
@@ -147,9 +137,9 @@ scrape_configs:
         target_label: __address__
         replacement: ${1}:3000
 
-  - job_name: 'postgres'
+  - job_name: 'surrealdb'
     static_configs:
-      - targets: ['postgres-exporter:9187']
+      - targets: ['surrealdb-exporter:9399']
 
   - job_name: 'redis'
     static_configs:
@@ -320,46 +310,44 @@ rate(file_upload_size_bytes_sum[5m]) / rate(file_upload_size_bytes_count[5m])
 - `message`
 - `context` (additional data)
 
-**Implementation (Node.js with Winston)**:
+**Implementation (Rust — `tracing` + `tracing-subscriber`)**:
 
-```javascript
-const winston = require('winston');
+```rust
+// Cargo.toml:
+// tracing = "0.1"
+// tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  defaultMeta: {
-    service: 'gotong-royong-api',
-    environment: process.env.NODE_ENV,
-  },
-  transports: [
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' }),
-  ],
-});
+use tracing_subscriber::{fmt, EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-// Console logging in development
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.simple(),
-  }));
+pub fn init_tracing() {
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+
+    let json_layer = fmt::layer()
+        .json()
+        .with_current_span(true)
+        .with_span_list(true);
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(json_layer)
+        .init();
 }
 
-// Usage
-logger.info('User created', {
-  user_id: 'user123',
-  username: 'alice',
-});
+// Usage in application code:
+use tracing::{info, error, warn, instrument};
 
-logger.error('Database connection failed', {
-  error: error.message,
-  stack: error.stack,
-  db_host: process.env.DB_HOST,
-});
+#[instrument(fields(user_id = %user.id))]
+async fn create_user(user: &User) {
+    info!(username = %user.username, "User created");
+}
+
+// Error logging
+error!(
+    db_host = %db_host,
+    error = %e,
+    "Database connection failed"
+);
 ```
 
 ### Log Levels
@@ -431,41 +419,55 @@ scrape_configs:
 
 ### OpenTelemetry Setup
 
-**Implementation (Node.js)**:
+**Implementation (Rust — `opentelemetry` + `tracing-opentelemetry`)**:
 
-```javascript
-const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
-const { registerInstrumentations } = require('@opentelemetry/instrumentation');
-const { HttpInstrumentation } = require('@opentelemetry/instrumentation-http');
-const { ExpressInstrumentation } = require('@opentelemetry/instrumentation-express');
+```rust
+// Cargo.toml:
+// opentelemetry = "0.22"
+// opentelemetry-otlp = { version = "0.15", features = ["http-proto"] }
+// tracing-opentelemetry = "0.23"
 
-const provider = new NodeTracerProvider();
-provider.register();
+use opentelemetry_otlp::WithExportConfig;
+use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_subscriber::layer::SubscriberExt;
 
-registerInstrumentations({
-  instrumentations: [
-    new HttpInstrumentation(),
-    new ExpressInstrumentation(),
-  ],
-});
+pub fn init_otel_tracing(otlp_endpoint: &str) {
+    let tracer = opentelemetry_otlp::new_pipeline()
+        .tracing()
+        .with_exporter(
+            opentelemetry_otlp::new_exporter()
+                .http()
+                .with_endpoint(otlp_endpoint),
+        )
+        .install_batch(opentelemetry_sdk::runtime::Tokio)
+        .expect("Failed to initialize OTel tracer");
+
+    tracing_subscriber::registry()
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .with(tracing_subscriber::fmt::layer().json())
+        .init();
+}
 ```
 
 **Trace Context Propagation**:
 
-```javascript
-// Add trace ID to logs
-app.use((req, res, next) => {
-  const span = trace.getSpan(context.active());
-  req.traceId = span?.spanContext().traceId;
-  next();
-});
+```rust
+use tracing::{info, Span};
 
-// Log with trace ID
-logger.info('Request received', {
-  trace_id: req.traceId,
-  method: req.method,
-  path: req.path,
-});
+// Axum middleware — trace ID is automatically propagated via tracing spans
+// Access trace ID in handlers:
+let trace_id = Span::current()
+    .context()
+    .span()
+    .span_context()
+    .trace_id();
+
+info!(
+    trace_id = %trace_id,
+    method = %method,
+    path = %path,
+    "Request received"
+);
 ```
 
 ## Alerting

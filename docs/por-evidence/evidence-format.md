@@ -102,100 +102,64 @@ Visual documentation of work completion with embedded timestamp proof.
 
 **Algorithm**: SHA-256
 
-**Example (Node.js)**:
-```javascript
-const crypto = require('crypto');
-const fs = require('fs');
+**Example (Rust)**:
+```rust
+use sha2::{Sha256, Digest};
 
-function computeMediaHash(filePath) {
-  const fileBuffer = fs.readFileSync(filePath);
-  return crypto.createHash('sha256').update(fileBuffer).digest('hex');
+fn compute_media_hash(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hex::encode(hasher.finalize())
 }
 
-// Usage
-const hash = computeMediaHash('./evidence.jpg');
-console.log(hash); // a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
-```
-
-**Example (Python)**:
-```python
-import hashlib
-
-def compute_media_hash(file_path):
-    sha256 = hashlib.sha256()
-    with open(file_path, 'rb') as f:
-        while chunk := f.read(8192):
-            sha256.update(chunk)
-    return sha256.hexdigest()
-
-# Usage
-hash = compute_media_hash('evidence.jpg')
-print(hash)  # a1b2c3d4e5f6789012345678901234567890abcdef...
+// Usage (from file bytes)
+let data = std::fs::read("evidence.jpg")?;
+let hash = compute_media_hash(&data);
+// a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
 ```
 
 ### EXIF Extraction
 
-**Example (Node.js with exifr)**:
-```javascript
-const exifr = require('exifr');
+**Example (Rust — `kamadak-exif` crate)**:
+```rust
+use exif::{Reader, Tag, In};
 
-async function extractExif(filePath) {
-  const exif = await exifr.parse(filePath, {
-    gps: true,
-    tiff: true,
-    exif: true,
-  });
+pub struct ExifMetadata {
+    pub camera: Option<String>,
+    pub captured_at: Option<String>,
+    pub gps_latitude: Option<f64>,
+    pub gps_longitude: Option<f64>,
+}
 
-  return {
-    camera: exif.Make && exif.Model ? `${exif.Make} ${exif.Model}` : null,
-    captured_at: exif.DateTimeOriginal?.toISOString(),
-    location: exif.latitude && exif.longitude ? {
-      latitude: exif.latitude,
-      longitude: exif.longitude,
-    } : null,
-    altitude: exif.GPSAltitude,
-    focal_length: exif.FocalLength ? `${exif.FocalLength}mm` : null,
-    iso: exif.ISO,
-    aperture: exif.FNumber ? `f/${exif.FNumber}` : null,
-  };
+pub fn extract_exif(image_bytes: &[u8]) -> ExifMetadata {
+    let mut cursor = std::io::Cursor::new(image_bytes);
+    let exif = match Reader::new().read_from_container(&mut cursor) {
+        Ok(e) => e,
+        Err(_) => return ExifMetadata::default(), // No EXIF — proceed without it
+    };
+
+    let camera = {
+        let make = exif.get_field(Tag::Make, In::PRIMARY)
+            .and_then(|f| f.display_value().to_string().into());
+        let model = exif.get_field(Tag::Model, In::PRIMARY)
+            .and_then(|f| f.display_value().to_string().into());
+        match (make, model) {
+            (Some(m), Some(mo)) => Some(format!("{} {}", m, mo)),
+            _ => None,
+        }
+    };
+
+    ExifMetadata {
+        camera,
+        captured_at: exif.get_field(Tag::DateTimeOriginal, In::PRIMARY)
+            .map(|f| f.display_value().to_string()),
+        gps_latitude: read_gps_decimal(&exif, Tag::GPSLatitude, Tag::GPSLatitudeRef),
+        gps_longitude: read_gps_decimal(&exif, Tag::GPSLongitude, Tag::GPSLongitudeRef),
+    }
 }
 ```
 
-**Example (Python with Pillow)**:
-```python
-from PIL import Image
-from PIL.ExifTags import TAGS, GPSTAGS
-from datetime import datetime
-
-def extract_exif(file_path):
-    image = Image.open(file_path)
-    exif_data = image._getexif()
-
-    if not exif_data:
-        return {}
-
-    exif = {}
-    for tag_id, value in exif_data.items():
-        tag = TAGS.get(tag_id, tag_id)
-        exif[tag] = value
-
-    return {
-        'camera': f"{exif.get('Make', '')} {exif.get('Model', '')}".strip(),
-        'captured_at': exif.get('DateTimeOriginal'),
-        'location': extract_gps(exif),
-        'iso': exif.get('ISOSpeedRatings'),
-        'aperture': exif.get('FNumber'),
-    }
-
-def extract_gps(exif):
-    gps_info = exif.get('GPSInfo')
-    if not gps_info:
-        return None
-
-    # Convert GPS coordinates to decimal degrees
-    # (Implementation details omitted for brevity)
-    return {'latitude': lat, 'longitude': lon}
-```
+See also: `crates/domain/src/evidence/validation.rs` for the full implementation used in the validation pipeline.
 
 ---
 

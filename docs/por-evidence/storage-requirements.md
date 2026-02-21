@@ -12,7 +12,7 @@ graph TB
     API[Gotong Royong API]
     S3[S3-Compatible Storage]
     CDN[CloudFront/CDN]
-    DB[(PostgreSQL)]
+    DB[(SurrealDB)]
     Backup[Backup Storage]
 
     Client -->|1. Request upload URL| API
@@ -113,48 +113,41 @@ Store metadata as S3 object tags:
 - Secure (time-limited, signed URLs)
 - Automatic retry on failure
 
-**Implementation (Node.js with AWS SDK)**:
+**Implementation (Rust — `aws-sdk-s3`)**:
 
-```javascript
-const AWS = require('aws-sdk');
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
-});
+```rust
+use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::Client;
+use std::time::Duration;
 
-async function generatePresignedUploadUrl(userId, contributionId, fileName) {
-  const key = `photos/${new Date().toISOString().split('T')[0].replace(/-/g, '/')}/${userId}_${contributionId}_${fileName}`;
+async fn generate_presigned_upload_url(
+    s3: &Client,
+    bucket: &str,
+    user_id: &str,
+    contribution_id: &str,
+    file_name: &str,
+) -> Result<PresignedUploadUrl, Error> {
+    let today = chrono::Utc::now().format("%Y/%m/%d");
+    let key = format!("photos/{}/{}_{}_{}", today, user_id, contribution_id, file_name);
 
-  const params = {
-    Bucket: process.env.S3_BUCKET_NAME,
-    Key: key,
-    Expires: 300, // 5 minutes
-    ContentType: 'image/jpeg',
-    Metadata: {
-      user_id: userId,
-      contribution_id: contributionId,
-    },
-  };
+    let presigning_config = PresigningConfig::expires_in(Duration::from_secs(300))?;
 
-  const uploadUrl = await s3.getSignedUrlPromise('putObject', params);
+    let presigned = s3
+        .put_object()
+        .bucket(bucket)
+        .key(&key)
+        .content_type("image/jpeg")
+        .metadata("user_id", user_id)
+        .metadata("contribution_id", contribution_id)
+        .presigned(presigning_config)
+        .await?;
 
-  return {
-    upload_url: uploadUrl,
-    file_key: key,
-    expires_in: 300,
-  };
+    Ok(PresignedUploadUrl {
+        upload_url: presigned.uri().to_string(),
+        file_key: key,
+        expires_in: 300,
+    })
 }
-
-// API endpoint
-app.post('/api/evidence/upload-url', async (req, res) => {
-  const { contribution_id, file_name } = req.body;
-  const user_id = req.user.id;
-
-  const urlData = await generatePresignedUploadUrl(user_id, contribution_id, file_name);
-
-  res.json(urlData);
-});
 ```
 
 **Client Upload (JavaScript)**:

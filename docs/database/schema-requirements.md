@@ -161,7 +161,3 @@ Must-have checks:
 - Reconnect catch-up query semantics
 - `LIVE SELECT DIFF` payload behavior on updates
 - Permission-filtered live stream behavior
-
-## Legacy Notice
-
-Relational PostgreSQL/MySQL schema examples from pre-lock documentation are superseded for current implementation planning.

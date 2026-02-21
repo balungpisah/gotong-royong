@@ -92,86 +92,28 @@ aws secretsmanager get-secret-value \
 - Log all signature failures for security monitoring
 - Alert on sudden spike in signature failures (potential attack)
 
-**Dual Secret Example**:
-```javascript
-const OLD_SECRET = process.env.GOTONG_ROYONG_WEBHOOK_SECRET_OLD;
-const NEW_SECRET = process.env.GOTONG_ROYONG_WEBHOOK_SECRET;
-
-function verifySignature(payload, signature) {
-  // Try new secret first
-  if (isValidSignature(payload, signature, NEW_SECRET)) {
-    return true;
-  }
-  // Fall back to old secret during transition
-  if (OLD_SECRET && isValidSignature(payload, signature, OLD_SECRET)) {
-    console.warn('Webhook using old secret, migration needed');
-    return true;
-  }
-  return false;
+**Dual Secret Example (Rust)**:
+```rust
+async fn verify_with_rotation(
+    payload: &[u8],
+    signature: &str,
+    new_secret: &str,
+    old_secret: Option<&str>,
+) -> bool {
+    if verify_hmac(new_secret, payload, signature).is_ok() {
+        return true;
+    }
+    if let Some(old) = old_secret {
+        if verify_hmac(old, payload, signature).is_ok() {
+            tracing::warn!("Webhook using old secret — rotation needed");
+            return true;
+        }
+    }
+    false
 }
 ```
 
 ### 2. Signature Computation (Sender Side)
-
-#### Node.js / TypeScript
-
-```typescript
-import crypto from 'crypto';
-
-function computeSignature(secret: string, payload: string): string {
-  return crypto
-    .createHmac('sha256', secret)
-    .update(payload, 'utf-8')
-    .digest('hex');
-}
-
-// Usage
-const payload = JSON.stringify(event);
-const signature = computeSignature(process.env.GOTONG_ROYONG_WEBHOOK_SECRET!, payload);
-const headerValue = `sha256=${signature}`;
-
-// Send webhook
-await axios.post(webhookUrl, payload, {
-  headers: {
-    'Content-Type': 'application/json',
-    'X-GR-Signature': headerValue,
-  },
-});
-```
-
-#### Python
-
-```python
-import hmac
-import hashlib
-import json
-
-def compute_signature(secret: str, payload: str) -> str:
-    return hmac.new(
-        secret.encode('utf-8'),
-        payload.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
-
-# Usage
-import os
-import requests
-
-secret = os.environ['GOTONG_ROYONG_WEBHOOK_SECRET']
-payload = json.dumps(event, separators=(',', ':'))  # Compact JSON
-signature = compute_signature(secret, payload)
-header_value = f'sha256={signature}'
-
-# Send webhook
-response = requests.post(
-    webhook_url,
-    data=payload,
-    headers={
-        'Content-Type': 'application/json',
-        'X-GR-Signature': header_value,
-    }
-)
-```
 
 #### Rust
 
@@ -207,49 +149,6 @@ let response = client
     .await?;
 ```
 
-#### Go
-
-```go
-package main
-
-import (
-    "crypto/hmac"
-    "crypto/sha256"
-    "encoding/hex"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "os"
-    "strings"
-)
-
-func computeSignature(secret string, payload []byte) string {
-    h := hmac.New(sha256.New, []byte(secret))
-    h.Write(payload)
-    return hex.EncodeToString(h.Sum(nil))
-}
-
-func main() {
-    secret := os.Getenv("GOTONG_ROYONG_WEBHOOK_SECRET")
-    event := map[string]interface{}{
-        "event_type": "contribution_created",
-        // ... event data
-    }
-
-    payloadBytes, _ := json.Marshal(event)
-    signature := computeSignature(secret, payloadBytes)
-    headerValue := fmt.Sprintf("sha256=%s", signature)
-
-    req, _ := http.NewRequest("POST", webhookUrl, strings.NewReader(string(payloadBytes)))
-    req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("X-GR-Signature", headerValue)
-
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-}
-```
-
 ### 3. Signature Verification (Receiver Side)
 
 #### Critical: Constant-Time Comparison
@@ -257,125 +156,29 @@ func main() {
 **⚠️ Security Warning**: Always use constant-time comparison to prevent timing attacks.
 
 **Vulnerable Code** (DO NOT USE):
-```javascript
-// INSECURE: Timing attack possible
-if (computedSignature === providedSignature) {
-  return true;
+```rust
+// INSECURE: Early-exit comparison leaks timing info
+if computed_signature == provided_signature {
+    return true;
 }
 ```
 
-**Secure Code** (USE THIS):
-```javascript
+**Secure Code** (USE THIS — `subtle` crate):
+```rust
+use subtle::ConstantTimeEq;
+
 // SECURE: Constant-time comparison
-const crypto = require('crypto');
+let computed_bytes = computed_signature.as_bytes();
+let provided_bytes = provided_signature.as_bytes();
 
-function isValidSignature(payload, providedSignature, secret) {
-  const computedSignature = computeSignature(secret, payload);
-
-  // Constant-time comparison prevents timing attacks
-  return crypto.timingSafeEqual(
-    Buffer.from(computedSignature, 'utf-8'),
-    Buffer.from(providedSignature, 'utf-8')
-  );
+if computed_bytes.len() == provided_bytes.len()
+    && computed_bytes.ct_eq(provided_bytes).into()
+{
+    return Ok(());
 }
 ```
 
-#### Node.js / TypeScript
-
-```typescript
-import crypto from 'crypto';
-
-function verifyWebhookSignature(
-  payload: string,
-  signatureHeader: string,
-  secret: string
-): boolean {
-  // Extract hex hash from header
-  if (!signatureHeader.startsWith('sha256=')) {
-    throw new Error('Invalid signature format');
-  }
-  const providedSignature = signatureHeader.substring(7); // Remove "sha256="
-
-  // Compute expected signature
-  const computedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(payload, 'utf-8')
-    .digest('hex');
-
-  // Constant-time comparison
-  if (computedSignature.length !== providedSignature.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(
-    Buffer.from(computedSignature, 'utf-8'),
-    Buffer.from(providedSignature, 'utf-8')
-  );
-}
-
-// Express middleware
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString('utf-8');
-  }
-}));
-
-app.post('/webhook', (req, res) => {
-  const signature = req.headers['x-gr-signature'];
-  const secret = process.env.GOTONG_ROYONG_WEBHOOK_SECRET;
-
-  if (!verifyWebhookSignature(req.rawBody, signature, secret)) {
-    return res.status(401).json({ error: 'Invalid signature' });
-  }
-
-  // Process webhook
-  res.json({ processed: 1 });
-});
-```
-
-#### Python
-
-```python
-import hmac
-import hashlib
-
-def verify_webhook_signature(payload: bytes, signature_header: str, secret: str) -> bool:
-    """Verify HMAC-SHA256 webhook signature."""
-    if not signature_header.startswith('sha256='):
-        return False
-
-    provided_signature = signature_header[7:]  # Remove "sha256="
-
-    # Compute expected signature
-    computed_signature = hmac.new(
-        secret.encode('utf-8'),
-        payload,
-        hashlib.sha256
-    ).hexdigest()
-
-    # Constant-time comparison
-    return hmac.compare_digest(computed_signature, provided_signature)
-
-# Flask example
-from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    signature = request.headers.get('X-GR-Signature')
-    secret = os.environ['GOTONG_ROYONG_WEBHOOK_SECRET']
-    payload = request.get_data()  # Raw bytes
-
-    if not verify_webhook_signature(payload, signature, secret):
-        return jsonify({'error': 'Invalid signature'}), 401
-
-    # Process webhook
-    event = request.json
-    return jsonify({'processed': 1})
-```
-
-#### Rust (from Markov Engine)
+#### Rust (Axum handler)
 
 ```rust
 use hmac::{Hmac, Mac};
@@ -417,24 +220,23 @@ fn verify_hmac(secret: &str, payload: &[u8], signature: &str) -> Result<(), Erro
 ### 1. Always Verify Signatures
 
 **❌ NEVER accept webhooks without signature verification**:
-```javascript
+```rust
 // INSECURE - DO NOT DO THIS
-app.post('/webhook', (req, res) => {
-  processWebhook(req.body);  // No signature check!
-  res.json({ ok: true });
-});
+async fn webhook_handler(body: Bytes) -> impl IntoResponse {
+    process_webhook(body).await; // No signature check!
+    Json(json!({"ok": true}))
+}
 ```
 
-**✅ Always verify**:
-```javascript
-// SECURE
-app.post('/webhook', (req, res) => {
-  if (!verifySignature(req.rawBody, req.headers['x-gr-signature'])) {
-    return res.status(401).json({ error: 'Invalid signature' });
-  }
-  processWebhook(req.body);
-  res.json({ ok: true });
-});
+**✅ Always verify** (use `WebhookSignature` extractor middleware):
+```rust
+// SECURE — Axum extractor rejects bad signatures before reaching the handler
+async fn webhook_handler(
+    WebhookSignature(event): WebhookSignature<WebhookEvent>,
+) -> impl IntoResponse {
+    process_webhook(event).await;
+    Json(json!({"ok": true}))
+}
 ```
 
 ### 2. Use Raw Request Body
@@ -442,63 +244,53 @@ app.post('/webhook', (req, res) => {
 **Critical**: Compute signature over **raw bytes**, not parsed JSON.
 
 **❌ Wrong**:
-```javascript
-const signature = computeSignature(JSON.stringify(req.body));  // WRONG
+```rust
+// INSECURE: re-serializing parsed JSON may reorder/modify whitespace
+let payload_str = serde_json::to_string(&parsed_event)?;
+verify_hmac(&secret, payload_str.as_bytes(), &signature)?;
 ```
 
-**✅ Correct**:
-```javascript
-const signature = computeSignature(req.rawBody);  // Correct
+**✅ Correct** — verify over raw bytes before parsing:
+```rust
+// SECURE: operate on the original request bytes
+let raw_body: Bytes = request.into_body().collect().await?.to_bytes();
+verify_hmac(&secret, &raw_body, &signature)?;
+let event: WebhookEvent = serde_json::from_slice(&raw_body)?;
 ```
 
-**Why**: JSON serialization may add/remove whitespace, changing the signature.
+**Why**: JSON serialization may reorder keys or add whitespace, changing the hash.
 
 ### 3. Validate Timestamp
 
 **Prevent replay attacks** by checking event timestamp:
 
-```javascript
-function isTimestampValid(timestamp, maxAgeSeconds = 300) {
-  const eventTime = new Date(timestamp).getTime();
-  const now = Date.now();
-  const ageSeconds = (now - eventTime) / 1000;
-
-  return ageSeconds >= 0 && ageSeconds <= maxAgeSeconds;
+```rust
+fn is_timestamp_valid(timestamp: &DateTime<Utc>, max_age: Duration) -> bool {
+    let age = Utc::now() - *timestamp;
+    age >= Duration::zero() && age <= max_age
 }
 
-app.post('/webhook', (req, res) => {
-  // Verify signature first
-  if (!verifySignature(req.rawBody, req.headers['x-gr-signature'])) {
-    return res.status(401).json({ error: 'Invalid signature' });
-  }
-
-  // Check timestamp (if present)
-  const event = req.body;
-  if (event.timestamp && !isTimestampValid(event.timestamp)) {
-    return res.status(400).json({ error: 'Timestamp too old or in future' });
-  }
-
-  processWebhook(event);
-  res.json({ ok: true });
-});
+// In Axum extractor — check timestamp after signature verification:
+let age = Utc::now() - event.timestamp;
+if age < Duration::zero() || age > Duration::minutes(5) {
+    return Err(StatusCode::BAD_REQUEST);
+}
 ```
 
 ### 4. Log Signature Failures
 
 **Monitor for attacks** by logging verification failures:
 
-```javascript
-if (!verifySignature(payload, signature, secret)) {
-  console.error('Webhook signature verification failed', {
-    source_ip: req.ip,
-    signature_prefix: signature.substring(0, 20),
-    timestamp: new Date().toISOString(),
-  });
-
-  // Alert on high failure rate
-  alertIfTooManyFailures();
-
-  return res.status(401).json({ error: 'Invalid signature' });
+```rust
+if verify_hmac(&secret, &raw_body, &signature).is_err() {
+    warn!(
+        source_ip = %client_ip,
+        signature_prefix = &signature[..20.min(signature.len())],
+        "Webhook signature verification failed"
+    );
+    // Prometheus counter — alert triggers if rate spikes
+    counter!("gotong_webhook_signature_failures_total").increment(1);
+    return Err(StatusCode::UNAUTHORIZED);
 }
 ```
 
@@ -506,135 +298,126 @@ if (!verifySignature(payload, signature, secret)) {
 
 **Prevent brute-force attacks**:
 
-```javascript
-const failedAttempts = new Map();
+Use Redis to track failures per IP with TTL-based reset:
 
-function checkRateLimit(ip) {
-  const attempts = failedAttempts.get(ip) || 0;
-  if (attempts > 10) {
-    return false;  // Rate limited
-  }
-  return true;
+```rust
+// In the webhook signature extractor middleware:
+let failure_key = format!("webhook:sig_fail:{}", client_ip);
+
+if verify_hmac(&secret, &raw_body, &signature).is_err() {
+    let failures: u32 = redis.incr(&failure_key).await?;
+    redis.expire(&failure_key, 3600).await?; // Reset window: 1 hour
+
+    if failures > 10 {
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+    return Err(StatusCode::UNAUTHORIZED);
 }
-
-function recordFailure(ip) {
-  const attempts = failedAttempts.get(ip) || 0;
-  failedAttempts.set(ip, attempts + 1);
-
-  // Reset after 1 hour
-  setTimeout(() => failedAttempts.delete(ip), 3600000);
-}
-
-app.post('/webhook', (req, res) => {
-  if (!checkRateLimit(req.ip)) {
-    return res.status(429).json({ error: 'Rate limit exceeded' });
-  }
-
-  if (!verifySignature(req.rawBody, req.headers['x-gr-signature'])) {
-    recordFailure(req.ip);
-    return res.status(401).json({ error: 'Invalid signature' });
-  }
-
-  // Process webhook
-  res.json({ ok: true });
-});
+// Clear failure count on success
+redis.del(&failure_key).await.ok();
 ```
 
 ## Testing
 
 ### Unit Tests
 
-**Test signature generation**:
-```javascript
-describe('Signature computation', () => {
-  it('generates valid HMAC-SHA256 signature', () => {
-    const secret = 'test_secret_32_chars_minimum_here';
-    const payload = '{"event_type":"contribution_created"}';
+**Test signature generation and verification**:
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    const signature = computeSignature(secret, payload);
+    const TEST_SECRET: &str = "test_secret_32_chars_minimum_here";
+    const PAYLOAD: &str = r#"{"event_type":"contribution_created"}"#;
 
-    expect(signature).toHaveLength(64);  // SHA-256 = 32 bytes = 64 hex chars
-    expect(signature).toMatch(/^[a-f0-9]{64}$/);
-  });
+    #[test]
+    fn compute_signature_produces_64_char_hex() {
+        let sig = compute_signature(TEST_SECRET, PAYLOAD.as_bytes());
+        assert_eq!(sig.len(), 64, "SHA-256 hex is always 64 chars");
+        assert!(sig.chars().all(|c| c.is_ascii_hexdigit()));
+    }
 
-  it('produces different signatures for different payloads', () => {
-    const secret = 'test_secret_32_chars_minimum_here';
-    const payload1 = '{"event_type":"contribution_created"}';
-    const payload2 = '{"event_type":"vouch_submitted"}';
+    #[test]
+    fn different_payloads_produce_different_signatures() {
+        let payload2 = r#"{"event_type":"vouch_submitted"}"#;
+        let sig1 = compute_signature(TEST_SECRET, PAYLOAD.as_bytes());
+        let sig2 = compute_signature(TEST_SECRET, payload2.as_bytes());
+        assert_ne!(sig1, sig2);
+    }
 
-    const sig1 = computeSignature(secret, payload1);
-    const sig2 = computeSignature(secret, payload2);
+    #[test]
+    fn verify_hmac_accepts_valid_signature() {
+        let sig = compute_signature(TEST_SECRET, PAYLOAD.as_bytes());
+        let header = format!("sha256={}", sig);
+        assert!(verify_hmac(TEST_SECRET, PAYLOAD.as_bytes(), &header).is_ok());
+    }
 
-    expect(sig1).not.toEqual(sig2);
-  });
-});
-```
+    #[test]
+    fn verify_hmac_rejects_invalid_signature() {
+        let header = "sha256=invalid_signature_here";
+        assert!(verify_hmac(TEST_SECRET, PAYLOAD.as_bytes(), header).is_err());
+    }
 
-**Test signature verification**:
-```javascript
-describe('Signature verification', () => {
-  it('accepts valid signature', () => {
-    const secret = 'test_secret_32_chars_minimum_here';
-    const payload = '{"event_type":"contribution_created"}';
-    const signature = computeSignature(secret, payload);
-    const header = `sha256=${signature}`;
+    #[test]
+    fn verify_hmac_rejects_tampered_payload() {
+        let sig = compute_signature(TEST_SECRET, PAYLOAD.as_bytes());
+        let header = format!("sha256={}", sig);
+        let tampered = r#"{"event_type":"contribution_deleted"}"#;
+        assert!(verify_hmac(TEST_SECRET, tampered.as_bytes(), &header).is_err());
+    }
 
-    expect(verifySignature(payload, header, secret)).toBe(true);
-  });
-
-  it('rejects invalid signature', () => {
-    const secret = 'test_secret_32_chars_minimum_here';
-    const payload = '{"event_type":"contribution_created"}';
-    const header = 'sha256=invalid_signature_here';
-
-    expect(verifySignature(payload, header, secret)).toBe(false);
-  });
-
-  it('rejects tampered payload', () => {
-    const secret = 'test_secret_32_chars_minimum_here';
-    const payload = '{"event_type":"contribution_created"}';
-    const signature = computeSignature(secret, payload);
-    const header = `sha256=${signature}`;
-
-    const tamperedPayload = '{"event_type":"contribution_deleted"}';
-
-    expect(verifySignature(tamperedPayload, header, secret)).toBe(false);
-  });
-});
+    #[test]
+    fn verify_hmac_rejects_missing_prefix() {
+        let sig = compute_signature(TEST_SECRET, PAYLOAD.as_bytes());
+        // Header without "sha256=" prefix
+        assert!(verify_hmac(TEST_SECRET, PAYLOAD.as_bytes(), &sig).is_err());
+    }
+}
 ```
 
 ### Integration Tests
 
-**Test with real Markov Engine**:
-```javascript
-describe('Webhook integration', () => {
-  it('accepts webhook with valid signature', async () => {
-    const secret = process.env.GOTONG_ROYONG_WEBHOOK_SECRET;
-    const payload = {
-      event_type: 'contribution_created',
-      actor: { user_id: 'test_user', username: 'test' },
-      subject: { contribution_type: 'task_completion', title: 'Test' },
-    };
+**Test webhook endpoint with mock Markov Engine** (using `wiremock`):
+```rust
+use wiremock::{MockServer, Mock, ResponseTemplate};
+use wiremock::matchers::{method, path, header_exists};
 
-    const payloadStr = JSON.stringify(payload);
-    const signature = computeSignature(secret, payloadStr);
+#[tokio::test]
+async fn webhook_sender_includes_valid_signature() {
+    let mock_server = MockServer::start().await;
 
-    const response = await axios.post(
-      'https://api.markov.local/v1/platforms/gotong_royong/webhook',
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-GR-Signature': `sha256=${signature}`,
-        },
-      }
-    );
+    Mock::given(method("POST"))
+        .and(path("/v1/platforms/gotong_royong/webhook"))
+        .and(header_exists("X-GR-Signature"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({ "processed": 1 })
+        ))
+        .mount(&mock_server)
+        .await;
 
-    expect(response.status).toBe(200);
-    expect(response.data.processed).toBe(1);
-  });
-});
-```
+    let secret = "test_secret_32_chars_minimum_here";
+    let event = serde_json::json!({
+        "event_type": "contribution_created",
+        "actor": { "user_id": "test_user", "username": "test" },
+        "subject": { "contribution_type": "task_completion", "title": "Test" },
+    });
+    let payload = serde_json::to_string(&event).unwrap();
+    let signature = compute_signature(secret, payload.as_bytes());
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/v1/platforms/gotong_royong/webhook", mock_server.uri()))
+        .header("Content-Type", "application/json")
+        .header("X-GR-Signature", format!("sha256={}", signature))
+        .body(payload)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), 200);
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(body["processed"], 1);
+}
 
 ## Common Issues
 

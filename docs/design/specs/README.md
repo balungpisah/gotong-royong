@@ -2,13 +2,19 @@
 
 The large spec files are split into themed sub-documents to reduce merge conflicts and speed up handoff.
 
-- `DESIGN-DNA-v0.1.md` (modular index)
-- `AI-SPEC-v0.2.md` (modular index)
-- `UI-UX-SPEC-v0.5.md` (modular index)
-- `ADAPTIVE-PATH-SPEC-v0.1.md` (data model, supersedes fixed path choices)
-- `ADAPTIVE-PATH-ORCHESTRATION-v0.1.md` (orchestration flow — who does what, when)
-- `ENTRY-PATH-MATRIX-v0.1.md` (eagle view — all 4 modes, routing logic, Catatan Komunitas spec)
-- `ONTOLOGY-VOCAB-v0.1.md` (vocabulary conventions — Schema.org + Wikidata + OSM + SurrealDB graph)
+## Primary Specs (Canonical)
+
+| File | Status | Description |
+|------|--------|-------------|
+| `ADAPTIVE-PATH-SPEC-v0.1.md` | **PRIMARY** | Data model for adaptive path; supersedes all fixed-track lifecycle descriptions |
+| `ADAPTIVE-PATH-ORCHESTRATION-v0.1.md` | Current | Orchestration flow — who does what, when |
+| `ENTRY-PATH-MATRIX-v0.1.md` | Current | Eagle view — all 4 modes, routing logic, Catatan Komunitas spec |
+| `ONTOLOGY-VOCAB-v0.1.md` | Current | Vocabulary conventions — Schema.org + Wikidata + OSM + SurrealDB graph |
+| `DESIGN-DNA-v0.1.md` | Current | Modular index for design system |
+| `AI-SPEC-v0.2.md` | Current | Modular index for 10 AI touch points |
+| `UI-UX-SPEC-v0.5.md` | Current | Modular index for product flow and interaction patterns |
+
+> **Note**: Any document referencing fixed Bahas→Rancang→Garap→Periksa stage sequences as lifecycle drivers is superseded. Use `ADAPTIVE-PATH-SPEC-v0.1.md` instead.
 
 ## Module Folders
 

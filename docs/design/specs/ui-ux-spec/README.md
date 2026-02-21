@@ -17,7 +17,7 @@
 
 ### Domain Logic (Active Reference)
 - `03-track-architecture.md` — Track/mode architecture
-- `04-stages-per-track.md` — Stages per track
+- `04-adaptive-phase-patterns.md` — Adaptive Phase Patterns (replaces archived `04-stages-per-track.md`)
 - `05-bahas-decision.md` — Bahas decision flow
 - `06-cross-cutting-capabilities.md` — Cross-cutting capabilities (Galang, Siarkan, Rutin)
 - `07-governance-voting.md` — Governance and voting mechanics

@@ -597,18 +597,6 @@ Unique event IDs enable idempotent webhook delivery, preventing duplicate proces
 
 ### Generation Examples
 
-**Node.js**:
-```javascript
-const crypto = require('crypto');
-const eventId = `evt_${crypto.randomBytes(8).toString('hex')}`;
-```
-
-**Python**:
-```python
-import secrets
-event_id = f"evt_{secrets.token_hex(8)}"
-```
-
 **Rust**:
 ```rust
 use rand::Rng;
@@ -627,17 +615,6 @@ All timestamps MUST use **RFC3339** format:
 **Example**: `2026-02-09T10:30:00Z`
 
 **Generation Examples**:
-
-**Node.js**:
-```javascript
-const timestamp = new Date().toISOString();
-```
-
-**Python**:
-```python
-from datetime import datetime
-timestamp = datetime.utcnow().isoformat() + 'Z'
-```
 
 **Rust**:
 ```rust

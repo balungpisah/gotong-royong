@@ -143,7 +143,3 @@ After production apply:
 - validate health endpoints
 - run post-migration query checks
 - monitor error rate and stream behavior
-
-## Legacy Notice
-
-Pre-lock migration guidance for Knex, Alembic, Diesel, and SQLx-oriented relational workflows is superseded for current implementation planning.

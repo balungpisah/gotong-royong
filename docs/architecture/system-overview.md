@@ -9,14 +9,15 @@ Gotong Royong is a mutual credit platform that tracks physical and digital task 
 ```mermaid
 graph TB
     subgraph "Frontend Layer"
-        WEB[Web Application]
-        MOBILE[Mobile App]
+        WEB[SvelteKit Web App]
+        MOBILE[Mobile Web / PWA]
     end
 
     subgraph "API Layer"
-        API[REST API]
-        AUTH[Authentication Service]
+        API[Axum REST API]
+        AUTH[JWT Auth Middleware]
         WEBHOOK[Webhook Publisher]
+        WS[WebSocket Server]
     end
 
     subgraph "Business Logic Layer"
@@ -24,12 +25,13 @@ graph TB
         EVIDENCE[Evidence Storage]
         USER[User Management]
         VERIFY[Verification Service]
+        AI[AI Touch Points]
     end
 
     subgraph "Data Layer"
-        DB[(PostgreSQL)]
-        CACHE[(Redis Cache)]
-        S3[S3 Object Storage]
+        DB[(SurrealDB)]
+        CACHE[(Redis)]
+        S3[S3-Compatible Storage]
     end
 
     subgraph "External Integration"
@@ -38,6 +40,7 @@ graph TB
 
     WEB --> API
     MOBILE --> API
+    WEB <--> WS
     API --> AUTH
     API --> TASK
     API --> EVIDENCE
@@ -57,166 +60,144 @@ graph TB
     VERIFY --> WEBHOOK
 
     WEBHOOK --> MARKOV
+    AI --> DB
 ```
+
+## Technology Stack
+
+**Locked** — see [ADR-001](adr/ADR-001-rust-axum-surrealdb-stack-lock.md) for the full decision record.
+
+| Layer | Technology |
+|-------|-----------|
+| **Language** | Rust 2024 edition, MSRV 1.88.0 |
+| **HTTP Framework** | Axum 0.7 + Tokio async runtime + Tower/tower-http middleware |
+| **Database** | SurrealDB `=3.0.0-beta.4` (TiKV engine in prod, in-memory in dev) |
+| **Cache / Rate Limiting** | Redis 7+ (idempotency keys, rate controls, ephemeral fanout) |
+| **Object Storage** | S3-compatible (AWS S3 / MinIO / DigitalOcean Spaces) |
+| **Auth** | JWT (access + refresh tokens) + HMAC-SHA256 webhook signatures |
+| **Realtime** | WebSocket primary; SSE + polling fallbacks |
+| **Frontend** | SvelteKit 2, Svelte 5 runes, Tailwind CSS, shadcn-svelte, Paraglide i18n |
+| **Frontend Runtime** | Bun |
+| **Containerization** | Docker + Docker Compose (dev), Kubernetes (prod) |
 
 ## Core Modules
 
 ### 1. Task Management
-**Purpose**: Create, assign, and track task completion
+
+**Purpose**: Create, assign, and track community task completion
 
 **Responsibilities**:
 - Task CRUD operations
-- Task assignment to contributors
-- Completion status tracking
-- Skill tagging and categorization
+- Assignment to contributors
+- Adaptive path lifecycle (AI-proposed phases and checkpoints — see [AI Spec](../design/specs/AI-SPEC-v0.2.md))
+- Skill tagging via ESCO codes
 - Task history and audit trail
 
-**Key Entities**:
-- Task (id, title, description, status, creator_id, assignee_id, created_at, completed_at)
-- TaskSkill (task_id, skill_id)
-- TaskMetadata (location, duration, complexity)
-
-**Tech Stack Options**:
-- **Node.js**: Express + TypeORM
-- **Rust**: Actix-web + Diesel/SQLx
-- **Python**: FastAPI + SQLAlchemy
+**Key Entities** (SurrealDB):
+- `task` — id, title, description, status, creator_id, adaptive_path
+- `task_skill` — task_id, esco_code, label, relevance
+- `task_metadata` — location, duration, complexity, track_hint
 
 ### 2. Evidence Storage
+
 **Purpose**: Store and validate Proof of Reality (PoR) evidence
 
 **Responsibilities**:
-- Evidence file upload (photos, GPS logs, documents)
-- Evidence metadata extraction (EXIF, GPS coordinates, timestamps)
-- Hash computation and integrity verification
+- Evidence file upload (photos, GPS logs, documents) via S3 presigned URLs
+- Metadata extraction (EXIF, GPS coordinates, timestamps) in Rust using `kamadak-exif`
+- SHA-256 hash computation and integrity verification
 - Evidence linking to contributions
-- Immutable audit trail
+- Immutable audit trail in SurrealDB
 
 **Key Entities**:
-- Evidence (id, contribution_id, evidence_type, file_url, media_hash, timestamp)
-- EvidenceMetadata (lat, lon, camera_model, altitude, witnesses)
+- `evidence` — id, contribution_id, evidence_type, file_url, media_hash, timestamp
+- `evidence_metadata` — lat, lon, camera_model, altitude, witnesses
 
-**Storage Backend**:
-- **Primary**: S3-compatible object storage (AWS S3, MinIO, DigitalOcean Spaces)
-- **Metadata**: PostgreSQL for queryable fields
-- **Hashes**: SHA-256 for content integrity
+**Storage**:
+- **Files**: S3-compatible object storage (immutable, lifecycle policies for archival)
+- **Metadata**: SurrealDB (`evidence_metadata` records linked to `evidence`)
+- **Integrity**: SHA-256 hashes stored alongside every file record
 
 ### 3. User Management
+
 **Purpose**: Manage contributor accounts and profiles
 
 **Responsibilities**:
-- User registration and authentication
+- User registration and JWT authentication
 - Profile management (bio, skills, contact)
-- Reputation display (from Markov Engine)
+- Reputation display (queried from Markov Engine)
 - Contribution history
 - Vouch relationships
 
 **Key Entities**:
-- User (id, username, email, password_hash, markov_user_id)
-- UserProfile (bio, location, skills, avatar_url)
-- UserReputation (cached from Markov Engine)
+- `user` — id, username, email, password_hash, markov_user_id
+- `user_profile` — bio, location, skills, avatar_url
+- `user_reputation` — cached J-Score and tier from Markov Engine
 
 **Authentication**:
-- JWT tokens for session management
-- HMAC-SHA256 for webhook signatures
-- Optional OAuth2 for social login
+- JWT tokens (15-minute access, 7-day refresh)
+- HMAC-SHA256 for outbound webhook signatures
+- Argon2id password hashing
 
 ### 4. Webhook Publisher
+
 **Purpose**: Publish events to Markov Engine for reputation updates
 
 **Responsibilities**:
-- Event serialization to JSON
+- Event serialization to canonical JSON
 - HMAC-SHA256 signature generation
-- HTTP POST to Markov webhook endpoint
-- Retry logic with exponential backoff
-- Event delivery confirmation
+- HTTP POST to Markov webhook endpoint via `reqwest`
+- Retry logic with exponential backoff (Tokio tasks)
+- Dead-letter queue via Redis for failed events
 
 **Event Types**:
-- `contribution_created` - Task completed
-- `vouch_submitted` - Peer endorsement
-- `por_evidence` - Evidence submitted
+- `contribution_created` — task completed with PoR evidence
+- `vouch_submitted` — peer endorsement
+- `por_evidence` — standalone evidence submission
 
 **Delivery Guarantees**:
 - At-least-once delivery
-- Idempotency via event IDs
-- Dead letter queue for failed events
+- Idempotency via `event_id` (stored in Redis with TTL)
+- DLQ depth monitored via Prometheus gauge
 
-## Technology Stack
+### 5. AI Touch Points
 
-### Backend Framework (Choose One)
+**Purpose**: LLM-assisted community intelligence (10 touch points — see [AI Spec](../design/specs/AI-SPEC-v0.2.md))
 
-| Framework | Pros | Cons | Use When |
-|-----------|------|------|----------|
-| **Node.js + Express** | Fast development, large ecosystem, JSON-native | Less type-safe, memory management | Team familiar with JS/TS |
-| **Rust + Actix-web** | Blazing performance, memory safety, robust | Steeper learning curve | Performance-critical |
-| **Python + FastAPI** | Rapid prototyping, excellent docs, async | Slower than Rust/Node | Data-heavy operations |
-| **Go + Gin** | Simple deployment, good concurrency | Less ecosystem than Node | Microservices architecture |
+**Key interactions**:
+- **AI-00 (Catatan Saksi)**: Conversational story collection; proposes adaptive path plan
+- **AI-01 (Triple Refinement)**: Validates RDF triples, generates track_hint, ESCO skills
+- **AI-03 (Duplicate Check)**: Vector similarity search before seed creation
+- **AI-08 (Media Scan)**: Sensitive content detection on uploaded images
 
-**Recommendation**: Start with **Node.js + TypeScript + Express** for rapid iteration, then migrate performance-critical paths to Rust if needed.
-
-### Database
-
-**Primary**: PostgreSQL 14+
-- JSONB support for flexible metadata
-- PostGIS extension for GPS queries
-- Native UUID support
-- Excellent performance for OLTP workloads
-
-**Caching**: Redis 7+
-- User session caching
-- Reputation score caching
-- Frequently accessed task lists
-- Rate limiting counters
-
-### Object Storage
-
-**Requirement**: S3-compatible API
-
-**Options**:
-- AWS S3 (production)
-- MinIO (self-hosted, open-source)
-- DigitalOcean Spaces (cost-effective)
-- Backblaze B2 (low-cost archival)
-
-**Features Needed**:
-- Immutable object storage
-- Pre-signed URLs for secure uploads
-- Lifecycle policies for archival
-- CDN integration for global delivery
-
-### Infrastructure
-
-**Container Runtime**: Docker + Docker Compose (development), Kubernetes (production)
-
-**CI/CD**: GitHub Actions / GitLab CI
-
-**Monitoring**: Prometheus + Grafana
-
-**Logging**: Structured JSON logs → ELK Stack / Loki
+AI calls are routed through the Axum API layer; models are Haiku-class (fast) or Sonnet-class (reasoning) per touch point budget.
 
 ## Integration Points
 
 ### Markov Engine Integration
 
-**Mode**: Native (Trusted Platform; Gotong controls its own database; Markov receives webhooks and serves read APIs with transparent auto-linking)
+**Mode**: Native (Trusted Platform — Gotong Royong controls its own database; Markov receives webhooks and serves read APIs with transparent auto-linking)
 
 **Flow**:
 ```
 Gotong Royong → Webhook Event → Markov Engine API → Reputation Update
 ```
 
-**Endpoints**:
-- **POST** `/api/v1/platforms/gotong_royong/webhook` (Markov receives events)
-- **GET** `/api/v1/users/{user_id}/reputation` (Gotong Royong queries reputation)
-- **GET** `/api/v1/users/{user_id}/tier`
-- **GET** `/api/v1/users/{user_id}/activity`
-- **GET** `/api/v1/cv-hidup/{user_id}`
-- **GET** `/api/v1/reputation/leaderboard`
-- **GET** `/api/v1/skills/search` (optional UX enrichment)
-- **GET** `/api/v1/por/requirements` (PoR UX guidance)
+**Endpoints consumed**:
+- `POST /api/v1/platforms/gotong_royong/webhook` — Markov receives events
+- `GET /api/v1/users/{user_id}/reputation` — Gotong queries reputation
+- `GET /api/v1/users/{user_id}/tier`
+- `GET /api/v1/cv-hidup/{user_id}`
+- `GET /api/v1/reputation/leaderboard`
+- `GET /api/v1/skills/search` — optional UX enrichment
+- `GET /api/v1/por/requirements` — PoR UX guidance
 
 **Authentication**: HMAC-SHA256 webhook signatures + platform service token for read APIs
 
-**Reference**: [Integration Architecture](integration-architecture.md)
+**Tandang Signals** (planned — not yet implemented):
+- Pattern Observed, Collective Vouch, J-Score, Genesis Decay, Consistency Multiplier
+
+**Reference**: [Integration Architecture](integration-architecture.md), [Full Integration Spec](tandang-full-integration.md)
 
 ## Data Flow
 
@@ -225,29 +206,30 @@ See [Data Flow](data-flow.md) for detailed sequence diagrams.
 ## Scalability Considerations
 
 ### Horizontal Scaling
-- Stateless API servers behind load balancer
-- Database connection pooling (PgBouncer)
-- Redis cluster for cache distribution
+- Stateless Axum API servers behind load balancer
+- SurrealDB TiKV engine handles distributed storage in production
+- Redis cluster for cache, idempotency, and rate limiting
 - S3 for distributed file storage
 
 ### Performance Targets
 - API response time: <200ms (p95)
 - Webhook delivery: <5s (p95)
-- Evidence upload: <2s for 10MB file
-- Concurrent users: 10,000+ (with caching)
+- Evidence upload: <2s for 10MB file (direct-to-S3 presigned URL flow)
+- Concurrent users: 10,000+ (with Redis caching)
 
 ### Bottlenecks
-- **Database writes**: Use connection pooling, consider read replicas
-- **Evidence uploads**: Stream directly to S3 (presigned URLs)
-- **Webhook delivery**: Background job queue (Bull, Celery)
+- **Database writes**: SurrealDB TiKV handles horizontal scaling; use connection pooling in the Rust client
+- **Evidence uploads**: Stream directly to S3 via presigned URLs (API never proxies file bytes)
+- **Webhook delivery**: Background Tokio tasks with Redis-backed DLQ
 
 ## Security Architecture
 
 - **Transport**: TLS 1.3 for all connections
-- **Authentication**: JWT with short expiration (15 min access, 7 day refresh)
-- **Authorization**: Role-based access control (RBAC)
-- **Webhook Security**: HMAC-SHA256 signatures
-- **Data Encryption**: AES-256 for data at rest (S3, database)
+- **Authentication**: JWT with short expiration (15-min access, 7-day refresh)
+- **Password Hashing**: Argon2id (memory-hard, OWASP-recommended)
+- **Authorization**: Role-based access control (RBAC) via Axum middleware
+- **Webhook Security**: HMAC-SHA256 signatures with constant-time comparison (`subtle` crate)
+- **Data Encryption**: AES-256 for data at rest (S3 SSE, SurrealDB field encryption)
 - **Secrets Management**: HashiCorp Vault / AWS Secrets Manager
 
 See [Security Checklist](../deployment/security-checklist.md) for complete hardening guide.
@@ -256,16 +238,20 @@ See [Security Checklist](../deployment/security-checklist.md) for complete harde
 
 ### Development
 ```
-Docker Compose (API + PostgreSQL + Redis + MinIO)
+Docker Compose
+├── Gotong API (cargo watch, hot-reload)
+├── SurrealDB (in-memory mode)
+├── Redis
+└── MinIO (local S3)
 ```
 
 ### Production
 ```
 Kubernetes Cluster
-├── API Pods (replicas: 3)
-├── Worker Pods (background jobs, replicas: 2)
-├── PostgreSQL (RDS or managed instance)
-├── Redis (ElastiCache or managed)
+├── API Pods (Axum, replicas: 3)
+├── Worker Pods (Tokio background tasks, replicas: 2)
+├── SurrealDB (TiKV cluster or managed)
+├── Redis (managed instance)
 └── S3 (managed storage)
 ```
 
@@ -273,44 +259,44 @@ See [Infrastructure](../deployment/infrastructure.md) for detailed deployment op
 
 ## Monitoring and Observability
 
+**Instrumentation**: `metrics` + `metrics-exporter-prometheus` crates; `tracing` + `tracing-subscriber` for structured logs.
+
 **Metrics**:
-- Request throughput (requests/sec)
-- Error rate (%)
-- Response latency (p50, p95, p99)
-- Database connection pool utilization
-- Webhook delivery success rate
+- Request throughput and latency (p50, p95, p99)
+- Error rate
+- `gotong_worker_webhook_delivery_total{result,status_code}`
+- `gotong_worker_webhook_dead_letter_total`
+- SurrealDB connection pool utilization
 - Evidence validation failures
 
 **Logs**:
-- Structured JSON format
-- Request/response logging (excluding sensitive data)
-- Error stack traces
-- Audit logs (task completion, evidence submission)
+- Structured JSON via `tracing` (request_id, user_id, event fields)
+- Audit logs for task completion, evidence submission, vouch events
 
 **Alerting**:
 - Error rate > 1%
 - Latency p95 > 500ms
-- Webhook delivery failures > 5%
-- Database connection saturation
+- Webhook delivery success < 95%
+- DLQ depth > 50
 
 See [Monitoring](../deployment/monitoring.md) for implementation details.
 
 ## Development Workflow
 
-1. **Local Setup**: Docker Compose for all services
-2. **Feature Development**: Feature branches + pull requests
-3. **Testing**: Unit tests + integration tests + E2E tests
-4. **Code Review**: At least 1 approval required
-5. **Staging Deployment**: Automatic on merge to `develop`
-6. **Production Deployment**: Manual approval + canary deployment
+1. **Local Setup**: Docker Compose for SurrealDB, Redis, MinIO; `cargo watch` for API hot-reload
+2. **Frontend**: `bun dev` in `apps/web/`
+3. **Feature Development**: Feature branches + pull requests
+4. **Testing**: `cargo test` (unit + integration); `just test` for full suite
+5. **Code Review**: At least 1 approval required
+6. **Staging Deployment**: Automatic on merge to `main`
+7. **Production Deployment**: Manual approval + canary deployment
 
 See [Local Development](../development/local-development.md) for setup instructions.
 
-## Next Steps
+## Implementation Entry Points
 
-For implementation:
-1. Choose tech stack based on team expertise
-2. Set up database schema (see [Schema Requirements](../database/schema-requirements.md))
-3. Implement webhook publisher (see [Webhook Spec](../api/webhook-spec.md))
-4. Build PoR evidence validator (see [Validation Rules](../por-evidence/validation-rules.md))
-5. Deploy to staging environment (see [Infrastructure](../deployment/infrastructure.md))
+1. Set up local environment ([Setup Guide](../development/setup-guide.md))
+2. Review database schema ([Schema Requirements](../database/schema-requirements.md))
+3. Implement webhook publisher ([Webhook Spec](../api/webhook-spec.md))
+4. Build PoR evidence validator ([Validation Rules](../por-evidence/validation-rules.md))
+5. Deploy to staging ([Infrastructure](../deployment/infrastructure.md))

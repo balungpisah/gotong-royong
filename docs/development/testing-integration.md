@@ -1,19 +1,20 @@
 # Testing Integration
 
-## Stack Lock Notice
+## Stack
 
-Canonical implementation stack is Rust 2024 + Axum + SurrealDB `v3.0.0-beta.4`.
+All tests use the Rust testing infrastructure:
 
-Use these as source of truth for active stack/runtime decisions:
-- `setup-guide.md`
-- `../backend-research.md`
-- `../research/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
+| Tool | Purpose |
+|------|---------|
+| `cargo test` | Built-in Rust test runner |
+| `tokio::test` | Async test macro (Tokio runtime) |
+| `axum-test` or `tower::ServiceExt` | HTTP integration testing |
+| `pretty_assertions` | Readable assertion diffs |
+| `surrealdb` in-memory | Isolated DB per test suite |
+| `mockall` | Mock trait implementations |
+| `wiremock` | HTTP mock server (Markov Engine stubs) |
 
-This document includes pre-lock multi-language testing examples. They are useful as patterns, but implementation planning should prioritize Rust/SurrealDB-aligned tests.
-
-## Overview
-
-This document describes the testing strategy for the Gotong Royong platform, including unit tests, integration tests, E2E tests, and testing the Markov Engine integration.
+See [ADR-001](../architecture/adr/ADR-001-rust-axum-surrealdb-stack-lock.md) for the full stack decision.
 
 ## Test Pyramid
 
@@ -30,688 +31,410 @@ This document describes the testing strategy for the Gotong Royong platform, inc
 /_________________\
 ```
 
-**Test Distribution**:
-- **Unit Tests**: 70% - Fast, isolated, test individual functions
-- **Integration Tests**: 25% - Test component interactions
-- **E2E Tests**: 5% - Test complete user flows
-
-## Testing Stack
-
-### Recommended Tools
-
-| Stack | Unit | Integration | E2E | Mocking |
-|-------|------|-------------|-----|---------|
-| **Node.js** | Jest | Jest + Supertest | Playwright/Cypress | nock |
-| **Python** | pytest | pytest | Playwright | responses |
-| **Rust** | cargo test | cargo test | - | mockito |
+- **Unit Tests (70%)**: Fast, isolated, test individual functions and domain logic
+- **Integration Tests (25%)**: Test component interactions (API handlers + DB)
+- **E2E Tests (5%)**: Test complete user flows against a running stack
 
 ## Unit Tests
 
-### Writing Unit Tests
+Unit tests live alongside source code in `#[cfg(test)]` modules.
 
-**Purpose**: Test individual functions in isolation
+### Domain Logic
 
-**Example (Node.js with Jest)**:
+```rust
+// crates/domain/src/evidence.rs
 
-```javascript
-// src/utils/validation.js
-function isValidEmail(email) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+pub fn validate_timestamp(timestamp: &DateTime<Utc>) -> Result<(), ValidationError> {
+    let age_days = (Utc::now() - *timestamp).num_days();
+    if age_days < 0 {
+        return Err(ValidationError::FutureTimestamp);
+    }
+    if age_days > 30 {
+        return Err(ValidationError::TimestampTooOld { days: age_days });
+    }
+    Ok(())
 }
 
-function isValidPassword(password) {
-  return password.length >= 12;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_timestamp_older_than_30_days() {
+        let old_timestamp = Utc::now() - chrono::Duration::days(45);
+        let result = validate_timestamp(&old_timestamp);
+        assert!(matches!(result, Err(ValidationError::TimestampTooOld { .. })));
+    }
+
+    #[test]
+    fn rejects_future_timestamp() {
+        let future = Utc::now() + chrono::Duration::hours(1);
+        let result = validate_timestamp(&future);
+        assert!(matches!(result, Err(ValidationError::FutureTimestamp)));
+    }
+
+    #[test]
+    fn accepts_recent_timestamp() {
+        let recent = Utc::now() - chrono::Duration::days(5);
+        assert!(validate_timestamp(&recent).is_ok());
+    }
 }
-
-module.exports = { isValidEmail, isValidPassword };
 ```
 
-**Test File**:
-```javascript
-// src/utils/validation.test.js
-const { isValidEmail, isValidPassword } = require('./validation');
+### HMAC Signature
 
-describe('Email validation', () => {
-  it('accepts valid email', () => {
-    expect(isValidEmail('user@example.com')).toBe(true);
-  });
+```rust
+// crates/infrastructure/src/webhook/signature.rs
 
-  it('rejects email without @', () => {
-    expect(isValidEmail('userexample.com')).toBe(false);
-  });
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
 
-  it('rejects email without domain', () => {
-    expect(isValidEmail('user@')).toBe(false);
-  });
-});
+    #[test]
+    fn compute_signature_is_deterministic() {
+        let secret = "test-secret-32-chars-minimum-req";
+        let payload = b"test payload";
+        let sig1 = compute_hmac_signature(secret, payload);
+        let sig2 = compute_hmac_signature(secret, payload);
+        assert_eq!(sig1, sig2);
+    }
 
-describe('Password validation', () => {
-  it('accepts password with 12 characters', () => {
-    expect(isValidPassword('SecurePass123!')).toBe(true);
-  });
+    #[test]
+    fn verify_accepts_valid_signature() {
+        let secret = "test-secret-32-chars-minimum-req";
+        let payload = b"test payload";
+        let signature = compute_hmac_signature(secret, payload);
+        let header = format!("sha256={}", signature);
+        assert!(verify_hmac_signature(secret, payload, &header).is_ok());
+    }
 
-  it('rejects password with 11 characters', () => {
-    expect(isValidPassword('ShortPass1!')).toBe(false);
-  });
-});
-```
-
-**Run Tests**:
-```bash
-npm test
-```
-
-### Test Coverage
-
-**Target**: 80% code coverage
-
-**Generate Coverage Report**:
-```bash
-npm run test:coverage
-```
-
-**Coverage Configuration** (jest.config.js):
-```javascript
-module.exports = {
-  collectCoverageFrom: [
-    'src/**/*.js',
-    '!src/**/*.test.js',
-    '!src/index.js',
-  ],
-  coverageThreshold: {
-    global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80,
-    },
-  },
-};
+    #[test]
+    fn verify_rejects_tampered_payload() {
+        let secret = "test-secret-32-chars-minimum-req";
+        let original = b"original payload";
+        let signature = compute_hmac_signature(secret, original);
+        let header = format!("sha256={}", signature);
+        let tampered = b"tampered payload";
+        assert!(verify_hmac_signature(secret, tampered, &header).is_err());
+    }
+}
 ```
 
 ## Integration Tests
 
-### Database Integration Tests
+Integration tests live in `crates/*/tests/` and use a real SurrealDB in-memory instance.
 
-**Purpose**: Test database interactions
+### Test App Setup
 
-**Setup**:
-```javascript
-// tests/setup.js
-const { Pool } = require('pg');
+```rust
+// tests/common/mod.rs
 
-let db;
+pub async fn test_app() -> TestApp {
+    // Start in-memory SurrealDB
+    let db = Surreal::new::<Mem>(()).await.unwrap();
+    db.use_ns("test").use_db("test").await.unwrap();
+    crate::infrastructure::db::run_migrations(&db).await.unwrap();
 
-beforeAll(async () => {
-  db = new Pool({
-    connectionString: process.env.TEST_DATABASE_URL,
-  });
+    // Start Redis (test instance via testcontainers or mock)
+    let redis = redis::Client::open("redis://127.0.0.1/15").unwrap();
 
-  // Run migrations
-  await runMigrations(db);
-});
+    let state = AppState { db, redis };
+    let router = crate::api::router(state);
 
-afterAll(async () => {
-  await db.end();
-});
-
-beforeEach(async () => {
-  // Clean database before each test
-  await db.query('TRUNCATE users, contributions, evidence CASCADE');
-});
-
-module.exports = { db };
-```
-
-**Test File**:
-```javascript
-// tests/repositories/user.test.js
-const { db } = require('../setup');
-const UserRepository = require('../../src/repositories/user');
-
-describe('UserRepository', () => {
-  let userRepo;
-
-  beforeEach(() => {
-    userRepo = new UserRepository(db);
-  });
-
-  it('creates user', async () => {
-    const user = await userRepo.create({
-      username: 'alice',
-      email: 'alice@example.com',
-      password_hash: 'hashed_password',
-    });
-
-    expect(user.id).toBeDefined();
-    expect(user.username).toBe('alice');
-  });
-
-  it('finds user by email', async () => {
-    await userRepo.create({
-      username: 'alice',
-      email: 'alice@example.com',
-      password_hash: 'hashed_password',
-    });
-
-    const user = await userRepo.findByEmail('alice@example.com');
-    expect(user).toBeDefined();
-    expect(user.username).toBe('alice');
-  });
-
-  it('returns null for non-existent user', async () => {
-    const user = await userRepo.findByEmail('nonexistent@example.com');
-    expect(user).toBeNull();
-  });
-});
-```
-
-### API Integration Tests
-
-**Purpose**: Test API endpoints
-
-**Example (Node.js with Supertest)**:
-
-```javascript
-// tests/api/auth.test.js
-const request = require('supertest');
-const app = require('../../src/app');
-const { db } = require('../setup');
-
-describe('POST /api/auth/register', () => {
-  it('registers new user', async () => {
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'alice',
-        email: 'alice@example.com',
-        password: 'SecurePassword123!',
-      })
-      .expect(201);
-
-    expect(response.body).toHaveProperty('user_id');
-    expect(response.body).toHaveProperty('access_token');
-  });
-
-  it('rejects duplicate email', async () => {
-    await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'alice',
-        email: 'alice@example.com',
-        password: 'SecurePassword123!',
-      });
-
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'bob',
-        email: 'alice@example.com',  // Duplicate
-        password: 'SecurePassword123!',
-      })
-      .expect(400);
-
-    expect(response.body.error).toContain('already exists');
-  });
-
-  it('rejects weak password', async () => {
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'alice',
-        email: 'alice@example.com',
-        password: 'weak',  // Too short
-      })
-      .expect(400);
-
-    expect(response.body.error).toContain('password');
-  });
-});
-```
-
-## Testing Markov Engine Integration
-
-### Mock Markov Server
-
-**Purpose**: Test webhook integration without running Markov Engine
-
-**Setup**:
-```javascript
-// tests/mocks/markov-server.js
-const nock = require('nock');
-
-function mockMarkovWebhook(status = 200, response = { processed: 1 }) {
-  return nock('http://localhost:3001')
-    .post('/v1/platforms/gotong_royong/webhook')
-    .reply(status, response);
+    TestApp { router }
 }
 
-function mockMarkovReputationQuery(userId, reputation = 2550) {
-  return nock('http://localhost:3001')
-    .get(`/v1/users/gotong_royong:${userId}/reputation`)
-    .reply(200, {
-      user_id: `gotong_royong:${userId}`,
-      reputation_score: reputation,
-      tier: 'advanced',
-    });
+pub struct TestApp {
+    router: Router,
 }
 
-module.exports = { mockMarkovWebhook, mockMarkovReputationQuery };
+impl TestApp {
+    pub async fn post(&self, path: &str) -> TestRequest {
+        // ... axum-test helper
+    }
+}
 ```
 
-**Test File**:
-```javascript
-// tests/integration/webhook.test.js
-const { mockMarkovWebhook } = require('../mocks/markov-server');
-const { publishWebhook } = require('../../src/services/webhook');
+### API Handler Tests
 
-describe('Webhook Publishing', () => {
-  it('sends contribution_created event', async () => {
-    const mock = mockMarkovWebhook(200, { processed: 1 });
+```rust
+// crates/api/tests/tasks_test.rs
 
-    await publishWebhook({
-      event_type: 'contribution_created',
-      actor: { user_id: 'user123', username: 'alice' },
-      subject: {
-        contribution_type: 'task_completion',
-        title: 'Test Task',
-      },
-    });
+#[tokio::test]
+async fn create_task_returns_201() {
+    let app = test_app().await;
+    let token = app.login_test_user().await;
 
-    expect(mock.isDone()).toBe(true);
-  });
+    let response = app
+        .post("/api/tasks")
+        .bearer_auth(&token)
+        .json(&serde_json::json!({
+            "title": "Fix pothole on Jl. Merdeka",
+            "description": "Large pothole near the market"
+        }))
+        .await;
 
-  it('retries on 500 error', async () => {
-    const mock1 = mockMarkovWebhook(500);
-    const mock2 = mockMarkovWebhook(200, { processed: 1 });
+    assert_eq!(response.status(), 201);
+    let body: Task = response.json().await;
+    assert!(!body.id.to_raw().is_empty());
+    assert_eq!(body.title, "Fix pothole on Jl. Merdeka");
+}
 
-    await publishWebhook({
-      event_type: 'contribution_created',
-      actor: { user_id: 'user123', username: 'alice' },
-      subject: {
-        contribution_type: 'task_completion',
-        title: 'Test Task',
-      },
-    });
+#[tokio::test]
+async fn create_task_requires_auth() {
+    let app = test_app().await;
 
-    expect(mock1.isDone()).toBe(true);
-    expect(mock2.isDone()).toBe(true);
-  });
+    let response = app
+        .post("/api/tasks")
+        .json(&serde_json::json!({"title": "No auth task"}))
+        .await;
 
-  it('fails after max retries', async () => {
-    const mock1 = mockMarkovWebhook(500);
-    const mock2 = mockMarkovWebhook(500);
-    const mock3 = mockMarkovWebhook(500);
-
-    await expect(
-      publishWebhook({
-        event_type: 'contribution_created',
-        actor: { user_id: 'user123', username: 'alice' },
-        subject: {
-          contribution_type: 'task_completion',
-          title: 'Test Task',
-        },
-      })
-    ).rejects.toThrow();
-
-    expect(mock1.isDone()).toBe(true);
-    expect(mock2.isDone()).toBe(true);
-    expect(mock3.isDone()).toBe(true);
-  });
-});
+    assert_eq!(response.status(), 401);
+}
 ```
 
-### Testing with Real Markov Engine
+### Evidence Validation Tests
 
-**Purpose**: End-to-end integration testing
+```rust
+// crates/api/tests/evidence_test.rs
 
-**Setup**:
-1. Start Markov Engine locally
-2. Configure webhook secret
-3. Run integration tests
+#[tokio::test]
+async fn evidence_upload_requires_valid_timestamp() {
+    let app = test_app().await;
+    let token = app.login_test_user().await;
 
-**Docker Compose for Testing**:
-```yaml
-# docker-compose.test.yml
-version: '3.8'
+    let old_timestamp = Utc::now() - chrono::Duration::days(45);
 
-services:
-  gotong-royong-api:
-    build: .
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@test-db:5432/test_db
-      - MARKOV_API_URL=http://markov-engine:3001
-    depends_on:
-      - test-db
-      - markov-engine
+    let response = app
+        .post("/api/evidence")
+        .bearer_auth(&token)
+        .json(&serde_json::json!({
+            "task_id": "task:test123",
+            "evidence_type": "photo",
+            "timestamp": old_timestamp.to_rfc3339()
+        }))
+        .await;
 
-  test-db:
-    image: postgres:14-alpine
-    environment:
-      - POSTGRES_DB=test_db
-      - POSTGRES_PASSWORD=postgres
-
-  markov-engine:
-    image: markov-engine:latest
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@markov-db:5432/markov_db
-      - GOTONG_ROYONG_WEBHOOK_SECRET=test_secret_32_chars_minimum_here
-
-  markov-db:
-    image: postgres:14-alpine
-    environment:
-      - POSTGRES_DB=markov_db
-      - POSTGRES_PASSWORD=postgres
+    assert_eq!(response.status(), 422);
+    let body: ErrorResponse = response.json().await;
+    assert_eq!(body.code, "TIMESTAMP_TOO_OLD");
+}
 ```
 
-**Run E2E Tests**:
+## Webhook Integration Tests
+
+Test the full webhook delivery pipeline against a mock Markov server.
+
+```rust
+// crates/infrastructure/tests/webhook_delivery_test.rs
+
+use wiremock::{MockServer, Mock, ResponseTemplate};
+use wiremock::matchers::{method, path, header_exists};
+
+#[tokio::test]
+async fn delivers_contribution_created_event() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/platforms/gotong_royong/webhook"))
+        .and(header_exists("X-GR-Signature"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "processed": 1
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = WebhookClient::new(
+        mock_server.uri(),
+        "test-webhook-secret-32-chars-minimum",
+    );
+
+    let event = ContributionCreatedEvent {
+        event_id: "evt_test123".to_string(),
+        actor: Actor { user_id: "user:alice".to_string(), username: "alice".to_string() },
+        // ...
+    };
+
+    let result = client.deliver(event).await;
+    assert!(result.is_ok());
+
+    // Verify the mock received exactly one request
+    let received = mock_server.received_requests().await.unwrap();
+    assert_eq!(received.len(), 1);
+
+    // Verify HMAC header was present
+    let signature = received[0].headers.get("X-GR-Signature").unwrap();
+    assert!(signature.to_str().unwrap().starts_with("sha256="));
+}
+
+#[tokio::test]
+async fn retries_on_500_with_exponential_backoff() {
+    let mock_server = MockServer::start().await;
+
+    // First two attempts fail, third succeeds
+    Mock::given(method("POST"))
+        .and(path("/api/v1/platforms/gotong_royong/webhook"))
+        .respond_with(ResponseTemplate::new(500))
+        .up_to_n_times(2)
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/platforms/gotong_royong/webhook"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"processed": 1})))
+        .mount(&mock_server)
+        .await;
+
+    let client = WebhookClient::new_with_config(
+        mock_server.uri(),
+        "test-webhook-secret-32-chars-minimum",
+        RetryConfig { max_attempts: 5, base_delay_ms: 10 }, // fast for tests
+    );
+
+    let result = client.deliver(test_event()).await;
+    assert!(result.is_ok());
+
+    let received = mock_server.received_requests().await.unwrap();
+    assert_eq!(received.len(), 3); // 2 failures + 1 success
+}
+```
+
+## SurrealDB Integration Tests
+
+```rust
+// crates/infrastructure/tests/db_test.rs
+
+#[tokio::test]
+async fn stores_and_retrieves_task() {
+    let db = test_db().await;
+    let repo = TaskRepository::new(db);
+
+    let task = Task {
+        id: Thing::from(("task", Id::ulid())),
+        title: "Test task".to_string(),
+        status: TaskStatus::Open,
+        created_at: Utc::now(),
+        ..Default::default()
+    };
+
+    repo.insert(&task).await.unwrap();
+
+    let retrieved = repo.find_by_id(&task.id).await.unwrap();
+    assert_eq!(retrieved.title, "Test task");
+    assert_eq!(retrieved.status, TaskStatus::Open);
+}
+
+#[tokio::test]
+async fn lists_tasks_by_community() {
+    let db = test_db().await;
+    let repo = TaskRepository::new(db);
+
+    // Insert tasks for two communities
+    for i in 0..3 {
+        repo.insert(&test_task("community:a", &format!("Task {i}"))).await.unwrap();
+    }
+    repo.insert(&test_task("community:b", "Other task")).await.unwrap();
+
+    let tasks = repo.list_by_community("community:a", 10, 0).await.unwrap();
+    assert_eq!(tasks.len(), 3);
+}
+```
+
+## Running Tests
+
+### Commands
+
 ```bash
-docker-compose -f docker-compose.test.yml up -d
-npm run test:e2e
-docker-compose -f docker-compose.test.yml down
+# Run all tests
+cargo test
+
+# Run tests for a specific crate
+cargo test -p gotong-api
+
+# Run a specific test
+cargo test test_create_task -- --nocapture
+
+# Run tests with detailed output
+cargo test -- --nocapture
+
+# Run integration tests only
+cargo test --test '*'
+
+# Run via just
+just test          # all tests
+just test-api      # API crate only
+just test-infra    # infrastructure crate only
+```
+
+### Test Isolation
+
+Each test that touches SurrealDB should use a fresh in-memory instance:
+
+```rust
+async fn test_db() -> Surreal<Mem> {
+    let db = Surreal::new::<Mem>(()).await.unwrap();
+    db.use_ns("test").use_db(ulid::Ulid::new().to_string()).await.unwrap();
+    run_migrations(&db).await.unwrap();
+    db
+}
+```
+
+Using a unique DB name (`Ulid::new()`) ensures full isolation between concurrent tests.
+
+### CI Pipeline
+
+```yaml
+# .github/workflows/test.yml
+- name: Run tests
+  run: cargo test --workspace --all-features
+  env:
+    RUST_LOG: error
+    DATABASE_URL: "memory"
+    REDIS_URL: "redis://localhost:6379/15"
 ```
 
 ## E2E Tests
 
-### Testing Complete User Flows
-
-**Purpose**: Test complete user journeys
-
-**Example (Playwright)**:
-
-```javascript
-// tests/e2e/contribution-flow.spec.js
-const { test, expect } = require('@playwright/test');
-
-test.describe('Contribution Flow', () => {
-  test('user completes task with evidence', async ({ page }) => {
-    // 1. Login
-    await page.goto('http://localhost:3000/login');
-    await page.fill('input[name="email"]', 'alice@example.com');
-    await page.fill('input[name="password"]', 'SecurePassword123!');
-    await page.click('button[type="submit"]');
-
-    // 2. Navigate to task
-    await page.goto('http://localhost:3000/tasks/task_123');
-
-    // 3. Mark as complete
-    await page.click('button:has-text("Mark Complete")');
-
-    // 4. Upload evidence
-    const fileInput = await page.locator('input[type="file"]');
-    await fileInput.setInputFiles('tests/fixtures/evidence.jpg');
-
-    // 5. Submit
-    await page.click('button:has-text("Submit Evidence")');
-
-    // 6. Verify success message
-    await expect(page.locator('.success-message')).toContainText('Evidence submitted');
-
-    // 7. Verify contribution appears
-    await page.goto('http://localhost:3000/profile');
-    await expect(page.locator('.contributions-list')).toContainText('task_123');
-  });
-});
-```
-
-**Run E2E Tests**:
-```bash
-npx playwright test
-```
-
-## Test Data Fixtures
-
-### Creating Test Fixtures
-
-**Purpose**: Reusable test data
-
-**Example**:
-```javascript
-// tests/fixtures/users.js
-module.exports = {
-  validUser: {
-    username: 'alice',
-    email: 'alice@example.com',
-    password: 'SecurePassword123!',
-  },
-
-  invalidUsers: [
-    {
-      username: 'a',  // Too short
-      email: 'alice@example.com',
-      password: 'SecurePassword123!',
-    },
-    {
-      username: 'alice',
-      email: 'invalid-email',  // Invalid format
-      password: 'SecurePassword123!',
-    },
-    {
-      username: 'alice',
-      email: 'alice@example.com',
-      password: 'weak',  // Too weak
-    },
-  ],
-};
-```
-
-**Load Test Payloads from Markov Fixtures**:
-```javascript
-// tests/fixtures/gotong-royong-payloads.js
-const fs = require('fs');
-const path = require('path');
-
-const fixturesPath = path.join(
-  __dirname,
-  '../../../../tandang/markov-engine/tests/fixtures/gotong_royong_payloads.json'
-);
-
-const payloads = JSON.parse(fs.readFileSync(fixturesPath, 'utf-8'));
-
-module.exports = payloads;
-```
-
-**Usage**:
-```javascript
-const { valid_contribution } = require('../fixtures/gotong-royong-payloads');
-
-it('processes valid contribution', async () => {
-  const response = await request(app)
-    .post('/api/webhook')
-    .send(valid_contribution)
-    .expect(200);
-
-  expect(response.body.processed).toBe(1);
-});
-```
-
-## Continuous Integration
-
-### GitHub Actions
-
-**.github/workflows/test.yml**:
-```yaml
-name: Test
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:14
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linter
-        run: npm run lint
-
-      - name: Run tests
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379
-        run: npm test -- --coverage
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v2
-        with:
-          files: ./coverage/lcov.info
-```
-
-## Testing Best Practices
-
-### DO
-
-- ✅ Write tests before fixing bugs (TDD)
-- ✅ Test edge cases and error conditions
-- ✅ Use descriptive test names
-- ✅ Keep tests independent (no shared state)
-- ✅ Use fixtures for test data
-- ✅ Mock external services (Markov, S3)
-- ✅ Run tests in CI/CD pipeline
-- ✅ Maintain 80%+ code coverage
-
-### DON'T
-
-- ❌ Test implementation details
-- ❌ Write flaky tests (timing-dependent)
-- ❌ Skip tests in CI
-- ❌ Test third-party libraries
-- ❌ Use production database for tests
-- ❌ Commit test secrets
-- ❌ Write tests that depend on each other
-
-## Performance Testing
-
-### Load Testing (k6)
-
-**Purpose**: Test API under load
-
-**Setup**:
-```bash
-brew install k6
-```
-
-**Test Script** (k6-load-test.js):
-```javascript
-import http from 'k6/http';
-import { check, sleep } from 'k6';
-
-export let options = {
-  stages: [
-    { duration: '30s', target: 20 },   // Ramp-up to 20 users
-    { duration: '1m', target: 20 },    // Stay at 20 users
-    { duration: '30s', target: 0 },    // Ramp-down to 0 users
-  ],
-};
-
-export default function () {
-  let response = http.get('http://localhost:3000/api/tasks');
-
-  check(response, {
-    'status is 200': (r) => r.status === 200,
-    'response time < 200ms': (r) => r.timings.duration < 200,
-  });
-
-  sleep(1);
-}
-```
-
-**Run Load Test**:
-```bash
-k6 run k6-load-test.js
-```
-
-## Security Testing
-
-### Dependency Scanning
+E2E tests run against a fully assembled Docker Compose stack. They are slower and run only in CI on pull requests to `main`.
 
 ```bash
-# Node.js
-npm audit
-npm audit fix
+# Start full stack
+docker-compose -f docker-compose.e2e.yml up -d
 
-# Python
-pip-audit
-safety check
+# Run E2E tests
+cargo test --test e2e
 
-# Rust
-cargo audit
+# Teardown
+docker-compose -f docker-compose.e2e.yml down -v
 ```
 
-### Static Analysis
-
-```bash
-# Node.js
-npm run lint
-
-# Python
-bandit -r .
-pylint .
-
-# Rust
-cargo clippy
-```
-
-## Test Documentation
-
-### Writing Test Documentation
-
-**Test README** (tests/README.md):
-```markdown
-# Testing Guide
-
-## Running Tests
-
-Unit tests: `npm test`
-Integration tests: `npm run test:integration`
-E2E tests: `npm run test:e2e`
-All tests: `npm run test:all`
+Key E2E scenarios:
+1. User registers → completes task → submits evidence → webhook delivered to Markov mock
+2. Peer vouches for contribution → vouch webhook delivered
+3. Evidence rejected (age > 30 days) → no webhook sent
 
 ## Test Coverage
 
-View coverage: `npm run test:coverage`
-Target: 80% coverage
+```bash
+# Install cargo-tarpaulin (coverage tool)
+cargo install cargo-tarpaulin
 
-## CI/CD
+# Generate coverage report
+cargo tarpaulin --workspace --out Html
 
-Tests run automatically on:
-- Every push to main
-- Every pull request
-- Nightly builds
+# Open report
+open tarpaulin-report.html
 ```
+
+**Targets**:
+- Domain logic: ≥ 90% coverage
+- Infrastructure: ≥ 80% coverage
+- API handlers: ≥ 75% coverage
 
 ## References
 
-- [Setup Guide](setup-guide.md) - Local development setup
-- [Local Development](local-development.md) - Development workflow
-- [Markov Integration Guide](../../../tandang/markov-engine/docs/GOTONG-ROYONG-INTEGRATION-GUIDE.md) - Integration details
-- [API Specifications](../api/webhook-spec.md) - API endpoints
+- [Setup Guide](setup-guide.md) — Initial environment setup
+- [Local Development](local-development.md) — Day-to-day workflow
+- [Webhook Spec](../api/webhook-spec.md) — Webhook protocol details
+- [Validation Rules](../por-evidence/validation-rules.md) — Evidence validation spec

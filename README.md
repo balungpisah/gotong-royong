@@ -51,11 +51,11 @@ This platform integrates with the Markov Credential Engine for reputation calcul
 
 ## Quick Links
 
-- [Contributing Guidelines](#) (TBD)
-- [API Documentation](#) (TBD)
-- [Security Policy](#) (TBD)
-- [Community Forum](#) (TBD)
+- [API Documentation](docs/api/webhook-spec.md)
+- [Security Policy](docs/deployment/security-checklist.md)
+- [Authentication Guide](docs/api/authentication.md)
+- [Full Documentation Index](docs/README.md)
 
 ## License
 
-TBD
+See LICENSE file (to be added).

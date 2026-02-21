@@ -10,7 +10,7 @@ Implementation planning and execution are locked to:
 - Redis + S3-compatible object storage
 
 Canonical decision:
-- `research/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
+- [`architecture/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`](architecture/adr/ADR-001-rust-axum-surrealdb-stack-lock.md)
 
 ## Table of Contents
 
@@ -19,6 +19,9 @@ Canonical decision:
 - [Integration Architecture](architecture/integration-architecture.md) - Markov Engine integration patterns
 - [Data Flow](architecture/data-flow.md) - Task and evidence flow diagrams
 - [Gameplay Rules (Tandang Signals)](architecture/tandang-gameplay-rules.md) - Deterministic gameplay gates/rewards driven by Tandang
+- [Tandang Signal Mapping](architecture/tandang-signal-mapping.md) - GR event → Tandang signal mapping table
+- [Full Gotong ↔ Tandang Integration](architecture/tandang-full-integration.md) - Complete integration spec
+- [Tandang Read Cache Policy](architecture/tandang-read-cache-policy.md) - Caching strategy for Tandang reputation reads
 
 ### API Specifications
 - [Webhook Specification](api/webhook-spec.md) - Webhook endpoint requirements
@@ -97,6 +100,14 @@ Canonical decision:
 1. Start: [System Overview](architecture/system-overview.md)
 2. Then: [Data Flow](architecture/data-flow.md)
 3. Then: [Evidence Format](por-evidence/evidence-format.md)
+
+### AI / LLM Agent
+1. Start: [Design Context](design/context/DESIGN-CONTEXT.md) — locked terminology and conventions
+2. Then: [Adaptive Path Map](design/context/ADAPTIVE-PATH-MAP.md) — current lifecycle model
+3. Then: [ADR-001](architecture/adr/ADR-001-rust-axum-surrealdb-stack-lock.md) — locked stack (non-negotiable)
+4. Then: [AI Spec](design/specs/AI-SPEC-v0.2.md) — 10 AI touch points and their contracts
+5. Then: [Research Index](research/README.md) — decision records and contract artifacts
+6. Then: [Webhook Spec](api/webhook-spec.md) + [Event Payloads](api/event-payloads.md) — integration contracts
 
 ## External References
 

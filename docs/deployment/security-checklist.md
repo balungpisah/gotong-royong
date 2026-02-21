@@ -18,7 +18,7 @@ This checklist covers security hardening requirements for the Gotong Royong plat
 - [ ] **Password Security**
   - [ ] Enforce minimum password length (12 characters)
   - [ ] Require password complexity (uppercase, lowercase, number, symbol)
-  - [ ] Hash passwords with bcrypt (cost factor: 12) or Argon2id
+  - [ ] Hash passwords with Argon2id (`argon2` crate)
   - [ ] Implement rate limiting on login attempts (5 attempts per 15 minutes)
   - [ ] Implement account lockout after failed attempts
   - [ ] Support password reset with secure tokens (time-limited, one-time use)
@@ -29,17 +29,23 @@ This checklist covers security hardening requirements for the Gotong Royong plat
   - [ ] Use role-based access control middleware
   - [ ] Audit role assignments
 
-**Example (Node.js)**:
-```javascript
-const bcrypt = require('bcrypt');
-const SALT_ROUNDS = 12;
+**Example (Rust — Argon2id)**:
+```rust
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
 
-async function hashPassword(password) {
-  return bcrypt.hash(password, SALT_ROUNDS);
+pub fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default(); // Argon2id, OWASP-recommended defaults
+    let hash = argon2.hash_password(password.as_bytes(), &salt)?;
+    Ok(hash.to_string())
 }
 
-async function verifyPassword(password, hash) {
-  return bcrypt.compare(password, hash);
+pub fn verify_password(password: &str, hash: &str) -> Result<bool, argon2::password_hash::Error> {
+    let parsed_hash = PasswordHash::new(hash)?;
+    Ok(Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok())
 }
 ```
 
@@ -59,21 +65,25 @@ async function verifyPassword(password, hash) {
   - [ ] Evidence upload: 10 uploads/hour per user
   - [ ] Return `429 Too Many Requests` with `Retry-After` header
 
-**Example (Express)**:
-```javascript
-const rateLimit = require('express-rate-limit');
+**Example (Rust — Tower middleware + Redis)**:
+```rust
+use tower_governor::{GovernorConfigBuilder, GovernorLayer};
+use std::net::IpAddr;
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
-  message: 'Too many login attempts, please try again later',
-});
+// Login endpoint: 5 requests per 15 minutes per IP
+let login_governor = GovernorConfigBuilder::default()
+    .per_second(60 * 15 / 5)  // 1 request per 180s = 5 per 15min
+    .burst_size(5)
+    .finish()
+    .unwrap();
 
-app.post('/api/auth/login', loginLimiter, loginHandler);
+Router::new()
+    .route("/api/auth/login", post(login_handler))
+    .layer(GovernorLayer::new(Arc::new(login_governor)))
 ```
 
 - [ ] **Input Validation**
-  - [ ] Validate all user input (use schema validation: Joi, Zod, yup)
+  - [ ] Validate all user input (use `validator` crate or `garde` for Rust struct validation)
   - [ ] Sanitize HTML input (prevent XSS)
   - [ ] Validate file uploads (type, size, content)
   - [ ] Use parameterized queries (prevent SQL injection)
@@ -85,16 +95,21 @@ app.post('/api/auth/login', loginLimiter, loginHandler);
   - [ ] Configure allowed headers
   - [ ] Set `Access-Control-Allow-Credentials: true` only if needed
 
-**Example**:
-```javascript
-const cors = require('cors');
+**Example (Rust — tower-http)**:
+```rust
+use tower_http::cors::{CorsLayer, AllowOrigin, AllowMethods, AllowHeaders};
+use axum::http::{HeaderName, Method};
 
-app.use(cors({
-  origin: ['https://app.gotong-royong.app'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-}));
+let cors = CorsLayer::new()
+    .allow_origin(AllowOrigin::exact("https://app.gotong-royong.app".parse().unwrap()))
+    .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+    .allow_headers([
+        HeaderName::from_static("content-type"),
+        HeaderName::from_static("authorization"),
+    ])
+    .allow_credentials(true);
+
+Router::new().layer(cors)
 ```
 
 - [ ] **Security Headers**
@@ -104,20 +119,25 @@ app.use(cors({
   - [ ] `X-XSS-Protection: 1; mode=block`
   - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
 
-**Example (Helmet.js)**:
-```javascript
-const helmet = require('helmet');
+**Example (Rust — tower-http `SetResponseHeaderLayer`)**:
+```rust
+use tower_http::set_header::SetResponseHeaderLayer;
+use axum::http::{HeaderName, HeaderValue};
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-}));
+Router::new()
+    .layer(SetResponseHeaderLayer::if_not_present(
+        HeaderName::from_static("x-content-type-options"),
+        HeaderValue::from_static("nosniff"),
+    ))
+    .layer(SetResponseHeaderLayer::if_not_present(
+        HeaderName::from_static("x-frame-options"),
+        HeaderValue::from_static("DENY"),
+    ))
+    .layer(SetResponseHeaderLayer::if_not_present(
+        HeaderName::from_static("strict-transport-security"),
+        HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+    ))
+    // CSP header set per-route or via middleware
 ```
 
 ### Database Security
@@ -140,18 +160,17 @@ app.use(helmet({
   - [ ] Validate input types
   - [ ] Use ORM with proper escaping
 
-**Example (PostgreSQL with parameterized queries)**:
-```javascript
-// ✅ GOOD: Parameterized query
-const result = await db.query(
-  'SELECT * FROM users WHERE email = $1',
-  [email]
-);
+**Example (SurrealDB — parameterized queries via Rust SDK)**:
+```rust
+// ✅ GOOD: Parameterized binding (SurrealDB SDK always uses bindings)
+let result: Vec<User> = db
+    .query("SELECT * FROM user WHERE email = $email")
+    .bind(("email", &email))
+    .await?
+    .take(0)?;
 
-// ❌ BAD: String concatenation (SQL injection risk)
-const result = await db.query(
-  `SELECT * FROM users WHERE email = '${email}'`
-);
+// ❌ BAD: String interpolation (never do this)
+let query = format!("SELECT * FROM user WHERE email = '{}'", email);
 ```
 
 - [ ] **Backup Security**
@@ -251,25 +270,18 @@ secrets/
   - [ ] Log suspicious activity (repeated failed logins, etc.)
   - [ ] Never log passwords, tokens, or secrets
 
-**Example (structured logging)**:
-```javascript
-const winston = require('winston');
+**Example (structured logging — Rust `tracing`)**:
+```rust
+use tracing::{warn, instrument};
 
-const logger = winston.createLogger({
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.File({ filename: 'security.log' }),
-  ],
-});
-
-// Log failed login
-logger.warn('Login failed', {
-  event: 'auth.login.failed',
-  ip: req.ip,
-  email: email,
-  reason: 'invalid_password',
-  timestamp: new Date().toISOString(),
-});
+// Log failed login (fields are structured, never log raw secrets)
+warn!(
+    event = "auth.login.failed",
+    ip = %client_ip,
+    // do NOT log the password or token
+    reason = "invalid_password",
+    "Login failed"
+);
 ```
 
 - [ ] **Monitoring & Alerting**
@@ -311,28 +323,29 @@ logger.warn('Login failed', {
   - [ ] Use read-only root filesystem
   - [ ] Limit container resources (CPU, memory)
 
-**Example (Dockerfile)**:
+**Example (Dockerfile — Rust multi-stage)**:
 ```dockerfile
-FROM node:18-alpine
+# Build stage
+FROM rust:1.88-slim AS builder
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+RUN cargo build --release --bin gotong-api
+
+# Runtime stage — minimal image
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+RUN useradd -r -u 1001 -s /bin/false gotong
 
-# Set working directory
 WORKDIR /app
+COPY --from=builder /app/target/release/gotong-api .
+COPY --chown=gotong:gotong config/ config/
 
-# Copy files
-COPY --chown=nodejs:nodejs . .
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Switch to non-root user
-USER nodejs
-
-# Run application
-CMD ["node", "server.js"]
+USER gotong
+EXPOSE 8080
+CMD ["./gotong-api"]
 ```
 
 - [ ] **Kubernetes Security**
@@ -345,29 +358,24 @@ CMD ["node", "server.js"]
 ### Dependency Security
 
 - [ ] **Dependency Management**
-  - [ ] Use lock files (package-lock.json, Cargo.lock)
-  - [ ] Run `npm audit` or `cargo audit` regularly
+  - [ ] Use lock files (`Cargo.lock` committed, `bun.lockb` committed for frontend)
+  - [ ] Run `cargo audit` regularly (backend)
   - [ ] Update dependencies monthly
   - [ ] Use automated dependency updates (Dependabot, Renovate)
   - [ ] Review security advisories
 
 **Example**:
 ```bash
-# Node.js
-npm audit
-npm audit fix
-
-# Python
-pip-audit
-safety check
-
-# Rust
+# Backend (Rust)
 cargo audit
+
+# Frontend (Bun)
+cd apps/web && bun audit
 ```
 
 - [ ] **Supply Chain Security**
   - [ ] Verify package integrity (checksums)
-  - [ ] Use private npm registry for internal packages
+  - [ ] Use private registry for internal crates (crates.io mirror or cargo-dist)
   - [ ] Pin dependency versions
   - [ ] Review dependency licenses
 
@@ -397,13 +405,13 @@ cargo audit
 
 - [ ] **Vulnerability Scanning**
   - [ ] Scan web application (OWASP ZAP, Burp Suite)
-  - [ ] Scan dependencies (npm audit, Snyk)
+  - [ ] Scan dependencies (cargo audit, bun audit for frontend, Snyk)
   - [ ] Scan Docker images (Trivy, Clair)
   - [ ] Scan infrastructure (AWS Inspector, Nessus)
 
 - [ ] **Code Review**
   - [ ] Review all code changes before merge
-  - [ ] Use static analysis tools (ESLint, Clippy)
+  - [ ] Use static analysis tools (Clippy + cargo-deny for Rust; ESLint/Biome for frontend)
   - [ ] Check for hardcoded secrets (git-secrets, TruffleHog)
   - [ ] Review security-critical code by security team
 

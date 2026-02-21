@@ -177,5 +177,3 @@ mc mb local/gotong-royong-evidence-dev
 
 ## Notes
 
-- Pre-lock polyglot setup instructions (Node/Python/PostgreSQL/Knex/Alembic/Diesel) are superseded.
-- If you need historical context, check git history for older guide revisions.

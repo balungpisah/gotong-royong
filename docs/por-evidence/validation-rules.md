@@ -2,707 +2,270 @@
 
 ## Overview
 
-This document specifies the validation rules for Proof of Reality (PoR) evidence. All validation occurs before evidence is accepted and forwarded to the Markov Credential Engine.
+This document specifies the validation rules for Proof of Reality (PoR) evidence. All validation occurs in the Rust backend before evidence is accepted and forwarded to the Markov Credential Engine.
+
+Implementation: `crates/domain/src/evidence/validation.rs`
 
 ## General Validation Rules
 
 ### Age Limit
 
-**Rule**: Evidence timestamp must be <= 30 days old
+**Rule**: Evidence timestamp must be ≤ 30 days old
 
 **Rationale**: Prevents submission of stale or backdated evidence
 
 **Implementation**:
-```javascript
-const MAX_EVIDENCE_AGE_DAYS = 30;
+```rust
+use chrono::{DateTime, Utc, Duration};
 
-function isTimestampValid(timestamp) {
-  const eventTime = new Date(timestamp).getTime();
-  const now = Date.now();
-  const ageDays = (now - eventTime) / (1000 * 60 * 60 * 24);
+const MAX_EVIDENCE_AGE_DAYS: i64 = 30;
 
-  if (ageDays < 0) {
-    throw new Error('Timestamp is in the future');
-  }
+pub fn validate_timestamp(timestamp: &DateTime<Utc>) -> Result<(), ValidationError> {
+    let age_days = (Utc::now() - *timestamp).num_days();
 
-  if (ageDays > MAX_EVIDENCE_AGE_DAYS) {
-    throw new Error(`Timestamp is too old: ${Math.floor(ageDays)} days (max: ${MAX_EVIDENCE_AGE_DAYS} days)`);
-  }
+    if age_days < 0 {
+        return Err(ValidationError::FutureTimestamp);
+    }
 
-  return true;
+    if age_days > MAX_EVIDENCE_AGE_DAYS {
+        return Err(ValidationError::TimestampTooOld { days: age_days });
+    }
+
+    Ok(())
 }
 ```
 
 **Error Messages**:
-- `"Timestamp is too old: 45 days"` - Evidence older than 30 days
-- `"Timestamp is in the future"` - Clock skew detected
-- `"Invalid timestamp format. Expected RFC3339"` - Malformed timestamp
+- `"Timestamp is too old: 45 days"` — Evidence older than 30 days
+- `"Timestamp is in the future"` — Clock skew detected
+- `"Invalid timestamp format. Expected RFC3339"` — Malformed timestamp
 
-### Timestamp Format
+---
 
-**Rule**: Must be RFC3339 format
+### File Type Validation
 
-**Valid formats**:
-- `2026-02-09T10:30:00Z` (UTC)
-- `2026-02-09T10:30:00+07:00` (with timezone)
-- `2026-02-09T10:30:00.123Z` (with milliseconds)
+**Allowed MIME Types**:
 
-**Invalid formats**:
-- `2026-02-09` (date only)
-- `1644408600` (Unix timestamp)
-- `02/09/2026` (US date format)
-
-**Validation**:
-```javascript
-function isValidRFC3339(timestamp) {
-  const rfc3339Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
-  return rfc3339Regex.test(timestamp);
-}
-```
-
-## Evidence-Specific Validation
-
-### 1. photo_with_timestamp
-
-#### Required Fields
-
-| Field | Validation |
-|-------|------------|
-| `proof.timestamp` | RFC3339, <= 30 days old |
-| `proof.media_hash` | Hex string, >= 32 characters |
-
-#### Media Hash Validation
-
-**Rule**: SHA-256 hash (64 hex characters) or SHA-1 (40 characters) minimum
+| Type | MIME | Max Size |
+|------|------|---------|
+| Photo | `image/jpeg`, `image/png`, `image/webp` | 15 MB |
+| Video | `video/mp4`, `video/webm` | 100 MB |
+| Document | `application/pdf` | 10 MB |
+| GPS Log | `application/json`, `text/plain` | 1 MB |
 
 **Implementation**:
-```javascript
-const MIN_MEDIA_HASH_LENGTH = 32;
+```rust
+const ALLOWED_MIME_TYPES: &[&str] = &[
+    "image/jpeg", "image/png", "image/webp",
+    "video/mp4", "video/webm",
+    "application/pdf",
+    "application/json", "text/plain",
+];
 
-function isValidMediaHash(hash) {
-  if (!hash || hash.length < MIN_MEDIA_HASH_LENGTH) {
-    throw new Error(`Invalid media_hash format. Expected hex string (min ${MIN_MEDIA_HASH_LENGTH} chars)`);
-  }
-
-  const hexRegex = /^[a-f0-9]+$/i;
-  if (!hexRegex.test(hash)) {
-    throw new Error('Invalid media_hash format. Hash must contain only hexadecimal characters (0-9, a-f)');
-  }
-
-  return true;
-}
-```
-
-**Examples**:
-```
-✅ Valid:
-a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456 (SHA-256, 64 chars)
-abc123def456789012345678901234567890abcd (SHA-1, 40 chars)
-
-❌ Invalid:
-abc123 (too short, 6 chars)
-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz (contains non-hex character 'z')
-```
-
-#### Optional EXIF Validation
-
-If EXIF data is provided, validate consistency:
-
-**Rule**: EXIF timestamp should match proof.timestamp (within 1 minute)
-
-```javascript
-function validateExifConsistency(proofTimestamp, exifTimestamp) {
-  if (!exifTimestamp) return true; // Optional field
-
-  const proofTime = new Date(proofTimestamp).getTime();
-  const exifTime = new Date(exifTimestamp).getTime();
-  const diffSeconds = Math.abs(proofTime - exifTime) / 1000;
-
-  if (diffSeconds > 60) {
-    console.warn(`EXIF timestamp mismatch: ${diffSeconds}s difference`);
-    // Warning only, not a failure
-  }
-
-  return true;
-}
-```
-
-### 2. gps_verification
-
-#### Required Fields
-
-| Field | Validation |
-|-------|------------|
-| `proof.timestamp` | RFC3339, <= 30 days old |
-| `proof.location.lat` | Number, -90 to 90 |
-| `proof.location.lon` | Number, -180 to 180 |
-
-#### Latitude Validation
-
-**Rule**: Must be between -90 (South Pole) and 90 (North Pole)
-
-**Implementation**:
-```javascript
-const MIN_LATITUDE = -90.0;
-const MAX_LATITUDE = 90.0;
-
-function isValidLatitude(lat) {
-  if (typeof lat !== 'number' || isNaN(lat)) {
-    throw new Error('Latitude must be a number');
-  }
-
-  if (lat < MIN_LATITUDE || lat > MAX_LATITUDE) {
-    throw new Error(`Invalid latitude: ${lat}. Must be between ${MIN_LATITUDE} and ${MAX_LATITUDE}`);
-  }
-
-  return true;
-}
-```
-
-#### Longitude Validation
-
-**Rule**: Must be between -180 and 180
-
-**Implementation**:
-```javascript
-const MIN_LONGITUDE = -180.0;
-const MAX_LONGITUDE = 180.0;
-
-function isValidLongitude(lon) {
-  if (typeof lon !== 'number' || isNaN(lon)) {
-    throw new Error('Longitude must be a number');
-  }
-
-  if (lon < MIN_LONGITUDE || lon > MAX_LONGITUDE) {
-    throw new Error(`Invalid longitude: ${lon}. Must be between ${MIN_LONGITUDE} and ${MAX_LONGITUDE}`);
-  }
-
-  return true;
-}
-```
-
-#### Coordinate Precision
-
-**Recommendation**: Store coordinates with 6-8 decimal places
-
-**Precision levels**:
-- 1 decimal place: ~11 km precision
-- 2 decimal places: ~1.1 km
-- 3 decimal places: ~110 m
-- 4 decimal places: ~11 m
-- 5 decimal places: ~1.1 m
-- 6 decimal places: ~11 cm (recommended)
-- 7 decimal places: ~1.1 cm
-- 8 decimal places: ~1.1 mm
-
-#### GPS Accuracy Validation (Optional)
-
-If `accuracy` field is provided:
-
-```javascript
-const MAX_ACCEPTABLE_ACCURACY = 100; // meters
-
-function validateGPSAccuracy(accuracy) {
-  if (accuracy === null || accuracy === undefined) {
-    return true; // Optional field
-  }
-
-  if (accuracy > MAX_ACCEPTABLE_ACCURACY) {
-    console.warn(`GPS accuracy poor: ${accuracy}m (recommended: <${MAX_ACCEPTABLE_ACCURACY}m)`);
-    // Warning only, not a failure
-  }
-
-  return true;
-}
-```
-
-### 3. witness_attestation
-
-#### Required Fields
-
-| Field | Validation |
-|-------|------------|
-| `proof.timestamp` | RFC3339, <= 30 days old |
-| `proof.witnesses` | Array, minimum 1 witness |
-
-#### Witnesses Array Validation
-
-**Rule**: At least one witness required
-
-**Implementation**:
-```javascript
-function isValidWitnessArray(witnesses) {
-  if (!Array.isArray(witnesses)) {
-    throw new Error('witness_attestation requires proof.witnesses array');
-  }
-
-  if (witnesses.length === 0) {
-    throw new Error('witness_attestation requires at least one witness in proof.witnesses');
-  }
-
-  return true;
-}
-```
-
-#### Individual Witness Validation
-
-**Rule**: Each witness must have at minimum a `witness_name`
-
-**Implementation**:
-```javascript
-function validateWitness(witness, index) {
-  if (!witness.witness_name || witness.witness_name.trim() === '') {
-    throw new Error(`Witness ${index + 1} missing required field: witness_name`);
-  }
-
-  if (witness.witness_name.length > 255) {
-    throw new Error(`Witness ${index + 1} name too long (max 255 characters)`);
-  }
-
-  // Optional field validation
-  if (witness.relationship) {
-    const validRelationships = ['supervisor', 'peer', 'beneficiary', 'other'];
-    if (!validRelationships.includes(witness.relationship)) {
-      throw new Error(`Witness ${index + 1} invalid relationship: ${witness.relationship}`);
+pub fn validate_mime_type(mime: &str) -> Result<(), ValidationError> {
+    if !ALLOWED_MIME_TYPES.contains(&mime) {
+        return Err(ValidationError::UnsupportedMimeType {
+            provided: mime.to_string(),
+            allowed: ALLOWED_MIME_TYPES.iter().map(|s| s.to_string()).collect(),
+        });
     }
-  }
-
-  if (witness.statement && witness.statement.length > 2000) {
-    throw new Error(`Witness ${index + 1} statement too long (max 2000 characters)`);
-  }
-
-  return true;
-}
-
-function validateAllWitnesses(witnesses) {
-  witnesses.forEach((witness, index) => {
-    validateWitness(witness, index);
-  });
-  return true;
+    Ok(())
 }
 ```
 
-#### Maximum Witnesses
+**Error Messages**:
+- `"Unsupported file type: application/x-executable"`
+- `"File size exceeds limit: 120.5 MB (max: 100 MB)"`
 
-**Rule**: Maximum 10 witnesses per attestation
+---
 
-**Rationale**: Prevent abuse and keep payload size reasonable
+### GPS Coordinate Validation
 
-**Implementation**:
-```javascript
-const MAX_WITNESSES = 10;
+**Rule**: Coordinates must be valid WGS-84 values within Indonesia's bounding box
 
-function checkMaxWitnesses(witnesses) {
-  if (witnesses.length > MAX_WITNESSES) {
-    throw new Error(`Too many witnesses: ${witnesses.length} (max: ${MAX_WITNESSES})`);
-  }
-  return true;
-}
-```
-
-## Cross-Field Validation
-
-### Timestamp Consistency
-
-When multiple evidence items exist for the same contribution, timestamps should be reasonably close:
-
-**Rule**: All evidence for a contribution should be within 7 days
+**Bounding Box** (Indonesia):
+- Latitude: −11.0° to 6.0°
+- Longitude: 95.0° to 141.0°
 
 **Implementation**:
-```javascript
-function validateTimestampConsistency(evidenceList) {
-  if (evidenceList.length < 2) return true;
-
-  const timestamps = evidenceList.map(e => new Date(e.timestamp).getTime());
-  const minTime = Math.min(...timestamps);
-  const maxTime = Math.max(...timestamps);
-  const diffDays = (maxTime - minTime) / (1000 * 60 * 60 * 24);
-
-  if (diffDays > 7) {
-    console.warn(`Evidence timestamps span ${Math.floor(diffDays)} days`);
-  }
-
-  return true;
-}
-```
-
-### Location Consistency (Optional)
-
-If multiple evidence items include GPS data, they should be geographically consistent:
-
-**Rule**: GPS coordinates should be within 1 km of each other
-
-**Implementation**:
-```javascript
-function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
+```rust
+pub struct GpsCoordinate {
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
-function validateLocationConsistency(evidenceList) {
-  const locations = evidenceList
-    .filter(e => e.latitude && e.longitude)
-    .map(e => ({ lat: e.latitude, lon: e.longitude }));
-
-  if (locations.length < 2) return true;
-
-  for (let i = 0; i < locations.length - 1; i++) {
-    for (let j = i + 1; j < locations.length; j++) {
-      const distance = haversineDistance(
-        locations[i].lat, locations[i].lon,
-        locations[j].lat, locations[j].lon
-      );
-
-      if (distance > 1.0) {
-        console.warn(`Evidence locations ${i} and ${j} are ${distance.toFixed(2)}km apart`);
-      }
+pub fn validate_gps(coord: &GpsCoordinate) -> Result<(), ValidationError> {
+    if !(-90.0..=90.0).contains(&coord.latitude) {
+        return Err(ValidationError::InvalidLatitude { value: coord.latitude });
     }
-  }
+    if !(-180.0..=180.0).contains(&coord.longitude) {
+        return Err(ValidationError::InvalidLongitude { value: coord.longitude });
+    }
 
-  return true;
+    // Indonesia bounding box check (warn only, not error)
+    let in_indonesia = (-11.0..=6.0).contains(&coord.latitude)
+        && (95.0..=141.0).contains(&coord.longitude);
+
+    if !in_indonesia {
+        tracing::warn!(
+            lat = coord.latitude,
+            lng = coord.longitude,
+            "GPS coordinates outside Indonesia bounding box"
+        );
+    }
+
+    Ok(())
 }
 ```
 
-## Payload Size Limits
+---
 
-### Maximum Payload Size
+### Hash Integrity
 
-**Rule**: Entire webhook payload must be <= 1 MB
+**Rule**: SHA-256 hash of uploaded file must match provided hash
 
 **Implementation**:
-```javascript
-const MAX_PAYLOAD_SIZE = 1024 * 1024; // 1 MB
+```rust
+use sha2::{Sha256, Digest};
 
-function validatePayloadSize(payload) {
-  const payloadSize = Buffer.byteLength(JSON.stringify(payload), 'utf-8');
+pub fn compute_sha256(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hex::encode(hasher.finalize())
+}
 
-  if (payloadSize > MAX_PAYLOAD_SIZE) {
-    throw new Error(`Payload too large: ${payloadSize} bytes (max: ${MAX_PAYLOAD_SIZE} bytes)`);
-  }
-
-  return true;
+pub fn verify_integrity(data: &[u8], expected_hash: &str) -> Result<(), ValidationError> {
+    let computed = compute_sha256(data);
+    if computed != expected_hash {
+        return Err(ValidationError::HashMismatch {
+            expected: expected_hash.to_string(),
+            computed,
+        });
+    }
+    Ok(())
 }
 ```
 
-### Field-Specific Limits
+---
 
-| Field | Maximum Size |
-|-------|--------------|
-| `title` | 200 characters |
-| `description` | 2000 characters |
-| `witness.statement` | 2000 characters |
-| `metadata` object | 50 keys |
-| `witnesses` array | 10 items |
+### Image EXIF Validation
 
-## Security Validation
+**Rule**: For photos, EXIF data is extracted and stored; GPS coordinates from EXIF are validated if present
 
-### SQL Injection Prevention
+**Implementation** (using `kamadak-exif` crate):
+```rust
+use exif::{Reader, Tag, In};
 
-**Rule**: Sanitize all user input
+pub fn extract_exif_metadata(image_bytes: &[u8]) -> ExifMetadata {
+    let mut cursor = std::io::Cursor::new(image_bytes);
+    let exif = Reader::new().read_from_container(&mut cursor);
 
-**Implementation**: Use parameterized queries (examples from schema setup):
-```javascript
-// ✅ Good: Parameterized query
-db.query('INSERT INTO evidence (contribution_id, media_hash) VALUES ($1, $2)', [contributionId, mediaHash]);
-
-// ❌ Bad: String interpolation
-db.query(`INSERT INTO evidence (contribution_id, media_hash) VALUES ('${contributionId}', '${mediaHash}')`);
-```
-
-### XSS Prevention
-
-**Rule**: Escape HTML in user-provided text
-
-**Implementation**:
-```javascript
-function escapeHtml(text) {
-  const map = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
-  };
-  return text.replace(/[&<>"']/g, m => map[m]);
-}
-
-// Usage
-const safeStatement = escapeHtml(witness.statement);
-```
-
-### Path Traversal Prevention
-
-**Rule**: Validate file URLs don't contain path traversal sequences
-
-**Implementation**:
-```javascript
-function isValidFileUrl(url) {
-  if (url.includes('..') || url.includes('/../')) {
-    throw new Error('Invalid file URL: path traversal detected');
-  }
-
-  if (!url.startsWith('https://')) {
-    throw new Error('Invalid file URL: must use HTTPS');
-  }
-
-  return true;
+    match exif {
+        Ok(exif) => ExifMetadata {
+            gps_latitude: read_gps_lat(&exif),
+            gps_longitude: read_gps_lng(&exif),
+            timestamp: read_datetime(&exif),
+            camera_model: read_string(&exif, Tag::Model, In::PRIMARY),
+        },
+        Err(_) => ExifMetadata::default(), // No EXIF data; proceed without it
+    }
 }
 ```
 
-## Error Response Format
+---
 
-When validation fails, return structured error:
+## Evidence Type Rules
+
+### Photo Evidence
+
+| Rule | Requirement |
+|------|------------|
+| File type | JPEG, PNG, or WebP |
+| Max size | 15 MB |
+| Min resolution | 480×480 px |
+| EXIF stripping | Strip personal metadata before storage; keep GPS + timestamp |
+| Timestamp | Must be within 30 days |
+
+### Video Evidence
+
+| Rule | Requirement |
+|------|------------|
+| File type | MP4 or WebM |
+| Max size | 100 MB |
+| Max duration | 5 minutes |
+| Min resolution | 480p |
+| Timestamp | Must be within 30 days |
+
+### GPS Log Evidence
+
+| Rule | Requirement |
+|------|------------|
+| File type | JSON or plain text |
+| Format | GeoJSON `LineString` or NMEA sentences |
+| Min points | 3 GPS waypoints |
+| Max size | 1 MB |
+| Timestamp | Must be within 30 days |
+
+### Document Evidence
+
+| Rule | Requirement |
+|------|------------|
+| File type | PDF |
+| Max size | 10 MB |
+| Max pages | 50 |
+| Timestamp | Must be within 30 days |
+
+---
+
+## Validation Error Codes
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `TIMESTAMP_TOO_OLD` | 422 | Evidence older than 30 days |
+| `FUTURE_TIMESTAMP` | 422 | Timestamp is in the future |
+| `INVALID_TIMESTAMP_FORMAT` | 422 | Expected RFC3339 |
+| `UNSUPPORTED_MIME_TYPE` | 422 | File type not in allowed list |
+| `FILE_TOO_LARGE` | 413 | File size exceeds limit |
+| `HASH_MISMATCH` | 422 | Integrity check failed |
+| `INVALID_GPS_COORDINATES` | 422 | Out of range lat/lng |
+| `LOW_RESOLUTION` | 422 | Image below minimum resolution |
+| `EXIF_EXTRACTION_FAILED` | 422 | Corrupt image metadata |
+| `PDF_TOO_MANY_PAGES` | 422 | PDF exceeds 50 pages |
+
+---
+
+## Validation Error Response Format
 
 ```json
 {
-  "error": "Human-readable error message",
-  "code": "INVALID_PAYLOAD",
+  "error": "Evidence validation failed",
+  "code": "TIMESTAMP_TOO_OLD",
   "details": {
-    "field": "proof.timestamp",
-    "reason": "exceeds_max_age",
-    "max_age_days": 30,
-    "actual_age_days": 45
+    "field": "timestamp",
+    "provided_value": "2025-12-01T10:00:00Z",
+    "age_days": 81,
+    "max_age_days": 30
   }
 }
 ```
 
-**Example error responses**:
+---
 
-```json
-// Timestamp too old
-{
-  "error": "Timestamp is too old: 45 days",
-  "code": "INVALID_PAYLOAD",
-  "details": {
-    "field": "proof.timestamp",
-    "reason": "exceeds_max_age"
-  }
-}
+## Post-Validation Pipeline
 
-// Invalid coordinates
-{
-  "error": "Invalid latitude: 95.0. Must be between -90 and 90",
-  "code": "INVALID_PAYLOAD",
-  "details": {
-    "field": "proof.location.lat",
-    "reason": "out_of_range",
-    "min": -90,
-    "max": 90,
-    "actual": 95.0
-  }
-}
+After successful validation:
 
-// Missing witnesses
-{
-  "error": "witness_attestation requires at least one witness in proof.witnesses",
-  "code": "INVALID_PAYLOAD",
-  "details": {
-    "field": "proof.witnesses",
-    "reason": "array_empty",
-    "min_length": 1
-  }
-}
-```
+1. **EXIF Strip**: Personal metadata removed, GPS + timestamp retained
+2. **Hash Record**: SHA-256 stored in `evidence` table for integrity audit
+3. **S3 Upload**: File stored at `evidence/{community_id}/{year}/{month}/{uuid}.{ext}`
+4. **AI-08 Scan**: Content moderation check for sensitive material
+5. **Markov Webhook**: `por_evidence` event dispatched if all checks pass
 
-## Complete Validation Function
-
-**Example (Node.js)**:
-```javascript
-class PorValidator {
-  constructor() {
-    this.MAX_EVIDENCE_AGE_DAYS = 30;
-    this.MIN_MEDIA_HASH_LENGTH = 32;
-    this.MIN_LATITUDE = -90.0;
-    this.MAX_LATITUDE = 90.0;
-    this.MIN_LONGITUDE = -180.0;
-    this.MAX_LONGITUDE = 180.0;
-    this.MAX_WITNESSES = 10;
-  }
-
-  validate(evidenceType, proof) {
-    // Common validation
-    this.validateTimestamp(proof.timestamp);
-
-    // Type-specific validation
-    switch (evidenceType) {
-      case 'photo_with_timestamp':
-        return this.validatePhotoEvidence(proof);
-      case 'gps_verification':
-        return this.validateGPSEvidence(proof);
-      case 'witness_attestation':
-        return this.validateWitnessEvidence(proof);
-      default:
-        throw new Error(`Invalid evidence_type: ${evidenceType}`);
-    }
-  }
-
-  validateTimestamp(timestamp) {
-    if (!timestamp) {
-      throw new Error('Missing required field: proof.timestamp');
-    }
-
-    const eventTime = new Date(timestamp).getTime();
-    if (isNaN(eventTime)) {
-      throw new Error('Invalid timestamp format. Expected RFC3339');
-    }
-
-    const now = Date.now();
-    const ageDays = (now - eventTime) / (1000 * 60 * 60 * 24);
-
-    if (ageDays < 0) {
-      throw new Error('Timestamp is in the future');
-    }
-
-    if (ageDays > this.MAX_EVIDENCE_AGE_DAYS) {
-      throw new Error(`Timestamp is too old: ${Math.floor(ageDays)} days`);
-    }
-  }
-
-  validatePhotoEvidence(proof) {
-    if (!proof.media_hash) {
-      throw new Error('photo_with_timestamp requires proof.media_hash');
-    }
-
-    if (proof.media_hash.length < this.MIN_MEDIA_HASH_LENGTH) {
-      throw new Error(`Invalid media_hash format. Expected hex string (min ${this.MIN_MEDIA_HASH_LENGTH} chars)`);
-    }
-
-    if (!/^[a-f0-9]+$/i.test(proof.media_hash)) {
-      throw new Error('Invalid media_hash format. Hash must contain only hexadecimal characters');
-    }
-
-    return true;
-  }
-
-  validateGPSEvidence(proof) {
-    if (!proof.location) {
-      throw new Error('gps_verification requires proof.location');
-    }
-
-    const { lat, lon } = proof.location;
-
-    if (typeof lat !== 'number' || isNaN(lat)) {
-      throw new Error('Invalid latitude: must be a number');
-    }
-
-    if (lat < this.MIN_LATITUDE || lat > this.MAX_LATITUDE) {
-      throw new Error(`Invalid latitude: ${lat}. Must be between ${this.MIN_LATITUDE} and ${this.MAX_LATITUDE}`);
-    }
-
-    if (typeof lon !== 'number' || isNaN(lon)) {
-      throw new Error('Invalid longitude: must be a number');
-    }
-
-    if (lon < this.MIN_LONGITUDE || lon > this.MAX_LONGITUDE) {
-      throw new Error(`Invalid longitude: ${lon}. Must be between ${this.MIN_LONGITUDE} and ${this.MAX_LONGITUDE}`);
-    }
-
-    return true;
-  }
-
-  validateWitnessEvidence(proof) {
-    if (!Array.isArray(proof.witnesses)) {
-      throw new Error('witness_attestation requires proof.witnesses array');
-    }
-
-    if (proof.witnesses.length === 0) {
-      throw new Error('witness_attestation requires at least one witness');
-    }
-
-    if (proof.witnesses.length > this.MAX_WITNESSES) {
-      throw new Error(`Too many witnesses: ${proof.witnesses.length} (max: ${this.MAX_WITNESSES})`);
-    }
-
-    proof.witnesses.forEach((witness, index) => {
-      if (!witness.witness_name || witness.witness_name.trim() === '') {
-        throw new Error(`Witness ${index + 1} missing required field: witness_name`);
-      }
-    });
-
-    return true;
-  }
-}
-
-// Usage
-const validator = new PorValidator();
-try {
-  validator.validate('photo_with_timestamp', proof);
-  console.log('Validation passed');
-} catch (error) {
-  console.error('Validation failed:', error.message);
-}
-```
-
-## Testing Validation
-
-### Unit Tests
-
-```javascript
-describe('PoR Validation', () => {
-  const validator = new PorValidator();
-
-  describe('Timestamp validation', () => {
-    it('accepts recent timestamp', () => {
-      const timestamp = new Date().toISOString();
-      expect(() => validator.validateTimestamp(timestamp)).not.toThrow();
-    });
-
-    it('rejects old timestamp', () => {
-      const timestamp = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
-      expect(() => validator.validateTimestamp(timestamp)).toThrow('too old');
-    });
-
-    it('rejects future timestamp', () => {
-      const timestamp = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      expect(() => validator.validateTimestamp(timestamp)).toThrow('future');
-    });
-  });
-
-  describe('GPS validation', () => {
-    it('accepts valid coordinates', () => {
-      const proof = { location: { lat: -6.2088, lon: 106.8456 } };
-      expect(() => validator.validateGPSEvidence(proof)).not.toThrow();
-    });
-
-    it('rejects invalid latitude', () => {
-      const proof = { location: { lat: 95.0, lon: 106.8456 } };
-      expect(() => validator.validateGPSEvidence(proof)).toThrow('Invalid latitude');
-    });
-
-    it('rejects invalid longitude', () => {
-      const proof = { location: { lat: -6.2088, lon: -185.0 } };
-      expect(() => validator.validateGPSEvidence(proof)).toThrow('Invalid longitude');
-    });
-  });
-
-  describe('Witness validation', () => {
-    it('accepts valid witnesses', () => {
-      const proof = { witnesses: [{ witness_name: 'John Doe' }] };
-      expect(() => validator.validateWitnessEvidence(proof)).not.toThrow();
-    });
-
-    it('rejects empty witnesses array', () => {
-      const proof = { witnesses: [] };
-      expect(() => validator.validateWitnessEvidence(proof)).toThrow('at least one witness');
-    });
-
-    it('rejects witness without name', () => {
-      const proof = { witnesses: [{}] };
-      expect(() => validator.validateWitnessEvidence(proof)).toThrow('missing required field');
-    });
-  });
-});
-```
+---
 
 ## References
 
-- [Evidence Format](evidence-format.md) - Evidence structure
-- [Event Payloads](../api/event-payloads.md) - JSON schemas
-- [Error Handling](../api/error-handling.md) - Error response format
-- [Markov Integration Guide](../../../tandang/markov-engine/docs/GOTONG-ROYONG-INTEGRATION-GUIDE.md) - Server-side validation
+- [Evidence Format](evidence-format.md) — Evidence type definitions
+- [Storage Requirements](storage-requirements.md) — S3 storage spec
+- [AI Spec — AI-08](../design/specs/AI-SPEC-v0.2.md) — Media scan touch point
+- [Webhook Spec](../api/webhook-spec.md) — Webhook delivery after validation

@@ -42,7 +42,7 @@ Before enabling production traffic between Gotong Royong and Markov:
 sequenceDiagram
     participant User
     participant GR as Gotong Royong API
-    participant DB as PostgreSQL
+    participant DB as SurrealDB
     participant Queue as Job Queue
     participant Webhook as Webhook Publisher
     participant Markov as Markov Engine
@@ -156,7 +156,7 @@ In native mode, Markov does NOT directly access Gotong Royong's database. All da
 └─────────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────────┐
-│ Background Worker (Bull/Celery/Delayed Job)            │
+│ Background Worker (Tokio task pool + Redis DLQ)        │
 │                                                         │
 │  [1] Dequeue webhook event                             │
 │    ↓                                                    │
@@ -170,99 +170,71 @@ In native mode, Markov does NOT directly access Gotong Royong's database. All da
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Code Example (Node.js/TypeScript)
+### Code Example (Rust)
 
-```typescript
-import crypto from 'crypto';
-import axios from 'axios';
+```rust
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
-interface WebhookEvent {
-  event_type: string;
-  actor: { user_id: string; username: string };
-  subject: Record<string, any>;
+type HmacSha256 = Hmac<Sha256>;
+
+pub struct WebhookPublisher {
+    client: reqwest::Client,
+    secret: String,
+    markov_base_url: String,
 }
 
-class WebhookPublisher {
-  private secret: string;
-  private markovBaseUrl: string;
-
-  constructor(secret: string, markovBaseUrl: string) {
-    this.secret = secret;
-    this.markovBaseUrl = markovBaseUrl;
-  }
-
-  async publish(event: WebhookEvent): Promise<void> {
-    const payload = JSON.stringify(event);
-    const signature = this.computeSignature(payload);
-
-    const url = `${this.markovBaseUrl}/api/v1/platforms/gotong_royong/webhook`;
-
-    try {
-      const response = await axios.post(url, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-GR-Signature': `sha256=${signature}`,
-        },
-        timeout: 10000, // 10 second timeout
-      });
-
-      console.log(`Webhook delivered: ${response.status}`);
-    } catch (error) {
-      console.error(`Webhook failed: ${error.message}`);
-      throw error; // Let queue retry
+impl WebhookPublisher {
+    pub fn new(secret: String, markov_base_url: String) -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .expect("HTTP client");
+        Self { client, secret, markov_base_url }
     }
-  }
 
-  private computeSignature(payload: string): string {
-    return crypto
-      .createHmac('sha256', this.secret)
-      .update(payload)
-      .digest('hex');
-  }
-}
+    pub async fn publish(&self, event: &WebhookEvent) -> Result<(), Error> {
+        let payload = serde_json::to_string(event)?;
+        let signature = self.compute_signature(&payload);
+        let url = format!(
+            "{}/api/v1/platforms/gotong_royong/webhook",
+            self.markov_base_url
+        );
 
-// Usage in job queue
-async function processWebhookJob(job: { data: WebhookEvent }) {
-  const publisher = new WebhookPublisher(
-    process.env.GOTONG_ROYONG_WEBHOOK_SECRET!,
-    process.env.MARKOV_API_URL!
-  );
+        let response = self.client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .header("X-GR-Signature", format!("sha256={}", signature))
+            .body(payload)
+            .send()
+            .await?;
 
-  await publisher.publish(job.data);
+        tracing::info!(status = %response.status(), "Webhook delivered");
+        Ok(())
+    }
+
+    fn compute_signature(&self, payload: &str) -> String {
+        let mut mac = HmacSha256::new_from_slice(self.secret.as_bytes())
+            .expect("HMAC accepts any key length");
+        mac.update(payload.as_bytes());
+        hex::encode(mac.finalize().into_bytes())
+    }
 }
 ```
 
 ### Job Queue Configuration
 
-**Recommended**: Use Redis-backed job queue
+**Implementation**: Tokio task pool backed by Redis for persistence. Failed deliveries move to a Dead Letter Queue (DLQ) stored in SurrealDB `webhook_failures`.
 
-**Options**:
-- **Node.js**: Bull or BullMQ
-- **Python**: Celery with Redis broker
-- **Rust**: Faktory or custom tokio-based queue
+**Pattern**: Webhook events are enqueued as Tokio tasks via an `mpsc` channel. A background worker pool consumes them with exponential backoff retry.
 
-**Configuration**:
-```javascript
-// Bull configuration
-const webhookQueue = new Bull('webhook-events', {
-  redis: process.env.REDIS_URL,
-  defaultJobOptions: {
-    attempts: 5,
-    backoff: {
-      type: 'exponential',
-      delay: 1000, // Start with 1 second
-    },
-    removeOnComplete: true,
-    removeOnFail: false, // Keep failed jobs for debugging
-  },
-});
-
-// Add job to queue
-await webhookQueue.add('contribution_created', {
-  event_type: 'contribution_created',
-  actor: { user_id: 'user123', username: 'alice' },
-  subject: { /* event data */ },
-});
+```rust
+// Enqueue a webhook event (fire-and-forget)
+webhook_tx.send(WebhookJob {
+    event_type: "contribution_created".into(),
+    actor: Actor { user_id: "user123".into(), username: "alice".into() },
+    subject: subject_data,
+}).await?;
 ```
 
 ## Retry Logic
@@ -459,13 +431,12 @@ Instead of sending individual webhooks, batch multiple events:
 
 Reuse HTTP connections to Markov Engine:
 
-```javascript
-const axiosInstance = axios.create({
-  baseURL: process.env.MARKOV_API_URL,
-  timeout: 10000,
-  httpAgent: new http.Agent({ keepAlive: true }),
-  httpsAgent: new https.Agent({ keepAlive: true }),
-});
+```rust
+// Build once at startup; reqwest pools connections automatically
+let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .pool_max_idle_per_host(5)
+    .build()?;
 ```
 
 ## Testing Integration

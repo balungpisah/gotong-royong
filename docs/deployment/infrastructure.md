@@ -169,7 +169,3 @@ Metrics:
 Tracing/logging:
 - propagate `correlation_id` across API, jobs, and event delivery
 - structured logs with error codes for DB and stream failures
-
-## Legacy Notice
-
-Previous infrastructure examples centered on PostgreSQL/MySQL relational deployment are superseded by this profile for new implementation work.

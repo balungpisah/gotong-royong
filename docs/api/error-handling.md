@@ -224,135 +224,59 @@ delay = min(base_delay * (2 ^ attempt), max_delay)
 | 5 | 8s | 15s |
 | Failed | - | Move to Dead Letter Queue |
 
-### Implementation (Node.js)
+### Implementation (Rust)
 
-```javascript
-async function sendWebhookWithRetry(url, payload, signature, maxAttempts = 5) {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      const response = await axios.post(url, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-GR-Signature': signature,
-        },
-        timeout: 10000,
-      });
+```rust
+use reqwest::StatusCode;
+use std::time::Duration;
+use tokio::time::sleep;
 
-      // Success
-      if (response.status >= 200 && response.status < 300) {
-        console.log(`Webhook delivered (attempt ${attempt + 1})`);
-        return response.data;
-      }
+async fn send_webhook_with_retry(
+    client: &reqwest::Client,
+    url: &str,
+    payload: &str,
+    signature: &str,
+    max_attempts: u32,
+) -> Result<serde_json::Value, Error> {
+    for attempt in 0..max_attempts {
+        match client
+            .post(url)
+            .header("Content-Type", "application/json")
+            .header("X-GR-Signature", signature)
+            .body(payload.to_owned())
+            .send()
+            .await
+        {
+            Ok(r) if r.status().is_success() => return Ok(r.json().await?),
+            Ok(r) => {
+                let status = r.status();
+                // Don't retry on permanent 4xx (except 429 rate limit)
+                if status.is_client_error() && status != StatusCode::TOO_MANY_REQUESTS {
+                    return Err(Error::PermanentFailure(status));
+                }
+                // Respect Retry-After on 429
+                if status == StatusCode::TOO_MANY_REQUESTS {
+                    let wait = r
+                        .headers()
+                        .get("retry-after")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .unwrap_or(60);
+                    tracing::warn!(wait_secs = wait, "Rate limited by Markov Engine");
+                    sleep(Duration::from_secs(wait)).await;
+                    continue;
+                }
+            }
+            Err(e) if attempt == max_attempts - 1 => return Err(Error::Request(e)),
+            Err(e) => tracing::warn!(attempt, error = %e, "Webhook delivery failed"),
+        }
 
-    } catch (error) {
-      const status = error.response?.status;
-
-      // Don't retry on permanent failures
-      if (status >= 400 && status < 500 && status !== 429) {
-        console.error(`Webhook failed permanently: ${status}`);
-        throw error;
-      }
-
-      // Last attempt - give up
-      if (attempt === maxAttempts - 1) {
-        console.error(`Webhook failed after ${maxAttempts} attempts`);
-        throw error;
-      }
-
-      // Calculate backoff delay
-      const delay = Math.min(1000 * Math.pow(2, attempt), 60000);
-      console.log(`Webhook failed (attempt ${attempt + 1}), retrying in ${delay}ms`);
-      await sleep(delay);
+        if attempt < max_attempts - 1 {
+            let delay = std::cmp::min(1u64 << attempt, 60);
+            sleep(Duration::from_secs(delay)).await;
+        }
     }
-  }
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-```
-
-### Implementation (Python)
-
-```python
-import time
-import requests
-from typing import Optional
-
-def send_webhook_with_retry(
-    url: str,
-    payload: str,
-    signature: str,
-    max_attempts: int = 5
-) -> Optional[dict]:
-    for attempt in range(max_attempts):
-        try:
-            response = requests.post(
-                url,
-                data=payload,
-                headers={
-                    'Content-Type': 'application/json',
-                    'X-GR-Signature': signature,
-                },
-                timeout=10.0
-            )
-
-            # Success
-            if 200 <= response.status_code < 300:
-                print(f"Webhook delivered (attempt {attempt + 1})")
-                return response.json()
-
-            # Don't retry on permanent failures
-            if 400 <= response.status_code < 500 and response.status_code != 429:
-                print(f"Webhook failed permanently: {response.status_code}")
-                raise Exception(f"Permanent failure: {response.status_code}")
-
-        except requests.exceptions.Timeout:
-            print(f"Webhook timeout (attempt {attempt + 1})")
-
-        except Exception as e:
-            print(f"Webhook error (attempt {attempt + 1}): {e}")
-
-        # Last attempt - give up
-        if attempt == max_attempts - 1:
-            print(f"Webhook failed after {max_attempts} attempts")
-            raise Exception("Max retries exceeded")
-
-        # Calculate backoff delay
-        delay = min(1 * (2 ** attempt), 60)
-        print(f"Retrying in {delay}s...")
-        time.sleep(delay)
-
-    return None
-```
-
-### Rate Limit Handling
-
-When receiving `429 Too Many Requests`, respect the `Retry-After` header:
-
-```javascript
-async function sendWebhookWithRateLimit(url, payload, signature) {
-  try {
-    const response = await axios.post(url, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-GR-Signature': signature,
-      },
-      timeout: 10000,
-    });
-    return response.data;
-
-  } catch (error) {
-    if (error.response?.status === 429) {
-      const retryAfter = parseInt(error.response.headers['retry-after'] || '60');
-      console.log(`Rate limited, waiting ${retryAfter}s`);
-      await sleep(retryAfter * 1000);
-
-      // Retry once after waiting
-      return sendWebhookWithRateLimit(url, payload, signature);
-    }
-    throw error;
-  }
+    Err(Error::MaxRetriesExceeded)
 }
 ```
 
@@ -432,20 +356,6 @@ async function processWebhook(event) {
 ### Event ID Generation
 
 **Format**: `evt_{16_hex_chars}`
-
-**Node.js**:
-```javascript
-const crypto = require('crypto');
-const eventId = `evt_${crypto.randomBytes(8).toString('hex')}`;
-// Example: evt_a1b2c3d4e5f6789a
-```
-
-**Python**:
-```python
-import secrets
-event_id = f"evt_{secrets.token_hex(8)}"
-# Example: evt_a1b2c3d4e5f6789a
-```
 
 **Rust**:
 ```rust
@@ -585,65 +495,90 @@ gotong_worker_webhook_dead_letter_total
 
 ### Unit Tests
 
-```javascript
-describe('Error handling', () => {
-  it('retries on 500 error', async () => {
-    const mockAxios = jest.spyOn(axios, 'post')
-      .mockRejectedValueOnce({ response: { status: 500 } })
-      .mockResolvedValueOnce({ status: 200, data: { processed: 1 } });
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::{MockServer, Mock, ResponseTemplate};
+    use wiremock::matchers::{method, path};
 
-    const result = await sendWebhookWithRetry(url, payload, signature);
+    #[tokio::test]
+    async fn retries_on_500_then_succeeds() {
+        let mock_server = MockServer::start().await;
 
-    expect(mockAxios).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ processed: 1 });
-  });
+        Mock::given(method("POST")).and(path("/webhook"))
+            .respond_with(ResponseTemplate::new(500))
+            .up_to_n_times(1)
+            .mount(&mock_server).await;
 
-  it('does not retry on 400 error', async () => {
-    const mockAxios = jest.spyOn(axios, 'post')
-      .mockRejectedValueOnce({ response: { status: 400 } });
+        Mock::given(method("POST")).and(path("/webhook"))
+            .respond_with(ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({"processed": 1})))
+            .mount(&mock_server).await;
 
-    await expect(sendWebhookWithRetry(url, payload, signature)).rejects.toThrow();
+        let client = reqwest::Client::new();
+        let result = send_webhook_with_retry(
+            &client, &format!("{}/webhook", mock_server.uri()),
+            r#"{}"#, "sha256=test", 5,
+        ).await;
 
-    expect(mockAxios).toHaveBeenCalledTimes(1);  // No retry
-  });
+        assert!(result.is_ok());
+    }
 
-  it('respects Retry-After on 429', async () => {
-    const mockAxios = jest.spyOn(axios, 'post')
-      .mockRejectedValueOnce({
-        response: { status: 429, headers: { 'retry-after': '2' } }
-      })
-      .mockResolvedValueOnce({ status: 200, data: { processed: 1 } });
+    #[tokio::test]
+    async fn does_not_retry_on_400() {
+        let mock_server = MockServer::start().await;
 
-    const startTime = Date.now();
-    await sendWebhookWithRateLimit(url, payload, signature);
-    const elapsed = Date.now() - startTime;
+        Mock::given(method("POST")).and(path("/webhook"))
+            .respond_with(ResponseTemplate::new(400))
+            .mount(&mock_server).await;
 
-    expect(elapsed).toBeGreaterThanOrEqual(2000);  // Waited 2 seconds
-  });
-});
+        let client = reqwest::Client::new();
+        let result = send_webhook_with_retry(
+            &client, &format!("{}/webhook", mock_server.uri()),
+            r#"{}"#, "sha256=test", 5,
+        ).await;
+
+        assert!(matches!(result, Err(Error::PermanentFailure(_))));
+        // Verify only one request was made (no retry)
+        mock_server.verify().await;
+    }
+}
 ```
 
 ### Integration Tests
 
-```javascript
-describe('Error integration', () => {
-  it('moves to DLQ after max retries', async () => {
-    // Mock Markov to always fail
-    nock('https://api.markov.local')
-      .post('/v1/platforms/gotong_royong/webhook')
-      .times(5)
-      .reply(500, { error: 'Internal error' });
+```rust
+#[tokio::test]
+async fn moves_to_dlq_after_max_retries() {
+    let mock_server = MockServer::start().await;
+    let db = test_db().await;
 
-    await expect(sendWebhookWithRetry(url, payload, signature, 5)).rejects.toThrow();
+    // Always return 500
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(500))
+        .expect(5)
+        .mount(&mock_server).await;
 
-    // Check DLQ
-    const failures = await db.query(
-      'SELECT * FROM webhook_failures WHERE event_id = $1',
-      [event.event_id]
-    );
-    expect(failures.rows).toHaveLength(1);
-  });
-});
+    let result = send_webhook_with_retry(
+        &reqwest::Client::new(),
+        &format!("{}/webhook", mock_server.uri()),
+        r#"{"event_id":"evt_test123"}"#,
+        "sha256=test",
+        5,
+    ).await;
+
+    assert!(result.is_err());
+    mock_server.verify().await;
+
+    // Verify DLQ entry was recorded
+    let failures: Vec<WebhookFailure> = db
+        .query("SELECT * FROM webhook_failures WHERE event_id = $event_id")
+        .bind(("event_id", "evt_test123"))
+        .await?
+        .take(0)?;
+    assert_eq!(failures.len(), 1);
+}
 ```
 
 ## References
