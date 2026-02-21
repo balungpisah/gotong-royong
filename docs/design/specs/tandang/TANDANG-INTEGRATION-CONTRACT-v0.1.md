@@ -1,11 +1,11 @@
 # Tandang Integration Contract — v0.1
 
 > **Purpose**: Define the interface between gotong-royong and the tandang human-measurement engine.
-> **Status**: DRAFT — tandang SDK not yet available. This is a **pre-integration contract** recording what we need.
+> **Status**: DRAFT — implementation-focused contract for gotong-royong ↔ tandang integration.
 > **Companion docs**:
-> - [ENGAGEMENT-STRATEGY-v0.2.md](./ENGAGEMENT-STRATEGY-v0.2.md) — Octalysis × Tandang phase roadmap
+> - [ENGAGEMENT-STRATEGY-v0.2.md](../ENGAGEMENT-STRATEGY-v0.2.md) — Octalysis × Tandang phase roadmap
 > - [TANDANG-SIGNAL-INVENTORY-v0.1.md](./TANDANG-SIGNAL-INVENTORY-v0.1.md) — Raw signal catalog (120+ events)
-> - [ENGAGEMENT-BACKEND-CONTRACT-v0.1.md](./ENGAGEMENT-BACKEND-CONTRACT-v0.1.md) — Feed field registry
+> - [ENGAGEMENT-BACKEND-CONTRACT-v0.1.md](../ENGAGEMENT-BACKEND-CONTRACT-v0.1.md) — Feed field registry
 > **Last updated**: 2025-02-19
 
 ---

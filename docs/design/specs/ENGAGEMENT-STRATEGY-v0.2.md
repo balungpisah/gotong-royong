@@ -20,8 +20,8 @@ v0.1 was designed **before** we knew about tandang. It proposed generic mechanic
 | 5 generic phases | 5 signal-driven phases: INPUT → OUTPUT → PERSONAL → IMMERSION |
 
 **Companion documents:**
-- [TANDANG-SIGNAL-INVENTORY-v0.1.md](./TANDANG-SIGNAL-INVENTORY-v0.1.md) — Raw signal catalog (120+ events)
-- [TANDANG-INTEGRATION-CONTRACT-v0.1.md](./TANDANG-INTEGRATION-CONTRACT-v0.1.md) — API/event contracts per phase
+- [TANDANG-SIGNAL-INVENTORY-v0.1.md](./tandang/TANDANG-SIGNAL-INVENTORY-v0.1.md) — Raw signal catalog (120+ events)
+- [TANDANG-INTEGRATION-CONTRACT-v0.1.md](./tandang/TANDANG-INTEGRATION-CONTRACT-v0.1.md) — API/event contracts per phase
 - [ENGAGEMENT-BACKEND-CONTRACT-v0.1.md](./ENGAGEMENT-BACKEND-CONTRACT-v0.1.md) — Feed field registry
 
 ---
@@ -209,7 +209,7 @@ Time-sensitive countdown badges with color escalation. Quorum progress bars. All
 - Vouch budget indicator: "12/25 remaining" next to vouch chip
 - Skeptis chip shows concern count in amber
 - Saya Saksi may open mini-form for optional location/media
-- See [TANDANG-INTEGRATION-CONTRACT §2](./TANDANG-INTEGRATION-CONTRACT-v0.1.md#2-outbound-signals) for payloads
+- See [TANDANG-INTEGRATION-CONTRACT §2](./tandang/TANDANG-INTEGRATION-CONTRACT-v0.1.md#2-outbound-signals) for payloads
 
 **Mockup concept:**
 ```
@@ -256,7 +256,7 @@ Time-sensitive countdown badges with color escalation. Quorum progress bars. All
 **Implementation notes:**
 - Tier badge: small diamond glyphs next to name, colored by tier
 - Vouch/skeptis: compact counts in card header area
-- All data comes from tandang query endpoints (see [Integration Contract §4](./TANDANG-INTEGRATION-CONTRACT-v0.1.md#4-query-endpoints))
+- All data comes from tandang query endpoints (see [Integration Contract §4](./tandang/TANDANG-INTEGRATION-CONTRACT-v0.1.md#4-query-endpoints))
 
 ### 5.6 — Jejak Saya: Personal Tandang Dashboard (NEW)
 > **Drives:** ② Accomplishment, ④ Ownership, ⑥ Scarcity, ⑧ Loss & Avoidance
@@ -401,8 +401,8 @@ Biggest jumps enabled by tandang:
 - [Gamification, Crowdsourcing and Civic Tech — The Good Lobby](https://thegoodlobby.eu/gamification-crowdsourcing-civic-tech/)
 - [Gameful Civic Engagement: Review of Literature — ScienceDirect](https://www.sciencedirect.com/science/article/pii/S0740624X19302606)
 - **Tandang Engine** — `/Users/damarpanuluh/MERIDIAN-NEW/tandang/` (internal)
-- [TANDANG-SIGNAL-INVENTORY-v0.1.md](./TANDANG-SIGNAL-INVENTORY-v0.1.md) — Signal catalog
-- [TANDANG-INTEGRATION-CONTRACT-v0.1.md](./TANDANG-INTEGRATION-CONTRACT-v0.1.md) — Integration contract
+- [TANDANG-SIGNAL-INVENTORY-v0.1.md](./tandang/TANDANG-SIGNAL-INVENTORY-v0.1.md) — Signal catalog
+- [TANDANG-INTEGRATION-CONTRACT-v0.1.md](./tandang/TANDANG-INTEGRATION-CONTRACT-v0.1.md) — Integration contract
 
 ---
 

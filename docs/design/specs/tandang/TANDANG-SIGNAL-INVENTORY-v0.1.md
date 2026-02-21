@@ -1,8 +1,8 @@
 # Tandang Signal Inventory — v0.1
 
-> **Purpose**: Living reference of all signals available from the [tandang](../../tandang) human-measurement engine.
+> **Purpose**: Living reference of all signals available from the [tandang](../../../../tandang/markov-engine) human-measurement engine.
 > **Use**: Map these signals → gotong-royong UI affordances (reaction chips, badges, progress bars, trust indicators).
-> **Source**: `/Users/damarpanuluh/MERIDIAN-NEW/tandang/src/`
+> **Source**: `/Users/damarpanuluh/MERIDIAN-NEW/tandang/markov-engine/crates/`
 > **Date**: 2025-02-19
 
 ---

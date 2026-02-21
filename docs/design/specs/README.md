@@ -21,5 +21,6 @@ The large spec files are split into themed sub-documents to reduce merge conflic
 - [ai-spec](./ai-spec/) — AI touch point definitions (10 AI points + governance, prompts, and metrics)
 - [design-dna](./design-dna/) — Core design system, tokens, component, and card architecture
 - [ui-ux-spec](./ui-ux-spec/) — Product flow, governance, privacy, permissions, and interaction patterns
+- [tandang](./tandang/) — Tandang integration contract, signal inventory, and GR integration briefs/prompts
 
 Prefer linking to these section files from implementation tickets instead of referencing the root indexes.
