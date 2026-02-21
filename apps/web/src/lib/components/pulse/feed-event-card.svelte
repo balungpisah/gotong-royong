@@ -138,14 +138,18 @@
 	tabindex={onclick ? 0 : undefined}
 	{onclick}
 	onkeydown={onclick ? handleKeydown : undefined}
+	data-witness-id={item.witness_id}
 	class="group relative overflow-hidden rounded-xl transition-all duration-200
 		{selected
-			? 'border border-border/50'
+			? 'border-2 border-foreground/70'
 			: 'border border-border/20 hover:border-border/40'}
 		{onclick ? 'cursor-pointer' : ''}
 		{isAlive && !selected ? 'animate-pulse-glow' : ''}
-		bg-card"
-	style="--pulse-color: {moodColor}; box-shadow: {selected ? selectedShadow : isAlive ? 'none' : restShadow};"
+"
+	style="--pulse-color: {moodColor};
+		background: var(--color-card);
+		box-shadow: {selected ? selectedShadow : isAlive ? 'none' : restShadow};
+		scroll-margin-top: 5rem;"
 	onmouseenter={(e) => { if (!selected && !isAlive) e.currentTarget.style.boxShadow = hoverShadow; }}
 	onmouseleave={(e) => { if (!selected && !isAlive) e.currentTarget.style.boxShadow = restShadow; }}
 >
@@ -269,15 +273,14 @@
 		{#if hasPeek}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
-				class="mt-3 -mx-5 cursor-pointer border-y border-border/10 px-5 py-2 transition-colors hover:bg-muted/30"
-				style="background: color-mix(in srgb, {moodColor} 3%, transparent);
-					box-shadow: inset 0 2px 4px -1px color-mix(in srgb, {moodColor} 8%, transparent),
-						inset 0 -1px 2px 0 color-mix(in srgb, {moodColor} 5%, transparent);"
+				class="mt-3 -mx-5 cursor-pointer border-y border-border/10 bg-foreground/[0.04] px-5 py-2 transition-colors hover:bg-foreground/[0.07]"
+				style="box-shadow: inset 0 2px 4px -1px color-mix(in srgb, {moodColor} 10%, transparent),
+						inset 0 -1px 2px 0 color-mix(in srgb, {moodColor} 6%, transparent);"
 				onclick={(e) => { e.stopPropagation(); peekExpanded = !peekExpanded; }}
 				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); peekExpanded = !peekExpanded; } }}
 			>
 				<div class="flex items-start gap-2">
-					<MessageCircleIcon class="mt-0.5 size-3 shrink-0 text-muted-foreground/40" />
+					<MessageCircleIcon class="mt-0.5 size-3 shrink-0 text-foreground/50" />
 					<!-- Clipping window. Height transitions smoothly between states.
 					     contain:strict isolates inner animation from masonry ResizeObserver. -->
 					<div
@@ -289,14 +292,14 @@
 						<div class="peek-scroll" style="animation-duration: {peekDuration}s;">
 							{#each peekMessages as msg, i (i)}
 								<p class="text-[11.5px] leading-[1.5]" style="padding-bottom: 4px;">
-									<span class="font-semibold text-foreground/70">{msg.author}:</span>
-									<span class="text-foreground/55">{' '}{msg.text}</span>
+									<span class="font-semibold text-foreground/80">{msg.author}:</span>
+									<span class="text-foreground/60">{' '}{msg.text}</span>
 								</p>
 							{/each}
 							{#each peekMessages as msg, i (`dup-${i}`)}
 								<p class="text-[11.5px] leading-[1.5]" style="padding-bottom: 4px;">
-									<span class="font-semibold text-foreground/70">{msg.author}:</span>
-									<span class="text-foreground/55">{' '}{msg.text}</span>
+									<span class="font-semibold text-foreground/80">{msg.author}:</span>
+									<span class="text-foreground/60">{' '}{msg.text}</span>
 								</p>
 							{/each}
 						</div>

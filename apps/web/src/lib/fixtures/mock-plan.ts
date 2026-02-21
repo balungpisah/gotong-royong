@@ -116,6 +116,80 @@ export const mockPathPlan: PathPlan = {
 							locked_fields: []
 						}
 					]
+				},
+				{
+					phase_id: 'phase-4',
+					title: 'Pengawasan Kualitas',
+					objective: 'Warga mengawasi hasil perbaikan selama 30 hari pertama',
+					status: 'planned',
+					source: 'ai',
+					locked_fields: [],
+					checkpoints: [
+						{
+							checkpoint_id: 'cp-10',
+							title: 'Inspeksi mingguan oleh tim warga',
+							status: 'planned',
+							source: 'ai',
+							locked_fields: []
+						},
+						{
+							checkpoint_id: 'cp-11',
+							title: 'Dokumentasi foto sebelum dan sesudah',
+							status: 'planned',
+							source: 'ai',
+							locked_fields: [],
+							evidence_required: true
+						}
+					]
+				},
+				{
+					phase_id: 'phase-5',
+					title: 'Pelaporan & Pertanggungjawaban',
+					objective: 'Laporan keuangan dan hasil akhir ke seluruh warga',
+					status: 'planned',
+					source: 'ai',
+					locked_fields: [],
+					checkpoints: [
+						{
+							checkpoint_id: 'cp-12',
+							title: 'Laporan keuangan lengkap',
+							status: 'planned',
+							source: 'ai',
+							locked_fields: []
+						},
+						{
+							checkpoint_id: 'cp-13',
+							title: 'Musyawarah tutup proyek',
+							status: 'planned',
+							source: 'ai',
+							locked_fields: [],
+							evidence_required: true
+						}
+					]
+				},
+				{
+					phase_id: 'phase-6',
+					title: 'Perawatan Berkelanjutan',
+					objective: 'Rencana perawatan rutin agar jalan tetap terjaga',
+					status: 'planned',
+					source: 'ai',
+					locked_fields: [],
+					checkpoints: [
+						{
+							checkpoint_id: 'cp-14',
+							title: 'Jadwal perawatan triwulan',
+							status: 'planned',
+							source: 'ai',
+							locked_fields: []
+						},
+						{
+							checkpoint_id: 'cp-15',
+							title: 'Dana cadangan perawatan disisihkan',
+							status: 'planned',
+							source: 'ai',
+							locked_fields: []
+						}
+					]
 				}
 			]
 		},

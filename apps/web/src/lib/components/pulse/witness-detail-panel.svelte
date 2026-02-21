@@ -108,6 +108,21 @@
 	// ---------------------------------------------------------------------------
 
 	let expandedItem = $state<'overview' | number | null>(null);
+	let phaseScrollEl: HTMLDivElement | undefined = $state();
+
+	// Auto-scroll to center the active phase row on mount
+	$effect(() => {
+		if (phaseScrollEl && currentPhaseIndex >= 0) {
+			requestAnimationFrame(() => {
+				const activeRow = phaseScrollEl?.querySelector('[data-phase-current]') as HTMLElement | null;
+				if (activeRow && phaseScrollEl) {
+					const top = activeRow.offsetTop - phaseScrollEl.offsetTop;
+					const center = top - phaseScrollEl.clientHeight / 2 + activeRow.clientHeight / 2;
+					phaseScrollEl.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+				}
+			});
+		}
+	});
 
 	function toggleItem(item: 'overview' | number) {
 		expandedItem = expandedItem === item ? null : item;
@@ -133,6 +148,17 @@
 	// ---------------------------------------------------------------------------
 
 	const memberCount = $derived((detail.members ?? []).length);
+
+	// ---------------------------------------------------------------------------
+	// Phase momentum — completed count + active phase checkpoint progress
+	// ---------------------------------------------------------------------------
+
+	const completedPhases = $derived(phases.filter((p) => p.status === 'completed').length);
+	const activePhase = $derived(phases[currentPhaseIndex] ?? null);
+	const activeCheckpointsDone = $derived(
+		activePhase ? activePhase.checkpoints.filter((c) => c.status === 'completed').length : 0
+	);
+	const activeCheckpointsTotal = $derived(activePhase ? activePhase.checkpoints.length : 0);
 
 	// ---------------------------------------------------------------------------
 	// Time since update
@@ -165,17 +191,15 @@
 	});
 </script>
 
-<div class="flex h-full flex-col overflow-hidden">
+{#key detail.witness_id}
+<div class="flex h-full flex-col overflow-hidden" style="--accent: {accentColor};">
 	<!-- ================================================================== -->
 	<!-- PINNED CARD — two-column: identity left, phase nav right           -->
 	<!-- ================================================================== -->
 	<div class="detail-header relative z-10 shrink-0 border-y border-border/60">
 
 		{#if feedItem}
-			<div
-				class="pinned-card"
-				style="--accent: {accentColor};"
-			>
+			<div class="pinned-card">
 				<!-- Close button — top right -->
 				{#if onClose}
 					<button
@@ -211,7 +235,7 @@
 						</div>
 
 						{#if feedItem.entity_tags.length > 0}
-							<div class="flex flex-wrap items-center gap-1 opacity-60">
+							<div class="flex flex-wrap items-center gap-1 opacity-80">
 								{#each feedItem.entity_tags as tag (tag.entity_id)}
 									<EntityPill {tag} />
 								{/each}
@@ -236,13 +260,13 @@
 					</div>
 
 					<!-- DIVIDER -->
-					<div class="mx-2 w-px self-stretch bg-border/30"></div>
+					<div class="mx-2 w-px self-stretch" style="background: color-mix(in srgb, var(--accent) 25%, var(--color-border));"></div>
 
 					<!-- RIGHT: phase list nav -->
 					<div class="phase-list-col flex flex-col">
 						<!-- Sticky overview row -->
 						<button
-							class="phase-row sticky top-0 z-10"
+							class="phase-row phase-row-sticky sticky top-0 z-10"
 							class:phase-row-active={expandedItem === 'overview'}
 							onclick={() => toggleItem('overview')}
 						>
@@ -260,7 +284,7 @@
 						</button>
 
 						<!-- Phase items — scrollable -->
-						<div class="phase-scroll flex-1 overflow-y-auto">
+						<div class="phase-scroll flex-1 overflow-y-auto" bind:this={phaseScrollEl}>
 							{#each phases as phase, i (phase.phase_id)}
 								{@const icon = phaseIcon(phase, i)}
 								{@const counts = checkpointCounts(phase)}
@@ -268,6 +292,7 @@
 									class="phase-row"
 									class:phase-row-active={expandedItem === i}
 									class:phase-row-current={i === currentPhaseIndex}
+									data-phase-current={i === currentPhaseIndex ? '' : undefined}
 									onclick={() => toggleItem(i)}
 								>
 									<span class="flex items-center gap-1.5">
@@ -386,18 +411,77 @@
 	{/if}
 
 	<!-- ================================================================== -->
+	<!-- MOMENTUM TRAIL — phase dots, no finish line                        -->
+	<!-- ================================================================== -->
+	{#if phases.length > 0}
+		<div class="momentum-strip shrink-0 flex items-center gap-1.5 px-4 py-1.5 border-b border-border/30">
+			<span class="text-[10px] font-medium text-muted-foreground/60">Fase {currentPhaseIndex + 1} aktif</span>
+			<span class="text-muted-foreground/30">·</span>
+			<div class="flex items-center gap-1">
+				{#each phases as phase, i (phase.phase_id)}
+					{#if phase.status === 'completed'}
+						<!-- Completed — filled accent dot -->
+						<div class="size-2 rounded-full" style="background: color-mix(in srgb, var(--accent) 70%, var(--color-muted-foreground));"></div>
+					{:else if i === currentPhaseIndex}
+						<!-- Active — pulsing accent dot with partial fill ring -->
+						<div class="relative flex items-center justify-center">
+							<div class="size-2.5 rounded-full border-[1.5px] animate-pulse" style="border-color: color-mix(in srgb, var(--accent) 60%, var(--color-primary));">
+								{#if activeCheckpointsTotal > 0}
+									<div
+										class="absolute inset-0 rounded-full"
+										style="background: conic-gradient(
+											color-mix(in srgb, var(--accent) 50%, var(--color-primary)) {activeCheckpointsDone / activeCheckpointsTotal * 360}deg,
+											transparent {activeCheckpointsDone / activeCheckpointsTotal * 360}deg
+										); opacity: 0.4;"
+									></div>
+								{/if}
+							</div>
+						</div>
+					{:else}
+						<!-- Future — hollow muted dot -->
+						<div class="size-2 rounded-full border border-muted-foreground/25"></div>
+					{/if}
+				{/each}
+			</div>
+			{#if completedPhases > 0}
+				<span class="text-[10px] text-muted-foreground/50">{completedPhases} selesai</span>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- ================================================================== -->
 	<!-- CHAT — sunken conversation well                                    -->
 	<!-- ================================================================== -->
-	<WitnessChatPanel messages={detail.messages} onSend={onSendMessage} {onStempel} {sending} {stempeling} />
+	<div class="chat-reveal">
+		<WitnessChatPanel messages={detail.messages} onSend={onSendMessage} {onStempel} {sending} {stempeling} />
+	</div>
 </div>
+{/key}
 
 <style>
+	/*
+	 * Staggered top-to-bottom reveal — matches the motion.div cascade
+	 * in SelfProfile and CommunityPulse so all three tabs feel consistent.
+	 */
+	@keyframes unwrap-in {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
 	/*
 	 * Unified dark surface — header, card, and drawer share
 	 * one tone so only the chat well stands out as lighter.
 	 */
 	.detail-header {
 		background: color-mix(in srgb, var(--color-foreground) 5%, var(--color-card));
+		border-bottom: 1px solid color-mix(in srgb, var(--accent, transparent) 20%, var(--color-border));
+		animation: unwrap-in 0.25s ease-out both;
 	}
 
 	.pinned-card {
@@ -424,10 +508,12 @@
 		max-height: 120px; /* cap so it doesn't push chat down too much */
 	}
 
-	/* Phase list scroll area */
+	/* Phase list scroll area — fade masks hint at overflow */
 	.phase-scroll {
 		scrollbar-width: thin;
 		scrollbar-color: var(--color-border) transparent;
+		mask-image: linear-gradient(to bottom, transparent, black 8px, black calc(100% - 8px), transparent);
+		-webkit-mask-image: linear-gradient(to bottom, transparent, black 8px, black calc(100% - 8px), transparent);
 	}
 
 	/* Each phase row — clickable, compact */
@@ -454,10 +540,32 @@
 	.phase-row-current {
 		background: color-mix(in srgb, var(--color-primary) 4%, transparent);
 	}
+	/* Sticky row needs solid bg so scrolled items don't bleed through */
+	.phase-row-sticky {
+		background: color-mix(in srgb, var(--color-foreground) 5%, var(--color-card));
+	}
+	.phase-row-sticky:hover {
+		background: color-mix(in srgb, var(--color-foreground) 8%, var(--color-card));
+	}
 
 	/* Expansion drawer — slightly lighter than header for separation */
 	.expansion-drawer {
 		background: color-mix(in srgb, var(--color-foreground) 3%, var(--color-card));
+	}
+
+	/* Momentum trail — subtle transitional strip between header and chat */
+	.momentum-strip {
+		background: color-mix(in srgb, var(--color-foreground) 2%, var(--color-background));
+		animation: unwrap-in 0.2s ease-out 0.06s both;
+	}
+
+	/* Chat entrance — fills remaining space with staggered reveal */
+	.chat-reveal {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		animation: unwrap-in 0.3s ease-out 0.12s both;
 	}
 
 	/* Drawer title — matches active phase-row highlight for visual connection */

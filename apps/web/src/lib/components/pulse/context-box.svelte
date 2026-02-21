@@ -273,8 +273,8 @@
 {#if active}
 	<div
 		class="context-box hidden lg:flex flex-col
-			rounded-xl border bg-card
-			{moodColor ? 'border-border/50' : 'border-border/20 shadow-sm'}"
+			rounded-xl bg-card
+			{moodColor && activeTab === 'project' ? 'border border-foreground/90' : 'border border-border/20 shadow-sm'}"
 		style:box-shadow={panelShadow}
 		in:slideFade={{ duration: 300, easing: cubicOut, x: 60 }}
 		out:slideFade={{ duration: 200, easing: cubicIn, x: 60 }}
@@ -357,11 +357,13 @@
 			</Tip>
 		</div>
 
-		<!-- Tab content — each tab absolutely positioned for crossfade -->
+		<!-- Tab content — each tab absolutely positioned for crossfade.
+		     `will-change` promotes the layer for GPU-composited fly animation
+		     so heavy child mounts (WitnessDetailPanel) can't block the transition. -->
 		<div class="relative min-h-0 flex-1">
 			{#if activeTab === 'project'}
 				<div
-					class="absolute inset-0 overflow-y-auto overflow-x-hidden"
+					class="tab-pane absolute inset-0 overflow-y-auto overflow-x-hidden"
 					transition:fly={{ x: 12, duration: 200 }}
 				>
 					{#if hasWitnessDetail && witnessDetail}
@@ -394,14 +396,14 @@
 				</div>
 			{:else if activeTab === 'self'}
 				<div
-					class="absolute inset-0 overflow-y-auto overflow-x-hidden"
+					class="tab-pane absolute inset-0 overflow-y-auto overflow-x-hidden"
 					transition:fly={{ x: 12, duration: 200 }}
 				>
 					<SelfProfile userId={selectedUserId} />
 				</div>
 			{:else if activeTab === 'community'}
 				<div
-					class="absolute inset-0 overflow-y-auto overflow-x-hidden"
+					class="tab-pane absolute inset-0 overflow-y-auto overflow-x-hidden"
 					transition:fly={{ x: 12, duration: 200 }}
 				>
 					<CommunityPulse />
@@ -518,6 +520,12 @@
 		opacity: 0.7;
 		white-space: nowrap;
 		text-align: center;
+	}
+
+	/* ── Tab pane: GPU-promoted layer for smooth fly transitions ── */
+	.tab-pane {
+		will-change: transform, opacity;
+		contain: layout style paint;
 	}
 
 	/* ── Animated underline indicator ── */

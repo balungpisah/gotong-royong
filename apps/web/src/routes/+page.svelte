@@ -64,6 +64,22 @@
 		return () => clearTimeout(timer);
 	});
 
+	// Scroll selected card to top of viewport after masonry reflow settles.
+	// Uses getBoundingClientRect for accurate position inside masonry's
+	// absolute/transformed layout, with manual header offset.
+	const HEADER_OFFSET = 80; // px — clears sticky header + breathing room
+	$effect(() => {
+		if (!selectedWitnessId) return;
+		const timer = setTimeout(() => {
+			const card = document.querySelector(`[data-witness-id="${selectedWitnessId}"]`);
+			if (!card) return;
+			const rect = card.getBoundingClientRect();
+			const targetY = window.scrollY + rect.top - HEADER_OFFSET;
+			window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+		}, 500);
+		return () => clearTimeout(timer);
+	});
+
 	// The selected feed item — used for pinned card header in detail panel
 	const selectedFeedItem = $derived.by(() => {
 		if (!selectedWitnessId) return null;
@@ -164,17 +180,10 @@
 		sort_timestamp: '9999-12-31T00:00:00Z' // always sorts first
 	};
 
-	// When a card is selected, move it to the front so masonry FLIP-animates it to the top.
+	// Keep natural feed order — the dark border on the selected card
+	// identifies it without reordering and disrupting scroll position.
 	const masonryStream = $derived.by<MasonryItem[]>(() => {
-		const stream = feedStore.filteredStream;
-		if (!selectedWitnessId) return [triageEntry, ...stream];
-
-		const idx = stream.findIndex(
-			(s) => s.kind === 'witness' && s.data.witness_id === selectedWitnessId
-		);
-		if (idx <= 0) return [triageEntry, ...stream];
-
-		return [triageEntry, stream[idx], ...stream.slice(0, idx), ...stream.slice(idx + 1)];
+		return [triageEntry, ...feedStore.filteredStream];
 	});
 
 	const skeletonItems = [
