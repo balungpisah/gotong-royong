@@ -40,7 +40,7 @@
 						</p>
 					{/if}
 					<p class="text-xs text-muted-foreground/70">
-						{entity.witness_count} aktivitas · {entity.follower_count} pengikut
+						{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {m.discover_followers({ count: String(entity.follower_count) })}
 					</p>
 				</div>
 

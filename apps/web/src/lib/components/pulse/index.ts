@@ -19,3 +19,5 @@ export { default as EntityPill } from './entity-pill.svelte';
 export { default as ContextBox } from './context-box.svelte';
 export { default as CommunityPulse } from './community-pulse.svelte';
 export { default as SelfProfile } from './self-profile.svelte';
+export { default as AkuPanel } from './aku-panel.svelte';
+export { default as KomunitasPanel } from './komunitas-panel.svelte';

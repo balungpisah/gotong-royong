@@ -8,6 +8,8 @@
 	import { motion } from '@humanspeak/svelte-motion';
 	import { getUserStore } from '$lib/stores';
 	import { timeAgo } from '$lib/utils/time';
+	import { m } from '$lib/paraglide/messages';
+	import { TandangAvatar } from '$lib/components/ui/tandang-avatar';
 
 	interface Props {
 		userId?: string | null;
@@ -46,23 +48,23 @@
 	const locationLabel = $derived(profile?.location ?? '');
 
 	// Tier 0-4 → label mapping
-	const tierLabels: Record<number, string> = {
-		0: 'Pemula',
-		1: 'Kontributor',
-		2: 'Saksi Terpercaya',
-		3: 'Pemandu',
-		4: 'Penjaga'
-	};
+	const tierLabels = $derived({
+		0: m.tier_0_label(),
+		1: m.tier_1_label(),
+		2: m.tier_2_label(),
+		3: m.tier_3_label(),
+		4: m.tier_4_label()
+	} as Record<number, string>);
 
-	const tierLabel = $derived(tierLabels[profile?.tier ?? 0] ?? 'Pemula');
-	const tierLevel = $derived(`Level ${(profile?.tier ?? 0) + 1}`);
+	const tierLabel = $derived(tierLabels[profile?.tier ?? 0] ?? m.tier_0_label());
+	const tierLevel = $derived(m.tier_level({ level: String((profile?.tier ?? 0) + 1) }));
 
 	// Role badge
 	const roleBadge = $derived(
 		profile?.role === 'admin'
-			? { label: 'Admin', color: 'text-red-600 bg-red-50' }
+			? { label: m.profil_role_admin(), color: 'text-bahaya bg-bahaya-lembut' }
 			: profile?.role === 'moderator'
-				? { label: 'Moderator', color: 'text-blue-600 bg-blue-50' }
+				? { label: m.profil_role_moderator(), color: 'text-signal-proof bg-signal-proof/10' }
 				: null
 	);
 
@@ -75,7 +77,7 @@
 	// Dynamic max for tandang signal bars
 	const maxSignal = $derived(
 		tandang
-			? Math.max(tandang.vouch, tandang.bagus, tandang.proof_of_resolve, tandang.skeptis, 1)
+			? Math.max(tandang.vouch, tandang.dukung, tandang.proof_of_resolve, tandang.skeptis, 1)
 			: 1
 	);
 
@@ -83,10 +85,10 @@
 	const tandangRows = $derived(
 		tandang
 			? [
-					{ label: 'Vouch', received: tandang.vouch, icon: HandHeart, color: 'text-green-600 bg-green-50' },
-					{ label: 'Bagus!', received: tandang.bagus, icon: Star, color: 'text-purple-600 bg-purple-50' },
-					{ label: 'Proof of Resolve', received: tandang.proof_of_resolve, icon: Award, color: 'text-blue-600 bg-blue-50' },
-					{ label: 'Skeptis', received: tandang.skeptis, icon: Eye, color: 'text-amber-600 bg-amber-50' }
+					{ label: m.signal_vouch(), received: tandang.vouch, icon: HandHeart, color: 'text-signal-vouch bg-signal-vouch/10' },
+					{ label: m.signal_dukung(), received: tandang.dukung, icon: Star, color: 'text-signal-dukung bg-signal-dukung/10' },
+					{ label: m.signal_proof(), received: tandang.proof_of_resolve, icon: Award, color: 'text-signal-proof bg-signal-proof/10' },
+					{ label: m.signal_skeptis(), received: tandang.skeptis, icon: Eye, color: 'text-signal-skeptis bg-signal-skeptis/10' }
 				]
 			: []
 	);
@@ -113,7 +115,7 @@
 
 {#if !profile}
 	<div class="flex h-full items-center justify-center">
-		<p class="text-[var(--fs-caption)] text-muted-foreground">Memuat profil...</p>
+		<p class="text-caption text-muted-foreground">{m.loading_profile()}</p>
 	</div>
 {:else}
 	<div class="flex h-full flex-col">
@@ -127,26 +129,18 @@
 			>
 				<!-- Avatar -->
 				<div class="relative">
-					<div class="size-14 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 p-0.5">
-						{#if profile.avatar_url}
-							<img
-								src={profile.avatar_url}
-								alt={profile.name}
-								class="size-full rounded-full object-cover"
-							/>
-						{:else}
-							<div class="flex size-full items-center justify-center rounded-full bg-card text-[var(--fs-h2)] font-bold text-primary">
-								{initials}
-							</div>
-						{/if}
-					</div>
+					<TandangAvatar
+						person={{ user_id: profile.user_id, name: profile.name, avatar_url: profile.avatar_url }}
+						size="lg"
+						isSelf
+					/>
 					<!-- Online indicator -->
-					<div class="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-card bg-green-500"></div>
+					<div class="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-card bg-online"></div>
 				</div>
 				<div class="min-w-0 flex-1">
-					<h2 class="truncate text-[var(--fs-body)] font-bold text-foreground">{profile.name}</h2>
-					<p class="text-[var(--fs-caption)] text-muted-foreground">
-						{#if locationLabel}{locationLabel} · {/if}Warga aktif sejak {joinedYear}
+					<h2 class="truncate text-sm font-bold text-foreground">{profile.name}</h2>
+					<p class="text-caption text-muted-foreground">
+						{#if locationLabel}{locationLabel} · {/if}{m.profil_member_since_active({ year: joinedYear })}
 					</p>
 				</div>
 			</motion.div>
@@ -158,16 +152,16 @@
 				animate={{ opacity: 1 }}
 				transition={{ duration: 0.3, delay: 0.1 }}
 			>
-				<span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[var(--fs-caption)] font-medium text-primary">
+				<span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-caption font-medium text-primary">
 					<Shield class="size-3" />
 					{tierLabel}
 				</span>
-				<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[var(--fs-caption)] font-medium text-amber-700">
+				<span class="inline-flex items-center gap-1 rounded-full bg-waspada-lembut px-2.5 py-0.5 text-caption font-medium text-waspada">
 					<Star class="size-3" />
 					{tierLevel}
 				</span>
 				{#if roleBadge}
-					<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[var(--fs-caption)] font-medium {roleBadge.color}">
+					<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-caption font-medium {roleBadge.color}">
 						<Crown class="size-3" />
 						{roleBadge.label}
 					</span>
@@ -184,19 +178,19 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.3, delay: 0.15 }}
 				>
-					<h3 class="text-[var(--fs-small)] font-semibold text-foreground">Kontribusi</h3>
+					<h3 class="text-xs font-semibold text-foreground">{m.profil_stats_title()}</h3>
 					<div class="mt-2 grid grid-cols-3 gap-2">
 						<div class="rounded-lg bg-muted/20 p-2.5 text-center">
-							<p class="text-[var(--fs-h2)] font-bold text-foreground">{stats.evidence_submitted}</p>
-							<p class="text-xs text-muted-foreground">Tandang</p>
+							<p class="text-xl font-bold text-foreground">{stats.evidence_submitted}</p>
+							<p class="text-xs text-muted-foreground">{m.profil_stat_tandang()}</p>
 						</div>
 						<div class="rounded-lg bg-muted/20 p-2.5 text-center">
-							<p class="text-[var(--fs-h2)] font-bold text-foreground">{stats.witnesses_participated}</p>
-							<p class="text-xs text-muted-foreground">Saksi</p>
+							<p class="text-xl font-bold text-foreground">{stats.witnesses_participated}</p>
+							<p class="text-xs text-muted-foreground">{m.profil_stat_saksi()}</p>
 						</div>
 						<div class="rounded-lg bg-muted/20 p-2.5 text-center">
-							<p class="text-[var(--fs-h2)] font-bold text-foreground">{stats.resolutions_completed}</p>
-							<p class="text-xs text-muted-foreground">Resolusi</p>
+							<p class="text-xl font-bold text-foreground">{stats.resolutions_completed}</p>
+							<p class="text-xs text-muted-foreground">{m.profil_stat_resolusi()}</p>
 						</div>
 					</div>
 				</motion.div>
@@ -210,8 +204,8 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.3, delay: 0.2 }}
 				>
-					<h3 class="text-[var(--fs-small)] font-semibold text-foreground">Reputasi Tandang</h3>
-					<p class="mt-0.5 text-[var(--fs-caption)] text-muted-foreground">Sinyal yang diterima dari komunitas</p>
+					<h3 class="text-xs font-semibold text-foreground">{m.profil_tandang_title()}</h3>
+					<p class="mt-0.5 text-caption text-muted-foreground">{m.profil_tandang_subtitle()}</p>
 					<div class="mt-3 space-y-2.5">
 						{#each tandangRows as signal}
 							<div class="flex items-center gap-3">
@@ -220,8 +214,8 @@
 								</div>
 								<div class="min-w-0 flex-1">
 									<div class="flex items-center justify-between">
-										<span class="text-[var(--fs-caption)] font-medium text-foreground">{signal.label}</span>
-										<span class="text-[var(--fs-caption)] font-bold text-foreground">{signal.received}</span>
+										<span class="text-caption font-medium text-foreground">{signal.label}</span>
+										<span class="text-caption font-bold text-foreground">{signal.received}</span>
 									</div>
 									<div class="mt-1 h-1.5 w-full rounded-full bg-muted/30">
 										<div
@@ -244,12 +238,12 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.35, delay: 0.3 }}
 				>
-					<h3 class="text-[var(--fs-small)] font-semibold text-foreground">Engagement Drivers</h3>
-					<p class="mt-0.5 text-[var(--fs-caption)] text-muted-foreground">Octalysis framework</p>
+					<h3 class="text-xs font-semibold text-foreground">{m.profil_engagement_title()}</h3>
+					<p class="mt-0.5 text-caption text-muted-foreground">{m.profil_octalysis_subtitle()}</p>
 					<div class="mt-3 space-y-2">
 						{#each octalysisRows as drive}
 							<div class="flex items-center gap-2">
-								<span class="w-28 text-[var(--fs-caption)] text-muted-foreground">{drive.core}</span>
+								<span class="w-28 text-caption text-muted-foreground">{drive.core}</span>
 								<div class="h-1.5 flex-1 rounded-full bg-muted/30">
 									<div
 										class="h-full rounded-full bg-primary transition-all duration-500"
@@ -271,13 +265,13 @@
 					animate={{ opacity: 1 }}
 					transition={{ duration: 0.3, delay: 0.4 }}
 				>
-					<h3 class="text-[var(--fs-small)] font-semibold text-foreground">Aktivitas Terbaru</h3>
+					<h3 class="text-xs font-semibold text-foreground">{m.pulse_recent_activity()}</h3>
 					<div class="mt-2 space-y-1.5">
 						{#each activity as item}
 							<div class="flex items-start gap-2 rounded-lg px-2 py-1.5">
 								<div class="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/40"></div>
 								<div>
-									<p class="text-[var(--fs-caption)] leading-relaxed text-foreground/80">{item.text}</p>
+									<p class="text-caption leading-relaxed text-foreground/80">{item.text}</p>
 									<p class="text-xs text-muted-foreground">{timeAgo(item.timestamp)}</p>
 								</div>
 							</div>

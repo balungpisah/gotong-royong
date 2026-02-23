@@ -1,28 +1,130 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages';
-	import { getTriageStore } from '$lib/stores';
+	import { goto } from '$app/navigation';
+	import { getTriageStore, getWitnessStore, getFeedStore, getGroupStore } from '$lib/stores';
+	import { Badge } from '$lib/components/ui/badge';
 	import Tip from '$lib/components/ui/tip.svelte';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import SendHorizontal from '@lucide/svelte/icons/send-horizontal';
 	import X from '@lucide/svelte/icons/x';
-	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import Layers from '@lucide/svelte/icons/layers';
+	import Sprout from '@lucide/svelte/icons/sprout';
+	import Gauge from '@lucide/svelte/icons/gauge';
+	import Plus from '@lucide/svelte/icons/plus';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import Settings from '@lucide/svelte/icons/settings';
+	import TrajectoryGrid from '$lib/components/triage/trajectory-grid.svelte';
+	import TriageAttachmentPicker from '$lib/components/triage/triage-attachment-picker.svelte';
+	import TriageAttachmentPreview from '$lib/components/triage/triage-attachment-preview.svelte';
+	import type { WitnessCreateInput, FeedItem, TriageBudget, TriageAttachment } from '$lib/types';
+	import Zap from '@lucide/svelte/icons/zap';
+	import Video from '@lucide/svelte/icons/video';
+	import Mic from '@lucide/svelte/icons/mic';
+	import type { BadgeVariant } from '$lib/components/ui/badge';
+
+	interface Props {
+		onWitnessCreated?: (witnessId: string) => void;
+	}
+
+	let { onWitnessCreated }: Props = $props();
 
 	const triageStore = getTriageStore();
+	const witnessStore = getWitnessStore();
+	const feedStore = getFeedStore();
+	const groupStore = getGroupStore();
 
 	let content = $state('');
 	let expanded = $state(false);
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let wrapperEl = $state<HTMLDivElement | null>(null);
 
+	/** Cooldown — prevents rapid re-submission after completing a triage session. */
+	const COOLDOWN_MS = 30_000;
+	let cooldownUntil = $state(0);
+	let cooldownRemaining = $state(0);
+	let cooldownTimer: ReturnType<typeof setInterval> | null = null;
+	const isOnCooldown = $derived(cooldownRemaining > 0);
+
+	function startCooldown() {
+		cooldownUntil = Date.now() + COOLDOWN_MS;
+		cooldownRemaining = COOLDOWN_MS;
+		cooldownTimer = setInterval(() => {
+			cooldownRemaining = Math.max(0, cooldownUntil - Date.now());
+			if (cooldownRemaining <= 0 && cooldownTimer) {
+				clearInterval(cooldownTimer);
+				cooldownTimer = null;
+			}
+		}, 1000);
+	}
+
 	/** Chat messages for the current triage session */
-	interface ChatMessage {
+	interface TriageChatMessage {
 		role: 'user' | 'ai';
 		text: string;
+		attachments?: { type: 'image' | 'video' | 'audio'; preview_url: string }[];
 	}
-	let messages = $state<ChatMessage[]>([]);
+	let messages = $state<TriageChatMessage[]>([]);
 
-	const canSend = $derived(content.trim().length > 0 && !triageStore.loading);
+	/** Pending file attachments for current message */
+	let pendingAttachments = $state<TriageAttachment[]>([]);
+
+	function handleFilesSelected(files: File[]) {
+		const remaining = 5 - pendingAttachments.length;
+		const toAdd = Array.from(files).slice(0, remaining);
+
+		for (const file of toAdd) {
+			const type = file.type.startsWith('image/') ? 'image'
+				: file.type.startsWith('video/') ? 'video'
+				: 'audio' as const;
+			pendingAttachments.push({
+				id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+				file,
+				type,
+				preview_url: URL.createObjectURL(file)
+			});
+		}
+	}
+
+	function handleRemoveAttachment(id: string) {
+		const idx = pendingAttachments.findIndex(a => a.id === id);
+		if (idx >= 0) {
+			URL.revokeObjectURL(pendingAttachments[idx].preview_url);
+			pendingAttachments.splice(idx, 1);
+		}
+	}
+
+	const canSend = $derived(
+		(content.trim().length > 0 || pendingAttachments.length > 0) && !triageStore.loading
+	);
 	const hasSession = $derived(triageStore.sessionId !== null);
+
+	/** Budget tracking — drives the "Sisa Energi" energy bar. */
+	const budget = $derived(triageStore.result?.budget as TriageBudget | undefined);
+	const budgetPct = $derived(budget ? budget.budget_pct : 0);
+	const budgetColor = $derived(
+		budgetPct > 0.7 ? 'bg-bahaya' : budgetPct > 0.4 ? 'bg-waspada' : 'bg-berhasil'
+	);
+
+	/** Map track hint to badge variant */
+	function trackBadgeVariant(track?: string): BadgeVariant {
+		if (!track) return 'secondary';
+		const map: Record<string, BadgeVariant> = {
+			tuntaskan: 'track-tuntaskan',
+			wujudkan: 'track-wujudkan',
+			telusuri: 'track-telusuri',
+			rayakan: 'track-rayakan',
+			musyawarah: 'track-musyawarah'
+		};
+		return map[track] ?? 'secondary';
+	}
+
+	/** Phase summary from proposed plan */
+	const planPhaseCount = $derived(
+		triageStore.proposedPlan?.branches?.[0]?.phases?.length ?? 0
+	);
+	const firstPhaseTitle = $derived(
+		triageStore.proposedPlan?.branches?.[0]?.phases?.[0]?.title ?? null
+	);
 
 	function autoResize() {
 		if (!textareaEl) return;
@@ -51,37 +153,54 @@
 		if (r.confidence?.label) parts.push(r.confidence.label);
 
 		if (r.bar_state === 'probing') {
-			parts.push('Bisa ceritakan lebih detail tentang situasinya?');
+			parts.push(m.triage_ai_probing());
 		} else if (r.bar_state === 'leaning') {
-			parts.push('Saya mulai memahami. Ada informasi tambahan?');
+			parts.push(m.triage_ai_leaning());
 		} else if (
 			r.bar_state === 'ready' ||
 			r.bar_state === 'vault-ready' ||
 			r.bar_state === 'siaga-ready'
 		) {
-			if (r.track_hint) parts.push(`Jalur: ${r.track_hint}`);
-			if (r.seed_hint) parts.push(`Benih: ${r.seed_hint}`);
-			parts.push('Triase selesai! Saksi siap dibuat.');
+			if (r.track_hint) parts.push(m.triage_track_label({ track: r.track_hint! }));
+			if (r.seed_hint) parts.push(m.triage_seed_label({ seed: r.seed_hint! }));
+			parts.push(m.triage_ready());
 		}
 
-		return parts.join(' · ') || 'Memproses...';
+		return parts.join(' · ') || m.triage_processing();
 	}
 
-	async function handleSubmit() {
-		if (!canSend) return;
-		const text = content.trim();
+	async function handleSubmit(injectedText?: string) {
+		const text = (injectedText ?? content).trim();
+		if ((!text && pendingAttachments.length === 0) || triageStore.loading || isOnCooldown) return;
+
 		content = '';
 		if (textareaEl) textareaEl.style.height = 'auto';
 
-		messages.push({ role: 'user', text });
+		// Capture attachment previews for the message bubble
+		const msgAttachments = pendingAttachments.length > 0
+			? pendingAttachments.map(a => ({ type: a.type, preview_url: a.preview_url }))
+			: undefined;
+
+		// Extract files for the service call
+		const files = pendingAttachments.length > 0
+			? pendingAttachments.map(a => a.file)
+			: undefined;
+
+		messages.push({ role: 'user', text: text || '(lampiran)', attachments: msgAttachments });
+
+		// Clear pending (don't revoke URLs — they're referenced by message bubbles now)
+		pendingAttachments = [];
 
 		if (!hasSession) {
-			await triageStore.startTriage(text);
+			await triageStore.startTriage(text, files);
 		} else {
-			await triageStore.updateTriage(text);
+			await triageStore.updateTriage(text, files);
 		}
 
 		messages.push({ role: 'ai', text: aiResponseText() });
+
+		// Re-focus textarea for next message
+		requestAnimationFrame(() => textareaEl?.focus());
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -98,12 +217,123 @@
 		triageStore.reset();
 		messages = [];
 		content = '';
+		startCooldown();
 		collapse();
+	}
+
+	/** User tapped a trajectory chip — submit the primer directly. */
+	function handleTrajectorySelect(primer: string) {
+		handleSubmit(primer);
+	}
+
+	async function handleCreateWitness() {
+		if (witnessStore.creating || !triageStore.result) return;
+
+		const result = triageStore.result;
+		const firstUserMsg = messages.find((m) => m.role === 'user')?.text ?? 'Laporan baru';
+		const lastAiMsg = messages.findLast((m) => m.role === 'ai')?.text ?? '';
+
+		const input: WitnessCreateInput = {
+			title: firstUserMsg.slice(0, 80),
+			summary: lastAiMsg,
+			route: result.route,
+			track_hint: result.track_hint,
+			seed_hint: result.seed_hint,
+			confidence: result.confidence,
+			rahasia_level: result.route === 'vault' ? 'L2' : 'L0',
+			proposed_plan: result.proposed_plan,
+			triage_result: result,
+			triage_messages: [...messages]
+		};
+
+		const witnessId = await witnessStore.createWitness(input);
+		if (!witnessId) return;
+
+		// Use first image attachment as cover_url for the feed item
+		const firstImage = messages
+			.flatMap(msg => msg.attachments ?? [])
+			.find(a => a.type === 'image');
+
+		// Build feed item and prepend
+		const now = new Date().toISOString();
+		const feedItem: FeedItem = {
+			witness_id: witnessId,
+			title: input.title,
+			track_hint: input.track_hint,
+			status: 'open',
+			rahasia_level: input.rahasia_level,
+			cover_url: firstImage?.preview_url,
+			latest_event: {
+				event_id: `evt-${Date.now()}`,
+				event_type: 'created',
+				actor_name: 'Ahmad Hidayat',
+				timestamp: now,
+				verb: 'membuat saksi baru'
+			},
+			collapsed_count: 0,
+			member_count: 1,
+			members_preview: [
+				{
+					user_id: 'u-001',
+					name: 'Ahmad Hidayat',
+					role: 'pelapor'
+				}
+			],
+			entity_tags: [],
+			urgency: 'baru',
+			source: 'terlibat',
+			sentiment: 'curious',
+			hook_line: input.summary.slice(0, 100),
+			body: input.summary,
+			monitored: true
+		};
+
+		feedStore.prependWitnessItem(feedItem);
+		onWitnessCreated?.(witnessId);
+
+		// Reset triage + cooldown to prevent rapid re-submission
+		triageStore.reset();
+		messages = [];
+		content = '';
+		startCooldown();
+		collapse();
+	}
+
+	async function handleCreateGroup() {
+		if (groupStore.creating || !triageStore.result?.kelola_result) return;
+
+		const kelola = triageStore.result.kelola_result;
+		if (kelola.action !== 'create' || !kelola.group_detail) return;
+
+		const { name, description, join_policy, entity_type } = kelola.group_detail;
+		const groupId = await groupStore.createGroup({ name, description, join_policy, entity_type });
+		if (!groupId) return;
+
+		// Reset triage + cooldown, then navigate to new group
+		triageStore.reset();
+		messages = [];
+		content = '';
+		startCooldown();
+		collapse();
+		goto(`/komunitas/kelompok/${groupId}`);
 	}
 </script>
 
 <!-- Wrapper: keeps the compact card in flow, expanded panel is absolute -->
 <div class="relative" bind:this={wrapperEl}>
+	<!-- Pulsing arrow — comically large, points at the start box -->
+	{#if !expanded && !hasSession}
+		<div class="onboarding-arrow" aria-hidden="true">
+			<svg viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<path
+					d="M0 22h80v-22l40 30-40 30v-22h-80z"
+					fill="var(--color-primary)"
+					fill-opacity="0.85"
+				/>
+			</svg>
+		</div>
+	{/if}
+
 	<!-- Compact card — always in document flow to hold space -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
@@ -118,7 +348,7 @@
 		<div class="mb-2.5">
 			<span class="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold tracking-wide text-primary-foreground uppercase">
 				<Sparkles class="size-2.5" />
-				Mulai di sini
+				{m.triage_start_here()}
 			</span>
 		</div>
 
@@ -127,9 +357,9 @@
 				<Sparkles class="size-4 text-primary" />
 			</div>
 			<div class="flex-1 min-w-0">
-				<p class="text-[13px] font-semibold text-foreground leading-tight">Ceritakan kejadian</p>
+				<p class="text-[13px] font-semibold text-foreground leading-tight">{m.triage_tell_story()}</p>
 				<p class="mt-0.5 text-xs text-muted-foreground truncate">
-					Ketuk untuk mulai laporan...
+					{m.triage_tap_to_start()}
 				</p>
 			</div>
 		</div>
@@ -156,7 +386,7 @@
 		<div class="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
 			<div class="flex items-center gap-2 text-xs text-muted-foreground">
 				<Sparkles class="size-3.5 text-primary" />
-				<span class="font-medium">AI-00 Triage</span>
+				<span class="font-medium">{m.triage_ai_label()}</span>
 				{#if triageStore.confidence}
 					<span
 						class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
@@ -164,32 +394,60 @@
 						{triageStore.confidence.label}
 					</span>
 				{/if}
+				{#if budget && hasSession}
+					<div class="ml-1 flex items-center gap-1.5" title={m.triage_energy_remaining({ pct: String(Math.round((1 - budgetPct) * 100)) })}>
+						<Zap class="size-3 {budgetPct > 0.7 ? 'text-bahaya' : budgetPct > 0.4 ? 'text-waspada' : 'text-berhasil'}" />
+						<div class="h-1.5 w-14 overflow-hidden rounded-full bg-muted">
+							<div
+								class="h-full rounded-full transition-all duration-500 ease-out {budgetColor}"
+								style="width: {Math.max(4, (1 - budgetPct) * 100)}%"
+							></div>
+						</div>
+					</div>
+				{/if}
 			</div>
-			<Tip text="Tutup">
-				<button
-					type="button"
-					onclick={collapse}
-					class="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
-					aria-label="Tutup"
-					tabindex={expanded ? 0 : -1}
-				>
-					<X class="size-4" />
-				</button>
-			</Tip>
+			<div class="flex items-center gap-1">
+				{#if hasSession}
+					<Tip text={m.triage_restart()}>
+						<button
+							type="button"
+							onclick={handleReset}
+							class="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+							aria-label={m.triage_restart()}
+							tabindex={expanded ? 0 : -1}
+						>
+							<RotateCcw class="size-3.5" />
+						</button>
+					</Tip>
+				{/if}
+				<Tip text={m.common_close()}>
+					<button
+						type="button"
+						onclick={collapse}
+						class="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+						aria-label={m.common_close()}
+						tabindex={expanded ? 0 : -1}
+					>
+						<X class="size-4" />
+					</button>
+				</Tip>
+			</div>
 		</div>
 
 		<!-- Messages area -->
 		<div class="flex-1 overflow-y-auto px-4 py-3">
-			{#if messages.length === 0}
-				<div class="flex flex-col items-center justify-center gap-2 py-8 text-center">
-					<div class="flex size-10 items-center justify-center rounded-full bg-primary/10">
-						<Sparkles class="size-5 text-primary" />
+			{#if messages.length === 0 && isOnCooldown}
+				<div class="flex flex-col items-center justify-center gap-2 py-12 text-center">
+					<div class="flex size-10 items-center justify-center rounded-full bg-muted">
+						<RotateCcw class="size-5 text-muted-foreground" />
 					</div>
-					<p class="text-sm font-medium text-foreground">Apa yang terjadi di sekitarmu?</p>
-					<p class="max-w-[240px] text-xs text-muted-foreground">
-						Ceritakan situasi yang kamu saksikan, AI-00 akan membantu mentriase
+					<p class="text-sm font-medium text-foreground">{m.triage_session_complete()}</p>
+					<p class="text-xs text-muted-foreground">
+						{m.triage_cooldown({ seconds: String(Math.ceil(cooldownRemaining / 1000)) })}
 					</p>
 				</div>
+			{:else if messages.length === 0}
+				<TrajectoryGrid onSelect={handleTrajectorySelect} />
 			{:else}
 				<div class="flex flex-col gap-3">
 					{#each messages as msg}
@@ -199,6 +457,23 @@
 									class="max-w-[80%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm text-primary-foreground"
 								>
 									{msg.text}
+									{#if msg.attachments?.length}
+										<div class="mt-1.5 flex gap-1.5 flex-wrap">
+											{#each msg.attachments as att}
+												{#if att.type === 'image'}
+													<img src={att.preview_url} alt="" class="size-16 rounded-lg object-cover ring-1 ring-white/20" />
+												{:else if att.type === 'video'}
+													<div class="flex size-16 items-center justify-center rounded-lg bg-black/20 ring-1 ring-white/20">
+														<Video class="size-6 text-primary-foreground/70" />
+													</div>
+												{:else}
+													<div class="flex size-16 items-center justify-center rounded-lg bg-black/20 ring-1 ring-white/20">
+														<Mic class="size-6 text-primary-foreground/70" />
+													</div>
+												{/if}
+											{/each}
+										</div>
+									{/if}
 								</div>
 							</div>
 						{:else}
@@ -244,34 +519,157 @@
 					{/if}
 
 					{#if triageStore.isReady}
-						<div
-							class="mt-1 rounded-xl border border-green-500/20 bg-green-500/5 px-3 py-2 text-center"
-						>
-							<p class="text-xs font-medium text-green-700 dark:text-green-400">✓ Triase selesai</p>
-							<button
-								type="button"
-								onclick={handleReset}
-								class="mt-1.5 text-xs font-medium text-primary underline-offset-2 hover:underline"
-							>
-								Mulai baru
-							</button>
+						{#if triageStore.route === 'kelola'}
+						<!-- Kelola result card -->
+						<div class="mt-2 overflow-hidden rounded-xl border border-blue-600/30 bg-card shadow-sm">
+							<div class="flex items-center gap-2 border-b border-border/30 px-3 py-2">
+								<Badge variant="secondary">
+									<Settings class="mr-1 size-3" />
+									{m.triage_intent_kelola_name()}
+								</Badge>
+								{#if triageStore.confidence}
+									<span class="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+										<Gauge class="size-3" />
+										{triageStore.confidence.label}
+									</span>
+								{/if}
+							</div>
+							{#if triageStore.result?.kelola_result?.group_detail}
+								{@const detail = triageStore.result.kelola_result.group_detail}
+								<div class="px-3 py-2.5">
+									<p class="text-sm font-semibold text-foreground leading-tight">
+										{detail.name}
+									</p>
+									<p class="mt-1 text-xs text-muted-foreground line-clamp-2">
+										{detail.description}
+									</p>
+								</div>
+							{/if}
+							<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
+								<button
+									type="button"
+									onclick={handleCreateGroup}
+									disabled={groupStore.creating}
+									class="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									{#if groupStore.creating}
+										<div class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+										{m.group_create_creating()}
+									{:else}
+										<Plus class="size-4" />
+										{m.triage_create_group()}
+									{/if}
+								</button>
+								<button
+									type="button"
+									disabled
+									title={m.common_coming_soon()}
+									class="rounded-lg border border-border/50 px-3 py-2 text-sm font-medium text-muted-foreground transition disabled:cursor-not-allowed disabled:opacity-40"
+								>
+									{m.triage_modify()}
+								</button>
+							</div>
 						</div>
+						{:else}
+						<!-- Path plan preview card -->
+						<div class="mt-2 overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
+							<!-- Track + seed header -->
+							<div class="flex items-center gap-2 border-b border-border/30 px-3 py-2">
+								{#if triageStore.trackHint}
+									<Badge variant={trackBadgeVariant(triageStore.trackHint)}>
+										{triageStore.trackHint}
+									</Badge>
+								{/if}
+								{#if triageStore.seedHint}
+									<span class="flex items-center gap-1 text-xs text-muted-foreground">
+										<Sprout class="size-3" />
+										{triageStore.seedHint}
+									</span>
+								{/if}
+								{#if triageStore.confidence}
+									<span class="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+										<Gauge class="size-3" />
+										{triageStore.confidence.label}
+									</span>
+								{/if}
+							</div>
+
+							<!-- Plan summary -->
+							{#if triageStore.proposedPlan}
+								<div class="px-3 py-2.5">
+									<p class="text-sm font-semibold text-foreground leading-tight">
+										{triageStore.proposedPlan.title}
+									</p>
+									{#if triageStore.proposedPlan.summary}
+										<p class="mt-1 text-xs text-muted-foreground line-clamp-2">
+											{triageStore.proposedPlan.summary}
+										</p>
+									{/if}
+									<div class="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+										<Layers class="size-3" />
+										<span>{m.triage_phases({ count: String(planPhaseCount) })}</span>
+										{#if firstPhaseTitle}
+											<span class="text-muted-foreground/50">·</span>
+											<span class="truncate">{firstPhaseTitle}</span>
+										{/if}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Action buttons -->
+							<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
+								<button
+									type="button"
+									onclick={handleCreateWitness}
+									disabled={witnessStore.creating}
+									class="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									{#if witnessStore.creating}
+										<div class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+										{m.triage_creating()}
+									{:else}
+										<Plus class="size-4" />
+										{m.triage_create_witness()}
+									{/if}
+								</button>
+								<button
+									type="button"
+									disabled
+									title={m.common_coming_soon()}
+									class="rounded-lg border border-border/50 px-3 py-2 text-sm font-medium text-muted-foreground transition disabled:cursor-not-allowed disabled:opacity-40"
+								>
+									{m.triage_modify()}
+								</button>
+							</div>
+						</div>
+						{/if}
 					{/if}
 				</div>
 			{/if}
 		</div>
 
+		<!-- Attachment preview row -->
+		{#if pendingAttachments.length > 0}
+			<div class="border-t border-border/40 pt-2">
+				<TriageAttachmentPreview attachments={pendingAttachments} onRemove={handleRemoveAttachment} />
+			</div>
+		{/if}
+
 		<!-- Input bar -->
 		<div class="border-t border-border/40 px-3 py-2.5">
 			<div class="flex items-end gap-2">
+				<TriageAttachmentPicker
+					onFilesSelected={handleFilesSelected}
+					disabled={triageStore.loading || triageStore.isReady || isOnCooldown || pendingAttachments.length >= 5}
+				/>
 				<div class="relative flex-1">
 					<textarea
 						bind:this={textareaEl}
 						bind:value={content}
 						oninput={autoResize}
 						onkeydown={handleKeydown}
-						placeholder={triageStore.isReady ? 'Triase selesai' : m.shell_chat_placeholder()}
-						disabled={triageStore.loading || triageStore.isReady}
+						placeholder={isOnCooldown ? m.triage_wait() : triageStore.isReady ? m.triage_complete() : m.shell_chat_placeholder()}
+						disabled={triageStore.loading || triageStore.isReady || isOnCooldown}
 						rows={1}
 						tabindex={expanded ? 0 : -1}
 						class="w-full resize-none rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -281,7 +679,7 @@
 				<Tip text={m.shell_chat_send()}>
 					<button
 						type="button"
-						onclick={handleSubmit}
+						onclick={() => handleSubmit()}
 						disabled={!canSend}
 						tabindex={expanded ? 0 : -1}
 						class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
@@ -339,5 +737,28 @@
 
 	.triage-panel.scale-95 {
 		transform: scale(0.95);
+	}
+
+	/* ── Onboarding arrow — comically large pulsing pointer ─────── */
+	.onboarding-arrow {
+		position: absolute;
+		top: 50%;
+		right: calc(100% + 0.25rem);
+		width: 4.5rem;
+		transform: translateY(-50%);
+		pointer-events: none;
+		z-index: 5;
+		animation: arrow-nudge 1.2s ease-in-out infinite;
+		filter: drop-shadow(0 2px 6px oklch(from var(--color-primary) l c h / 0.35));
+	}
+
+	.onboarding-arrow svg {
+		width: 100%;
+		height: auto;
+	}
+
+	@keyframes arrow-nudge {
+		0%, 100% { transform: translateY(-50%) translateX(0); }
+		50% { transform: translateY(-50%) translateX(0.5rem); }
 	}
 </style>

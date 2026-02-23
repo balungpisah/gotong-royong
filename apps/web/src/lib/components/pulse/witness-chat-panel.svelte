@@ -1,12 +1,16 @@
 <script lang="ts">
-	import type { ChatMessage } from '$lib/types';
+	import type { ChatMessage, TriageAttachment } from '$lib/types';
 	import Send from '@lucide/svelte/icons/send';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import ChatThread from '$lib/components/chat/chat-thread.svelte';
+	import TriageAttachmentPicker from '$lib/components/triage/triage-attachment-picker.svelte';
+	import TriageAttachmentPreview from '$lib/components/triage/triage-attachment-preview.svelte';
+
+	const MAX_ATTACHMENTS = 5;
 
 	interface Props {
 		messages: ChatMessage[];
-		onSend?: (content: string) => void;
+		onSend?: (content: string, attachments?: File[]) => void;
 		onStempel?: () => void;
 		sending?: boolean;
 		stempeling?: boolean;
@@ -16,6 +20,9 @@
 
 	let inputValue = $state('');
 	let scrollContainer: HTMLDivElement | undefined = $state();
+	let pendingAttachments = $state<TriageAttachment[]>([]);
+
+	const canSend = $derived(inputValue.trim().length > 0 || pendingAttachments.length > 0);
 
 	// Auto-scroll to bottom when messages change
 	$effect(() => {
@@ -27,11 +34,34 @@
 		}
 	});
 
+	function handleFilesSelected(files: File[]) {
+		const remaining = MAX_ATTACHMENTS - pendingAttachments.length;
+		if (remaining <= 0) return;
+		const accepted = files.slice(0, remaining);
+		const newAttachments: TriageAttachment[] = accepted.map((f) => ({
+			id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+			file: f,
+			type: f.type.startsWith('image/') ? 'image' : f.type.startsWith('video/') ? 'video' : 'audio',
+			preview_url: URL.createObjectURL(f)
+		}));
+		pendingAttachments = [...pendingAttachments, ...newAttachments];
+	}
+
+	function handleRemoveAttachment(id: string) {
+		const att = pendingAttachments.find((a) => a.id === id);
+		if (att) URL.revokeObjectURL(att.preview_url);
+		pendingAttachments = pendingAttachments.filter((a) => a.id !== id);
+	}
+
 	function handleSend() {
 		const trimmed = inputValue.trim();
-		if (!trimmed || sending) return;
-		onSend?.(trimmed);
+		if (!canSend || sending) return;
+		const files = pendingAttachments.length > 0 ? pendingAttachments.map((a) => a.file) : undefined;
+		onSend?.(trimmed, files);
 		inputValue = '';
+		// Revoke preview URLs
+		for (const att of pendingAttachments) URL.revokeObjectURL(att.preview_url);
+		pendingAttachments = [];
 	}
 
 	function handleStempel() {
@@ -61,6 +91,9 @@
 	<div class="border-t bg-card/80 px-3 py-2"
 		style="border-color: color-mix(in srgb, var(--accent, gray) 15%, var(--color-border));"
 	>
+		<!-- Attachment previews -->
+		<TriageAttachmentPreview attachments={pendingAttachments} onRemove={handleRemoveAttachment} />
+
 		<div class="flex items-end gap-1.5">
 			<!-- Stempel — invoke AI to evaluate phase progress -->
 			<button
@@ -77,6 +110,9 @@
 				{/if}
 			</button>
 
+			<!-- Attachment picker -->
+			<TriageAttachmentPicker onFilesSelected={handleFilesSelected} disabled={pendingAttachments.length >= MAX_ATTACHMENTS} />
+
 			<!-- Message input -->
 			<textarea
 				bind:value={inputValue}
@@ -89,7 +125,7 @@
 			<!-- Send -->
 			<button
 				onclick={handleSend}
-				disabled={!inputValue.trim() || sending}
+				disabled={!canSend || sending}
 				class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:opacity-40"
 				aria-label="Kirim pesan"
 			>

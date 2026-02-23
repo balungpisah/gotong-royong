@@ -1,10 +1,13 @@
 <script lang="ts">
 	import type { EntityType, FollowableEntity } from '$lib/types';
 	import { m } from '$lib/paraglide/messages';
-	import { getFeedStore } from '$lib/stores';
+	import { getFeedStore, getGroupStore } from '$lib/stores';
+	import { goto } from '$app/navigation';
+	import { GroupCard } from '$lib/components/kelompok';
 	import Compass from '@lucide/svelte/icons/compass';
 	import Masonry from 'svelte-bricks';
 	const feedStore = getFeedStore();
+	const groupStore = getGroupStore();
 
 	const iconMap: Record<EntityType, string> = {
 		lingkungan: '📍',
@@ -14,13 +17,13 @@
 		warga: '👤'
 	};
 
-	const labelMap: Record<EntityType, string> = {
-		lingkungan: 'Lingkungan',
-		topik: 'Topik',
-		kelompok: 'Kelompok',
-		lembaga: 'Lembaga',
-		warga: 'Warga'
-	};
+	const labelMap = $derived({
+		lingkungan: m.entity_type_lingkungan(),
+		topik: m.entity_type_topik(),
+		kelompok: m.entity_type_kelompok(),
+		lembaga: m.entity_type_lembaga(),
+		warga: m.entity_type_warga()
+	} as Record<EntityType, string>);
 
 	/** Group entities by type. */
 	const groupedEntities = $derived(() => {
@@ -55,6 +58,14 @@
 			}
 		}
 	}
+
+	$effect(() => {
+		if (groupStore.groups.length === 0 && !groupStore.listLoading) {
+			groupStore.loadGroups({ limit: 4 });
+		}
+	});
+
+	const previewGroups = $derived(groupStore.groups.slice(0, 4));
 </script>
 
 <div class="flex flex-col gap-6">
@@ -128,7 +139,7 @@
 											</p>
 										{/if}
 										<p class="text-xs text-muted-foreground/70">
-											{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {entity.follower_count} pengikut
+											{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {m.discover_followers({ count: String(entity.follower_count) })}
 										</p>
 									</div>
 
@@ -149,11 +160,38 @@
 					<!-- Placeholder cards (trending, nearby) -->
 					<section class="rounded-xl border border-dashed border-border/40 bg-muted/10 p-4 text-center">
 						<p class="text-xs text-muted-foreground/60">
-							{item.emoji} {item.label()} — segera hadir
+							{item.emoji} {item.label()} — {m.common_coming_soon()}
 						</p>
 					</section>
 				{/if}
 			{/snippet}
 		</Masonry>
 	{/if}
+
+	<!-- Groups (Kelompok & Lembaga) — always visible, even for new users -->
+	<section class="rounded-xl border border-border/50 bg-card p-4">
+		<div class="flex items-center justify-between gap-3">
+			<div>
+				<h3 class="text-sm font-bold text-foreground">{m.group_discover_section_title()}</h3>
+				<p class="mt-0.5 text-xs text-muted-foreground/80">{m.group_discover_section_subtitle()}</p>
+			</div>
+			<a href="/komunitas/kelompok" class="text-xs font-semibold text-primary hover:underline">
+				{m.common_view_all({ count: previewGroups.length })}
+			</a>
+		</div>
+
+		{#if previewGroups.length === 0}
+			<p class="mt-3 text-xs text-muted-foreground/80">{m.group_empty_discover()}</p>
+		{:else}
+			<div class="mt-3 grid gap-3 sm:grid-cols-2">
+				{#each previewGroups as group (group.group_id)}
+					<GroupCard
+						{group}
+						onJoin={(groupId) => groupStore.joinGroup(groupId)}
+						onRequestJoin={(groupId) => goto(`/komunitas/kelompok/${groupId}`)}
+					/>
+				{/each}
+			</div>
+		{/if}
+	</section>
 </div>

@@ -18,7 +18,11 @@
 	};
 
 	const tooltip = $derived(
-		tag.followed ? 'Diikuti' : 'Ketuk untuk ikuti'
+		tag.entity_type === 'kelompok' || tag.entity_type === 'lembaga'
+			? 'Buka detail'
+			: tag.followed
+				? 'Diikuti'
+				: 'Ketuk untuk ikuti'
 	);
 
 	const pillClass = $derived(
@@ -26,7 +30,7 @@
 			tag.followed
 				? 'border-primary/30 bg-primary/5 text-primary'
 				: 'border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted/50'
-		} ${onclick ? 'cursor-pointer' : ''}`
+		} ${onclick || tag.entity_type === 'kelompok' || tag.entity_type === 'lembaga' ? 'cursor-pointer' : ''}`
 	);
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -38,12 +42,16 @@
 </script>
 
 {#snippet pillContent()}
-	<span class="text-[10px]">{iconMap[tag.entity_type] ?? '📌'}</span>
+	<span class="text-caption">{iconMap[tag.entity_type] ?? '📌'}</span>
 	<span class="max-w-[8rem] truncate">{tag.label}</span>
 {/snippet}
 
 <Tip text={tooltip}>
-	{#if onclick}
+	{#if tag.entity_type === 'kelompok' || tag.entity_type === 'lembaga'}
+		<a href={`/komunitas/kelompok/${tag.entity_id}`} class={pillClass}>
+			{@render pillContent()}
+		</a>
+	{:else if onclick}
 		<button
 			type="button"
 			onclick={onclick}

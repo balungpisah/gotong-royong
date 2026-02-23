@@ -1,154 +1,122 @@
 <script lang="ts">
 	/**
-	 * Signal Chip Bar — tandang-backed action chips for feed cards.
+	 * Signal Chip Bar — content-directed signal chips for feed cards.
+	 *
+	 * Content signals only: saksi, perlu_dicek (2 consequential Tandang signals).
+	 * "Bagus" was renamed to "Dukung" and moved to feed card footer as a social action.
+	 * Vouch/skeptis moved to TandangAvatar popover (person-directed).
 	 *
 	 * Compact mode: icon-only chips + count in a dedicated row.
 	 * The ENTIRE row surface is tappable to expand/collapse.
-	 * Individual chip taps still fire actions (vouch/skeptis/etc.)
+	 * Individual chip taps fire actions via SignalStore.
 	 *
 	 * Expanded mode: vertical list with label + description (teaching moment).
+	 *
+	 * Pending signals show a subtle animated dot.
+	 * Resolved signals show outcome indicator (check/dash/x).
 	 */
 
-	import type { FeedEventType, MyRelation, SignalCounts } from '$lib/types';
+	import type { MyRelation, SignalCounts, ContentSignalType, SignalResolutionOutcome, SignalLabels } from '$lib/types';
+	import { getSignalStore } from '$lib/stores';
 	import { safeSlide as slide } from '$lib/utils/safe-slide';
 	import { quintOut } from 'svelte/easing';
-	import HandshakeIcon from '@lucide/svelte/icons/handshake';
-	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
 	import EyeIcon from '@lucide/svelte/icons/eye';
-	import ThumbsUpIcon from '@lucide/svelte/icons/thumbs-up';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
-	import CheckCircleIcon from '@lucide/svelte/icons/check-circle-2';
-	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import MinusIcon from '@lucide/svelte/icons/minus';
+	import XIcon from '@lucide/svelte/icons/x';
 	import Tip from '$lib/components/ui/tip.svelte';
 
+	/** Hardcoded fallback labels when signal_labels is absent (legacy data). */
+	const DEFAULT_LABELS: SignalLabels = {
+		saksi: { label: 'Saya Saksi', desc: 'Kamu melihat atau mengalami sendiri' },
+		perlu_dicek: { label: 'Perlu Dicek', desc: 'Informasi perlu diverifikasi kebenarannya' }
+	};
+
 	interface Props {
-		eventType: FeedEventType;
+		witnessId: string;
+		/** LLM-generated contextual labels for the 3 signal chips. */
+		signalLabels?: SignalLabels;
 		myRelation?: MyRelation;
 		signalCounts?: SignalCounts;
+		/** Per-signal resolution outcomes (from SignalStore). */
+		signalOutcomes?: Map<ContentSignalType, SignalResolutionOutcome>;
 		/** Mood color CSS variable for active chip tinting. */
 		moodColor?: string;
 		onchipclick?: (chip: string, value: boolean) => void;
 	}
 
 	let {
-		eventType,
+		witnessId,
+		signalLabels,
 		myRelation,
 		signalCounts,
+		signalOutcomes,
 		moodColor = 'var(--c-batu)',
 		onchipclick
 	}: Props = $props();
 
+	const signalStore = getSignalStore();
+
 	// ── Expand/collapse state ──────────────────────────────────────
 	let expanded = $state(false);
 
-	// ── PoR contextual wording ──────────────────────────────────────
-	const porConfig = $derived.by(() => {
-		switch (eventType) {
-			case 'resolved':
-			case 'checkpoint':
-				return { label: 'Sudah Beres', desc: 'Kamu konfirmasi masalah sudah selesai', icon: CheckCircleIcon };
-			case 'evidence':
-				return { label: 'Bukti Valid', desc: 'Kamu validasi bukti yang diberikan', icon: ShieldCheckIcon };
-			case 'vote_opened':
-				return null;
-			default:
-				return { label: 'Saya Saksi', desc: 'Kamu melihat atau mengalami sendiri', icon: EyeIcon };
-		}
-	});
+	// ── Resolve labels: LLM-generated or fallback defaults ─────────
+	const labels = $derived(signalLabels ?? DEFAULT_LABELS);
 
 	// ── Chip state derivations ──────────────────────────────────────
-	const isVouched = $derived(myRelation?.vouched ?? false);
 	const isWitnessed = $derived(myRelation?.witnessed ?? false);
 	const isFlagged = $derived(myRelation?.flagged ?? false);
-	const isQualityVoted = $derived(myRelation?.quality_voted ?? false);
-	const isSkeptis = $derived(
-		myRelation?.vouched && myRelation?.vouch_type === 'skeptical'
-	);
 
 	// ── Signal count helpers ────────────────────────────────────────
-	const vouchCount = $derived(signalCounts?.vouch_positive ?? 0);
-	const skeptisCount = $derived(signalCounts?.vouch_skeptical ?? 0);
 	const witnessCount = $derived(signalCounts?.witness_count ?? 0);
-	const qualityVotes = $derived(signalCounts?.quality_votes ?? 0);
 	const flagCount = $derived(signalCounts?.flags ?? 0);
 
-	// ── Chip definitions (data-driven for both compact + expanded) ──
-	const chips = $derived.by(() => {
-		const list: Array<{
-			id: string;
-			icon: typeof HandshakeIcon;
-			label: string;
-			desc: string;
-			count: number;
-			active: boolean;
-			activeColor: string;
-		}> = [
-			{
-				id: 'vouch',
-				icon: HandshakeIcon,
-				label: 'Vouch',
-				desc: 'Kamu percaya laporan ini akurat',
-				count: vouchCount,
-				active: isVouched && !isSkeptis,
-				activeColor: 'var(--c-berhasil)'
-			},
-			{
-				id: 'skeptis',
-				icon: CircleHelpIcon,
-				label: 'Skeptis',
-				desc: 'Kamu ragu, perlu bukti lebih lanjut',
-				count: skeptisCount,
-				active: !!isSkeptis,
-				activeColor: 'var(--t-telusuri)'
-			}
-		];
+	// ── Resolution outcome helpers ─────────────────────────────────
+	function getOutcome(signalType: ContentSignalType): SignalResolutionOutcome | undefined {
+		return signalOutcomes?.get(signalType);
+	}
 
-		if (porConfig) {
-			list.push({
-				id: 'saksi',
-				icon: porConfig.icon,
-				label: porConfig.label,
-				desc: porConfig.desc,
+	function isTerminal(outcome: SignalResolutionOutcome | undefined): boolean {
+		return outcome !== undefined && outcome !== 'pending';
+	}
+
+	// ── Chip definitions — 2 consequential Tandang chips ──────────────
+	const chips = $derived.by(() => {
+		return [
+			{
+				id: 'saksi' as ContentSignalType,
+				icon: EyeIcon,
+				label: labels.saksi.label,
+				desc: labels.saksi.desc,
 				count: witnessCount,
 				active: isWitnessed,
-				activeColor: 'var(--c-api)'
-			});
-		}
-
-		list.push(
-			{
-				id: 'bagus',
-				icon: ThumbsUpIcon,
-				label: 'Bagus',
-				desc: 'Laporan berkualitas, layak diperhatikan',
-				count: qualityVotes,
-				active: isQualityVoted,
-				activeColor: 'var(--t-wujudkan)'
+				activeColor: 'var(--c-api)',
+				outcome: getOutcome('saksi')
 			},
 			{
-				id: 'perlu_dicek',
+				id: 'perlu_dicek' as ContentSignalType,
 				icon: TriangleAlertIcon,
-				label: 'Perlu Dicek',
-				desc: 'Informasi perlu diverifikasi kebenarannya',
+				label: labels.perlu_dicek.label,
+				desc: labels.perlu_dicek.desc,
 				count: flagCount,
 				active: isFlagged,
-				activeColor: 'var(--c-bahaya)'
+				activeColor: 'var(--c-bahaya)',
+				outcome: getOutcome('perlu_dicek')
 			}
-		);
-
-		return list;
+		];
 	});
 
 	// ── Handlers ────────────────────────────────────────────────────
-	function handleChip(e: MouseEvent, chipId: string, currentState: boolean) {
+	async function handleChip(e: MouseEvent, chipId: ContentSignalType, currentState: boolean) {
 		e.stopPropagation();
+		await signalStore.toggleSignal(witnessId, chipId);
 		onchipclick?.(chipId, !currentState);
 	}
 
 	function handleRowClick(e: MouseEvent) {
 		e.stopPropagation();
-		// Only expand if the click wasn't on a chip button
 		const target = e.target as HTMLElement;
 		if (!target.closest('.signal-chip')) {
 			expanded = !expanded;
@@ -171,14 +139,28 @@
 			<button
 				class="signal-chip"
 				class:signal-chip--active={chip.active}
+				class:signal-chip--resolved={isTerminal(chip.outcome)}
 				style="--chip-active-color: {chip.activeColor}"
 				onclick={(e) => handleChip(e, chip.id, chip.active)}
 				aria-label={chip.label}
 				aria-pressed={chip.active}
+				disabled={isTerminal(chip.outcome) || signalStore.sending}
 			>
 				<chip.icon class="size-3" />
 				{#if chip.count > 0}
 					<span class="signal-chip-count">{chip.count}</span>
+				{/if}
+				<!-- Pending indicator: subtle animated dot -->
+				{#if chip.active && chip.outcome === 'pending'}
+					<span class="signal-pending-dot" aria-label="Menunggu hasil"></span>
+				{/if}
+				<!-- Resolved indicator -->
+				{#if chip.outcome === 'resolved_positive'}
+					<CheckIcon class="size-2.5 text-berhasil" />
+				{:else if chip.outcome === 'resolved_neutral' || chip.outcome === 'expired'}
+					<MinusIcon class="size-2.5 text-muted-foreground/50" />
+				{:else if chip.outcome === 'resolved_negative'}
+					<XIcon class="size-2.5 text-destructive" />
 				{/if}
 			</button>
 		</Tip>
@@ -208,10 +190,12 @@
 			<button
 				class="signal-row"
 				class:signal-row--active={chip.active}
+				class:signal-row--resolved={isTerminal(chip.outcome)}
 				style="--chip-active-color: {chip.activeColor}"
-				onclick={(e) => { e.stopPropagation(); onchipclick?.(chip.id, !chip.active); }}
+				onclick={(e) => { e.stopPropagation(); handleChip(e, chip.id, chip.active); }}
 				aria-label={chip.label}
 				aria-pressed={chip.active}
+				disabled={isTerminal(chip.outcome) || signalStore.sending}
 			>
 				<div class="signal-row-icon">
 					<chip.icon class="size-3.5" />
@@ -220,7 +204,16 @@
 					<span class="signal-row-label">{chip.label}</span>
 					<span class="signal-row-desc">{chip.desc}</span>
 				</div>
-				{#if chip.count > 0}
+				{#if chip.active && chip.outcome === 'pending'}
+					<span class="signal-pending-dot signal-pending-dot--row" aria-label="Menunggu hasil"></span>
+				{/if}
+				{#if chip.outcome === 'resolved_positive'}
+					<CheckIcon class="size-3.5 shrink-0 text-berhasil" />
+				{:else if chip.outcome === 'resolved_neutral' || chip.outcome === 'expired'}
+					<MinusIcon class="size-3.5 shrink-0 text-muted-foreground/50" />
+				{:else if chip.outcome === 'resolved_negative'}
+					<XIcon class="size-3.5 shrink-0 text-destructive" />
+				{:else if chip.count > 0}
 					<span class="signal-row-count">{chip.count}</span>
 				{/if}
 			</button>
@@ -287,14 +280,18 @@
 		flex-shrink: 0;
 	}
 
-	.signal-chip:hover {
+	.signal-chip:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--v-wash) 90%, transparent);
 		border-color: color-mix(in srgb, var(--v-light) 40%, transparent);
 		color: var(--v-deep);
 	}
 
-	.signal-chip:active {
+	.signal-chip:active:not(:disabled) {
 		transform: scale(0.96);
+	}
+
+	.signal-chip:disabled {
+		cursor: default;
 	}
 
 	/* ── Active state ─────────────────────────────────────────────── */
@@ -304,9 +301,14 @@
 		color: var(--chip-active-color);
 	}
 
-	.signal-chip--active:hover {
+	.signal-chip--active:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--chip-active-color) 18%, transparent);
 		border-color: color-mix(in srgb, var(--chip-active-color) 40%, transparent);
+	}
+
+	/* ── Resolved state — muted, non-interactive ─────────────────── */
+	.signal-chip--resolved {
+		opacity: 0.6;
 	}
 
 	.signal-chip-count {
@@ -317,6 +319,27 @@
 
 	.signal-chip--active .signal-chip-count {
 		opacity: 1;
+	}
+
+	/* ── Pending dot — subtle animated indicator ─────────────────── */
+	.signal-pending-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 9999px;
+		background: var(--chip-active-color);
+		animation: pending-pulse 2s ease-in-out infinite;
+		flex-shrink: 0;
+	}
+
+	.signal-pending-dot--row {
+		width: 6px;
+		height: 6px;
+		margin-left: auto;
+	}
+
+	@keyframes pending-pulse {
+		0%, 100% { opacity: 0.3; transform: scale(0.8); }
+		50% { opacity: 1; transform: scale(1.2); }
 	}
 
 	/* ── Expanded panel ───────────────────────────────────────────── */
@@ -346,20 +369,28 @@
 		width: 100%;
 	}
 
-	.signal-row:hover {
+	.signal-row:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--v-wash) 80%, transparent);
 	}
 
-	.signal-row:active {
+	.signal-row:active:not(:disabled) {
 		transform: scale(0.99);
+	}
+
+	.signal-row:disabled {
+		cursor: default;
 	}
 
 	.signal-row--active {
 		background: color-mix(in srgb, var(--chip-active-color) 8%, transparent);
 	}
 
-	.signal-row--active:hover {
+	.signal-row--active:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--chip-active-color) 14%, transparent);
+	}
+
+	.signal-row--resolved {
+		opacity: 0.6;
 	}
 
 	.signal-row-icon {

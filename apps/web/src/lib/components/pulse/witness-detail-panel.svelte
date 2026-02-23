@@ -5,6 +5,8 @@
 	import { StatusIndicator, type StatusIndicatorStatus } from '$lib/components/ui/status-indicator';
 	import WitnessChatPanel from './witness-chat-panel.svelte';
 	import EntityPill from './entity-pill.svelte';
+	import { TandangAvatar } from '$lib/components/ui/tandang-avatar';
+	import type { TandangAvatarPerson } from '$lib/types';
 	import X from '@lucide/svelte/icons/x';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
@@ -21,7 +23,7 @@
 		detail: WitnessDetail;
 		feedItem?: FeedItem | null;
 		onClose?: () => void;
-		onSendMessage?: (content: string) => void;
+		onSendMessage?: (content: string, attachments?: File[]) => void;
 		onStempel?: () => void;
 		sending?: boolean;
 		stempeling?: boolean;
@@ -149,6 +151,19 @@
 
 	const memberCount = $derived((detail.members ?? []).length);
 
+	/** The pelapor (initiator) — shown in the header as TandangAvatar */
+	const initiator = $derived.by((): TandangAvatarPerson | null => {
+		const pelapor = detail.members?.find((m) => m.role === 'pelapor');
+		if (!pelapor) return null;
+		return {
+			user_id: pelapor.user_id,
+			name: pelapor.name,
+			avatar_url: pelapor.avatar_url,
+			tier: pelapor.tier as TandangAvatarPerson['tier'],
+			role: pelapor.role
+		};
+	});
+
 	// ---------------------------------------------------------------------------
 	// Phase momentum — completed count + active phase checkpoint progress
 	// ---------------------------------------------------------------------------
@@ -212,22 +227,22 @@
 				{/if}
 
 				<div class="pinned-columns">
-					<!-- LEFT: identity — what is this -->
-					<div class="min-w-0 flex-1 space-y-1">
+					<!-- LEFT: identity — flex-col so initiator pins to bottom, aligned with last phase row -->
+					<div class="min-w-0 flex-1 flex flex-col gap-1">
 						<div class="flex items-start gap-1.5 pr-4">
 							<span class="mt-0.5 text-sm select-none opacity-60">
 								{eventEmojiMap[feedItem.latest_event.event_type] ?? '📌'}
 							</span>
 							<div class="min-w-0 flex-1">
 								{#if feedItem.hook_line}
-									<p class="text-[13px] font-bold leading-snug text-foreground line-clamp-2">
+									<p class="text-sm font-bold leading-snug text-foreground line-clamp-2">
 										{feedItem.hook_line}
 									</p>
 									<p class="mt-0.5 text-xs leading-snug text-muted-foreground/70 line-clamp-1">
 										{feedItem.title}
 									</p>
 								{:else}
-									<p class="text-[13px] font-bold leading-snug text-foreground line-clamp-2">
+									<p class="text-sm font-bold leading-snug text-foreground line-clamp-2">
 										{feedItem.title}
 									</p>
 								{/if}
@@ -242,16 +257,15 @@
 							</div>
 						{/if}
 
-						<!-- Status row — below identity -->
-						<div class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+						<!-- Initiator signature — mt-auto pins to bottom, aligning with last phase row on right -->
+						<div class="flex items-center gap-1.5 mt-auto pt-1">
 							<StatusIndicator status={statusMap[detail.status] ?? 'active'} />
-							{#if detail.track_hint}
-								<Badge variant={trackVariantMap[detail.track_hint] ?? 'secondary'} class="text-[10px]">
-									{detail.track_hint}
-								</Badge>
+							{#if initiator}
+								<TandangAvatar person={initiator} size="xs" showTierDot={false} />
+								<span class="text-[13px] text-muted-foreground/60 truncate max-w-[160px]" style="font-family: 'Caveat', cursive;">— {initiator.name}</span>
 							{/if}
 							{#if rahasiaDisplay.show}
-								<Badge variant={rahasiaDisplay.variant} class="text-[10px]">
+								<Badge variant={rahasiaDisplay.variant} class="text-caption">
 									<ShieldAlert class="mr-0.5 size-2.5" />
 									{rahasiaDisplay.label}
 								</Badge>
@@ -297,9 +311,9 @@
 								>
 									<span class="flex items-center gap-1.5">
 										{#if icon === 'completed'}
-											<Check class="size-3 text-green-600" />
+											<Check class="size-3 text-berhasil" />
 										{:else if icon === 'blocked'}
-											<Lock class="size-3 text-red-500" />
+											<Lock class="size-3 text-bahaya" />
 										{:else if icon === 'active'}
 											<CircleDot class="size-3 text-primary" />
 										{:else}
@@ -309,7 +323,7 @@
 											{phase.title}
 										</span>
 									</span>
-									<span class="shrink-0 text-[10px] tabular-nums text-muted-foreground/50">
+									<span class="shrink-0 text-caption tabular-nums text-muted-foreground/50">
 										{counts.done}/{counts.total}
 									</span>
 								</button>
@@ -367,7 +381,7 @@
 							</span>
 						</div>
 						{#if detail.unread_count > 0}
-							<Badge variant="danger" class="text-[10px]">
+							<Badge variant="danger" class="text-caption">
 								{detail.unread_count} pesan baru
 							</Badge>
 						{/if}
@@ -381,22 +395,22 @@
 							<p class="text-xs font-semibold text-foreground">
 								{phase.title}
 							</p>
-							<span class="text-[10px] tabular-nums text-muted-foreground">
+							<span class="text-caption tabular-nums text-muted-foreground">
 								{counts.done}/{counts.total}{counts.blocked > 0 ? ` · ${counts.blocked} terblokir` : ''}
 							</span>
 						</div>
 						{#if phase.objective}
-							<p class="text-[10px] leading-relaxed text-muted-foreground/70">{phase.objective}</p>
+							<p class="text-caption leading-relaxed text-muted-foreground/70">{phase.objective}</p>
 						{/if}
 						<ul class="space-y-1">
 							{#each phase.checkpoints as cp (cp.checkpoint_id)}
 								<li class="flex items-start gap-1.5 text-xs">
 									{#if cp.status === 'completed'}
-										<Check class="mt-0.5 size-3 shrink-0 text-green-600" />
+										<Check class="mt-0.5 size-3 shrink-0 text-berhasil" />
 										<span class="text-muted-foreground line-through">{cp.title}</span>
 									{:else if cp.status === 'blocked'}
-										<Lock class="mt-0.5 size-3 shrink-0 text-red-500" />
-										<span class="text-red-600">{cp.title}</span>
+										<Lock class="mt-0.5 size-3 shrink-0 text-bahaya" />
+										<span class="text-bahaya">{cp.title}</span>
 									{:else}
 										<Circle class="mt-0.5 size-3 shrink-0 text-muted-foreground/30" />
 										<span class="text-foreground">{cp.title}</span>
@@ -415,7 +429,7 @@
 	<!-- ================================================================== -->
 	{#if phases.length > 0}
 		<div class="momentum-strip shrink-0 flex items-center gap-1.5 px-4 py-1.5 border-b border-border/30">
-			<span class="text-[10px] font-medium text-muted-foreground/60">Fase {currentPhaseIndex + 1} aktif</span>
+			<span class="text-caption font-medium text-muted-foreground/60">Fase {currentPhaseIndex + 1} aktif</span>
 			<span class="text-muted-foreground/30">·</span>
 			<div class="flex items-center gap-1">
 				{#each phases as phase, i (phase.phase_id)}
@@ -444,7 +458,7 @@
 				{/each}
 			</div>
 			{#if completedPhases > 0}
-				<span class="text-[10px] text-muted-foreground/50">{completedPhases} selesai</span>
+				<span class="text-caption text-muted-foreground/50">{completedPhases} selesai</span>
 			{/if}
 		</div>
 	{/if}

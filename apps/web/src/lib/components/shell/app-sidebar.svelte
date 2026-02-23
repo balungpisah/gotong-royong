@@ -3,16 +3,19 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
+	import { setLocale, getLocale } from '$lib/paraglide/runtime';
 	import { getNavigationStore, getFeedStore, getNotificationStore, getUserStore, getThemeStore, getPreferencesStore } from '$lib/stores';
 	import { resolveTabIcon } from '$lib/utils';
 	import type { TabConfig } from '$lib/types';
 	import Plus from '@lucide/svelte/icons/plus';
 	import BellRing from '@lucide/svelte/icons/bell-ring';
 	import User from '@lucide/svelte/icons/user';
+	import Users from '@lucide/svelte/icons/users';
 	import Sun from '@lucide/svelte/icons/sun';
 	import Moon from '@lucide/svelte/icons/moon';
 	import Monitor from '@lucide/svelte/icons/monitor';
 	import X from '@lucide/svelte/icons/x';
+	import Globe from '@lucide/svelte/icons/globe';
 	import CircleHelp from '@lucide/svelte/icons/circle-help';
 	import Tip from '$lib/components/ui/tip.svelte';
 
@@ -25,6 +28,12 @@
 
 	const themeIconMap = { light: Sun, dark: Moon, system: Monitor } as const;
 	const ThemeIcon = $derived(themeIconMap[themeStore.mode]);
+
+	function toggleLocale() {
+		setLocale(getLocale() === 'id' ? 'en' : 'id');
+	}
+
+	const localeLabel = $derived(getLocale() === 'id' ? 'ID' : 'EN');
 
 	// ---------------------------------------------------------------------------
 	// Click-to-expand state
@@ -181,33 +190,63 @@
 		</a>
 		</Tip>
 
+		<!-- Komunitas -->
+		<Tip text={m.shell_nav_komunitas()} side="right">
+		<a
+			href="{base}/komunitas"
+			class="sidebar-item sidebar-item-muted"
+			onclick={(e) => e.stopPropagation()}
+			aria-label={m.shell_nav_komunitas()}
+		>
+			<span class="sidebar-icon">
+				<Users class="size-5" />
+			</span>
+			<span class="sidebar-label">{m.shell_nav_komunitas()}</span>
+		</a>
+		</Tip>
+
+		<!-- Language toggle -->
+		<Tip text={m.shell_lang_label()} side="right">
+		<button
+			type="button"
+			class="sidebar-item sidebar-item-muted"
+			onclick={(e) => { e.stopPropagation(); toggleLocale(); }}
+			aria-label={m.shell_lang_label()}
+		>
+			<span class="sidebar-icon">
+				<Globe class="size-5" />
+			</span>
+			<span class="sidebar-label">{localeLabel}</span>
+		</button>
+		</Tip>
+
 		<!-- Theme toggle -->
-		<Tip text="Ganti tema" side="right">
+		<Tip text={m.shell_theme_toggle()} side="right">
 		<button
 			type="button"
 			class="sidebar-item sidebar-item-muted"
 			onclick={(e) => { e.stopPropagation(); themeStore.toggle(); }}
-			aria-label="Toggle tema"
+			aria-label={m.shell_theme_toggle()}
 		>
 			<span class="sidebar-icon">
 				<ThemeIcon class="size-5" />
 			</span>
-			<span class="sidebar-label">Tema</span>
+			<span class="sidebar-label">{m.shell_theme_label()}</span>
 		</button>
 		</Tip>
 
 		<!-- Tooltip toggle -->
-		<Tip text={prefsStore.showTooltips ? 'Tooltip aktif' : 'Tooltip nonaktif'} side="right">
+		<Tip text={prefsStore.showTooltips ? m.shell_tooltip_active() : m.shell_tooltip_inactive()} side="right">
 		<button
 			type="button"
 			class="sidebar-item sidebar-item-muted"
 			onclick={(e) => { e.stopPropagation(); prefsStore.toggleTooltips(); }}
-			aria-label={prefsStore.showTooltips ? 'Tooltip aktif' : 'Tooltip nonaktif'}
+			aria-label={prefsStore.showTooltips ? m.shell_tooltip_active() : m.shell_tooltip_inactive()}
 		>
 			<span class="sidebar-icon">
 				<CircleHelp class="size-5 transition-opacity {prefsStore.showTooltips ? '' : 'opacity-40'}" />
 			</span>
-			<span class="sidebar-label">{prefsStore.showTooltips ? 'Tooltip aktif' : 'Tooltip mati'}</span>
+			<span class="sidebar-label">{prefsStore.showTooltips ? m.shell_tooltip_active() : m.shell_tooltip_off()}</span>
 		</button>
 		</Tip>
 

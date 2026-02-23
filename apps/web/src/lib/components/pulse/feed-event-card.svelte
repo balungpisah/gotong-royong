@@ -1,17 +1,21 @@
 <script lang="ts">
-	import type { FeedItem, UrgencyBadge } from '$lib/types';
+	import type { FeedItem, UrgencyBadge, ContentSignalType, SignalResolutionOutcome } from '$lib/types';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import { m } from '$lib/paraglide/messages';
 	import EntityPill from './entity-pill.svelte';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import EyeIcon from '@lucide/svelte/icons/eye';
+	import HeartIcon from '@lucide/svelte/icons/heart';
 	import BookmarkIcon from '@lucide/svelte/icons/bookmark';
 	import Share2Icon from '@lucide/svelte/icons/share-2';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import MessageCircleIcon from '@lucide/svelte/icons/message-circle';
+	import CheckCircle2Icon from '@lucide/svelte/icons/check-circle-2';
 	import SignalChipBar from './signal-chip-bar.svelte';
 	import Tip from '$lib/components/ui/tip.svelte';
 	import { getMoodColor, moodShadow } from '$lib/utils/mood-color';
+	import { TandangAvatar } from '$lib/components/ui/tandang-avatar';
+	import { getSignalStore, getFeedStore } from '$lib/stores';
 
 	interface Props {
 		item: FeedItem;
@@ -22,6 +26,27 @@
 	}
 
 	let { item, selected = false, onclick, onToggleMonitor, onShare }: Props = $props();
+
+	const signalStore = getSignalStore();
+	const feedStore = getFeedStore();
+
+	// ── Dukung (support) state — non-Tandang social action ──────────
+	const isSupported = $derived(item.my_relation?.supported ?? false);
+	const dukungCount = $derived(item.signal_counts?.dukung_count ?? 0);
+
+	// ── Signal resolution state ─────────────────────────────────────
+	const isTerminalWitness = $derived(item.status === 'resolved' || item.status === 'closed');
+	const resolutions = $derived(signalStore.getResolutionsForWitness(item.witness_id));
+	const resolutionCount = $derived(resolutions.length);
+
+	/** Build outcome map for signal-chip-bar from resolved signals. */
+	const signalOutcomes = $derived.by(() => {
+		const map = new Map<ContentSignalType, SignalResolutionOutcome>();
+		for (const sig of resolutions) {
+			map.set(sig.signal_type, sig.outcome);
+		}
+		return map;
+	});
 
 	// ── Mood color (shared utility) ─────────────────────────────────
 	const moodColor = $derived(getMoodColor(item.sentiment, item.track_hint));
@@ -176,10 +201,10 @@
 			{/if}
 
 			{#if isAlive}
-				<span class="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600">
+				<span class="inline-flex items-center gap-1 text-[10px] font-medium text-berhasil">
 					<span class="relative flex size-1.5">
-						<span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-						<span class="relative inline-flex size-1.5 rounded-full bg-emerald-500"></span>
+						<span class="absolute inline-flex size-full animate-ping rounded-full bg-berhasil/60 opacity-75"></span>
+						<span class="relative inline-flex size-1.5 rounded-full bg-berhasil"></span>
 					</span>
 					{item.active_now} aktif
 				</span>
@@ -197,9 +222,9 @@
 			<div class="mb-3 flex flex-col gap-1.5">
 				{#if countdown}
 					<div class="flex items-center gap-1.5">
-						<ClockIcon class="size-3 {countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-amber-500' : 'text-muted-foreground/60'}" />
+						<ClockIcon class="size-3 {countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-waspada' : 'text-muted-foreground/60'}" />
 						<span class="text-xs font-semibold
-							{countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-amber-600' : 'text-muted-foreground/70'}">
+							{countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-waspada' : 'text-muted-foreground/70'}">
 							{item.deadline_label ?? 'Berakhir'}: {countdown.label}
 						</span>
 					</div>
@@ -209,7 +234,7 @@
 						<div class="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/60">
 							<div
 								class="h-full rounded-full transition-all duration-500
-									{quorumPercent >= 75 ? 'bg-emerald-500' : quorumPercent >= 50 ? 'bg-amber-500' : 'bg-primary'}"
+									{quorumPercent >= 75 ? 'bg-berhasil' : quorumPercent >= 50 ? 'bg-waspada' : 'bg-primary'}"
 								style="width: {quorumPercent}%"
 							></div>
 						</div>
@@ -321,11 +346,21 @@
 		{#if item.signal_counts || item.my_relation}
 			<div class="mt-2">
 				<SignalChipBar
-					eventType={item.latest_event.event_type}
+					witnessId={item.witness_id}
+					signalLabels={item.signal_labels}
 					myRelation={item.my_relation}
 					signalCounts={item.signal_counts}
+					{signalOutcomes}
 					{moodColor}
 				/>
+			</div>
+		{/if}
+
+		<!-- ── Resolution badge (completed witnesses only) ──────────── -->
+		{#if isTerminalWitness && resolutionCount > 0}
+			<div class="mt-2 flex items-center gap-1.5 rounded-md bg-berhasil/8 px-2.5 py-1.5 text-xs text-berhasil">
+				<CheckCircle2Icon class="size-3.5 shrink-0" />
+				<span class="font-medium">{m.signal_resolution_count({ count: resolutionCount })}</span>
 			</div>
 		{/if}
 
@@ -335,19 +370,11 @@
 			{#if item.members_preview.length > 0}
 				<div class="flex -space-x-1.5">
 					{#each item.members_preview.slice(0, 4) as member (member.user_id)}
-						{#if member.avatar_url}
-							<img
-								src={member.avatar_url}
-								alt={member.name}
-								class="size-5 rounded-full border-[1.5px] border-card object-cover"
-							/>
-						{:else}
-							<span
-								class="flex size-5 items-center justify-center rounded-full border-[1.5px] border-card bg-muted text-[10px] font-medium text-muted-foreground"
-							>
-								{member.name.charAt(0)}
-							</span>
-						{/if}
+						<TandangAvatar
+							person={{ user_id: member.user_id, name: member.name, avatar_url: member.avatar_url }}
+							size="xs"
+							class="border-[1.5px] border-card"
+						/>
 					{/each}
 				</div>
 			{/if}
@@ -357,6 +384,22 @@
 				<UsersIcon class="size-2.5" />
 				{item.member_count}
 			</span>
+
+			<!-- Dukung (support) button — non-Tandang social action -->
+			<button
+				class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all duration-150
+					{isSupported
+						? 'bg-rose-500/12 text-rose-500 border border-rose-500/25 hover:bg-rose-500/18'
+						: 'text-muted-foreground/50 hover:text-rose-400 hover:bg-rose-500/8 border border-transparent'}"
+				onclick={(e) => { e.stopPropagation(); feedStore.toggleDukung(item.witness_id); }}
+				aria-label={isSupported ? 'Batal dukung' : 'Dukung'}
+				aria-pressed={isSupported}
+			>
+				<HeartIcon class="size-3 {isSupported ? 'fill-current' : ''}" />
+				{#if dukungCount > 0}
+					<span>{dukungCount}</span>
+				{/if}
+			</button>
 
 			<div class="flex-1"></div>
 

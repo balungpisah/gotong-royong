@@ -4,21 +4,18 @@
 	import { getNotificationStore, getUserStore } from '$lib/stores';
 	import BellRing from '@lucide/svelte/icons/bell-ring';
 	import Activity from '@lucide/svelte/icons/activity';
-	import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
+	import { TandangAvatar } from '$lib/components/ui/tandang-avatar';
 	import ThemeToggle from './theme-toggle.svelte';
 	import Tip from '$lib/components/ui/tip.svelte';
 
 	const notificationStore = getNotificationStore();
 	const userStore = getUserStore();
 
-	const initials = $derived(
-		userStore.displayName
-			.split(' ')
-			.map((n) => n[0])
-			.join('')
-			.slice(0, 2)
-			.toUpperCase()
-	);
+	const headerPerson = $derived({
+		user_id: userStore.profile?.user_id ?? 'self',
+		name: userStore.displayName,
+		avatar_url: userStore.profile?.avatar_url
+	});
 </script>
 
 <header
@@ -76,14 +73,7 @@
 				class="rounded-full ring-2 ring-transparent transition hover:ring-primary/30"
 				aria-label={m.shell_nav_profil()}
 			>
-				<Avatar class="size-8">
-					{#if userStore.profile?.avatar_url}
-						<AvatarImage src={userStore.profile.avatar_url} alt={userStore.displayName} />
-					{/if}
-					<AvatarFallback class="bg-muted text-xs font-semibold text-muted-foreground">
-						{initials}
-					</AvatarFallback>
-				</Avatar>
+				<TandangAvatar person={headerPerson} size="sm" isSelf />
 			</a>
 			</Tip>
 		</div>

@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { UserMessage } from '$lib/types';
 	import { cn } from '$lib/utils';
-	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
+	import { TandangAvatar } from '$lib/components/ui/tandang-avatar';
+	import Video from '@lucide/svelte/icons/video';
+	import Mic from '@lucide/svelte/icons/mic';
 
 	let { message }: { message: UserMessage } = $props();
 
-	const initials = $derived(message.author.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase());
 	const timeStr = $derived(new Date(message.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
 
 	// ---------------------------------------------------------------------------
@@ -36,31 +37,22 @@
 		return '★★★★';
 	});
 
-	/** Deterministic hue from name for avatar ring color */
-	function nameHue(name: string): number {
-		let hash = 0;
-		for (let i = 0; i < name.length; i++) {
-			hash = name.charCodeAt(i) + ((hash << 5) - hash);
-		}
-		return Math.abs(hash) % 360;
-	}
-
-	const avatarRingColor = $derived(`hsl(${nameHue(message.author.name)}, 55%, 45%)`);
+	const avatarPerson = $derived({
+		user_id: message.author.user_id,
+		name: message.author.name,
+		avatar_url: message.author.avatar_url,
+		tier: message.author.tier as import('$lib/types').TandangTierLevel | undefined,
+		role: message.author.role
+	});
 </script>
 
 <div class={cn('flex gap-2', message.is_self ? 'flex-row-reverse' : 'flex-row')} data-slot="chat-bubble">
 	{#if !message.is_self}
-		<div class="relative shrink-0">
-			<Avatar class="size-8 ring-2 ring-offset-1 ring-offset-background" style="--tw-ring-color: {avatarRingColor}">
-				<AvatarFallback class="text-xs">{initials}</AvatarFallback>
-			</Avatar>
-			<!-- Role dot on avatar -->
-			{#if message.author.role}
-				<div
-					class="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background {roleColors[message.author.role]?.split(' ')[0] ?? 'bg-muted'}"
-				></div>
-			{/if}
-		</div>
+		<TandangAvatar
+			person={avatarPerson}
+			size="sm"
+			showTierDot
+		/>
 	{/if}
 	<div class={cn('max-w-[75%] flex flex-col gap-1', message.is_self ? 'items-end' : 'items-start')}>
 		{#if !message.is_self}
@@ -93,6 +85,14 @@
 				{#each message.attachments as att}
 					{#if att.type === 'image'}
 						<img src={att.url} alt={att.alt || ''} class="h-20 w-auto rounded-lg border border-border object-cover" loading="lazy" />
+					{:else if att.type === 'video'}
+						<div class="flex h-20 w-20 items-center justify-center rounded-lg bg-muted">
+							<Video class="size-6 text-muted-foreground" />
+						</div>
+					{:else}
+						<div class="flex h-20 w-20 items-center justify-center rounded-lg bg-muted">
+							<Mic class="size-6 text-muted-foreground" />
+						</div>
 					{/if}
 				{/each}
 			</div>

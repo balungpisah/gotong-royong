@@ -19,8 +19,8 @@
 	import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
 	import X from '@lucide/svelte/icons/x';
 	import WitnessDetailPanel from './witness-detail-panel.svelte';
-	import CommunityPulse from './community-pulse.svelte';
-	import SelfProfile from './self-profile.svelte';
+	import KomunitasPanel from './komunitas-panel.svelte';
+	import AkuPanel from './aku-panel.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import Tip from '$lib/components/ui/tip.svelte';
 	import { getMoodColor, moodShadow } from '$lib/utils/mood-color';
@@ -47,7 +47,7 @@
 		/** Callback to close the context box */
 		onClose: () => void;
 		/** Callback to send a message in witness chat */
-		onSendMessage: (content: string) => void;
+		onSendMessage: (content: string, attachments?: File[]) => void;
 		/** Callback to invoke AI Stempel evaluation */
 		onStempel?: () => void;
 		/** Whether Stempel is currently processing */
@@ -388,7 +388,7 @@
 							<div class="flex size-12 items-center justify-center rounded-xl bg-muted/30 text-muted-foreground">
 								<ClipboardList class="size-6" />
 							</div>
-							<p class="text-[var(--fs-small)] text-muted-foreground">
+							<p class="text-xs text-muted-foreground">
 								Pilih tandang dari feed untuk melihat detail
 							</p>
 						</div>
@@ -399,14 +399,14 @@
 					class="tab-pane absolute inset-0 overflow-y-auto overflow-x-hidden"
 					transition:fly={{ x: 12, duration: 200 }}
 				>
-					<SelfProfile userId={selectedUserId} />
+					<AkuPanel userId={selectedUserId} />
 				</div>
 			{:else if activeTab === 'community'}
 				<div
 					class="tab-pane absolute inset-0 overflow-y-auto overflow-x-hidden"
 					transition:fly={{ x: 12, duration: 200 }}
 				>
-					<CommunityPulse />
+					<KomunitasPanel />
 				</div>
 			{/if}
 		</div>
