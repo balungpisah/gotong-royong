@@ -96,7 +96,7 @@
 			{detail}
 			feedItem={mockFeedItem1}
 			onClose={() => {}}
-			onSendMessage={(msg) => console.log('Send:', msg)}
+			onSendMessage={(msg, attachments) => console.log('Send:', msg, attachments)}
 			onStempel={handleStempel}
 			sending={false}
 			{stempeling}

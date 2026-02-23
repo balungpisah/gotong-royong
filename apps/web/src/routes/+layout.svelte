@@ -15,6 +15,8 @@
 		ThemeStore,
 		PreferencesStore,
 		CommunityStore,
+		SignalStore,
+		GroupStore,
 		WITNESS_STORE_KEY,
 		USER_STORE_KEY,
 		NOTIFICATION_STORE_KEY,
@@ -23,7 +25,9 @@
 		FEED_STORE_KEY,
 		THEME_STORE_KEY,
 		PREFERENCES_STORE_KEY,
-		COMMUNITY_STORE_KEY
+		COMMUNITY_STORE_KEY,
+		SIGNAL_STORE_KEY,
+		GROUP_STORE_KEY
 	} from '$lib/stores';
 	import { AppHeader, AppSidebar, TabBar, AddTabSheet } from '$lib/components/shell';
 	import { TooltipProvider } from '$lib/components/ui/tooltip';
@@ -42,6 +46,8 @@
 	const themeStore = new ThemeStore();
 	const preferencesStore = new PreferencesStore();
 	const communityStore = new CommunityStore();
+	const signalStore = new SignalStore(services.signal);
+	const groupStore = new GroupStore(services.group);
 
 	setContext(SERVICES_KEY, services);
 	setContext(WITNESS_STORE_KEY, witnessStore);
@@ -53,6 +59,8 @@
 	setContext(THEME_STORE_KEY, themeStore);
 	setContext(PREFERENCES_STORE_KEY, preferencesStore);
 	setContext(COMMUNITY_STORE_KEY, communityStore);
+	setContext(SIGNAL_STORE_KEY, signalStore);
+	setContext(GROUP_STORE_KEY, groupStore);
 
 	let { children } = $props();
 

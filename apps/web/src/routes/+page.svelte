@@ -104,13 +104,19 @@
 		selectedUserId = null;
 	}
 
-	async function handleSendMessage(content: string) {
+	async function handleSendMessage(content: string, attachments?: File[]) {
 		messageSending = true;
 		try {
-			await witnessStore.sendMessage(content);
+			await witnessStore.sendMessage(content, attachments);
 		} finally {
 			messageSending = false;
 		}
+	}
+
+	function handleWitnessCreated(witnessId: string) {
+		selectedWitnessId = witnessId;
+		// witnessStore.current is already set by createWitness()
+		// selectedFeedItem derived will auto-find the new feed item
 	}
 
 	function handleStempel() {
@@ -332,7 +338,7 @@
 					>
 						{#snippet children({ item: streamItem })}
 							{#if streamItem.kind === 'triage'}
-								<ChatInput />
+								<ChatInput onWitnessCreated={handleWitnessCreated} />
 							{:else if streamItem.kind === 'witness'}
 								<FeedEventCard
 									item={streamItem.data}

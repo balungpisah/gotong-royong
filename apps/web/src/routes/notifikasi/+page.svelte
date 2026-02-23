@@ -29,12 +29,12 @@
 	// ---------------------------------------------------------------------------
 
 	const typeConfig: Record<NotificationType, { icon: typeof RefreshCw; color: string; label: string }> = {
-		phase_change: { icon: RefreshCw, color: 'text-blue-600 bg-blue-500/10', label: 'Fase' },
-		vote_open: { icon: BarChart3, color: 'text-purple-600 bg-purple-500/10', label: 'Voting' },
-		evidence_needed: { icon: Search, color: 'text-amber-600 bg-amber-500/10', label: 'Bukti' },
-		diff_proposed: { icon: Pencil, color: 'text-cyan-600 bg-cyan-500/10', label: 'Perubahan' },
-		mention: { icon: AtSign, color: 'text-green-600 bg-green-500/10', label: 'Sebutan' },
-		role_assigned: { icon: ShieldCheck, color: 'text-indigo-600 bg-indigo-500/10', label: 'Peran' },
+		phase_change: { icon: RefreshCw, color: 'text-signal-proof bg-signal-proof/10', label: 'Fase' },
+		vote_open: { icon: BarChart3, color: 'text-signal-dukung bg-signal-dukung/10', label: 'Voting' },
+		evidence_needed: { icon: Search, color: 'text-waspada bg-waspada/10', label: 'Bukti' },
+		diff_proposed: { icon: Pencil, color: 'text-tandang bg-tandang/10', label: 'Perubahan' },
+		mention: { icon: AtSign, color: 'text-berhasil bg-berhasil/10', label: 'Sebutan' },
+		role_assigned: { icon: ShieldCheck, color: 'text-telusuri bg-telusuri/10', label: 'Peran' },
 		system: { icon: Info, color: 'text-muted-foreground bg-muted/30', label: 'Sistem' }
 	};
 
@@ -82,8 +82,8 @@
 				<Bell class="size-5" />
 			</div>
 			<div>
-				<h1 class="text-[var(--fs-h1)] font-bold text-foreground">{m.page_notifikasi_title()}</h1>
-				<p class="text-[var(--fs-caption)] text-muted-foreground">{m.page_notifikasi_description()}</p>
+				<h1 class="text-h1 font-bold text-foreground">{m.page_notifikasi_title()}</h1>
+				<p class="text-caption text-muted-foreground">{m.page_notifikasi_description()}</p>
 			</div>
 		</div>
 		{#if store.hasUnread}
@@ -98,7 +98,7 @@
 	{#if store.loading}
 		<div class="flex flex-col items-center justify-center py-16 text-muted-foreground">
 			<Loader2 class="size-8 animate-spin" />
-			<p class="mt-3 text-[var(--fs-small)]">Memuat notifikasi...</p>
+			<p class="mt-3 text-xs">Memuat notifikasi...</p>
 		</div>
 
 	<!-- Empty state -->
@@ -112,8 +112,8 @@
 			<div class="flex size-14 items-center justify-center rounded-full bg-muted/20">
 				<Inbox class="size-7 text-muted-foreground" />
 			</div>
-			<p class="mt-4 text-[var(--fs-body)] font-medium text-foreground">Tidak ada notifikasi</p>
-			<p class="mt-1 text-[var(--fs-caption)] text-muted-foreground">Semua sudah bersih!</p>
+			<p class="mt-4 text-sm font-medium text-foreground">Tidak ada notifikasi</p>
+			<p class="mt-1 text-caption text-muted-foreground">Semua sudah bersih!</p>
 		</motion.div>
 
 	<!-- Notification list -->
@@ -122,7 +122,7 @@
 		{#if unread.length > 0}
 			<div>
 				<div class="flex items-center gap-2 px-1 pb-2">
-					<span class="text-[var(--fs-small)] font-semibold text-foreground">Belum dibaca</span>
+					<span class="text-xs font-semibold text-foreground">Belum dibaca</span>
 					<Badge variant="secondary" class="text-xs">{unread.length}</Badge>
 				</div>
 				<div class="space-y-2">
@@ -146,10 +146,10 @@
 							<!-- Content -->
 							<div class="min-w-0 flex-1 text-left">
 								<div class="flex items-center gap-2">
-									<span class="truncate text-[var(--fs-small)] font-semibold text-foreground">{notif.title}</span>
+									<span class="truncate text-xs font-semibold text-foreground">{notif.title}</span>
 									<Badge variant="outline" class="shrink-0 text-xs">{config.label}</Badge>
 								</div>
-								<p class="mt-0.5 line-clamp-2 text-[var(--fs-caption)] leading-relaxed text-muted-foreground">
+								<p class="mt-0.5 line-clamp-2 text-caption leading-relaxed text-muted-foreground">
 									{notif.body}
 								</p>
 								<p class="mt-1 text-xs text-muted-foreground/60">{timeAgo(notif.created_at)}</p>
@@ -169,7 +169,7 @@
 		{#if read.length > 0}
 			<div>
 				<div class="px-1 pb-2">
-					<span class="text-[var(--fs-small)] font-semibold text-muted-foreground">Sudah dibaca</span>
+					<span class="text-xs font-semibold text-muted-foreground">Sudah dibaca</span>
 				</div>
 				<div class="space-y-2">
 					{#each read as notif, i (notif.notification_id)}
@@ -189,10 +189,10 @@
 							<!-- Content -->
 							<div class="min-w-0 flex-1 text-left">
 								<div class="flex items-center gap-2">
-									<span class="truncate text-[var(--fs-small)] font-medium text-foreground/70">{notif.title}</span>
+									<span class="truncate text-xs font-medium text-foreground/70">{notif.title}</span>
 									<Badge variant="outline" class="shrink-0 text-xs opacity-60">{config.label}</Badge>
 								</div>
-								<p class="mt-0.5 line-clamp-2 text-[var(--fs-caption)] leading-relaxed text-muted-foreground/60">
+								<p class="mt-0.5 line-clamp-2 text-caption leading-relaxed text-muted-foreground/60">
 									{notif.body}
 								</p>
 								<p class="mt-1 text-xs text-muted-foreground/40">{timeAgo(notif.created_at)}</p>
