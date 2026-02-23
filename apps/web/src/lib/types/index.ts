@@ -72,10 +72,47 @@ export type {
 	EntryRoute,
 	TriageConfidence,
 	TriageResult,
+	TrajectoryComplexity,
+	TriageBudget,
 	RahasiaLevel,
 	RahasiaConfig,
-	EmergencyType
+	EmergencyType,
+	TriageAttachment
 } from './triage';
+
+// LLM JSON contracts — Card Enrichment & Trajectory
+export type {
+	TrajectoryType,
+	Sentiment,
+	CardEnrichment,
+	EntityTagSuggestion,
+	SignalLabel,
+	SignalLabels
+} from './card-enrichment';
+
+// LLM JSON contracts — Operator Consultation Protocol (v0.2: 9 uniform operators)
+export type {
+	OperatorResponse,
+	OperatorPayload,
+	ChecklistItem,
+	MasalahPayload,
+	MusyawarahPayload,
+	PantauPayload,
+	CatatPayload,
+	BantuanPayload,
+	MatchedResource,
+	RayakanPayload,
+	SiagaPayload,
+	ProgramPayload,
+	RotationEntry,
+	KelolaPayload,
+	KelolaGroupDetail,
+	DecisionStep,
+	TimelineEvent,
+	// Legacy aliases (deprecated)
+	AksiPayload,
+	MufakatPayload
+} from './operator';
 
 // LLM JSON contracts — AI Trigger Modes
 export type { TriggerMode, TriggerEvent, AiTouchPoint } from './trigger';
@@ -86,11 +123,39 @@ export type {
 	WitnessMemberRole,
 	Witness,
 	WitnessDetail,
-	WitnessMember
+	WitnessMember,
+	WitnessCreateInput
 } from './witness';
 
 // Domain aggregates — User
 export type { UserProfile, UserStats, TandangSignals, OctalysisScores, ActivityItem } from './user';
+
+// Domain aggregates — Tandang (Full I/C/J model)
+export type {
+	TandangTierLevel,
+	TandangTierName,
+	TandangTier,
+	IntegrityScore,
+	CompetenceDomain,
+	CompetenceScore,
+	JudgmentScore,
+	TandangScores,
+	ConsistencyInfo,
+	GenesisInfo,
+	VouchType,
+	VouchRelation,
+	PersonRelation,
+	TandangAvatarPerson,
+	VouchBudget,
+	DukungRecord,
+	GrSkillDomain,
+	UserSkill,
+	WeatherType,
+	GdfWeather,
+	ImpactMetrics,
+	ActivityTimelineItem,
+	TandangProfile
+} from './tandang';
 
 // Domain aggregates — Notification
 export type { NotificationType, AppNotification } from './notification';
@@ -109,6 +174,8 @@ export type {
 	EntityTag,
 	FollowableEntity,
 	FeedWitnessItem,
+	FeedDataItem,
+	DataItemRecord,
 	FeedSystemItem,
 	FeedStreamItem,
 	SystemCardVariant,
@@ -124,9 +191,27 @@ export type {
 	FeedListRequest,
 	FeedListResponse,
 	AutoPantauTrigger,
-	UserMonitorRecord
+	UserMonitorRecord,
+	WitnessCloseReason,
+	SignalResolutionOutcome,
+	ContentSignalType,
+	ContentSignal
 } from './feed';
 export { shouldAutoMonitor } from './feed';
+
+// Domain aggregates — Groups (Kelompok / Lembaga)
+export type {
+	GroupJoinPolicy,
+	GroupMemberRole,
+	MembershipRequestStatus,
+	GroupEntityType,
+	GroupSummary,
+	GroupDetail,
+	GroupMember,
+	MembershipRequest,
+	GroupCreateInput,
+	GroupUpdateInput
+} from './group';
 
 // Domain aggregates — Community
 export type {
@@ -135,6 +220,15 @@ export type {
 	CommunitySignalSummary,
 	CommunityActivityItem
 } from './community';
+
+// Domain aggregates — Community Dashboard (Full page model)
+export type {
+	TierDistribution,
+	CommunityIcjSummary,
+	ActiveMemberHighlight,
+	SignalFlowDataPoint,
+	CommunityDashboard
+} from './komunitas';
 
 // ---------------------------------------------------------------------------
 // Navigation

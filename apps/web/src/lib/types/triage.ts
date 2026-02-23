@@ -10,6 +10,8 @@
 
 import type { TrackHint } from './blocks';
 import type { PathPlan, SeedHint } from './path-plan';
+import type { TrajectoryType, CardEnrichment } from './card-enrichment';
+import type { KelolaPayload } from './operator';
 
 // ---------------------------------------------------------------------------
 // Context Bar States
@@ -34,7 +36,7 @@ export type ContextBarState =
 // ---------------------------------------------------------------------------
 
 /** Entry route determined by triage. */
-export type EntryRoute = 'komunitas' | 'vault' | 'siaga';
+export type EntryRoute = 'komunitas' | 'vault' | 'siaga' | 'catatan_komunitas' | 'kelola';
 
 /** Confidence level for the AI classification. */
 export interface TriageConfidence {
@@ -59,8 +61,16 @@ export interface TriageResult {
 	seed_hint?: SeedHint;
 	/** Classification confidence. */
 	confidence?: TriageConfidence;
+	/** Canonical trajectory type — the new routing field. */
+	trajectory_type?: TrajectoryType;
+	/** AI-generated card enrichment (icon, title, hook_line, sentiment). */
+	card_enrichment?: CardEnrichment;
+	/** Token budget tracking — drives the "Sisa Energi AI" energy bar. */
+	budget?: TriageBudget;
 	/** Proposed path plan (when bar_state is 'ready'). */
 	proposed_plan?: PathPlan;
+	/** Kelola result — group creation/management data (when route is 'kelola'). */
+	kelola_result?: KelolaPayload;
 	/** Duplicate detection result (AI-03). */
 	duplicate?: {
 		/** Similarity percentage (e.g., 87). */
@@ -70,6 +80,36 @@ export interface TriageResult {
 		/** Title preview. */
 		similar_seed_title: string;
 	};
+}
+
+// ---------------------------------------------------------------------------
+// Triage Session Budget
+// ---------------------------------------------------------------------------
+
+/**
+ * Token budget tracking for a triage session.
+ * Instead of a flat turn limit, each session gets a token budget based on
+ * user tier × trajectory complexity. The AI adjusts depth dynamically.
+ *
+ * @see docs/design/specs/ai-spec/04a-ai-00-edge-contract.md §4.1
+ */
+export type TrajectoryComplexity = 'simple' | 'standard' | 'complex';
+
+export interface TriageBudget {
+	/** Total input tokens allocated for this session. */
+	total_tokens: number;
+	/** Tokens consumed so far. */
+	used_tokens: number;
+	/** Tokens remaining. */
+	remaining_tokens: number;
+	/** Percentage of budget used (0.0–1.0). */
+	budget_pct: number;
+	/** Whether the session can accept more messages. */
+	can_continue: boolean;
+	/** Current turn number (1-indexed). */
+	turn_count: number;
+	/** Hard turn cap (always 8). */
+	max_turns: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,3 +140,16 @@ export type EmergencyType =
 	| 'kecelakaan'
 	| 'keamanan'
 	| 'lainnya';
+
+// ---------------------------------------------------------------------------
+// Triage Attachments
+// ---------------------------------------------------------------------------
+
+/** A file selected during triage — not yet uploaded. */
+export interface TriageAttachment {
+	id: string;
+	file: File;
+	type: 'image' | 'video' | 'audio';
+	/** Local blob URL for preview (via URL.createObjectURL). */
+	preview_url: string;
+}

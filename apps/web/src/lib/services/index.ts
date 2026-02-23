@@ -2,15 +2,24 @@
  * Service factory — provides mock or real service implementations.
  *
  * Toggle USE_MOCK to false when the Rust Axum backend is ready.
- * The factory returns a ServiceProvider containing all 4 services.
+ * The factory returns a ServiceProvider containing all services.
  */
 
-import type { WitnessService, UserService, TriageService, NotificationService } from './types';
+import type {
+	WitnessService,
+	UserService,
+	TriageService,
+	NotificationService,
+	SignalService,
+	GroupService
+} from './types';
 import {
 	MockWitnessService,
 	MockUserService,
 	MockTriageService,
-	MockNotificationService
+	MockNotificationService,
+	MockSignalService,
+	MockGroupService
 } from './mock';
 
 // Re-export types for convenience
@@ -19,6 +28,8 @@ export type {
 	UserService,
 	TriageService,
 	NotificationService,
+	SignalService,
+	GroupService,
 	Paginated
 } from './types';
 
@@ -35,6 +46,8 @@ export interface ServiceProvider {
 	user: UserService;
 	triage: TriageService;
 	notification: NotificationService;
+	signal: SignalService;
+	group: GroupService;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +66,9 @@ export function createServices(): ServiceProvider {
 			witness: new MockWitnessService(),
 			user: new MockUserService(),
 			triage: new MockTriageService(),
-			notification: new MockNotificationService()
+			notification: new MockNotificationService(),
+			signal: new MockSignalService(),
+			group: new MockGroupService()
 		};
 	}
 

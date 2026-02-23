@@ -164,6 +164,11 @@ export class FeedStore {
 		}
 	}
 
+	/** Prepend a new witness feed item (e.g. after witness creation). */
+	prependWitnessItem(feedItem: FeedItem) {
+		this.items = [feedItem, ...this.items];
+	}
+
 	/** Set the active feed filter tab. */
 	setFilter(f: FeedFilter) {
 		this.filter = f;
@@ -204,6 +209,39 @@ export class FeedStore {
 				my_relation: merged,
 				// Only auto-set to true, never auto-remove
 				monitored: item.monitored || shouldMonitor
+			};
+		});
+	}
+
+	/**
+	 * Toggle "dukung" (support) state for a witness.
+	 * Optimistic toggle — outside the Tandang signal pipeline.
+	 * TODO: Replace with API call when backend is ready.
+	 */
+	toggleDukung(witnessId: string) {
+		this.items = this.items.map((item) => {
+			if (item.witness_id !== witnessId) return item;
+
+			const wasSupported = item.my_relation?.supported ?? false;
+			const currentCount = item.signal_counts?.dukung_count ?? 0;
+
+			return {
+				...item,
+				my_relation: {
+					...item.my_relation,
+					vouched: item.my_relation?.vouched ?? false,
+					witnessed: item.my_relation?.witnessed ?? false,
+					flagged: item.my_relation?.flagged ?? false,
+					supported: !wasSupported
+				},
+				signal_counts: item.signal_counts
+					? {
+							...item.signal_counts,
+							dukung_count: wasSupported
+								? Math.max(0, currentCount - 1)
+								: currentCount + 1
+						}
+					: undefined
 			};
 		});
 	}

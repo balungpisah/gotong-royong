@@ -2,18 +2,104 @@ import type { WitnessService, Paginated } from '../types';
 import type {
 	Witness,
 	WitnessDetail,
+	WitnessCreateInput,
+	WitnessCloseReason,
+	WitnessStatus,
 	ChatMessage,
 	PathPlan,
 	DiffResponse,
-	UserMessage
+	ContentSignal,
+	UserMessage,
+	SystemMessage
 } from '$lib/types';
 import { mockWitnesses, mockWitnessDetail, mockPathPlan } from '$lib/fixtures';
+import { MockSignalService } from './signal-service.mock';
 
 const delay = (ms: number = 200) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export class MockWitnessService implements WitnessService {
 	private witnesses = [...mockWitnesses];
 	private detail = { ...mockWitnessDetail, messages: [...mockWitnessDetail.messages] };
+
+	/** Optional reference to MockSignalService for resolution demo. */
+	private signalService?: MockSignalService;
+
+	/** Inject MockSignalService for closeWitness resolution demo. */
+	setSignalService(signalService: MockSignalService): void {
+		this.signalService = signalService;
+	}
+
+	async create(input: WitnessCreateInput): Promise<WitnessDetail> {
+		await delay(400);
+		const now = new Date().toISOString();
+		const witnessId = `w-${Date.now()}`;
+
+		// Convert triage messages to ChatMessage[]
+		const messages: ChatMessage[] = input.triage_messages.map((msg, i) => {
+			if (msg.role === 'user') {
+				return {
+					message_id: `msg-${witnessId}-${i}`,
+					timestamp: now,
+					witness_id: witnessId,
+					type: 'user' as const,
+					author: {
+						user_id: 'u-001',
+						name: 'Ahmad Hidayat',
+						tier: 2,
+						role: 'pelapor'
+					},
+					is_self: true,
+					content: msg.text
+				} satisfies UserMessage;
+			}
+			return {
+				message_id: `msg-${witnessId}-${i}`,
+				timestamp: now,
+				witness_id: witnessId,
+				type: 'system' as const,
+				subtype: 'plan_updated' as const,
+				content: msg.text
+			} satisfies SystemMessage;
+		});
+
+		const witness: Witness = {
+			witness_id: witnessId,
+			title: input.title,
+			summary: input.summary,
+			track_hint: input.track_hint,
+			seed_hint: input.seed_hint,
+			status: 'open',
+			rahasia_level: input.rahasia_level,
+			created_at: now,
+			updated_at: now,
+			created_by: 'u-001',
+			member_count: 1,
+			message_count: messages.length,
+			unread_count: 0
+		};
+
+		const detail: WitnessDetail = {
+			...witness,
+			messages,
+			plan: input.proposed_plan ?? null,
+			blocks: [],
+			members: [
+				{
+					user_id: 'u-001',
+					name: 'Ahmad Hidayat',
+					role: 'pelapor',
+					tier: 2,
+					joined_at: now
+				}
+			],
+			triage: input.triage_result
+		};
+
+		// Prepend to internal list
+		this.witnesses = [witness, ...this.witnesses];
+
+		return detail;
+	}
 
 	async list(opts?: {
 		status?: string;
@@ -51,9 +137,16 @@ export class MockWitnessService implements WitnessService {
 	async sendMessage(
 		witnessId: string,
 		content: string,
-		_attachments?: File[]
+		attachments?: File[]
 	): Promise<ChatMessage> {
 		await delay(300);
+		const messageAttachments = attachments?.map(f => ({
+			type: (f.type.startsWith('image/') ? 'image'
+				: f.type.startsWith('video/') ? 'video'
+				: 'audio') as 'image' | 'video' | 'audio',
+			url: URL.createObjectURL(f),
+			alt: f.name
+		}));
 		const newMessage: UserMessage = {
 			message_id: `msg-${Date.now()}`,
 			timestamp: new Date().toISOString(),
@@ -66,7 +159,8 @@ export class MockWitnessService implements WitnessService {
 				role: 'pelapor'
 			},
 			is_self: true,
-			content
+			content,
+			attachments: messageAttachments?.length ? messageAttachments : undefined
 		};
 		this.detail.messages = [...this.detail.messages, newMessage];
 		return newMessage;
@@ -85,5 +179,45 @@ export class MockWitnessService implements WitnessService {
 	async castVote(witnessId: string, voteId: string, optionId: string): Promise<void> {
 		await delay();
 		console.log('[MockWitnessService] castVote:', { witnessId, voteId, optionId });
+	}
+
+	/**
+	 * Close a witness with a reason — demo flow for signal resolution.
+	 * Updates witness status and triggers signal resolution via MockSignalService.
+	 */
+	async closeWitness(
+		witnessId: string,
+		closeReason: WitnessCloseReason
+	): Promise<{ status: WitnessStatus; close_reason: WitnessCloseReason; resolved_signals: ContentSignal[] }> {
+		await delay(300);
+
+		const terminalStatus: WitnessStatus = closeReason === 'selesai' ? 'resolved' : 'closed';
+
+		// Update internal witness list
+		this.witnesses = this.witnesses.map((w) =>
+			w.witness_id === witnessId
+				? { ...w, status: terminalStatus, close_reason: closeReason, updated_at: new Date().toISOString() }
+				: w
+		);
+
+		// Update detail if it matches
+		if (this.detail.witness_id === witnessId) {
+			this.detail = {
+				...this.detail,
+				status: terminalStatus,
+				close_reason: closeReason,
+				updated_at: new Date().toISOString()
+			};
+		}
+
+		// Trigger signal resolution if signal service is wired
+		let resolved_signals: ContentSignal[] = [];
+		if (this.signalService) {
+			resolved_signals = await this.signalService.simulateResolution(witnessId, closeReason);
+		}
+
+		console.log('[MockWitnessService] closeWitness:', { witnessId, closeReason, terminalStatus, resolved_signals });
+
+		return { status: terminalStatus, close_reason: closeReason, resolved_signals };
 	}
 }

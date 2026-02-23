@@ -62,7 +62,7 @@ export interface UserMessage extends ChatMessageBase {
 	content: string;
 	/** Optional media attachments (max 5 per spec). */
 	attachments?: {
-		type: 'image' | 'video';
+		type: 'image' | 'video' | 'audio';
 		url: string;
 		alt?: string;
 	}[];

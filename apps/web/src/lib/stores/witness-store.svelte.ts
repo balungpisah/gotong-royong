@@ -6,7 +6,7 @@
  */
 
 import type { WitnessService } from '$lib/services/types';
-import type { Witness, WitnessDetail, WitnessStatus, DiffResponse } from '$lib/types';
+import type { Witness, WitnessDetail, WitnessStatus, WitnessCreateInput, DiffResponse } from '$lib/types';
 
 export class WitnessStore {
 	// ---------------------------------------------------------------------------
@@ -16,6 +16,13 @@ export class WitnessStore {
 	witnesses = $state<Witness[]>([]);
 	listLoading = $state(false);
 	listError = $state<string | null>(null);
+
+	// ---------------------------------------------------------------------------
+	// Create state
+	// ---------------------------------------------------------------------------
+
+	creating = $state(false);
+	createError = $state<string | null>(null);
 
 	// ---------------------------------------------------------------------------
 	// Detail state
@@ -48,6 +55,25 @@ export class WitnessStore {
 	// Actions
 	// ---------------------------------------------------------------------------
 
+	async createWitness(input: WitnessCreateInput): Promise<string | null> {
+		this.creating = true;
+		this.createError = null;
+		try {
+			const detail = await this.service.create(input);
+			// Prepend summary to list
+			const { messages, plan, blocks, members, triage, ...summary } = detail;
+			this.witnesses = [summary, ...this.witnesses];
+			// Set as current detail
+			this.current = detail;
+			return detail.witness_id;
+		} catch (err) {
+			this.createError = err instanceof Error ? err.message : 'Gagal membuat saksi';
+			return null;
+		} finally {
+			this.creating = false;
+		}
+	}
+
 	async loadList(opts?: { status?: WitnessStatus }) {
 		this.listLoading = true;
 		this.listError = null;
@@ -73,10 +99,10 @@ export class WitnessStore {
 		}
 	}
 
-	async sendMessage(content: string) {
+	async sendMessage(content: string, attachments?: File[]) {
 		if (!this.current) return;
 		try {
-			const message = await this.service.sendMessage(this.current.witness_id, content);
+			const message = await this.service.sendMessage(this.current.witness_id, content, attachments);
 			this.current = {
 				...this.current,
 				messages: [...this.current.messages, message],

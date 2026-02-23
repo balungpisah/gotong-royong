@@ -10,13 +10,15 @@ import type {
 	CommunityStats,
 	ParticipationDataPoint,
 	CommunitySignalSummary,
-	CommunityActivityItem
+	CommunityActivityItem,
+	CommunityDashboard
 } from '$lib/types';
 import {
 	mockCommunityStats,
 	mockParticipation,
 	mockCommunitySignals,
-	mockCommunityActivity
+	mockCommunityActivity,
+	mockCommunityDashboard
 } from '$lib/fixtures';
 
 export class CommunityStore {
@@ -31,15 +33,22 @@ export class CommunityStore {
 	loading = $state(false);
 	error = $state<string | null>(null);
 
+	// Full community dashboard (for Komunitas page)
+	dashboard = $state<CommunityDashboard | null>(null);
+	dashboardLoading = $state(false);
+	dashboardError = $state<string | null>(null);
+
 	// ---------------------------------------------------------------------------
 	// Derived
 	// ---------------------------------------------------------------------------
 
 	hasData = $derived(this.stats !== null);
+	hasDashboard = $derived(this.dashboard !== null);
+	weather = $derived(this.dashboard?.weather ?? null);
 	signalTotal = $derived(
 		this.signals
 			? this.signals.vouch + this.signals.skeptis + this.signals.proof_of_resolve +
-				this.signals.bagus + this.signals.perlu_dicek
+				this.signals.dukung + this.signals.perlu_dicek
 			: 0
 	);
 
@@ -71,5 +80,22 @@ export class CommunityStore {
 	/** Reload community data. */
 	async refresh() {
 		await this.loadCommunityData();
+	}
+
+	/**
+	 * Load full community dashboard data. Currently returns mock data.
+	 * TODO: Replace with CommunityService when backend is ready.
+	 */
+	async loadDashboard() {
+		this.dashboardLoading = true;
+		this.dashboardError = null;
+		try {
+			await new Promise((resolve) => setTimeout(resolve, 300));
+			this.dashboard = { ...mockCommunityDashboard };
+		} catch (err) {
+			this.dashboardError = err instanceof Error ? err.message : 'Gagal memuat dashboard komunitas';
+		} finally {
+			this.dashboardLoading = false;
+		}
 	}
 }

@@ -46,12 +46,12 @@ export class TriageStore {
 	// Actions
 	// ---------------------------------------------------------------------------
 
-	async startTriage(content: string) {
+	async startTriage(content: string, attachments?: File[]) {
 		this.loading = true;
 		this.error = null;
 		this.sessionId = `triage-${Date.now()}`;
 		try {
-			this.result = await this.service.startTriage(content);
+			this.result = await this.service.startTriage(content, attachments);
 		} catch (err) {
 			this.error = err instanceof Error ? err.message : 'Gagal memulai triase';
 		} finally {
@@ -59,12 +59,12 @@ export class TriageStore {
 		}
 	}
 
-	async updateTriage(answer: string) {
+	async updateTriage(answer: string, attachments?: File[]) {
 		if (!this.sessionId) return;
 		this.loading = true;
 		this.error = null;
 		try {
-			this.result = await this.service.updateTriage(this.sessionId, answer);
+			this.result = await this.service.updateTriage(this.sessionId, answer, attachments);
 		} catch (err) {
 			this.error = err instanceof Error ? err.message : 'Gagal memperbarui triase';
 		} finally {

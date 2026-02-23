@@ -45,7 +45,7 @@ export const mockCommunitySignals: CommunitySignalSummary = {
 	vouch: 45,
 	skeptis: 12,
 	proof_of_resolve: 38,
-	bagus: 42,
+	dukung: 42,
 	perlu_dicek: 19
 };
 

@@ -40,7 +40,7 @@ export const mockUser1: UserProfile = {
 	},
 	tandang_signals: {
 		vouch: 18,
-		bagus: 14,
+		dukung: 14,
 		proof_of_resolve: 7,
 		skeptis: 2
 	},
@@ -75,7 +75,7 @@ export const mockUser2: UserProfile = {
 	},
 	tandang_signals: {
 		vouch: 34,
-		bagus: 28,
+		dukung: 28,
 		proof_of_resolve: 15,
 		skeptis: 4
 	},
@@ -110,7 +110,7 @@ export const mockUser3: UserProfile = {
 	},
 	tandang_signals: {
 		vouch: 6,
-		bagus: 4,
+		dukung: 4,
 		proof_of_resolve: 2,
 		skeptis: 1
 	},
@@ -145,7 +145,7 @@ export const mockUser4: UserProfile = {
 	},
 	tandang_signals: {
 		vouch: 56,
-		bagus: 48,
+		dukung: 48,
 		proof_of_resolve: 25,
 		skeptis: 6
 	},
@@ -180,7 +180,7 @@ export const mockUser5: UserProfile = {
 	},
 	tandang_signals: {
 		vouch: 1,
-		bagus: 0,
+		dukung: 0,
 		proof_of_resolve: 0,
 		skeptis: 0
 	},

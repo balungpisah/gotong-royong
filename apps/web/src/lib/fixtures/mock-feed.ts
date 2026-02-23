@@ -1,7 +1,7 @@
 /**
  * Mock feed fixtures for the Pulse event-based feed.
- * 10 feed items covering all event types, urgency badges, sources, and reposts,
- * plus followable entity suggestions for onboarding.
+ * 10 feed items covering all 10 trajectory types + varied event types,
+ * urgency badges, sources, reposts, and visual treatments.
  */
 
 import type {
@@ -13,7 +13,8 @@ import type {
 	RepostFrame,
 	SystemCardData,
 	MyRelation,
-	SignalCounts
+	SignalCounts,
+	SignalLabels
 } from '$lib/types';
 
 // ---------------------------------------------------------------------------
@@ -27,6 +28,10 @@ const ts = (minutesAgo: number): string => new Date(now - minutesAgo * 60 * 1000
 
 /** Returns an ISO timestamp N days in the past. */
 const tsDay = (daysAgo: number): string => ts(daysAgo * 24 * 60);
+
+/** Returns an ISO timestamp N minutes in the FUTURE. */
+const tsFuture = (minutesAhead: number): string =>
+	new Date(now + minutesAhead * 60 * 1000).toISOString();
 
 // ---------------------------------------------------------------------------
 // Reusable member previews
@@ -118,19 +123,36 @@ const entitySembako: EntityTag = {
 	followed: false
 };
 
+const entityKeamanan: EntityTag = {
+	entity_id: 'ent-008',
+	entity_type: 'topik',
+	label: 'Keamanan',
+	followed: false
+};
+
+const entityHukum: EntityTag = {
+	entity_id: 'ent-009',
+	entity_type: 'topik',
+	label: 'Bantuan Hukum',
+	followed: false
+};
+
+const entityBencana: EntityTag = {
+	entity_id: 'ent-010',
+	entity_type: 'topik',
+	label: 'Kesiagaan Bencana',
+	followed: true
+};
+
 // ---------------------------------------------------------------------------
-// Individual feed items
+// 1. AKSI — Jalan Berlubang (created, photo+body, angry)
 // ---------------------------------------------------------------------------
 
-/** Returns an ISO timestamp N minutes in the FUTURE. */
-const tsFuture = (minutesAhead: number): string =>
-	new Date(now + minutesAhead * 60 * 1000).toISOString();
-
-/** 1. Created — PHOTO + LONG BODY — angry, with evidence photo */
 export const mockFeedItem1: FeedItem = {
 	witness_id: 'witness-feed-001',
-	title: 'Lampu Jalan Mati di Gang Melati',
-	track_hint: 'tuntaskan',
+	title: 'Jalan Berlubang Jl. Mawar, 30 KK Terdampak',
+	trajectory_type: 'aksi',
+	icon: 'construction',
 	status: 'open',
 	rahasia_level: 'L0',
 	latest_event: {
@@ -140,7 +162,7 @@ export const mockFeedItem1: FeedItem = {
 		actor_role: 'pelapor',
 		timestamp: ts(25),
 		verb: 'melaporkan masalah baru',
-		snippet: 'Sudah 2 minggu lampu jalan di Gang Melati padam total. Warga merasa tidak aman saat malam.'
+		snippet: 'Jalan rusak parah di Jl. Mawar selama 3 bulan tanpa perbaikan. Motor sering jatuh.'
 	},
 	collapsed_count: 0,
 	member_count: 1,
@@ -148,477 +170,523 @@ export const mockFeedItem1: FeedItem = {
 	entity_tags: [entityRT05, entityInfrastruktur],
 	urgency: 'baru',
 	source: 'ikutan',
-	hook_line: 'Sudah 2 minggu, gelap total.',
+	hook_line: '3 bulan tanpa respons — warga turun tangan sendiri.',
 	sentiment: 'angry',
 	intensity: 4,
-	cover_url: 'https://images.unsplash.com/photo-1504472478235-9bc48ba4d60f?w=600&h=400&fit=crop',
-	body: 'Warga Gang Melati mengeluh lampu jalan padam total sejak dua minggu lalu. Ibu-ibu takut pulang malam dari pasar. Pak Ahmad sudah lapor ke kelurahan tapi belum ada respon. "Anak saya harus lewat gang gelap setiap pulang les," katanya.',
+	cover_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&h=400&fit=crop',
+	body: 'Warga Jl. Mawar melaporkan jalan rusak parah selama 3 bulan tanpa tindakan dari RT. Sekitar 30 KK terdampak, termasuk motor yang sering jatuh. Warga siap gotong royong perbaiki sendiri jika ada dana.',
 	active_now: 3,
-	// Auto-pantau: user is saksi (witnessed: true)
 	monitored: true,
-	// Tandang signals: user witnessed this problem, 2 vouches, 1 skeptic
 	my_relation: {
 		vouched: false,
 		witnessed: true,
 		flagged: false,
-		quality_voted: false
+		supported: false
 	},
 	signal_counts: {
 		vouch_positive: 2,
 		vouch_skeptical: 1,
 		witness_count: 5,
-		quality_avg: 0,
-		quality_votes: 0,
+		dukung_count: 0,
 		flags: 0
 	},
+	signal_labels: {
+		saksi: { label: 'Saya Saksi', desc: 'Kamu melihat atau mengalami sendiri' },
+		perlu_dicek: { label: 'Perlu Dicek', desc: 'Informasi perlu diverifikasi kebenarannya' }
+	},
 	peek_messages: [
-		{ author: 'Sari', text: 'Sudah foto buktinya tadi pagi, gelap banget. Saya kirim ke grup RT tapi belum ada yang respon sampai sekarang.' },
-		{ author: 'Ahmad', text: 'Saya coba hubungi kelurahan lagi besok pagi. Kemarin Pak Lurah bilang anggaran penerangan habis, tapi saya mau coba minta alokasi darurat karena ini sudah dua minggu lebih.' },
-		{ author: 'Budi', text: 'Gang sebelah juga mati, mungkin satu trafo.' },
-		{ author: 'Dewi', text: 'Ibu-ibu pengajian sudah kumpul tanda tangan 47 orang yang terdampak. Mau kita serahkan ke kelurahan bareng?' }
+		{ author: 'Ahmad', text: 'Sudah lapor ke RT tapi belum ada tindakan sama sekali. Motor anak saya jatuh minggu lalu gara-gara lubang ini.' },
+		{ author: 'Sari', text: 'Saya foto buktinya tadi pagi. Lubangnya makin lebar setelah hujan kemarin.' },
+		{ author: 'Budi', text: 'Gang sebelah juga rusak, mungkin satu area yang perlu diperbaiki sekaligus.' }
 	]
 };
 
-/** 2. Joined — BARE CARD — short, punchy, no photo no body */
+// ---------------------------------------------------------------------------
+// 2. MUFAKAT — Taman Bermain (vote_opened, bare card, curious)
+// ---------------------------------------------------------------------------
+
 export const mockFeedItem2: FeedItem = {
 	witness_id: 'witness-feed-002',
-	title: 'Jalan Rusak Jl. Mawar RT 05',
-	track_hint: 'tuntaskan',
+	title: 'Usulan Taman Bermain Anak di Lahan Kosong RT 03',
+	trajectory_type: 'mufakat',
+	icon: 'users',
 	status: 'active',
 	rahasia_level: 'L0',
 	latest_event: {
 		event_id: 'evt-002',
-		event_type: 'joined',
-		actor_name: 'Dewi Lestari',
-		actor_avatar: 'https://placehold.co/40x40/6A1B9A/white?text=DL',
-		actor_role: 'relawan',
-		timestamp: ts(45),
-		verb: 'bergabung sebagai Relawan'
+		event_type: 'vote_opened',
+		actor_name: 'Sistem',
+		timestamp: ts(60),
+		verb: 'membuka voting',
+		snippet: 'Setuju lahan kosong dipakai untuk taman bermain anak? Sisa 3 hari.'
 	},
-	collapsed_count: 5,
-	member_count: 12,
-	members_preview: [memberAhmad, memberSari, memberBudi, memberRina, memberDewi],
-	entity_tags: [entityRT05, entityInfrastruktur],
-	source: 'terlibat',
-	hook_line: '12 orang turun tangan.',
-	sentiment: 'hopeful',
+	collapsed_count: 3,
+	member_count: 25,
+	members_preview: [memberRina, memberSari, memberAhmad, memberBudi],
+	entity_tags: [entityRW03, entityKarangTaruna],
+	urgency: 'voting',
+	source: 'ikutan',
+	hook_line: 'Lahan kosong jadi taman bermain — setuju?',
+	sentiment: 'curious',
 	intensity: 3,
-	active_now: 5,
-	// Auto-pantau: user vouched (positive)
+	active_now: 8,
 	monitored: true,
-	// Tandang signals: user vouched positive, many vouches, good quality
 	my_relation: {
 		vouched: true,
 		vouch_type: 'positive',
 		witnessed: false,
 		flagged: false,
-		quality_voted: true
+		supported: true,
+		vote_cast: 'yes'
 	},
 	signal_counts: {
-		vouch_positive: 8,
-		vouch_skeptical: 0,
-		witness_count: 3,
-		quality_avg: 4.2,
-		quality_votes: 6,
+		vouch_positive: 12,
+		vouch_skeptical: 3,
+		witness_count: 0,
+		dukung_count: 8,
 		flags: 0
 	},
+	signal_labels: {
+		saksi: { label: 'Hadir', desc: 'Kamu hadir atau mengikuti musyawarah ini' },
+		perlu_dicek: { label: 'Perlu Revisi', desc: 'Usulan perlu direvisi sebelum disetujui' }
+	},
+	deadline: tsFuture(72 * 60),
+	deadline_label: 'Voting ditutup',
+	quorum_target: 40,
+	quorum_current: 25,
 	peek_messages: [
-		{ author: 'Dewi', text: 'Saya bisa bantu survei akhir pekan ini kalau cuaca bagus, tapi kalau hujan mungkin kita tunda ke minggu depan saja ya?' },
-		{ author: 'Rina', text: 'Pak RT sudah setuju koordinasi. Beliau minta kita siapkan proposal sederhana dulu sebelum turun ke lapangan biar ada dokumentasinya.' },
-		{ author: 'Ahmad', text: 'Siapa yang punya cangkul? Kita butuh minimal 3 buat kerja bakti Sabtu.' },
-		{ author: 'Sari', text: 'Saya bawa dari rumah.' },
-		{ author: 'Budi', text: 'Kemarin saya lewat situ, lubangnya makin dalam. Motor saya hampir masuk. Tolong cepat ya sebelum ada korban.' }
+		{ author: 'Rina', text: 'Anak-anak SD butuh banget tempat main. Selama ini mereka main di jalan, bahaya.' },
+		{ author: 'Ahmad', text: 'Kalau jadi taman, siapa yang rawat? Perlu rencana pemeliharaan yang jelas.' },
+		{ author: 'Dewi', text: 'Saya usul ada area kebun kecil juga supaya anak-anak belajar menanam.' }
 	]
 };
 
-/** 3. Checkpoint — BODY ONLY — longer story, no photo */
+// ---------------------------------------------------------------------------
+// 3. PANTAU — Dana Desa (checkpoint, body only, curious)
+// ---------------------------------------------------------------------------
+
 export const mockFeedItem3: FeedItem = {
 	witness_id: 'witness-feed-003',
-	title: 'Pembangunan Taman Warga RW 03',
-	track_hint: 'wujudkan',
+	title: 'Pemantauan Dana Desa Tahap II — Rp 120 Juta',
+	trajectory_type: 'pantau',
+	icon: 'eye',
 	status: 'active',
 	rahasia_level: 'L0',
 	latest_event: {
 		event_id: 'evt-003',
 		event_type: 'checkpoint',
-		actor_name: 'Rina Kartika',
-		actor_avatar: 'https://placehold.co/40x40/C05621/white?text=RK',
-		actor_role: 'koordinator',
-		timestamp: ts(90),
+		actor_name: 'Budi Santoso',
+		actor_role: 'saksi',
+		timestamp: ts(120),
 		verb: 'menyelesaikan langkah',
-		snippet: 'Survei lokasi selesai — lahan di Jl. Kenari cocok untuk taman bermain anak.'
+		snippet: 'Progress fisik baru 30% padahal dana sudah cair 2 bulan lalu.'
 	},
 	collapsed_count: 8,
-	member_count: 15,
-	members_preview: [memberRina, memberSari, memberAhmad, memberBudi],
-	entity_tags: [entityRW03, entityKarangTaruna],
+	member_count: 7,
+	members_preview: [memberBudi, memberAhmad, memberDewi],
+	entity_tags: [entityRT05, entityInfrastruktur],
 	source: 'terlibat',
-	hook_line: 'Lahan di Jl. Kenari cocok — survei selesai.',
-	sentiment: 'hopeful',
+	hook_line: 'Dana cair Rp 120 juta tapi progress baru 30%.',
+	sentiment: 'curious',
 	intensity: 3,
-	body: 'Setelah 3 bulan negosiasi dengan pemilik lahan, akhirnya disepakati pinjam pakai selama 5 tahun. Tim survei Karang Taruna turun langsung mengukur dan memetakan. Rencananya ada area bermain anak, bangku lansia, dan kebun kecil yang dikelola bersama. Bu Rina bilang, "Ini mimpi warga sejak 2019."',
+	body: 'Pemantauan realisasi Dana Desa tahap II sebesar Rp 120 juta untuk perbaikan jalan RT 05-07. Dana sudah cair sejak 2 bulan lalu tapi progress fisik baru 30%. Warga meminta transparansi laporan penggunaan dana.',
 	active_now: 2,
-	// Tandang signals: user hasn't interacted, moderate community signals
+	monitored: true,
 	my_relation: {
 		vouched: false,
 		witnessed: false,
 		flagged: false,
-		quality_voted: false
+		supported: false
 	},
 	signal_counts: {
 		vouch_positive: 5,
-		vouch_skeptical: 2,
-		witness_count: 7,
-		quality_avg: 3.8,
-		quality_votes: 4,
-		flags: 0
+		vouch_skeptical: 4,
+		witness_count: 3,
+		dukung_count: 2,
+		flags: 1
+	},
+	signal_labels: {
+		saksi: { label: 'Saya Pantau', desc: 'Kamu ikut memantau penggunaan dana desa' },
+		perlu_dicek: { label: 'Perlu Audit', desc: 'Penggunaan dana perlu diaudit lebih lanjut' }
 	},
 	peek_messages: [
-		{ author: 'Rina', text: 'Ukuran lahan 12x20 meter, cukup luas! Kita bisa bagi jadi 3 zona: bermain anak, bangku lansia, dan kebun komunitas.' },
-		{ author: 'Budi', text: 'Kalau ada kebun kecil, saya siap rawat setiap pagi sebelum kerja. Sudah pengalaman nanam sayur di belakang rumah.' },
-		{ author: 'Sari', text: 'Anak-anak SD sini butuh banget tempat main. Selama ini mereka main di jalan, bahaya.' }
+		{ author: 'Budi', text: 'Saya cek langsung ke lokasi. Material yang terpasang tidak sesuai spesifikasi RAB.' },
+		{ author: 'Ahmad', text: 'Kita minta laporan resmi dari kepala desa. Harus ada pertanggungjawaban.' },
+		{ author: 'Dewi', text: 'Saya bisa bantu dokumentasi foto setiap minggu supaya ada bukti progress.' }
 	]
 };
 
-/** 4. Vote opened — BARE CARD — no photo, no body, just the vote hook */
+// ---------------------------------------------------------------------------
+// 4. DATA — Harga Cabai (community_note, bare card, curious)
+// ---------------------------------------------------------------------------
+
 export const mockFeedItem4: FeedItem = {
 	witness_id: 'witness-feed-004',
-	title: 'Musyawarah Anggaran RT 05 2025',
-	track_hint: 'musyawarah',
-	status: 'active',
+	title: 'Harga Cabai Rawit di Pasar Minggu — Rp 85.000/kg',
+	trajectory_type: 'data',
+	icon: 'file-text',
+	status: 'open',
 	rahasia_level: 'L0',
 	latest_event: {
 		event_id: 'evt-004',
-		event_type: 'vote_opened',
-		actor_name: 'Sistem',
-		timestamp: ts(120),
-		verb: 'membuka voting',
-		snippet: 'Setuju anggaran naik 15% untuk perbaikan fasilitas? Sisa 2 hari.'
+		event_type: 'community_note',
+		actor_name: 'Sari Dewi',
+		actor_avatar: 'https://placehold.co/40x40/2E7D32/white?text=SD',
+		actor_role: 'relawan',
+		timestamp: ts(180),
+		verb: 'mencatat data komunitas',
+		snippet: 'Harga cabai rawit naik 40% dari minggu lalu — Rp 85.000/kg.'
 	},
-	collapsed_count: 3,
-	member_count: 25,
-	members_preview: [memberAhmad, memberRina, memberBudi, memberSari],
-	entity_tags: [entityRT05],
-	urgency: 'voting',
-	source: 'ikutan',
-	hook_line: 'Anggaran naik 15% — setuju atau tidak?',
+	collapsed_count: 1,
+	member_count: 3,
+	members_preview: [memberSari, memberAhmad],
+	entity_tags: [entitySembako],
+	source: 'sekitar',
+	hook_line: 'Cabai rawit Rp 85.000/kg — naik 40% dalam seminggu.',
 	sentiment: 'curious',
-	intensity: 4,
-	active_now: 8,
-	// Auto-pantau: user vouched + voted
-	monitored: true,
-	// Tandang signals: user voted yes, high community engagement
-	my_relation: {
-		vouched: true,
-		vouch_type: 'positive',
-		witnessed: false,
-		flagged: false,
-		quality_voted: true,
-		vote_cast: 'yes'
-	},
+	intensity: 2,
 	signal_counts: {
-		vouch_positive: 15,
-		vouch_skeptical: 3,
-		witness_count: 0,
-		quality_avg: 4.5,
-		quality_votes: 12,
-		flags: 1
+		vouch_positive: 2,
+		vouch_skeptical: 0,
+		witness_count: 3,
+		dukung_count: 0,
+		flags: 0
 	},
-	deadline: tsFuture(47 * 60),       // ~47 hours from now (under 2 days)
-	deadline_label: 'Voting ditutup',
-	quorum_target: 40,
-	quorum_current: 25,
+	signal_labels: {
+		saksi: { label: 'Konfirmasi', desc: 'Kamu konfirmasi kenaikan harga di pasar' },
+		perlu_dicek: { label: 'Perlu Koreksi', desc: 'Harga yang dilaporkan perlu dicek ulang' }
+	},
 	peek_messages: [
-		{ author: 'Ahmad', text: 'Kenaikan 15% itu untuk apa saja? Minta rinciannya dong, jangan cuma angka total.' },
-		{ author: 'Rina', text: 'Perbaikan got dan penerangan gang. Detailnya ada di dokumen yang Pak Sekretaris upload kemarin.' },
-		{ author: 'Dewi', text: 'Saya setuju selama transparan. Tahun lalu iuran naik tapi laporannya tidak jelas, jadi kali ini saya minta ada laporan bulanan yang bisa dilihat semua warga.' }
+		{ author: 'Sari', text: 'Di Pasar Minggu tadi pagi Rp 85.000. Ada yang bisa cek pasar lain?' },
+		{ author: 'Ahmad', text: 'Pasar Tebet juga naik, tapi cuma Rp 75.000. Mungkin beda kualitas.' }
 	]
 };
 
-/** 5. Evidence — PHOTO + BODY — damning river pollution evidence */
+// ---------------------------------------------------------------------------
+// 5. BANTUAN — Bantuan Hukum (created, body only, sad)
+// ---------------------------------------------------------------------------
+
 export const mockFeedItem5: FeedItem = {
 	witness_id: 'witness-feed-005',
-	title: 'Penyelidikan Limbah Pabrik Sungai Ciliwung',
-	track_hint: 'telusuri',
-	status: 'active',
-	rahasia_level: 'L1',
+	title: 'Butuh Bantuan Hukum — Sengketa Tanah Warisan',
+	trajectory_type: 'bantuan',
+	icon: 'heart',
+	status: 'open',
+	rahasia_level: 'L0',
 	latest_event: {
 		event_id: 'evt-005',
-		event_type: 'evidence',
-		actor_name: 'Budi Santoso',
-		actor_role: 'saksi',
-		timestamp: ts(180),
-		verb: 'menambah bukti',
-		snippet: 'Foto sampel air sungai menunjukkan perubahan warna signifikan di titik pembuangan.'
+		event_type: 'created',
+		actor_name: 'Rina Kartika',
+		actor_avatar: 'https://placehold.co/40x40/C05621/white?text=RK',
+		actor_role: 'pelapor',
+		timestamp: ts(240),
+		verb: 'meminta bantuan warga',
+		snippet: 'Butuh pendamping hukum pro-bono untuk sengketa tanah warisan yang sudah berjalan 6 bulan.'
 	},
-	collapsed_count: 12,
-	member_count: 7,
-	members_preview: [memberBudi, memberAhmad, memberDewi],
-	entity_tags: [entityLingkungan],
-	source: 'terlibat',
-	hook_line: 'Air sungai berubah warna di titik buangan.',
-	sentiment: 'angry',
-	intensity: 5,
-	cover_url: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600&h=400&fit=crop',
-	body: 'Pak Budi mengambil sampel air di tiga titik berbeda sepanjang sungai. Di dekat pipa pembuangan pabrik, air berubah kecoklatan dengan bau menyengat. Warga nelayan hilir melaporkan ikan mati mengambang sejak bulan lalu. Data ini sudah dikirim ke Dinas Lingkungan Hidup.',
-	active_now: 4,
-	// Auto-pantau: user vouched (skeptical)
-	monitored: true,
-	// Tandang signals: user is skeptical, contentious evidence with flags
-	my_relation: {
-		vouched: true,
-		vouch_type: 'skeptical',
-		witnessed: false,
-		flagged: false,
-		quality_voted: true
-	},
+	collapsed_count: 0,
+	member_count: 1,
+	members_preview: [memberRina],
+	entity_tags: [entityHukum, entityRW03],
+	urgency: 'baru',
+	source: 'sekitar',
+	hook_line: 'Hak waris terancam — butuh pendamping hukum pro-bono.',
+	sentiment: 'sad',
+	intensity: 3,
+	body: 'Seorang warga membutuhkan bantuan hukum pro-bono untuk menyelesaikan sengketa tanah warisan keluarga. Kasus sudah berjalan 6 bulan tanpa kemajuan. Tidak mampu bayar pengacara tapi hak waris terancam hilang.',
 	signal_counts: {
-		vouch_positive: 3,
-		vouch_skeptical: 4,
-		witness_count: 2,
-		quality_avg: 3.1,
-		quality_votes: 8,
-		flags: 3
+		vouch_positive: 1,
+		vouch_skeptical: 0,
+		witness_count: 0,
+		dukung_count: 0,
+		flags: 0
+	},
+	signal_labels: {
+		saksi: { label: 'Bisa Bantu', desc: 'Kamu memiliki keahlian hukum yang relevan' },
+		perlu_dicek: { label: 'Perlu Verifikasi', desc: 'Detail kasus perlu diverifikasi lebih lanjut' }
 	},
 	peek_messages: [
-		{ author: 'Budi', text: 'Sampel ketiga paling parah, baunya menyengat sampai 50 meter dari sungai. Warga sekitar sudah mulai pakai masker kalau lewat situ.' },
-		{ author: 'Ahmad', text: 'Nelayan hilir bilang ikan mati mengambang sejak bulan lalu. Pendapatan mereka turun drastis, ada yang sudah pindah profesi.' },
-		{ author: 'Dewi', text: 'Sudah kirim ke Dinas LH, tunggu respons.' },
-		{ author: 'Rina', text: 'Saya punya kontak wartawan Kompas regional. Mau saya hubungi? Kalau masuk media biasanya pemerintah lebih cepat bergerak.' }
+		{ author: 'Rina', text: 'Sudah 6 bulan tanpa kemajuan. Kalau ada yang kenal pengacara atau LBH, tolong bantu hubungkan.' }
 	]
 };
 
-/** 6. Resolved — PHOTO ONLY — celebratory community moment, no body */
+// ---------------------------------------------------------------------------
+// 6. PENCAPAIAN — Jalan Diperbaiki (resolved, photo+body, celebratory)
+// ---------------------------------------------------------------------------
+
 export const mockFeedItem6: FeedItem = {
 	witness_id: 'witness-feed-006',
-	title: 'Perbaikan Pipa Air PDAM Blok C',
-	track_hint: 'tuntaskan',
+	title: 'Jalan Berhasil Diperbaiki! Gotong Royong 2 Hari',
+	trajectory_type: 'pencapaian',
+	icon: 'trophy',
 	status: 'resolved',
 	rahasia_level: 'L0',
 	latest_event: {
 		event_id: 'evt-006',
 		event_type: 'resolved',
 		actor_name: 'Sistem',
-		timestamp: ts(240),
+		timestamp: ts(300),
 		verb: 'kasus diselesaikan',
-		snippet: 'Perbaikan pipa selesai. Air mengalir normal kembali. 18 warga berkontribusi.'
+		snippet: 'Perbaikan jalan selesai dalam 2 hari gotong royong. 45 warga berkontribusi.'
 	},
 	collapsed_count: 15,
-	member_count: 18,
-	members_preview: [memberRina, memberAhmad, memberSari, memberBudi, memberDewi],
+	member_count: 45,
+	members_preview: [memberAhmad, memberSari, memberBudi, memberRina, memberDewi],
 	entity_tags: [entityRT05, entityInfrastruktur],
 	urgency: 'selesai',
 	source: 'ikutan',
-	hook_line: 'Air mengalir lagi. 18 warga berkontribusi.',
+	hook_line: 'Kalau bersama, semua bisa! 45 warga turun tangan.',
 	sentiment: 'celebratory',
-	intensity: 2,
+	intensity: 5,
 	cover_url: 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=600&h=300&fit=crop',
-	// Auto-pantau: user vouched + saksi
+	body: 'Setelah 2 hari gotong royong, jalan di Jl. Mawar berhasil diperbaiki oleh 45 warga. Total biaya Rp 3.2 juta dari iuran sukarela. Bukti nyata kekuatan kolaborasi warga.',
 	monitored: true,
-	// Tandang signals: user confirmed resolution, high trust, lots of witnesses
 	my_relation: {
 		vouched: true,
 		vouch_type: 'positive',
 		witnessed: true,
 		flagged: false,
-		quality_voted: true
+		supported: true
 	},
 	signal_counts: {
-		vouch_positive: 14,
+		vouch_positive: 30,
 		vouch_skeptical: 0,
-		witness_count: 11,
-		quality_avg: 4.8,
-		quality_votes: 15,
-		flags: 0
-	}
-};
-
-/** 7. Galang milestone — BODY ONLY — fundraising story */
-export const mockFeedItem7: FeedItem = {
-	witness_id: 'witness-feed-007',
-	title: 'Galang Dana Bedah Rumah Pak Surya',
-	track_hint: 'wujudkan',
-	status: 'active',
-	rahasia_level: 'L0',
-	latest_event: {
-		event_id: 'evt-007',
-		event_type: 'galang_milestone',
-		actor_name: 'Sistem',
-		timestamp: ts(300),
-		verb: 'target galang tercapai 75%',
-		snippet: 'Rp 7.500.000 dari Rp 10.000.000 terkumpul. 32 donatur.'
-	},
-	collapsed_count: 20,
-	member_count: 32,
-	members_preview: [memberSari, memberRina, memberDewi],
-	entity_tags: [entityRW03],
-	urgency: 'ramai',
-	source: 'sekitar',
-	hook_line: 'Rp 7,5 juta terkumpul — tinggal 25% lagi.',
-	sentiment: 'hopeful',
-	intensity: 4,
-	body: 'Pak Surya, 72 tahun, tinggal sendirian di rumah yang atapnya sudah bocor di mana-mana. Musim hujan kemarin plafon kamar tidurnya runtuh. Tetangga mulai galang dana setelah melihat kondisinya. Dalam 3 minggu, 32 orang sudah menyumbang. Sisa Rp 2,5 juta lagi untuk beli material atap baru.',
-	active_now: 1,
-	// Auto-pantau: user vouched (positive)
-	monitored: true,
-	// Tandang signals: user vouched, moderate engagement
-	my_relation: {
-		vouched: true,
-		vouch_type: 'positive',
-		witnessed: false,
-		flagged: false,
-		quality_voted: false
-	},
-	signal_counts: {
-		vouch_positive: 20,
-		vouch_skeptical: 1,
-		witness_count: 4,
-		quality_avg: 4.0,
-		quality_votes: 9,
+		witness_count: 20,
+		dukung_count: 25,
 		flags: 0
 	},
-	deadline: tsFuture(5 * 24 * 60),   // 5 days from now
-	deadline_label: 'Galang dana berakhir',
+	signal_labels: {
+		saksi: { label: 'Ikut Serta', desc: 'Kamu ikut dalam gotong royong perbaikan jalan' },
+		perlu_dicek: { label: 'Sudah Beres', desc: 'Perbaikan sudah selesai dan berfungsi baik' }
+	},
 	peek_messages: [
-		{ author: 'Sari', text: 'Pak Surya sudah bisa tidur di ruang tamu sementara, tapi kalau hujan deras tetap bocor juga. Kita harus cepat sebelum musim hujan puncak.' },
-		{ author: 'Rina', text: 'Tinggal 2,5 juta lagi, ayo semangat! Kalau masing-masing donasi 50 ribu, cuma butuh 50 orang lagi.' },
-		{ author: 'Ahmad', text: 'Tukang bangunan langganan saya bersedia kasih diskon material. Hubungi Pak Joko di 0812-xxx.' }
+		{ author: 'Ahmad', text: 'Alhamdulillah akhirnya selesai! Terima kasih semua yang sudah turun tangan.' },
+		{ author: 'Sari', text: 'Ibu-ibu nyiapin makanan 2 hari penuh. Luar biasa semangat warga sini!' },
+		{ author: 'Budi', text: 'Motor sudah bisa lewat tanpa was-was. Terima kasih pak-pak yang kerja bakti!' }
 	]
 };
 
-/** 8. Community note — BARE CARD — quick curiosity question */
-export const mockFeedItem8: FeedItem = {
-	witness_id: 'witness-feed-008',
-	title: 'Harga Beras Naik di Pasar Menteng',
-	track_hint: 'telusuri',
+// ---------------------------------------------------------------------------
+// 7. SIAGA — Banjir Ciliwung (created, photo only, urgent)
+// ---------------------------------------------------------------------------
+
+export const mockFeedItem7: FeedItem = {
+	witness_id: 'witness-feed-007',
+	title: 'Peringatan Banjir — Sungai Ciliwung Siaga Merah',
+	trajectory_type: 'siaga',
+	icon: 'siren',
 	status: 'open',
 	rahasia_level: 'L0',
 	latest_event: {
-		event_id: 'evt-008',
-		event_type: 'community_note',
-		actor_name: 'Sari Dewi',
-		actor_avatar: 'https://placehold.co/40x40/2E7D32/white?text=SD',
-		actor_role: 'relawan',
-		timestamp: ts(360),
-		verb: 'menambah catatan komunitas',
-		snippet: 'Harga beras medium naik Rp 2.000/kg sejak minggu lalu. Perlu verifikasi di pasar lain.'
+		event_id: 'evt-007',
+		event_type: 'created',
+		actor_name: 'Budi Santoso',
+		actor_role: 'pelapor',
+		timestamp: ts(15),
+		verb: 'melaporkan keadaan darurat',
+		snippet: 'Ketinggian air Sungai Ciliwung naik 2 meter dalam 6 jam terakhir!'
 	},
-	collapsed_count: 2,
-	member_count: 4,
-	members_preview: [memberSari, memberAhmad],
-	entity_tags: [entitySembako],
+	collapsed_count: 0,
+	member_count: 3,
+	members_preview: [memberBudi, memberAhmad, memberDewi],
+	entity_tags: [entityBencana, entityLingkungan],
+	urgency: 'baru',
 	source: 'sekitar',
-	hook_line: 'Beras naik Rp 2.000/kg — siapa lagi yang lihat?',
-	sentiment: 'curious',
-	intensity: 2,
-	// Tandang signals: fresh report, no user interaction, minimal signals
+	hook_line: 'Siaga merah! Segera evakuasi barang ke lantai atas.',
+	sentiment: 'urgent',
+	intensity: 5,
+	cover_url: 'https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600&h=400&fit=crop',
+	active_now: 12,
+	monitored: true,
+	my_relation: {
+		vouched: false,
+		witnessed: true,
+		flagged: false,
+		supported: false
+	},
 	signal_counts: {
-		vouch_positive: 1,
+		vouch_positive: 5,
 		vouch_skeptical: 0,
-		witness_count: 1,
-		quality_avg: 0,
-		quality_votes: 0,
+		witness_count: 8,
+		dukung_count: 3,
 		flags: 0
-	}
+	},
+	signal_labels: {
+		saksi: { label: 'Konfirmasi', desc: 'Kamu melihat langsung kondisi sungai/banjir' },
+		perlu_dicek: { label: 'Sudah Aman', desc: 'Kondisi sudah membaik di lokasi kamu' }
+	},
+	peek_messages: [
+		{ author: 'Budi', text: 'Air naik cepat banget! Warga bantaran sudah mulai evakuasi. Tolong yang punya perahu karet bantu!' },
+		{ author: 'Ahmad', text: 'Posko darurat sudah dibuka di Balai RT 05. Bawa selimut dan makanan siap saji.' },
+		{ author: 'Dewi', text: 'BMKG prediksi hujan deras lagi malam ini. Semua warga bantaran segera naik!' }
+	]
 };
 
-/** 9. Repost — PHOTO + BODY — community building work in progress */
-export const mockFeedItem9: FeedItem = {
-	witness_id: 'witness-feed-009',
-	title: 'Renovasi Pos Ronda RT 07',
-	track_hint: 'wujudkan',
+// ---------------------------------------------------------------------------
+// 8. PROGRAM — Jadwal Ronda (checkpoint, bare card, hopeful)
+// ---------------------------------------------------------------------------
+
+export const mockFeedItem8: FeedItem = {
+	witness_id: 'witness-feed-008',
+	title: 'Jadwal Ronda RT 05 — Periode Februari 2026',
+	trajectory_type: 'program',
+	icon: 'calendar',
 	status: 'active',
 	rahasia_level: 'L0',
 	latest_event: {
-		event_id: 'evt-009',
+		event_id: 'evt-008',
 		event_type: 'checkpoint',
-		actor_name: 'Dewi Lestari',
-		actor_avatar: 'https://placehold.co/40x40/6A1B9A/white?text=DL',
-		actor_role: 'relawan',
-		timestamp: ts(420),
-		verb: 'menyelesaikan langkah',
-		snippet: 'Material bangunan sudah tiba di lokasi. Persiapan renovasi dimulai akhir pekan.'
+		actor_name: 'Rina Kartika',
+		actor_avatar: 'https://placehold.co/40x40/C05621/white?text=RK',
+		actor_role: 'koordinator',
+		timestamp: ts(360),
+		verb: 'memperbarui jadwal',
+		snippet: 'Rotasi minggu ke-4 sudah ditentukan. 4 shift, masing-masing 3 orang.'
 	},
-	collapsed_count: 6,
-	member_count: 9,
-	members_preview: [memberDewi, memberRina, memberBudi],
-	entity_tags: [entityInfrastruktur],
-	source: 'ikutan',
-	repost: {
-		reposter_name: 'Sari Dewi',
-		reposter_avatar: 'https://placehold.co/40x40/2E7D32/white?text=SD',
-		reposter_role: 'relawan',
-		action_verb: 'bergabung sebagai Relawan'
-	},
-	hook_line: 'Material sudah tiba — renovasi akhir pekan ini.',
+	collapsed_count: 4,
+	member_count: 12,
+	members_preview: [memberRina, memberBudi, memberAhmad],
+	entity_tags: [entityRT05, entityKeamanan],
+	source: 'terlibat',
+	hook_line: 'Rotasi jaga malam minggu ke-4 sudah ditetapkan.',
 	sentiment: 'hopeful',
-	intensity: 3,
-	cover_url: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&h=400&fit=crop',
-	body: 'Warga RT 07 gotong royong mengumpulkan material bekas untuk pos ronda baru. Semen, pasir, dan bata sudah ditumpuk di lokasi. Akhir pekan ini mulai kerja bakti — sudah ada 9 relawan yang siap turun.',
-	// Tandang signals: user quality voted, healthy community trust
+	intensity: 1,
 	my_relation: {
 		vouched: false,
 		witnessed: false,
 		flagged: false,
-		quality_voted: true
+		supported: true
 	},
 	signal_counts: {
 		vouch_positive: 6,
 		vouch_skeptical: 0,
-		witness_count: 3,
-		quality_avg: 4.3,
-		quality_votes: 7,
+		witness_count: 0,
+		dukung_count: 4,
 		flags: 0
-	}
+	},
+	signal_labels: {
+		saksi: { label: 'Hadir', desc: 'Kamu hadir pada shift ronda yang ditentukan' },
+		perlu_dicek: { label: 'Jadwal Berubah', desc: 'Ada perubahan jadwal yang perlu dikoordinasikan' }
+	},
+	peek_messages: [
+		{ author: 'Rina', text: 'Minggu ini shift A: Pak Budi, Pak Ahmad, Mas Doni. Mulai jam 22:00.' },
+		{ author: 'Budi', text: 'Siap. Saya bawa senter dan HT seperti biasa.' }
+	]
 };
 
-/** 10. Created with repost — PHOTO ONLY — visual evidence of trash, no body */
-export const mockFeedItem10: FeedItem = {
-	witness_id: 'witness-feed-010',
-	title: 'Sampah Menumpuk di Pinggir Kali Baru',
-	track_hint: 'tuntaskan',
-	status: 'open',
+// ---------------------------------------------------------------------------
+// 9. ADVOKASI — Hak Air Bersih (evidence, photo+body, hopeful)
+// ---------------------------------------------------------------------------
+
+export const mockFeedItem9: FeedItem = {
+	witness_id: 'witness-feed-009',
+	title: 'Advokasi Hak Air Bersih Kampung Melayu',
+	trajectory_type: 'advokasi',
+	icon: 'megaphone',
+	status: 'active',
 	rahasia_level: 'L0',
 	latest_event: {
-		event_id: 'evt-010',
-		event_type: 'created',
-		actor_name: 'Budi Santoso',
-		actor_role: 'pelapor',
-		timestamp: ts(480),
-		verb: 'melaporkan masalah baru',
-		snippet: 'Tumpukan sampah di pinggir Kali Baru makin parah setelah hujan deras kemarin.'
+		event_id: 'evt-009',
+		event_type: 'evidence',
+		actor_name: 'Dewi Lestari',
+		actor_avatar: 'https://placehold.co/40x40/6A1B9A/white?text=DL',
+		actor_role: 'relawan',
+		timestamp: ts(420),
+		verb: 'menambah bukti',
+		snippet: 'Hasil lab menunjukkan air sumur tercemar bakteri E.coli di atas ambang batas aman.'
 	},
-	collapsed_count: 0,
-	member_count: 2,
-	members_preview: [memberBudi],
+	collapsed_count: 10,
+	member_count: 15,
+	members_preview: [memberDewi, memberRina, memberSari],
 	entity_tags: [entityLingkungan, entityRW03],
-	source: 'ikutan',
+	source: 'terlibat',
 	repost: {
-		reposter_name: 'Budi Santoso',
-		reposter_role: 'pelapor',
-		action_verb: 'melaporkan'
+		reposter_name: 'Sari Dewi',
+		reposter_avatar: 'https://placehold.co/40x40/2E7D32/white?text=SD',
+		reposter_role: 'relawan',
+		action_verb: 'membagikan bukti baru'
 	},
-	hook_line: 'Makin parah setelah hujan — sampah meluap.',
-	sentiment: 'angry',
+	hook_line: 'Bukti lab: air sumur tidak layak minum.',
+	sentiment: 'hopeful',
 	intensity: 4,
-	cover_url: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=600&h=350&fit=crop',
-	// Auto-pantau: user is saksi + flagged
+	cover_url: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600&h=400&fit=crop',
+	body: 'Komunitas Kampung Melayu mendesak pemerintah daerah untuk menyediakan akses air bersih. Hasil uji lab dari 5 sumur warga menunjukkan kadar bakteri E.coli di atas ambang batas aman. Petisi sudah ditandatangani 200+ warga.',
+	active_now: 4,
 	monitored: true,
-	// Tandang signals: user flagged this, some skepticism in community
+	my_relation: {
+		vouched: true,
+		vouch_type: 'positive',
+		witnessed: false,
+		flagged: false,
+		supported: true
+	},
+	signal_counts: {
+		vouch_positive: 12,
+		vouch_skeptical: 1,
+		witness_count: 5,
+		dukung_count: 15,
+		flags: 0
+	},
+	signal_labels: {
+		saksi: { label: 'Saya Terdampak', desc: 'Kamu mengalami masalah air bersih ini' },
+		perlu_dicek: { label: 'Perlu Verifikasi', desc: 'Hasil lab perlu diverifikasi pihak independen' }
+	},
+	peek_messages: [
+		{ author: 'Dewi', text: 'Lab resmi UGM sudah konfirmasi. Ini bukti kuat untuk petisi kita ke DPRD.' },
+		{ author: 'Rina', text: 'Petisi sudah 200+ tanda tangan. Target kita 500 sebelum kirim ke dewan.' },
+		{ author: 'Sari', text: 'Saya hubungi wartawan Kompas, mereka tertarik liputan minggu depan.' }
+	]
+};
+
+// ---------------------------------------------------------------------------
+// 10. MEDIASI — Sengketa Lahan (joined, body only, curious)
+// ---------------------------------------------------------------------------
+
+export const mockFeedItem10: FeedItem = {
+	witness_id: 'witness-feed-010',
+	title: 'Mediasi Sengketa Batas Lahan Antar Warga RT 07',
+	trajectory_type: 'mediasi',
+	icon: 'scale',
+	status: 'active',
+	rahasia_level: 'L1',
+	latest_event: {
+		event_id: 'evt-010',
+		event_type: 'joined',
+		actor_name: 'Rina Kartika',
+		actor_avatar: 'https://placehold.co/40x40/C05621/white?text=RK',
+		actor_role: 'koordinator',
+		timestamp: ts(480),
+		verb: 'bergabung sebagai Mediator'
+	},
+	collapsed_count: 4,
+	member_count: 5,
+	members_preview: [memberRina, memberAhmad, memberBudi],
+	entity_tags: [entityRW03],
+	source: 'terlibat',
+	hook_line: 'Mediator bergabung — dua warga cari jalan tengah.',
+	sentiment: 'curious',
+	intensity: 2,
+	body: 'Dua warga RT 07 berselisih soal batas tanah warisan. Bu Rina sebagai mediator akan memfasilitasi pertemuan pertama akhir pekan ini. Tujuannya mencapai kesepakatan tanpa harus ke jalur hukum formal.',
 	my_relation: {
 		vouched: false,
-		witnessed: true,
-		flagged: true,
-		quality_voted: false
+		witnessed: false,
+		flagged: false,
+		supported: false
 	},
 	signal_counts: {
 		vouch_positive: 2,
-		vouch_skeptical: 2,
-		witness_count: 4,
-		quality_avg: 2.5,
-		quality_votes: 3,
-		flags: 2
-	}
+		vouch_skeptical: 1,
+		witness_count: 2,
+		dukung_count: 1,
+		flags: 0
+	},
+	signal_labels: {
+		saksi: { label: 'Saya Tahu', desc: 'Kamu mengetahui detail sengketa batas lahan ini' },
+		perlu_dicek: { label: 'Perlu Klarifikasi', desc: 'Batas lahan perlu diukur ulang secara resmi' }
+	},
+	peek_messages: [
+		{ author: 'Rina', text: 'Saya sudah bicara dengan kedua pihak. Ada titik temu yang bisa diusahakan.' },
+		{ author: 'Ahmad', text: 'Kalau butuh surat ukur BPN, saya bisa bantu uruskan. Prosesnya sekitar 2 minggu.' }
+	]
 };
 
 // ---------------------------------------------------------------------------

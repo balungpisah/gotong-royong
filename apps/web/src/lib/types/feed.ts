@@ -9,6 +9,7 @@
 
 import type { WitnessStatus, WitnessMemberRole } from './witness';
 import type { RahasiaLevel } from './triage';
+import type { TrajectoryType, Sentiment, SignalLabels } from './card-enrichment';
 
 // ── Feed Event Types ──────────────────────────────────────────────
 
@@ -46,9 +47,43 @@ export type SignalChipType =
 	| 'vouch'       // 🤝 Saya Vouch — positive trust signal → I+C
 	| 'skeptis'     // 🤔 Skeptis — healthy doubt signal → J
 	| 'saksi'        // 👁️ PoR chip — contextual: Saya Saksi / Sudah Beres / Bukti Valid → I
-	| 'bagus'       // 👍 Bagus — quality upvote → C
 	| 'perlu_dicek' // ⚠️ Perlu Dicek — quality flag → I+J
 	| 'inline_vote'; // 🗳️ Ya/Tidak — inline voting (vote_opened cards only)
+
+// ── Signal Completion Resolution (AI-09a) ─────────────────────────
+
+/** Why a witness reached its terminal state. */
+export type WitnessCloseReason =
+	| 'selesai'       // resolved successfully
+	| 'tidak_valid'   // content was false/invalid
+	| 'duplikat'      // merged into another witness
+	| 'kedaluwarsa'   // expired
+	| 'ditarik';      // creator withdrew
+
+/** How a signal was resolved after witness completion. */
+export type SignalResolutionOutcome =
+	| 'pending'            // witness still active
+	| 'resolved_positive'  // signal aligned with outcome
+	| 'resolved_negative'  // signal contradicted outcome
+	| 'resolved_neutral'   // ambiguous outcome, no credit swing
+	| 'expired';           // witness closed without clear outcome
+
+/** Content-directed signal types (excludes vouch — that's person-directed).
+ *  bagus removed — renamed to "Dukung" and moved to FeedStore as a social action. */
+export type ContentSignalType = 'saksi' | 'perlu_dicek';
+
+/** A content-directed signal cast by a user on a witness. */
+export interface ContentSignal {
+	signal_id: string;
+	witness_id: string;
+	user_id: string;
+	signal_type: ContentSignalType;
+	outcome: SignalResolutionOutcome;
+	created_at: string;
+	resolved_at?: string;
+	/** Points earned/lost at resolution. Only set when outcome is terminal. */
+	credit_delta?: number;
+}
 
 /** Current user's relation to this witness/entity.
  *  Populated from tandang query: GET /user/{uid}/relation/{entity_id} */
@@ -57,7 +92,8 @@ export interface MyRelation {
 	vouch_type?: 'positive' | 'skeptical' | 'conditional' | 'mentorship';
 	witnessed: boolean;
 	flagged: boolean;
-	quality_voted: boolean;
+	/** Whether the user has "dukung"-ed (supported) this witness. Non-Tandang social action. */
+	supported: boolean;
 	vote_cast?: 'yes' | 'no';
 }
 
@@ -67,8 +103,8 @@ export interface SignalCounts {
 	vouch_positive: number;
 	vouch_skeptical: number;
 	witness_count: number;
-	quality_avg: number;
-	quality_votes: number;
+	/** Number of "dukung" (support) actions on this entity. Non-Tandang social metric. */
+	dukung_count: number;
 	flags: number;
 }
 
@@ -88,6 +124,10 @@ export interface FeedItem {
 	witness_id: string;
 	title: string;
 	track_hint?: string;
+	/** Canonical trajectory type — new routing field. */
+	trajectory_type?: TrajectoryType;
+	/** Lucide icon name from Card Enrichment. */
+	icon?: string;
 	status: WitnessStatus;
 	rahasia_level: RahasiaLevel;
 	latest_event: FeedEvent;
@@ -105,7 +145,7 @@ export interface FeedItem {
 	/** The most emotionally resonant sentence from the conversation. */
 	pull_quote?: string;
 	/** Emotional mood for visual styling. */
-	sentiment?: 'angry' | 'hopeful' | 'urgent' | 'celebratory' | 'sad' | 'curious' | 'fun';
+	sentiment?: Sentiment;
 	/** Conversation heat level (1–5). */
 	intensity?: number;
 
@@ -119,6 +159,10 @@ export interface FeedItem {
 	// ── Engagement: Story Peek (Phase 3) ────────────────────────
 	/** Recent conversation snippets for the auto-rotating peek strip. */
 	peek_messages?: PeekMessage[];
+
+	// ── LLM-generated signal labels ─────────────────────────────
+	/** LLM-generated contextual labels for signal chips. Falls back to defaults if absent. */
+	signal_labels?: SignalLabels;
 
 	// ── Tandang Signals (Phase 2) ────────────────────────────────
 	/** Current user's relation to this entity (from tandang). */
@@ -214,8 +258,40 @@ export interface FeedSystemItem extends FeedStreamBase {
 	data: SystemCardData;
 }
 
+/** A one-off data item card (survey, alert, vault, help, celebration). */
+export interface FeedDataItem extends FeedStreamBase {
+	kind: 'data';
+	data: DataItemRecord;
+}
+
+/** A point-in-time data record — no lifecycle, no phases. */
+export interface DataItemRecord {
+	data_id: string;
+	trajectory_type: TrajectoryType;
+	icon?: string;
+	title: string;
+	hook_line?: string;
+	body?: string;
+	sentiment?: Sentiment;
+	intensity?: number;
+	claim: string;
+	location?: { lat: number; lng: number };
+	timestamp: string;
+	proof_url?: string;
+	category: string;
+	entity_tags: EntityTag[];
+	// Alert-specific (trajectory J / siaga)
+	urgency?: UrgencyBadge;
+	expires_at?: string;
+	verification?: { confirms: number; denies: number; user_verified?: 'confirm' | 'deny' };
+	// Vault-specific (trajectory E)
+	sealed?: boolean;
+	sealed_at?: string;
+	content_hash?: string;
+}
+
 /** The polymorphic feed stream type. */
-export type FeedStreamItem = FeedWitnessItem | FeedSystemItem;
+export type FeedStreamItem = FeedWitnessItem | FeedDataItem | FeedSystemItem;
 
 // ── System Card Variants ─────────────────────────────────────────
 
@@ -269,8 +345,8 @@ export interface PromptPayload {
 // client-side seed data and optimistic UI.
 //
 // Design rationale: any action that costs social capital or effort
-// should auto-monitor. Lightweight actions (e.g. "Bagus" quality
-// upvote) remain manual-only.
+// should auto-monitor. Lightweight actions (e.g. "Dukung" support)
+// remain manual-only.
 // ─────────────────────────────────────────────────────────────────
 
 /** The 7 user actions that trigger automatic monitoring. */
@@ -284,7 +360,7 @@ export type AutoPantauTrigger =
 	| 'voted';         // User voted (yes or no)
 
 /** Actions that do NOT auto-monitor (manual eye-icon tap only). */
-// - quality_voted (Bagus 👍) — too lightweight, would flood Pantauan
+// - supported (Dukung ❤️) — too lightweight, would flood Pantauan
 // - viewing / scrolling — no signal of interest
 
 /**

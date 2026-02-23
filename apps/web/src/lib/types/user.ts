@@ -9,7 +9,7 @@ import type { AuthRole } from '$lib/auth';
  */
 export interface TandangSignals {
 	vouch: number;
-	bagus: number;
+	dukung: number;
 	proof_of_resolve: number;
 	skeptis: number;
 }

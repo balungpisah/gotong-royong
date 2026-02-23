@@ -20,6 +20,8 @@ export { FeedStore } from './feed-store.svelte';
 export { ThemeStore } from './theme-store.svelte';
 export { PreferencesStore } from './preferences-store.svelte';
 export { CommunityStore } from './community-store.svelte';
+export { SignalStore } from './signal-store.svelte';
+export { GroupStore } from './group-store.svelte';
 
 // ---------------------------------------------------------------------------
 // Import types for context helpers
@@ -34,6 +36,8 @@ import type { FeedStore } from './feed-store.svelte';
 import type { ThemeStore } from './theme-store.svelte';
 import type { PreferencesStore } from './preferences-store.svelte';
 import type { CommunityStore } from './community-store.svelte';
+import type { SignalStore } from './signal-store.svelte';
+import type { GroupStore } from './group-store.svelte';
 
 // ---------------------------------------------------------------------------
 // Context keys
@@ -48,6 +52,8 @@ export const FEED_STORE_KEY = Symbol('feed-store');
 export const THEME_STORE_KEY = Symbol('theme-store');
 export const PREFERENCES_STORE_KEY = Symbol('preferences-store');
 export const COMMUNITY_STORE_KEY = Symbol('community-store');
+export const SIGNAL_STORE_KEY = Symbol('signal-store');
+export const GROUP_STORE_KEY = Symbol('group-store');
 
 // ---------------------------------------------------------------------------
 // Typed context getters (for use in components)
@@ -96,4 +102,14 @@ export function getPreferencesStore(): PreferencesStore {
 /** Get the CommunityStore from component context. */
 export function getCommunityStore(): CommunityStore {
 	return getContext<CommunityStore>(COMMUNITY_STORE_KEY);
+}
+
+/** Get the SignalStore from component context. */
+export function getSignalStore(): SignalStore {
+	return getContext<SignalStore>(SIGNAL_STORE_KEY);
+}
+
+/** Get the GroupStore from component context. */
+export function getGroupStore(): GroupStore {
+	return getContext<GroupStore>(GROUP_STORE_KEY);
 }

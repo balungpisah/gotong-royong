@@ -30,7 +30,7 @@ export interface CommunitySignalSummary {
 	vouch: number;
 	skeptis: number;
 	proof_of_resolve: number;
-	bagus: number;
+	dukung: number;
 	perlu_dicek: number;
 }
 

@@ -6,7 +6,7 @@
  */
 
 import type { UserService } from '$lib/services/types';
-import type { UserProfile } from '$lib/types';
+import type { UserProfile, TandangProfile } from '$lib/types';
 
 export class UserStore {
 	// ---------------------------------------------------------------------------
@@ -17,6 +17,11 @@ export class UserStore {
 	loading = $state(false);
 	error = $state<string | null>(null);
 
+	// Tandang full profile (for CV Hidup page)
+	tandangProfile = $state<TandangProfile | null>(null);
+	tandangLoading = $state(false);
+	tandangError = $state<string | null>(null);
+
 	// ---------------------------------------------------------------------------
 	// Derived
 	// ---------------------------------------------------------------------------
@@ -25,6 +30,7 @@ export class UserStore {
 	displayName = $derived(this.profile?.name ?? 'Pengguna');
 	userRole = $derived(this.profile?.role ?? 'anonymous');
 	userTier = $derived(this.profile?.tier ?? 0);
+	hasTandangData = $derived(this.tandangProfile !== null);
 
 	// ---------------------------------------------------------------------------
 	// Constructor
@@ -64,8 +70,34 @@ export class UserStore {
 		}
 	}
 
+	async loadTandangProfile(userId: string) {
+		this.tandangLoading = true;
+		this.tandangError = null;
+		try {
+			this.tandangProfile = await this.service.getTandangProfile(userId);
+		} catch (err) {
+			this.tandangError = err instanceof Error ? err.message : 'Gagal memuat profil tandang';
+		} finally {
+			this.tandangLoading = false;
+		}
+	}
+
+	async loadCurrentTandangProfile() {
+		this.tandangLoading = true;
+		this.tandangError = null;
+		try {
+			this.tandangProfile = await this.service.getCurrentTandangProfile();
+		} catch (err) {
+			this.tandangError = err instanceof Error ? err.message : 'Gagal memuat profil tandang';
+		} finally {
+			this.tandangLoading = false;
+		}
+	}
+
 	logout() {
 		this.profile = null;
 		this.error = null;
+		this.tandangProfile = null;
+		this.tandangError = null;
 	}
 }

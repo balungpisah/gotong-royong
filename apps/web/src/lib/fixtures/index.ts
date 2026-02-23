@@ -6,3 +6,6 @@ export * from './mock-witnesses';
 export * from './mock-users';
 export * from './mock-notifications';
 export * from './mock-community';
+export * from './mock-tandang-profiles';
+export * from './mock-community-dashboard';
+export * from './mock-groups';
