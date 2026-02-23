@@ -237,6 +237,7 @@ RELATE warga:sari -> VOUCHES -> note:abc
 | `INSTANCE_OF` | place:* | concept:QID | Local entity → Wikidata type (P31) |
 | `VOUCHES` | warga:* | note:* | Trust signal |
 | `CHALLENGES` | warga:* | note:* | Dispute signal |
+| `ANCHOR` | warga:* | concept/place/warga | Identity fact — Schema.org predicate on edge (see [04d-identity-anchor-graph.md](ai-spec/04d-identity-anchor-graph.md)) |
 
 ### 4.2 Cross-Mode Connectivity
 
@@ -314,6 +315,32 @@ WHERE observed_at > time::now() - 1d
 GROUP BY concept, location
 HAVING current_avg > week_avg * 1.2;  -- 20% spike threshold
 ```
+
+### 4.5 Identity Anchor Graph (Warga as Subjects)
+
+The graph models not just **content** (notes, plans, alerts) but also **people**.
+Warga nodes link to concepts, places, and other warga via `ANCHOR` edges —
+using the same Schema.org predicates and graph patterns as content triples.
+
+```sql
+-- Identity anchors extracted during triage conversation
+RELATE warga:damar -> ANCHOR -> place:rt05_rw03
+  SET predicate = "schema:homeLocation",
+      kind = "location",           -- location | social | role | knowledge | personal
+      confidence = 0.9,
+      visibility = "system_only",  -- system_only | mutual | public
+      source = session:abc123,
+      gathered_at = time::now();
+
+-- Content and identity connect through shared nodes:
+--   note:flood_report  ──ABOUT──▶      concept:Q8068  ◀──ANCHOR──  warga:damar
+--   note:flood_report  ──LOCATED_AT──▶ place:rt05     ◀──ANCHOR──  warga:damar
+-- Cross-referencing is free — no explicit link needed.
+```
+
+**Full specification:** [ai-spec/04d-identity-anchor-graph.md](ai-spec/04d-identity-anchor-graph.md)
+— covers the 5 anchor kinds, visibility tiers, extraction flow, integrity
+scoring integration, privacy model, and cross-referencing query patterns.
 
 ---
 
@@ -612,9 +639,11 @@ All previous open questions (§13 in v0.1 original) have been resolved:
 | AI-SPEC-v0.2.md (AI-00, AI-01, AI-03) | Classification output schema = triples. AI-03 duplicate detection uses QID overlap. |
 | ADAPTIVE-PATH-ORCHESTRATION-v0.1.md | Cross-case learning queries use QID-based graph traversal. |
 | UI-UX-SPEC-v0.5.md | Feed filters use domain derived from Wikidata hierarchy. Progressive disclosure (S3-B4). |
+| ai-spec/04d-identity-anchor-graph.md | `ANCHOR` edge type for warga identity facts. Extends §4.1 edge types and §4.5 identity graph. |
+| ai-spec/04a-ai-00-edge-contract.md §6.4 | How AI-00 extracts identity anchors during triage conversation. |
 
 ---
 
-*Document revised: 2026-02-16*
+*Document revised: 2026-02-22*
 *Supersedes: Original 4-layer stack approach (see §13 "What This Replaces")*
-*Companion to: DECISIONS-LOG.md, ENTRY-PATH-MATRIX-v0.1.md, AI-SPEC-v0.2.md*
+*Companion to: DECISIONS-LOG.md, ENTRY-PATH-MATRIX-v0.1.md, AI-SPEC-v0.2.md, ai-spec/04d-identity-anchor-graph.md*

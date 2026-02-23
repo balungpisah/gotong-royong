@@ -12,12 +12,17 @@ This file is the modular index. Use the sections below for implementation.
 
 ## 2. Three-Layer Architecture
 - [Open section content](./ai-spec/02-three-layer-architecture.md)
+- [Edge-Pod Agent Topology](./ai-spec/02a-edge-pod-agent-topology.md)
 
 ## 3. Tandang-Handled AI
 - [Open section content](./ai-spec/03-tandang-handled-ai.md)
 
 ## 4. AI-00: Conversational Triage
 - [Open section content](./ai-spec/04-ai-00-triage.md)
+- [Edge-Pod Implementation Contract](./ai-spec/04a-ai-00-edge-contract.md)
+- [Trajectory Map](./ai-spec/04b-trajectory-map.md)
+- [Operator & Skill Map](./ai-spec/04c-operator-skill-map.md)
+- [Identity Anchor Graph](./ai-spec/04d-identity-anchor-graph.md)
 
 ## 5. AI-01: Track & Seed Classification
 - [Open section content](./ai-spec/05-ai-01-classification.md)
