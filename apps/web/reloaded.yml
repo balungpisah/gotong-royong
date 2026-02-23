@@ -1,0 +1,743 @@
+- generic [ref=e3]:
+  - navigation "App navigation" [ref=e4] [cursor=pointer]:
+    - generic [ref=e5]:
+      - link "Semua" [ref=e7]:
+        - /url: /
+        - img [ref=e9]
+        - generic: Semua
+      - link "Diikuti" [ref=e12]:
+        - /url: /
+        - img [ref=e14]
+        - generic: Diikuti
+      - link "Terlibat" [ref=e17]:
+        - /url: /
+        - img [ref=e19]
+        - generic: Terlibat
+      - link "Sekitar" [ref=e23]:
+        - /url: /
+        - img [ref=e25]
+        - generic: Sekitar
+      - link "Pantauan" [ref=e29]:
+        - /url: /
+        - img [ref=e31]
+        - generic: Pantauan
+      - link "Jelajahi" [ref=e35]:
+        - /url: /
+        - img [ref=e37]
+        - generic: Jelajahi
+      - button "Tambah Tab" [ref=e41]:
+        - img [ref=e43]
+        - generic: Tambah Tab
+    - generic [ref=e45]:
+      - link "Notifikasi" [ref=e47]:
+        - /url: /notifikasi
+        - img [ref=e49]
+        - generic: Notifikasi
+        - generic [ref=e189]: "6"
+      - link "Profil" [ref=e55]:
+        - /url: /profil
+        - img [ref=e57]
+        - generic: Ahmad Hidayat
+      - link "Komunitas" [ref=e61]:
+        - /url: /komunitas
+        - img [ref=e63]
+        - generic: Komunitas
+      - button "Bahasa" [ref=e69]:
+        - img [ref=e71]
+        - generic: ID
+      - button "Ganti tema" [ref=e75]:
+        - img [ref=e77]
+        - generic: Tema
+      - button "Tooltip aktif" [ref=e84]:
+        - img [ref=e86]
+        - generic: Tooltip aktif
+  - generic [ref=e89]:
+    - banner [ref=e90]:
+      - generic [ref=e91]:
+        - generic [ref=e92]:
+          - link "Gotong Royong" [ref=e93] [cursor=pointer]:
+            - /url: /
+          - generic [ref=e94]:
+            - img [ref=e95]
+            - generic [ref=e97]: Detak Komunitas
+        - paragraph [ref=e98]: Kolaborasi warga, dari masalah menuju solusi bersama.
+        - generic [ref=e99]:
+          - button "Ganti tema" [ref=e100]:
+            - img [ref=e101]
+          - link "Notifikasi" [ref=e108] [cursor=pointer]:
+            - /url: /notifikasi
+            - img [ref=e109]
+            - generic [ref=e190]: "6"
+          - link "Profil" [ref=e115] [cursor=pointer]:
+            - /url: /profil
+            - generic [ref=e117]: AH
+    - main [ref=e118]:
+      - region "Activity feed" [ref=e121]:
+        - list "Feed" [ref=e191]:
+          - generic [ref=e192]:
+            - generic [ref=e193]:
+              - generic [ref=e195]:
+                - button "Mulai di sini Ceritakan kejadian Ketuk untuk mulai laporan..." [ref=e196] [cursor=pointer]:
+                  - generic [ref=e198]:
+                    - img [ref=e199]
+                    - text: Mulai di sini
+                  - generic [ref=e200]:
+                    - img [ref=e202]
+                    - generic [ref=e203]:
+                      - paragraph [ref=e204]: Ceritakan kejadian
+                      - paragraph [ref=e205]: Ketuk untuk mulai laporan...
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: AI-00 Triage
+                    - generic:
+                      - generic:
+                        - button "Tutup":
+                          - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - paragraph: Apa yang ingin kamu lakukan?
+                        - paragraph: Pilih salah satu, atau langsung ceritakan di bawah
+                      - generic:
+                        - button "Masalah Ada masalah yang perlu diselesaikan":
+                          - generic:
+                            - img
+                          - generic:
+                            - paragraph: Masalah
+                            - paragraph: Ada masalah yang perlu diselesaikan
+                        - button "Musyawarah Perlu diskusi & keputusan bersama":
+                          - generic:
+                            - img
+                          - generic:
+                            - paragraph: Musyawarah
+                            - paragraph: Perlu diskusi & keputusan bersama
+                        - button "Pantau Awasi perkembangan kasus":
+                          - generic:
+                            - img
+                          - generic:
+                            - paragraph: Pantau
+                            - paragraph: Awasi perkembangan kasus
+                        - button "Catat Dokumentasi data atau bukti":
+                          - generic:
+                            - img
+                          - generic:
+                            - paragraph: Catat
+                            - paragraph: Dokumentasi data atau bukti
+                        - button "Bantuan Butuh pertolongan warga":
+                          - generic:
+                            - img
+                          - generic:
+                            - paragraph: Bantuan
+                            - paragraph: Butuh pertolongan warga
+                        - button "Rayakan! Bagikan kabar baik":
+                          - generic:
+                            - img
+                          - generic:
+                            - paragraph: Rayakan!
+                            - paragraph: Bagikan kabar baik
+                        - button "Siaga! Peringatan darurat untuk warga":
+                          - generic:
+                            - img
+                          - generic:
+                            - paragraph: Siaga!
+                            - paragraph: Peringatan darurat untuk warga
+                        - button "Program Kegiatan rutin komunitas":
+                          - generic:
+                            - img
+                          - generic:
+                            - paragraph: Program
+                            - paragraph: Kegiatan rutin komunitas
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - paragraph: Atau ceritakan langsung
+                          - paragraph: Ketik ceritamu di bawah — AI akan menentukan jalur yang tepat
+                  - generic:
+                    - generic:
+                      - generic:
+                        - textbox "Ceritakan isu komunitas Anda ke AI-00..."
+                      - generic:
+                        - button "Kirim" [disabled]:
+                          - img
+              - generic [ref=e207]:
+                - generic [ref=e208]:
+                  - generic [ref=e209]:
+                    - generic [ref=e210]: 💡
+                    - generic [ref=e211]: Ikuti topik yang relevan
+                  - button "Tutup" [ref=e212]:
+                    - img [ref=e213]
+                - paragraph [ref=e214]: Dapatkan update tentang isu yang Anda pedulikan.
+                - generic [ref=e215]:
+                  - button "📍 RT 05 Menteng +" [ref=e216]:
+                    - generic [ref=e217]: 📍
+                    - generic [ref=e218]: RT 05 Menteng
+                    - generic [ref=e219]: +
+                  - button "🏷️ Infrastruktur +" [ref=e220]:
+                    - generic [ref=e221]: 🏷️
+                    - generic [ref=e222]: Infrastruktur
+                    - generic [ref=e223]: +
+              - button [ref=e225] [cursor=pointer]:
+                - generic [ref=e226]:
+                  - generic [ref=e227]:
+                    - generic [ref=e228]: VOTING
+                    - generic [ref=e229]: 8 aktif
+                    - generic [ref=e233]: 🗳️
+                  - generic [ref=e234]:
+                    - generic [ref=e235]:
+                      - img [ref=e236]
+                      - generic [ref=e237]: "Voting ditutup: 46j 59m"
+                    - generic [ref=e241]: 15 orang lagi
+                  - paragraph [ref=e242]: Anggaran naik 15% — setuju atau tidak?
+                  - paragraph [ref=e243]: Musyawarah Anggaran RT 05 2025
+                  - generic [ref=e244]:
+                    - generic [ref=e245]: membuka voting
+                    - generic [ref=e246]: ·
+                    - generic [ref=e247]: 2j lalu
+                  - generic [ref=e249]:
+                    - img [ref=e250]
+                    - generic [ref=e252]:
+                      - paragraph [ref=e253]: "Ahmad: Kenaikan 15% itu untuk apa saja? Minta rinciannya dong, jangan cuma angka total."
+                      - paragraph [ref=e254]: "Rina: Perbaikan got dan penerangan gang. Detailnya ada di dokumen yang Pak Sekretaris upload kemarin."
+                      - paragraph [ref=e255]: "Dewi: Saya setuju selama transparan. Tahun lalu iuran naik tapi laporannya tidak jelas, jadi kali ini saya minta ada laporan bulanan yang bisa dilihat semua warga."
+                      - paragraph [ref=e256]: "Ahmad: Kenaikan 15% itu untuk apa saja? Minta rinciannya dong, jangan cuma angka total."
+                      - paragraph [ref=e257]: "Rina: Perbaikan got dan penerangan gang. Detailnya ada di dokumen yang Pak Sekretaris upload kemarin."
+                      - paragraph [ref=e258]: "Dewi: Saya setuju selama transparan. Tahun lalu iuran naik tapi laporannya tidak jelas, jadi kali ini saya minta ada laporan bulanan yang bisa dilihat semua warga."
+                  - generic [ref=e261]:
+                    - generic [ref=e262]: 📍
+                    - generic [ref=e263]: RT 05 Menteng
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e265]:
+                    - button "Vouch" [pressed] [ref=e267]:
+                      - img [ref=e268]
+                      - generic [ref=e269]: "15"
+                    - button "Skeptis" [ref=e271]:
+                      - img [ref=e272]
+                      - generic [ref=e273]: "3"
+                    - button "Bagus" [pressed] [ref=e275]:
+                      - img [ref=e276]
+                      - generic [ref=e277]: "12"
+                    - button "Perlu Dicek" [ref=e279]:
+                      - img [ref=e280]
+                      - generic [ref=e281]: "1"
+                    - img [ref=e283]
+                  - generic [ref=e284]:
+                    - generic [ref=e285]:
+                      - generic [ref=e286]: A
+                      - img "Rina Kartika" [ref=e287]
+                      - generic [ref=e288]: B
+                      - img "Sari Dewi" [ref=e289]
+                    - generic [ref=e290]:
+                      - img [ref=e291]
+                      - text: "25"
+                    - generic [ref=e292]:
+                      - button "Berhenti pantau" [ref=e294]:
+                        - img [ref=e295]
+                      - button "Simpan" [ref=e297]:
+                        - img [ref=e298]
+                      - button "Bagikan" [ref=e300]:
+                        - img [ref=e301]
+              - button [ref=e303] [cursor=pointer]:
+                - generic [ref=e304]:
+                  - generic [ref=e305]:
+                    - generic [ref=e306]: RAMAI
+                    - generic [ref=e307]: 1 aktif
+                    - generic [ref=e311]: 💰
+                  - generic [ref=e313]:
+                    - img [ref=e314]
+                    - generic [ref=e315]: "Galang dana berakhir: 4 hari lagi"
+                  - paragraph [ref=e316]: Rp 7,5 juta terkumpul — tinggal 25% lagi.
+                  - paragraph [ref=e317]: Galang Dana Bedah Rumah Pak Surya
+                  - generic [ref=e318]:
+                    - generic [ref=e319]: target galang tercapai 75%
+                    - generic [ref=e320]: ·
+                    - generic [ref=e321]: 5j lalu
+                  - paragraph [ref=e322]: Pak Surya, 72 tahun, tinggal sendirian di rumah yang atapnya sudah bocor di mana-mana. Musim hujan kemarin plafon kamar tidurnya runtuh. Tetangga mulai galang dana setelah melihat kondisinya. Dalam 3 minggu, 32 orang sudah menyumbang. Sisa Rp 2,5 juta lagi untuk beli material atap baru.
+                  - generic [ref=e324]:
+                    - img [ref=e325]
+                    - generic [ref=e327]:
+                      - paragraph [ref=e328]: "Sari: Pak Surya sudah bisa tidur di ruang tamu sementara, tapi kalau hujan deras tetap bocor juga. Kita harus cepat sebelum musim hujan puncak."
+                      - paragraph [ref=e329]: "Rina: Tinggal 2,5 juta lagi, ayo semangat! Kalau masing-masing donasi 50 ribu, cuma butuh 50 orang lagi."
+                      - paragraph [ref=e330]: "Ahmad: Tukang bangunan langganan saya bersedia kasih diskon material. Hubungi Pak Joko di 0812-xxx."
+                      - paragraph [ref=e331]: "Sari: Pak Surya sudah bisa tidur di ruang tamu sementara, tapi kalau hujan deras tetap bocor juga. Kita harus cepat sebelum musim hujan puncak."
+                      - paragraph [ref=e332]: "Rina: Tinggal 2,5 juta lagi, ayo semangat! Kalau masing-masing donasi 50 ribu, cuma butuh 50 orang lagi."
+                      - paragraph [ref=e333]: "Ahmad: Tukang bangunan langganan saya bersedia kasih diskon material. Hubungi Pak Joko di 0812-xxx."
+                  - generic [ref=e336]:
+                    - generic [ref=e337]: 📍
+                    - generic [ref=e338]: RW 03 Menteng
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e340]:
+                    - button "Vouch" [pressed] [ref=e342]:
+                      - img [ref=e343]
+                      - generic [ref=e344]: "20"
+                    - button "Skeptis" [ref=e346]:
+                      - img [ref=e347]
+                      - generic [ref=e348]: "1"
+                    - button "Saya Saksi" [ref=e350]:
+                      - img [ref=e351]
+                      - generic [ref=e352]: "4"
+                    - button "Bagus" [ref=e354]:
+                      - img [ref=e355]
+                      - generic [ref=e356]: "9"
+                    - button "Perlu Dicek" [ref=e358]:
+                      - img [ref=e359]
+                    - img [ref=e361]
+                  - generic [ref=e362]:
+                    - generic [ref=e363]:
+                      - img "Sari Dewi" [ref=e364]
+                      - img "Rina Kartika" [ref=e365]
+                      - img "Dewi Lestari" [ref=e366]
+                    - generic [ref=e367]:
+                      - img [ref=e368]
+                      - text: "32"
+                    - generic [ref=e369]:
+                      - button "Berhenti pantau" [ref=e371]:
+                        - img [ref=e372]
+                      - button "Simpan" [ref=e374]:
+                        - img [ref=e375]
+                      - button "Bagikan" [ref=e377]:
+                        - img [ref=e378]
+            - generic [ref=e379]:
+              - button [ref=e381] [cursor=pointer]:
+                - generic [ref=e382]:
+                  - generic [ref=e383]:
+                    - generic [ref=e384]: BARU
+                    - generic [ref=e385]: 3 aktif
+                    - generic [ref=e389]: 📢
+                  - paragraph [ref=e390]: Sudah 2 minggu, gelap total.
+                  - paragraph [ref=e391]: Lampu Jalan Mati di Gang Melati
+                  - generic [ref=e392]:
+                    - generic [ref=e393]: melaporkan masalah baru
+                    - generic [ref=e394]: ·
+                    - generic [ref=e395]: 25m lalu
+                  - paragraph [ref=e396]: Warga Gang Melati mengeluh lampu jalan padam total sejak dua minggu lalu. Ibu-ibu takut pulang malam dari pasar. Pak Ahmad sudah lapor ke kelurahan tapi belum ada respon. "Anak saya harus lewat gang gelap setiap pulang les," katanya.
+                  - generic [ref=e398]:
+                    - img [ref=e399]
+                    - generic [ref=e401]:
+                      - paragraph [ref=e402]: "Sari: Sudah foto buktinya tadi pagi, gelap banget. Saya kirim ke grup RT tapi belum ada yang respon sampai sekarang."
+                      - paragraph [ref=e403]: "Ahmad: Saya coba hubungi kelurahan lagi besok pagi. Kemarin Pak Lurah bilang anggaran penerangan habis, tapi saya mau coba minta alokasi darurat karena ini sudah dua minggu lebih."
+                      - paragraph [ref=e404]: "Budi: Gang sebelah juga mati, mungkin satu trafo."
+                      - paragraph [ref=e405]: "Dewi: Ibu-ibu pengajian sudah kumpul tanda tangan 47 orang yang terdampak. Mau kita serahkan ke kelurahan bareng?"
+                      - paragraph [ref=e406]: "Sari: Sudah foto buktinya tadi pagi, gelap banget. Saya kirim ke grup RT tapi belum ada yang respon sampai sekarang."
+                      - paragraph [ref=e407]: "Ahmad: Saya coba hubungi kelurahan lagi besok pagi. Kemarin Pak Lurah bilang anggaran penerangan habis, tapi saya mau coba minta alokasi darurat karena ini sudah dua minggu lebih."
+                      - paragraph [ref=e408]: "Budi: Gang sebelah juga mati, mungkin satu trafo."
+                      - paragraph [ref=e409]: "Dewi: Ibu-ibu pengajian sudah kumpul tanda tangan 47 orang yang terdampak. Mau kita serahkan ke kelurahan bareng?"
+                  - generic [ref=e410]:
+                    - generic [ref=e412]:
+                      - generic [ref=e413]: 📍
+                      - generic [ref=e414]: RT 05 Menteng
+                    - generic [ref=e416]:
+                      - generic [ref=e417]: 🏷️
+                      - generic [ref=e418]: Infrastruktur
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e420]:
+                    - button "Vouch" [ref=e422]:
+                      - img [ref=e423]
+                      - generic [ref=e424]: "2"
+                    - button "Skeptis" [ref=e426]:
+                      - img [ref=e427]
+                      - generic [ref=e428]: "1"
+                    - button "Saya Saksi" [pressed] [ref=e430]:
+                      - img [ref=e431]
+                      - generic [ref=e432]: "5"
+                    - button "Bagus" [ref=e434]:
+                      - img [ref=e435]
+                    - button "Perlu Dicek" [ref=e437]:
+                      - img [ref=e438]
+                    - img [ref=e440]
+                  - generic [ref=e441]:
+                    - generic [ref=e443]: A
+                    - generic [ref=e444]:
+                      - img [ref=e445]
+                      - text: "1"
+                    - generic [ref=e446]:
+                      - button "Berhenti pantau" [ref=e448]:
+                        - img [ref=e449]
+                      - button "Simpan" [ref=e451]:
+                        - img [ref=e452]
+                      - button "Bagikan" [ref=e454]:
+                        - img [ref=e455]
+              - generic [ref=e457]:
+                - generic [ref=e458]:
+                  - generic [ref=e459]:
+                    - generic [ref=e460]: 📸
+                    - generic [ref=e461]: Tahukah Anda?
+                  - button "Tutup" [ref=e462]:
+                    - img [ref=e463]
+                - paragraph [ref=e464]: Anda bisa melampirkan foto dan video sebagai bukti untuk memperkuat laporan.
+                - button "Pelajari →" [ref=e465]
+              - button "📝 Beras naik Rp 2.000/kg — siapa lagi yang lihat? Harga Beras Naik di Pasar Menteng menambah catatan komunitas · 6j lalu 🏷️ Harga Sembako Sinyal tandang — ketuk untuk penjelasan Sari Dewi A 4 Pantau Simpan Bagikan" [ref=e467] [cursor=pointer]:
+                - generic [ref=e468]:
+                  - generic [ref=e470]: 📝
+                  - paragraph [ref=e471]: Beras naik Rp 2.000/kg — siapa lagi yang lihat?
+                  - paragraph [ref=e472]: Harga Beras Naik di Pasar Menteng
+                  - generic [ref=e473]:
+                    - generic [ref=e474]: menambah catatan komunitas
+                    - generic [ref=e475]: ·
+                    - generic [ref=e476]: 6j lalu
+                  - generic [ref=e479]:
+                    - generic [ref=e480]: 🏷️
+                    - generic [ref=e481]: Harga Sembako
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e483]:
+                    - button "Vouch" [ref=e485]:
+                      - img [ref=e486]
+                      - generic [ref=e487]: "1"
+                    - button "Skeptis" [ref=e489]:
+                      - img [ref=e490]
+                    - button "Saya Saksi" [ref=e492]:
+                      - img [ref=e493]
+                      - generic [ref=e494]: "1"
+                    - button "Bagus" [ref=e496]:
+                      - img [ref=e497]
+                    - button "Perlu Dicek" [ref=e499]:
+                      - img [ref=e500]
+                    - img [ref=e502]
+                  - generic [ref=e503]:
+                    - generic [ref=e504]:
+                      - img "Sari Dewi" [ref=e505]
+                      - generic [ref=e506]: A
+                    - generic [ref=e507]:
+                      - img [ref=e508]
+                      - text: "4"
+                    - generic [ref=e509]:
+                      - button "Pantau" [ref=e511]:
+                        - img [ref=e512]
+                      - button "Simpan" [ref=e514]:
+                        - img [ref=e515]
+                      - button "Bagikan" [ref=e517]:
+                        - img [ref=e518]
+              - button "📢 Budi Santoso melaporkan Makin parah setelah hujan — sampah meluap. Sampah Menumpuk di Pinggir Kali Baru melaporkan masalah baru · 8j lalu 🏷️ Lingkungan Hidup 📍 RW 03 Menteng Sinyal tandang — ketuk untuk penjelasan B 2 Berhenti pantau Simpan Bagikan" [ref=e520] [cursor=pointer]:
+                - generic [ref=e521]:
+                  - generic [ref=e523]: 📢
+                  - paragraph [ref=e524]:
+                    - generic [ref=e525]: Budi Santoso
+                    - generic [ref=e526]: melaporkan
+                  - paragraph [ref=e527]: Makin parah setelah hujan — sampah meluap.
+                  - paragraph [ref=e528]: Sampah Menumpuk di Pinggir Kali Baru
+                  - generic [ref=e529]:
+                    - generic [ref=e530]: melaporkan masalah baru
+                    - generic [ref=e531]: ·
+                    - generic [ref=e532]: 8j lalu
+                  - generic [ref=e533]:
+                    - generic [ref=e535]:
+                      - generic [ref=e536]: 🏷️
+                      - generic [ref=e537]: Lingkungan Hidup
+                    - generic [ref=e539]:
+                      - generic [ref=e540]: 📍
+                      - generic [ref=e541]: RW 03 Menteng
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e543]:
+                    - button "Vouch" [ref=e545]:
+                      - img [ref=e546]
+                      - generic [ref=e547]: "2"
+                    - button "Skeptis" [ref=e549]:
+                      - img [ref=e550]
+                      - generic [ref=e551]: "2"
+                    - button "Saya Saksi" [pressed] [ref=e553]:
+                      - img [ref=e554]
+                      - generic [ref=e555]: "4"
+                    - button "Bagus" [ref=e557]:
+                      - img [ref=e558]
+                      - generic [ref=e559]: "3"
+                    - button "Perlu Dicek" [pressed] [ref=e561]:
+                      - img [ref=e562]
+                      - generic [ref=e563]: "2"
+                    - img [ref=e565]
+                  - generic [ref=e566]:
+                    - generic [ref=e568]: B
+                    - generic [ref=e569]:
+                      - img [ref=e570]
+                      - text: "2"
+                    - generic [ref=e571]:
+                      - button "Berhenti pantau" [ref=e573]:
+                        - img [ref=e574]
+                      - button "Simpan" [ref=e576]:
+                        - img [ref=e577]
+                      - button "Bagikan" [ref=e579]:
+                        - img [ref=e580]
+            - generic [ref=e581]:
+              - button [ref=e583] [cursor=pointer]:
+                - generic [ref=e584]:
+                  - generic [ref=e585]:
+                    - generic [ref=e586]: 5 aktif
+                    - generic [ref=e590]: 🙋
+                  - paragraph [ref=e591]: 12 orang turun tangan.
+                  - paragraph [ref=e592]: Jalan Rusak Jl. Mawar RT 05
+                  - generic [ref=e593]:
+                    - generic [ref=e594]: bergabung sebagai Relawan
+                    - generic [ref=e595]: ·
+                    - generic [ref=e596]: 45m lalu
+                  - generic [ref=e598]:
+                    - img [ref=e599]
+                    - generic [ref=e601]:
+                      - paragraph [ref=e602]: "Dewi: Saya bisa bantu survei akhir pekan ini kalau cuaca bagus, tapi kalau hujan mungkin kita tunda ke minggu depan saja ya?"
+                      - paragraph [ref=e603]: "Rina: Pak RT sudah setuju koordinasi. Beliau minta kita siapkan proposal sederhana dulu sebelum turun ke lapangan biar ada dokumentasinya."
+                      - paragraph [ref=e604]: "Ahmad: Siapa yang punya cangkul? Kita butuh minimal 3 buat kerja bakti Sabtu."
+                      - paragraph [ref=e605]: "Sari: Saya bawa dari rumah."
+                      - paragraph [ref=e606]: "Budi: Kemarin saya lewat situ, lubangnya makin dalam. Motor saya hampir masuk. Tolong cepat ya sebelum ada korban."
+                      - paragraph [ref=e607]: "Dewi: Saya bisa bantu survei akhir pekan ini kalau cuaca bagus, tapi kalau hujan mungkin kita tunda ke minggu depan saja ya?"
+                      - paragraph [ref=e608]: "Rina: Pak RT sudah setuju koordinasi. Beliau minta kita siapkan proposal sederhana dulu sebelum turun ke lapangan biar ada dokumentasinya."
+                      - paragraph [ref=e609]: "Ahmad: Siapa yang punya cangkul? Kita butuh minimal 3 buat kerja bakti Sabtu."
+                      - paragraph [ref=e610]: "Sari: Saya bawa dari rumah."
+                      - paragraph [ref=e611]: "Budi: Kemarin saya lewat situ, lubangnya makin dalam. Motor saya hampir masuk. Tolong cepat ya sebelum ada korban."
+                  - generic [ref=e612]:
+                    - generic [ref=e614]:
+                      - generic [ref=e615]: 📍
+                      - generic [ref=e616]: RT 05 Menteng
+                    - generic [ref=e618]:
+                      - generic [ref=e619]: 🏷️
+                      - generic [ref=e620]: Infrastruktur
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e622]:
+                    - button "Vouch" [pressed] [ref=e624]:
+                      - img [ref=e625]
+                      - generic [ref=e626]: "8"
+                    - button "Skeptis" [ref=e628]:
+                      - img [ref=e629]
+                    - button "Saya Saksi" [ref=e631]:
+                      - img [ref=e632]
+                      - generic [ref=e633]: "3"
+                    - button "Bagus" [pressed] [ref=e635]:
+                      - img [ref=e636]
+                      - generic [ref=e637]: "6"
+                    - button "Perlu Dicek" [ref=e639]:
+                      - img [ref=e640]
+                    - img [ref=e642]
+                  - generic [ref=e643]:
+                    - generic [ref=e644]:
+                      - generic [ref=e645]: A
+                      - img "Sari Dewi" [ref=e646]
+                      - generic [ref=e647]: B
+                      - img "Rina Kartika" [ref=e648]
+                    - generic [ref=e649]:
+                      - img [ref=e650]
+                      - text: "12"
+                    - generic [ref=e651]:
+                      - button "Berhenti pantau" [ref=e653]:
+                        - img [ref=e654]
+                      - button "Simpan" [ref=e656]:
+                        - img [ref=e657]
+                      - button "Bagikan" [ref=e659]:
+                        - img [ref=e660]
+              - button [ref=e662] [cursor=pointer]:
+                - generic [ref=e663]:
+                  - generic [ref=e664]:
+                    - generic [ref=e665]: 4 aktif
+                    - generic [ref=e669]: 📎
+                  - paragraph [ref=e670]: Air sungai berubah warna di titik buangan.
+                  - paragraph [ref=e671]: Penyelidikan Limbah Pabrik Sungai Ciliwung
+                  - generic [ref=e672]:
+                    - generic [ref=e673]: menambah bukti
+                    - generic [ref=e674]: ·
+                    - generic [ref=e675]: 3j lalu
+                  - paragraph [ref=e676]: Pak Budi mengambil sampel air di tiga titik berbeda sepanjang sungai. Di dekat pipa pembuangan pabrik, air berubah kecoklatan dengan bau menyengat. Warga nelayan hilir melaporkan ikan mati mengambang sejak bulan lalu. Data ini sudah dikirim ke Dinas Lingkungan Hidup.
+                  - generic [ref=e678]:
+                    - img [ref=e679]
+                    - generic [ref=e681]:
+                      - paragraph [ref=e682]: "Budi: Sampel ketiga paling parah, baunya menyengat sampai 50 meter dari sungai. Warga sekitar sudah mulai pakai masker kalau lewat situ."
+                      - paragraph [ref=e683]: "Ahmad: Nelayan hilir bilang ikan mati mengambang sejak bulan lalu. Pendapatan mereka turun drastis, ada yang sudah pindah profesi."
+                      - paragraph [ref=e684]: "Dewi: Sudah kirim ke Dinas LH, tunggu respons."
+                      - paragraph [ref=e685]: "Rina: Saya punya kontak wartawan Kompas regional. Mau saya hubungi? Kalau masuk media biasanya pemerintah lebih cepat bergerak."
+                      - paragraph [ref=e686]: "Budi: Sampel ketiga paling parah, baunya menyengat sampai 50 meter dari sungai. Warga sekitar sudah mulai pakai masker kalau lewat situ."
+                      - paragraph [ref=e687]: "Ahmad: Nelayan hilir bilang ikan mati mengambang sejak bulan lalu. Pendapatan mereka turun drastis, ada yang sudah pindah profesi."
+                      - paragraph [ref=e688]: "Dewi: Sudah kirim ke Dinas LH, tunggu respons."
+                      - paragraph [ref=e689]: "Rina: Saya punya kontak wartawan Kompas regional. Mau saya hubungi? Kalau masuk media biasanya pemerintah lebih cepat bergerak."
+                  - generic [ref=e692]:
+                    - generic [ref=e693]: 🏷️
+                    - generic [ref=e694]: Lingkungan Hidup
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e696]:
+                    - button "Vouch" [ref=e698]:
+                      - img [ref=e699]
+                      - generic [ref=e700]: "3"
+                    - button "Skeptis" [pressed] [ref=e702]:
+                      - img [ref=e703]
+                      - generic [ref=e704]: "4"
+                    - button "Bukti Valid" [ref=e706]:
+                      - img [ref=e707]
+                      - generic [ref=e708]: "2"
+                    - button "Bagus" [pressed] [ref=e710]:
+                      - img [ref=e711]
+                      - generic [ref=e712]: "8"
+                    - button "Perlu Dicek" [ref=e714]:
+                      - img [ref=e715]
+                      - generic [ref=e716]: "3"
+                    - img [ref=e718]
+                  - generic [ref=e719]:
+                    - generic [ref=e720]:
+                      - generic [ref=e721]: B
+                      - generic [ref=e722]: A
+                      - img "Dewi Lestari" [ref=e723]
+                    - generic [ref=e724]:
+                      - img [ref=e725]
+                      - text: "7"
+                    - generic [ref=e726]:
+                      - button "Berhenti pantau" [ref=e728]:
+                        - img [ref=e729]
+                      - button "Simpan" [ref=e731]:
+                        - img [ref=e732]
+                      - button "Bagikan" [ref=e734]:
+                        - img [ref=e735]
+              - generic [ref=e737]:
+                - generic [ref=e738]:
+                  - generic [ref=e739]:
+                    - generic [ref=e740]: 🎉
+                    - generic [ref=e741]: Komunitas makin aktif!
+                  - button "Tutup" [ref=e742]:
+                    - img [ref=e743]
+                - paragraph [ref=e744]: 10 saksi berhasil diselesaikan bulan ini oleh warga sekitar.
+                - generic [ref=e745]:
+                  - generic [ref=e746]: "10"
+                  - generic [ref=e747]: Saksi selesai bulan ini
+            - generic [ref=e748]:
+              - button [ref=e750] [cursor=pointer]:
+                - generic [ref=e751]:
+                  - generic [ref=e752]:
+                    - generic [ref=e753]: 2 aktif
+                    - generic [ref=e757]: 📍
+                  - paragraph [ref=e758]: Lahan di Jl. Kenari cocok — survei selesai.
+                  - paragraph [ref=e759]: Pembangunan Taman Warga RW 03
+                  - generic [ref=e760]:
+                    - generic [ref=e761]: menyelesaikan langkah
+                    - generic [ref=e762]: ·
+                    - generic [ref=e763]: 1j lalu
+                  - paragraph [ref=e764]: Setelah 3 bulan negosiasi dengan pemilik lahan, akhirnya disepakati pinjam pakai selama 5 tahun. Tim survei Karang Taruna turun langsung mengukur dan memetakan. Rencananya ada area bermain anak, bangku lansia, dan kebun kecil yang dikelola bersama. Bu Rina bilang, "Ini mimpi warga sejak 2019."
+                  - generic [ref=e766]:
+                    - img [ref=e767]
+                    - generic [ref=e769]:
+                      - paragraph [ref=e770]: "Rina: Ukuran lahan 12x20 meter, cukup luas! Kita bisa bagi jadi 3 zona: bermain anak, bangku lansia, dan kebun komunitas."
+                      - paragraph [ref=e771]: "Budi: Kalau ada kebun kecil, saya siap rawat setiap pagi sebelum kerja. Sudah pengalaman nanam sayur di belakang rumah."
+                      - paragraph [ref=e772]: "Sari: Anak-anak SD sini butuh banget tempat main. Selama ini mereka main di jalan, bahaya."
+                      - paragraph [ref=e773]: "Rina: Ukuran lahan 12x20 meter, cukup luas! Kita bisa bagi jadi 3 zona: bermain anak, bangku lansia, dan kebun komunitas."
+                      - paragraph [ref=e774]: "Budi: Kalau ada kebun kecil, saya siap rawat setiap pagi sebelum kerja. Sudah pengalaman nanam sayur di belakang rumah."
+                      - paragraph [ref=e775]: "Sari: Anak-anak SD sini butuh banget tempat main. Selama ini mereka main di jalan, bahaya."
+                  - generic [ref=e776]:
+                    - generic [ref=e778]:
+                      - generic [ref=e779]: 📍
+                      - generic [ref=e780]: RW 03 Menteng
+                    - generic [ref=e782]:
+                      - generic [ref=e783]: 👥
+                      - generic [ref=e784]: Karang Taruna RT 05
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e786]:
+                    - button "Vouch" [ref=e788]:
+                      - img [ref=e789]
+                      - generic [ref=e790]: "5"
+                    - button "Skeptis" [ref=e792]:
+                      - img [ref=e793]
+                      - generic [ref=e794]: "2"
+                    - button "Sudah Beres" [ref=e796]:
+                      - img [ref=e797]
+                      - generic [ref=e798]: "7"
+                    - button "Bagus" [ref=e800]:
+                      - img [ref=e801]
+                      - generic [ref=e802]: "4"
+                    - button "Perlu Dicek" [ref=e804]:
+                      - img [ref=e805]
+                    - img [ref=e807]
+                  - generic [ref=e808]:
+                    - generic [ref=e809]:
+                      - img "Rina Kartika" [ref=e810]
+                      - img "Sari Dewi" [ref=e811]
+                      - generic [ref=e812]: A
+                      - generic [ref=e813]: B
+                    - generic [ref=e814]:
+                      - img [ref=e815]
+                      - text: "15"
+                    - generic [ref=e816]:
+                      - button "Pantau" [ref=e818]:
+                        - img [ref=e819]
+                      - button "Simpan" [ref=e821]:
+                        - img [ref=e822]
+                      - button "Bagikan" [ref=e824]:
+                        - img [ref=e825]
+              - button "SELESAI ✅ Air mengalir lagi. 18 warga berkontribusi. Perbaikan Pipa Air PDAM Blok C kasus diselesaikan · 4j lalu 📍 RT 05 Menteng 🏷️ Infrastruktur Sinyal tandang — ketuk untuk penjelasan Rina Kartika A Sari Dewi B 18 Berhenti pantau Simpan Bagikan" [ref=e827] [cursor=pointer]:
+                - generic [ref=e828]:
+                  - generic [ref=e829]:
+                    - generic [ref=e830]: SELESAI
+                    - generic [ref=e831]: ✅
+                  - paragraph [ref=e832]: Air mengalir lagi. 18 warga berkontribusi.
+                  - paragraph [ref=e833]: Perbaikan Pipa Air PDAM Blok C
+                  - generic [ref=e834]:
+                    - generic [ref=e835]: kasus diselesaikan
+                    - generic [ref=e836]: ·
+                    - generic [ref=e837]: 4j lalu
+                  - generic [ref=e838]:
+                    - generic [ref=e840]:
+                      - generic [ref=e841]: 📍
+                      - generic [ref=e842]: RT 05 Menteng
+                    - generic [ref=e844]:
+                      - generic [ref=e845]: 🏷️
+                      - generic [ref=e846]: Infrastruktur
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e848]:
+                    - button "Vouch" [pressed] [ref=e850]:
+                      - img [ref=e851]
+                      - generic [ref=e852]: "14"
+                    - button "Skeptis" [ref=e854]:
+                      - img [ref=e855]
+                    - button "Sudah Beres" [pressed] [ref=e857]:
+                      - img [ref=e858]
+                      - generic [ref=e859]: "11"
+                    - button "Bagus" [pressed] [ref=e861]:
+                      - img [ref=e862]
+                      - generic [ref=e863]: "15"
+                    - button "Perlu Dicek" [ref=e865]:
+                      - img [ref=e866]
+                    - img [ref=e868]
+                  - generic [ref=e869]:
+                    - generic [ref=e870]:
+                      - img "Rina Kartika" [ref=e871]
+                      - generic [ref=e872]: A
+                      - img "Sari Dewi" [ref=e873]
+                      - generic [ref=e874]: B
+                    - generic [ref=e875]:
+                      - img [ref=e876]
+                      - text: "18"
+                    - generic [ref=e877]:
+                      - button "Berhenti pantau" [ref=e879]:
+                        - img [ref=e880]
+                      - button "Simpan" [ref=e882]:
+                        - img [ref=e883]
+                      - button "Bagikan" [ref=e885]:
+                        - img [ref=e886]
+              - button "📍 Sari Dewi bergabung sebagai Relawan Material sudah tiba — renovasi akhir pekan ini. Renovasi Pos Ronda RT 07 menyelesaikan langkah · 7j lalu Warga RT 07 gotong royong mengumpulkan material bekas untuk pos ronda baru. Semen, pasir, dan bata sudah ditumpuk di lokasi. Akhir pekan ini mulai kerja bakti — sudah ada 9 relawan yang siap turun. 🏷️ Infrastruktur Sinyal tandang — ketuk untuk penjelasan Dewi Lestari Rina Kartika B 9 Pantau Simpan Bagikan" [ref=e888] [cursor=pointer]:
+                - generic [ref=e889]:
+                  - generic [ref=e891]: 📍
+                  - paragraph [ref=e892]:
+                    - generic [ref=e893]: Sari Dewi
+                    - generic [ref=e894]: bergabung sebagai Relawan
+                  - paragraph [ref=e895]: Material sudah tiba — renovasi akhir pekan ini.
+                  - paragraph [ref=e896]: Renovasi Pos Ronda RT 07
+                  - generic [ref=e897]:
+                    - generic [ref=e898]: menyelesaikan langkah
+                    - generic [ref=e899]: ·
+                    - generic [ref=e900]: 7j lalu
+                  - paragraph [ref=e901]: Warga RT 07 gotong royong mengumpulkan material bekas untuk pos ronda baru. Semen, pasir, dan bata sudah ditumpuk di lokasi. Akhir pekan ini mulai kerja bakti — sudah ada 9 relawan yang siap turun.
+                  - generic [ref=e904]:
+                    - generic [ref=e905]: 🏷️
+                    - generic [ref=e906]: Infrastruktur
+                  - toolbar "Sinyal tandang — ketuk untuk penjelasan" [ref=e908]:
+                    - button "Vouch" [ref=e910]:
+                      - img [ref=e911]
+                      - generic [ref=e912]: "6"
+                    - button "Skeptis" [ref=e914]:
+                      - img [ref=e915]
+                    - button "Sudah Beres" [ref=e917]:
+                      - img [ref=e918]
+                      - generic [ref=e919]: "3"
+                    - button "Bagus" [pressed] [ref=e921]:
+                      - img [ref=e922]
+                      - generic [ref=e923]: "7"
+                    - button "Perlu Dicek" [ref=e925]:
+                      - img [ref=e926]
+                    - img [ref=e928]
+                  - generic [ref=e929]:
+                    - generic [ref=e930]:
+                      - img "Dewi Lestari" [ref=e931]
+                      - img "Rina Kartika" [ref=e932]
+                      - generic [ref=e933]: B
+                    - generic [ref=e934]:
+                      - img [ref=e935]
+                      - text: "9"
+                    - generic [ref=e936]:
+                      - button "Pantau" [ref=e938]:
+                        - img [ref=e939]
+                      - button "Simpan" [ref=e941]:
+                        - img [ref=e942]
+                      - button "Bagikan" [ref=e944]:
+                        - img [ref=e945]

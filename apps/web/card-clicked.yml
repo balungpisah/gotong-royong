@@ -1,0 +1,143 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: Edge-Pod
+      - button "Collapse" [ref=e7] [cursor=pointer]:
+        - img [ref=e8]
+    - navigation [ref=e9]:
+      - generic [ref=e10]: Build
+      - link "Forge" [ref=e11] [cursor=pointer]:
+        - /url: "#/forge"
+        - img [ref=e13]
+        - generic [ref=e14]: Forge
+      - link "Blueprints" [ref=e15] [cursor=pointer]:
+        - /url: "#/blueprints"
+        - img [ref=e17]
+        - generic [ref=e18]: Blueprints
+      - link "Skills" [ref=e19] [cursor=pointer]:
+        - /url: "#/skills"
+        - img [ref=e21]
+        - generic [ref=e22]: Skills
+      - link "Operators" [ref=e23] [cursor=pointer]:
+        - /url: "#/operators"
+        - img [ref=e25]
+        - generic [ref=e26]: Operators
+      - link "Primitives" [ref=e27] [cursor=pointer]:
+        - /url: "#/primitives"
+        - img [ref=e29]
+        - generic [ref=e30]: Primitives
+      - generic [ref=e31]: Deploy & Run
+      - link "Services" [ref=e32] [cursor=pointer]:
+        - /url: "#/services"
+        - img [ref=e34]
+        - generic [ref=e35]: Services
+      - link "Artifacts" [ref=e36] [cursor=pointer]:
+        - /url: "#/artifacts"
+        - img [ref=e38]
+        - generic [ref=e39]: Artifacts
+      - generic [ref=e40]: Monitor
+      - link "Overview" [ref=e41] [cursor=pointer]:
+        - /url: "#/"
+        - img [ref=e43]
+        - generic [ref=e44]: Overview
+      - link "Sessions" [ref=e45] [cursor=pointer]:
+        - /url: "#/sessions"
+        - img [ref=e47]
+        - generic [ref=e48]: Sessions
+      - link "Console" [ref=e49] [cursor=pointer]:
+        - /url: "#/console"
+        - img [ref=e51]
+        - generic [ref=e52]: Console
+      - generic [ref=e53]: System
+      - link "API Reference" [ref=e54] [cursor=pointer]:
+        - /url: "#/api-reference"
+        - img [ref=e56]
+        - generic [ref=e57]: API Reference
+      - link "About" [ref=e58] [cursor=pointer]:
+        - /url: "#/about"
+        - img [ref=e60]
+        - generic [ref=e61]: About
+  - generic [ref=e62]:
+    - banner [ref=e63]:
+      - generic [ref=e64]:
+        - heading "Admin Dashboard" [level=1] [ref=e65]
+        - generic [ref=e68]: Healthy
+      - generic [ref=e70]:
+        - img [ref=e71]
+        - textbox "API Key" [ref=e72]
+        - button "Show" [ref=e73] [cursor=pointer]
+    - main [ref=e74]:
+      - generic [ref=e75]:
+        - heading "Skills" [level=2] [ref=e76]
+        - generic [ref=e77]:
+          - list [ref=e81]:
+            - listitem [ref=e82]:
+              - button "debate builtin" [ref=e83] [cursor=pointer]:
+                - generic [ref=e84]: debate
+                - generic [ref=e85]: builtin
+            - listitem [ref=e86]:
+              - button "multi-agent-orchestration builtin" [ref=e87] [cursor=pointer]:
+                - generic [ref=e88]: multi-agent-orchestration
+                - generic [ref=e89]: builtin
+            - listitem [ref=e90]:
+              - button "coordinator-base builtin" [ref=e91] [cursor=pointer]:
+                - generic [ref=e92]: coordinator-base
+                - generic [ref=e93]: builtin
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - heading "debate" [level=3] [ref=e97]
+              - generic [ref=e98]:
+                - generic [ref=e99]: reasoning
+                - generic [ref=e100]: builtin
+                - generic [ref=e101]: v0.1.0
+            - generic [ref=e102]:
+              - heading "Description" [level=3] [ref=e104]
+              - paragraph [ref=e106]: Structured adversarial reasoning workflow using pro/con/judge agents.
+            - generic [ref=e107]:
+              - heading "Tags" [level=3] [ref=e109]
+              - generic [ref=e111]:
+                - generic [ref=e112]: reasoning
+                - generic [ref=e113]: debate
+                - generic [ref=e114]: decision-making
+            - generic [ref=e115]:
+              - heading "Required Primitives" [level=3] [ref=e117]
+              - generic [ref=e119]:
+                - generic [ref=e120]: agent.spawn
+                - generic [ref=e121]: comm.ask
+                - generic [ref=e122]: agent.terminate
+            - generic [ref=e123]:
+              - heading "Required Skills" [level=3] [ref=e125]
+              - generic [ref=e128]: coordinator-base
+            - generic [ref=e129]:
+              - heading "Composition" [level=3] [ref=e131]
+              - generic [ref=e133]:
+                - generic [ref=e134]:
+                  - generic [ref=e135]: Priority
+                  - generic [ref=e136]: "600"
+                - generic [ref=e137]:
+                  - generic [ref=e138]: Requires After
+                  - generic [ref=e139]: coordinator-base
+            - generic [ref=e140]:
+              - heading "Trust Requirements" [level=3] [ref=e142]
+              - generic [ref=e144]:
+                - generic [ref=e145]:
+                  - generic [ref=e146]: Skill Scripts
+                  - generic [ref=e147]: "No"
+                - generic [ref=e148]:
+                  - generic [ref=e149]: Inline Code
+                  - generic [ref=e150]: "No"
+                - generic [ref=e151]:
+                  - generic [ref=e152]: Network Access
+                  - generic [ref=e153]: "No"
+            - generic [ref=e154]:
+              - heading "Resources" [level=3] [ref=e156]
+              - generic [ref=e158]:
+                - generic [ref=e159]:
+                  - generic [ref=e160]: Token Estimate
+                  - generic [ref=e161]: "0"
+                - generic [ref=e162]:
+                  - generic [ref=e163]: References
+                  - generic [ref=e164]: "No"
+                - generic [ref=e165]:
+                  - generic [ref=e166]: Scripts
+                  - generic [ref=e167]: "No"
