@@ -31,6 +31,36 @@ USER_PASS="${SURREAL_PROBE_PASS:-root}"
 SURREAL_BIN="${SURREAL_BIN:-surreal}"
 LOCKED_TARGET_VERSION="${LOCKED_TARGET_VERSION:-3.0.0-beta.4}"
 
+pick_free_port() {
+  python3 - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+}
+
+port_is_free() {
+  local port="$1"
+  python3 - "$port" <<'PY'
+import socket, sys
+port = int(sys.argv[1])
+s = socket.socket()
+try:
+  s.bind(("127.0.0.1", port))
+  sys.exit(0)
+except OSError:
+  sys.exit(1)
+finally:
+  s.close()
+PY
+}
+
+if [[ -z "${SURREAL_PROBE_PORT:-}" ]] && ! port_is_free "${PORT}"; then
+  PORT="$(pick_free_port)"
+fi
+
 ENDPOINT_WS="ws://127.0.0.1:${PORT}"
 TMP_DIR="$(mktemp -d)"
 SERVER_LOG="${TMP_DIR}/server.log"

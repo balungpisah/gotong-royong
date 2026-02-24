@@ -62,17 +62,23 @@ db-migrate:
 db-check:
 	scripts/db/check.sh
 
+dev-db-up:
+	scripts/dev/up.sh
+
+dev-db-down:
+	scripts/dev/down.sh
+
 surreal-probe:
-	SURREAL_BIN=docs/research/samples/surrealdb/bin/surreal-v3.0.0-beta.4 \
-	LOCKED_TARGET_VERSION=3.0.0-beta.4 \
-	docs/research/samples/surrealdb/pattern_probe.sh docs/research/surrealdb-pattern-sampling-v3-beta4.md
+	SURREAL_BIN=scripts/tools/surreal-docker.sh \
+	LOCKED_TARGET_VERSION=3.0.0 \
+	docs/research/references/samples/surrealdb/pattern_probe.sh docs/research/surrealdb-pattern-sampling-v3.0.0.md
 
 surreal-ontology-probe:
-	SURREAL_BIN=docs/research/samples/surrealdb/bin/surreal-v3.0.0-beta.4 \
-	LOCKED_TARGET_VERSION=3.0.0-beta.4 \
-	docs/research/samples/surrealdb/ontology_probe.sh docs/research/ontology-probe-report.md
+	SURREAL_BIN=scripts/tools/surreal-docker.sh \
+	LOCKED_TARGET_VERSION=3.0.0 \
+	docs/research/references/samples/surrealdb/ontology_probe.sh docs/research/ontology-probe-report.md
 
 release-gates-surreal:
-	SURREAL_BIN=docs/research/samples/surrealdb/bin/surreal-v3.0.0-beta.4 \
-	LOCKED_TARGET_VERSION=3.0.0-beta.4 \
+	SURREAL_BIN=scripts/tools/surreal-docker.sh \
+	LOCKED_TARGET_VERSION=3.0.0 \
 	scripts/surrealdb-go-no-go.sh docs/research/surrealdb-go-no-go-latest.md

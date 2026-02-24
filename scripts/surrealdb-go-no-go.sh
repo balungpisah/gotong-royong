@@ -2,10 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
-PROBE_SCRIPT="${ROOT_DIR}/docs/research/samples/surrealdb/pattern_probe.sh"
+PROBE_SCRIPT="${ROOT_DIR}/docs/research/references/samples/surrealdb/pattern_probe.sh"
 
 : "${SURREAL_BIN:=surreal}"
-: "${LOCKED_TARGET_VERSION:=3.0.0-beta.4}"
+: "${LOCKED_TARGET_VERSION:=3.0.0}"
 
 if ! command -v "${SURREAL_BIN}" >/dev/null 2>&1; then
   echo "Surreal binary not found: ${SURREAL_BIN}" >&2
