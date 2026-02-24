@@ -6,7 +6,7 @@ set -euo pipefail
 : "${SURREAL_DB:=chat}"
 : "${SURREAL_USER:=root}"
 : "${SURREAL_PASS:=root}"
-: "${SURREAL_IMAGE:=surrealdb/surrealdb:v3.0.0-beta.4}"
+: "${SURREAL_IMAGE:=surrealdb/surrealdb:v3.0.0}"
 
 SUR_CMD=(surreal)
 WORKDIR="$(pwd)"
@@ -60,11 +60,16 @@ run_migration() {
     echo "migration failed for $migration_file due to Surreal thrown error" >&2
     return 1
   fi
+
+  if [[ "$output" == *"Parse error"* ]]; then
+    echo "migration failed for $migration_file due to Surreal parse error" >&2
+    return 1
+  fi
 }
 
 if command -v "${SUR_CMD[0]}" >/dev/null 2>&1; then
-  surreal_version="$(${SUR_CMD[0]} version 2>/dev/null | awk 'NR==1 {print $1}')"
-  surreal_major="${surreal_version%%.*}"
+  surreal_version="$(${SUR_CMD[0]} version 2>/dev/null || ${SUR_CMD[0]} --version 2>/dev/null || true)"
+  surreal_major="$(echo "$surreal_version" | grep -Eo '[0-9]+' | head -n 1 || true)"
   if [[ "$surreal_major" != "3" ]]; then
     configure_docker_cli
   fi
@@ -88,6 +93,11 @@ for migration_file in \
   "0014_remove_track_state_transition.surql" \
   "0015_discovery_drop_track_stage.surql" \
   "0016_add_mode_fields.surql" \
-  "0017_path_plan_action_type.surql"; do
+  "0017_path_plan_action_type.surql" \
+  "0018_auth_schema.surql" \
+  "0019_record_permissions.surql" \
+  "0020_auth_access_overwrite.surql" \
+  "0021_chat_optional_datetimes.surql" \
+  "0022_auth_token_permissions_fix.surql"; do
   run_migration "$migration_file"
 done

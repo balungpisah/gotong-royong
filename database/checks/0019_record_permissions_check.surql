@@ -1,0 +1,30 @@
+-- 0019_record_permissions_check
+INFO FOR TABLE chat_thread;
+INFO FOR TABLE chat_member;
+INFO FOR TABLE chat_message;
+INFO FOR TABLE chat_read_cursor;
+INFO FOR TABLE chat_delivery_event;
+INFO FOR TABLE contribution;
+INFO FOR TABLE evidence;
+INFO FOR TABLE vouch;
+INFO FOR TABLE vault_entry;
+INFO FOR TABLE vault_timeline_event;
+INFO FOR TABLE discovery_feed_item;
+INFO FOR TABLE discovery_notification;
+INFO FOR TABLE content_moderation;
+INFO FOR TABLE moderation_decision;
+INFO FOR TABLE path_plan;
+INFO FOR TABLE path_plan_event;
+INFO FOR TABLE plan_suggestion;
+INFO FOR TABLE siaga_broadcast;
+INFO FOR TABLE siaga_timeline_event;
+INFO FOR TABLE webhook_outbox_event;
+INFO FOR TABLE webhook_delivery_log;
+INFO FOR TABLE concept;
+INFO FOR TABLE note;
+INFO FOR TABLE VOUCHES;
+INFO FOR TABLE CHALLENGES;
+INFO FOR TABLE token;
+INFO FOR TABLE auth_audit;
+INFO FOR DB;
+
