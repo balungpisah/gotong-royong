@@ -1,21 +1,18 @@
 <script lang="ts">
 	import { getUserStore } from '$lib/stores';
 	import { m } from '$lib/paraglide/messages';
+	import AkuSkyPortrait from './aku-sky-portrait.svelte';
+	import AkuMissionControl from './aku-mission-control.svelte';
 	import {
-		ProfilHero,
-		IcjRings,
 		SkillsSection,
 		VouchNetwork,
 		ActivityTimeline,
 		DecayWarnings,
 		DukungHistory
 	} from '$lib/components/profil';
-	import Zap from '@lucide/svelte/icons/zap';
+	import { TandangAvatar } from '$lib/components/ui/tandang-avatar';
+	import PanelPinnedCard from './panel-pinned-card.svelte';
 	import Flame from '@lucide/svelte/icons/flame';
-	import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
-	import Target from '@lucide/svelte/icons/target';
-	import HeartHandshake from '@lucide/svelte/icons/heart-handshake';
-	import Award from '@lucide/svelte/icons/award';
 
 	interface Props {
 		userId?: string | null;
@@ -35,18 +32,17 @@
 
 	const profile = $derived(userStore.tandangProfile);
 
-	const budgetColor = $derived(() => {
-		if (!profile) return 'bg-berhasil';
-		const { remaining, max_vouches } = profile.vouch_budget;
-		if (remaining === 0) return 'bg-bahaya';
-		if (remaining / max_vouches < 0.3) return 'bg-waspada';
-		return 'bg-berhasil';
-	});
-
-	const genesisPct = $derived(() => {
-		if (!profile || profile.genesis.threshold === 0) return 0;
-		return Math.min(Math.round((profile.genesis.meaningful_interactions_this_month / profile.genesis.threshold) * 100), 100);
-	});
+	// Header identity helpers
+	const tierColors: Record<number, string> = {
+		0: 'var(--c-tier-0)',
+		1: 'var(--c-tier-1)',
+		2: 'var(--c-tier-2)',
+		3: 'var(--c-tier-3)',
+		4: 'var(--c-tier-4)'
+	};
+	const tierColor = $derived(profile ? (tierColors[profile.tier.level] ?? '#9E9E9E') : '#9E9E9E');
+	const joinedYear = $derived(profile ? new Date(profile.joined_at).getFullYear() : '');
+	const showFlameBadge = $derived(profile ? profile.consistency.streak_days > 7 : false);
 </script>
 
 {#if userStore.tandangLoading && !profile}
@@ -58,113 +54,86 @@
 	</div>
 {:else if profile}
 	<div class="flex h-full flex-col overflow-hidden">
-		<!-- Fixed header -->
-		<div class="panel-header shrink-0 border-b border-border/60">
-			<div class="px-4 py-3">
-				<ProfilHero {profile} isSelf={!userId} size="compact" />
-			</div>
-		</div>
+		<!-- Fixed header — PanelPinnedCard shared two-column template -->
+		<PanelPinnedCard>
+			{#snippet left()}
+				<div class="flex items-start gap-2.5">
+					<div class="relative shrink-0">
+						<TandangAvatar
+							person={{ user_id: profile.user_id, name: profile.name, avatar_url: profile.avatar_url, tier: profile.tier.level }}
+							size="sm"
+							isSelf={!userId}
+						/>
+						<span class="absolute bottom-0 right-0 size-2 rounded-full bg-online ring-1 ring-background"></span>
+					</div>
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-bold leading-tight text-foreground">{profile.name}</p>
+						<p class="truncate text-caption text-muted-foreground">
+							{#if profile.location}{profile.location} · {/if}{m.profil_member_since({ year: String(joinedYear) })}
+						</p>
+						<div class="mt-1 flex flex-nowrap items-center gap-1">
+							<span
+								class="inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-xs leading-tight font-medium"
+								style="border-color: color-mix(in srgb, {tierColor} 30%, transparent); background-color: color-mix(in srgb, {tierColor} 10%, transparent); color: {tierColor};"
+							>{profile.tier.pips} {profile.tier.name}</span>
+							{#if showFlameBadge}
+								<span class="inline-flex items-center gap-0.5 rounded-full border border-peringatan/30 bg-peringatan/10 px-2 py-0.5 text-xs leading-tight font-medium text-peringatan">
+									🔥 {profile.consistency.streak_days}h
+								</span>
+							{/if}
+						</div>
+					</div>
+				</div>
+			{/snippet}
+			{#snippet right()}
+				<div class="icj-col">
+					<div class="icj-row">
+						<span class="icj-label" style="color: var(--c-tandang-i)">I</span>
+						<div class="icj-bar-track">
+							<div class="icj-bar-fill" style="width: {Math.round(profile.scores.integrity.value * 100)}%; background: var(--c-tandang-i)"></div>
+						</div>
+						<span class="icj-value">{Math.round(profile.scores.integrity.value * 100)}</span>
+					</div>
+					<div class="icj-row">
+						<span class="icj-label" style="color: var(--c-tandang-c)">C</span>
+						<div class="icj-bar-track">
+							<div class="icj-bar-fill" style="width: {Math.round(profile.scores.competence.aggregate * 100)}%; background: var(--c-tandang-c)"></div>
+						</div>
+						<span class="icj-value">{Math.round(profile.scores.competence.aggregate * 100)}</span>
+					</div>
+					<div class="icj-row">
+						<span class="icj-label" style="color: var(--c-tandang-j)">J</span>
+						<div class="icj-bar-track">
+							<div class="icj-bar-fill" style="width: {Math.round(profile.scores.judgment.value * 100)}%; background: var(--c-tandang-j)"></div>
+						</div>
+						<span class="icj-value">{Math.round(profile.scores.judgment.value * 100)}</span>
+					</div>
+				</div>
+			{/snippet}
+		</PanelPinnedCard>
 
 		<!-- Scrollable content -->
 		<div class="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-2">
-			<!-- ICJ Rings — full width hero above grid -->
-			<div class="aku-card">
-				<IcjRings scores={profile.scores} />
-			</div>
+			<!-- Sky portrait — emotional state hero -->
+			<AkuSkyPortrait {profile} />
 
 			<!-- Decay warnings — above fold for loss aversion -->
 			{#if profile.decay_warnings.length > 0}
 				<DecayWarnings warnings={profile.decay_warnings} />
 			{/if}
 
-			<!-- 2-column grid -->
-			<div class="aku-grid">
-				<!-- Stats card -->
-				<div class="aku-card">
-					<div class="grid grid-cols-3 gap-1">
-						<div class="stat-cell">
-							<Zap class="size-3.5 text-waspada" />
-							<span class="text-xs font-bold text-foreground">{profile.consistency.multiplier.toFixed(2)}×</span>
-							<span class="stat-lbl">Multiplier</span>
-						</div>
-						<div class="stat-cell">
-							<Flame class="size-3.5 text-peringatan" />
-							<span class="text-xs font-bold text-foreground">{profile.consistency.streak_weeks}w</span>
-							<span class="stat-lbl">{m.profil_streak_label()}</span>
-						</div>
-						<div class="stat-cell">
-							<BarChart3 class="size-3.5 text-primary" />
-							<span class="text-xs font-bold text-foreground">{Math.round(profile.consistency.quality_avg * 100)}%</span>
-							<span class="stat-lbl">Kualitas</span>
-						</div>
-						<div class="stat-cell">
-							<Target class="size-3.5 text-berhasil" />
-							<span class="text-xs font-bold text-foreground">{profile.impact.witnesses_resolved}</span>
-							<span class="stat-lbl">Selesai</span>
-						</div>
-						<div class="stat-cell">
-							<HeartHandshake class="size-3.5 text-signal-proof" />
-							<span class="text-xs font-bold text-foreground">{profile.impact.people_helped}</span>
-							<span class="stat-lbl">Dibantu</span>
-						</div>
-						<div class="stat-cell">
-							<Award class="size-3.5 text-berhasil" />
-							<span class="text-xs font-bold text-foreground">
-								{profile.scores.judgment.dukung_success_rate !== null
-									? Math.round(profile.scores.judgment.dukung_success_rate * 100) + '%'
-									: '—'}
-							</span>
-							<span class="stat-lbl">Dukung</span>
-						</div>
-					</div>
-				</div>
+			<!-- Mission control — stats, impact, budget -->
+			<AkuMissionControl {profile} />
 
-				<!-- Vouch budget + Genesis -->
-				<div class="aku-card space-y-3">
-					<div class="min-w-0">
-						<div class="flex items-center justify-between gap-1">
-							<span class="text-caption font-medium text-foreground truncate">{m.profil_vouch_budget_title()}</span>
-							<span class="text-caption text-muted-foreground shrink-0">
-								{profile.vouch_budget.remaining}/{profile.vouch_budget.max_vouches}
-							</span>
-						</div>
-						<div class="mt-1.5 h-2 w-full rounded-full bg-muted/30">
-							<div
-								class="h-full rounded-full transition-all duration-500 {budgetColor()}"
-								style="width: {(profile.vouch_budget.active_vouches / profile.vouch_budget.max_vouches) * 100}%"
-							></div>
-						</div>
-					</div>
-					<div class="min-w-0">
-						<div class="flex items-center justify-between gap-1">
-							<span class="text-caption font-medium text-foreground truncate">{m.profil_genesis_weight()}</span>
-							<span class="text-caption text-muted-foreground shrink-0">
-								{profile.genesis.meaningful_interactions_this_month}/{profile.genesis.threshold}
-							</span>
-						</div>
-						<div class="mt-1.5 h-2 w-full rounded-full bg-muted/30">
-							<div
-								class="h-full rounded-full transition-all duration-500 {genesisPct() >= 100 ? 'bg-berhasil' : 'bg-primary/60'}"
-								style="width: {genesisPct()}%"
-							></div>
-						</div>
-						{#if genesisPct() >= 100}
-							<p class="mt-1 text-caption text-berhasil">{m.profil_genesis_paused()}</p>
-						{/if}
-					</div>
-				</div>
+			<!-- Skills -->
+			<SkillsSection skills={profile.skills} />
 
-				<!-- Skills -->
-				<SkillsSection skills={profile.skills} />
-
-				<!-- Vouch Network -->
-				<VouchNetwork
-					vouchedBy={profile.vouched_by}
-					vouchingFor={profile.vouching_for}
-					budget={profile.vouch_budget}
-				/>
-
-			</div>
+			<!-- Vouch Network -->
+			<VouchNetwork
+				vouchedBy={profile.vouched_by}
+				vouchingFor={profile.vouching_for}
+				budget={profile.vouch_budget}
+			/>
 
 			<!-- Full-width sections below the grid -->
 			<DukungHistory
@@ -183,48 +152,55 @@
 {/if}
 
 <style>
-	.panel-header {
-		background: color-mix(in srgb, var(--color-foreground) 5%, var(--color-card));
-	}
-
-	.aku-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.5rem;
-		align-items: start;
-	}
-
-	/* Prevent grid children from overflowing their column */
-	.aku-grid > :global(*) {
+	/* Right col content — rendered inside PanelPinnedCard's right slot */
+	.icj-col {
+		flex: 0 0 calc(40% - 1rem);
 		min-width: 0;
-		overflow: hidden;
-	}
-
-	.aku-card {
-		border-radius: 0.75rem;
-		border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
-		background: var(--color-card);
-		padding: 0.625rem;
-		overflow: hidden;
-		min-width: 0;
-	}
-
-	.stat-cell {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 0.15rem;
-		padding: 0.35rem 0;
+		justify-content: center;
+		gap: 0.45rem;
 	}
 
-	.stat-lbl {
-		font-size: 0.625rem;
-		line-height: 1.1;
-		color: var(--color-muted-foreground);
-		text-align: center;
-		max-width: 100%;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+	.icj-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 	}
+
+	/* text-xs = 0.75rem, matches phase row labels in tandang */
+	.icj-label {
+		font-size: 0.75rem;
+		font-weight: 800;
+		letter-spacing: 0.05em;
+		width: 0.75rem;
+		flex-shrink: 0;
+	}
+
+	.icj-bar-track {
+		flex: 1;
+		height: 5px;
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--color-muted) 40%, transparent);
+		overflow: hidden;
+	}
+
+	.icj-bar-fill {
+		height: 100%;
+		border-radius: 99px;
+		transition: width 500ms ease;
+	}
+
+	/* text-caption = 11px / 16px, matches phase count in tandang */
+	.icj-value {
+		font-size: 11px;
+		line-height: 16px;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		color: var(--color-muted-foreground);
+		width: 1.5rem;
+		text-align: right;
+		flex-shrink: 0;
+	}
+
 </style>

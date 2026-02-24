@@ -16,6 +16,7 @@ export { default as DiscoverView } from './discover-view.svelte';
 export { default as EntityPill } from './entity-pill.svelte';
 
 // Context box system
+export { default as PanelPinnedCard } from './panel-pinned-card.svelte';
 export { default as ContextBox } from './context-box.svelte';
 export { default as CommunityPulse } from './community-pulse.svelte';
 export { default as SelfProfile } from './self-profile.svelte';
