@@ -6,20 +6,20 @@ This document defines the **current deployment profile** for Gotong Royong after
 
 Canonical profile:
 - Rust 2024 backend (Axum + Tokio + Tower)
-- SurrealDB `v3.0.0-beta.4`
+- SurrealDB server `v3.0.0` (Rust SDK `surrealdb` `=3.0.0`)
 - Redis for ephemeral/idempotency/rate control
 - Realtime transport: local bus by default; Redis pub/sub when multi-replica
 - S3-compatible object storage for evidence payloads
 - OpenTelemetry + structured tracing
 
 Reference decision:
-- `docs/research/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
+- `docs/architecture/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
 
 ## Storage Engine Profile
 
 - Local development: in-memory engine (default) or file-backed for persistence.
 - Staging/production: TiKV engine for distributed, scalable storage.
-- SurrealKV remains beta and is not the default for production.
+- SurrealKV is not the default for production.
 
 ## Environments
 
@@ -38,11 +38,11 @@ Recommended local commands are documented in:
 
 Objectives:
 - Run pinned stack end-to-end with production-like networking.
-- Validate beta go/no-go gates before production promotion.
+- Validate go/no-go gates before production promotion.
 
 Minimum services:
 - `api`
-- `surrealdb` (`v3.0.0-beta.4`) backed by TiKV
+- `surrealdb` (`v3.0.0`) backed by TiKV
 - `redis`
 - `object storage` (S3-compatible)
 - telemetry collector + metrics/log backend
@@ -51,7 +51,7 @@ Minimum services:
 
 Constraints:
 - Pin versions (no floating tags for API or DB).
-- Use repository/adapter isolation to reduce Surreal beta upgrade risk.
+- Use repository/adapter isolation to reduce SurrealDB upgrade risk.
 - Enforce rollback path to stable target defined by release policy.
 
 Minimum topology:
@@ -90,7 +90,7 @@ services:
       - minio
 
   surrealdb:
-    image: surrealdb/surrealdb:v3.0.0-beta.4
+    image: surrealdb/surrealdb:v3.0.0
     command: start --user root --pass ${SURREAL_PASS} file:/data/surreal.db
     ports:
       - "8000:8000"

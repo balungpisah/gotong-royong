@@ -5,7 +5,7 @@
 This document defines migration workflow for the locked SurrealDB stack.
 
 Stack context:
-- SurrealDB `v3.0.0-beta.4`
+- SurrealDB server `v3.0.0`
 - Rust backend with repository/adapter boundary
 
 ## Migration Principles
@@ -134,7 +134,7 @@ Each migration must be validated against:
 ## Operational Checklist
 
 Before production apply:
-- confirm pinned SurrealDB version matches lock (`3.0.0-beta.4`)
+- confirm pinned SurrealDB version matches lock (`3.0.0`)
 - backup/export strategy verified
 - migration + checks reviewed
 - rollback/compensating path approved

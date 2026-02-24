@@ -17,7 +17,7 @@ A backend platform that:
 
 - **Language/Edition**: Rust 2024
 - **Backend Framework**: Axum + Tokio + Tower/tower-http
-- **Database**: SurrealDB v3 beta (current lock: `v3.0.0-beta-4`)
+- **Database**: SurrealDB v3 (current lock: `v3.0.0`)
 - **Realtime**: WebSocket (primary), SSE and polling fallbacks
 - **Cache**: Redis (idempotency, rate controls, ephemeral fanout metadata)
 - **Storage**: S3-compatible object storage (for evidence files)

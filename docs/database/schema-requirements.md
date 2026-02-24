@@ -3,8 +3,8 @@
 ## Overview
 
 This document defines schema requirements for the locked implementation stack:
-- SurrealDB `v3.0.0-beta.4`
-- Rust SDK 3 beta channel
+- SurrealDB server `v3.0.0`
+- Rust SDK `surrealdb` `v3.0.0`
 - Chat-heavy workload with realtime subscriptions
 
 Reference documents:

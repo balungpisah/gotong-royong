@@ -10,7 +10,7 @@ Surreal beta safety constraints.
 ## Precondition
 
 - Staging has two API replicas behind a load balancer.
-- SurrealDB pinned to `3.0.0-beta-4` with TiKV.
+- SurrealDB pinned to `3.0.0` with TiKV.
 - Redis available for idempotency and realtime fanout.
 - `CHAT_REALTIME_TRANSPORT=redis` on all API replicas.
 - Shared channel prefix configured (`CHAT_REALTIME_CHANNEL_PREFIX`).

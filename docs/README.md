@@ -6,7 +6,7 @@ This directory contains technical specifications and design documentation for bu
 
 Implementation planning and execution are locked to:
 - Rust 2024 + Axum + Tokio + Tower/tower-http
-- SurrealDB `v3.0.0-beta.4` (SDK 3 beta channel)
+- SurrealDB server `v3.0.0` (Rust SDK `surrealdb` `v3.0.0`)
 - Redis + S3-compatible object storage
 
 Canonical decision:
@@ -26,7 +26,8 @@ Canonical decision:
 ### API Specifications
 - [Webhook Specification](api/webhook-spec.md) - Webhook endpoint requirements
 - [Event Payloads](api/event-payloads.md) - JSON schemas for all event types
-- [Authentication](api/authentication.md) - HMAC-SHA256 implementation
+- [User Authentication](api/user-auth.md) - SurrealDB-native auth + DB-enforced authorization
+- [Webhook Authentication](api/authentication.md) - HMAC-SHA256 implementation
 - [Error Handling](api/error-handling.md) - Status codes and retry logic
 
 ### Design Documentation

@@ -8,7 +8,7 @@ Canonical implementation stack (locked — see [ADR-001](../architecture/adr/ADR
 |-----------|-----------|
 | Backend | Rust 2024 edition, MSRV 1.88.0 |
 | HTTP | Axum 0.7 + Tokio |
-| Database | SurrealDB `=3.0.0-beta.4` (in-memory in dev) |
+| Database | SurrealDB `=3.0.0` (in-memory in dev) |
 | Cache | Redis 7+ |
 | Object Storage | MinIO (local S3-compatible) |
 | Frontend | SvelteKit 2 + Svelte 5 runes + Tailwind + Bun |

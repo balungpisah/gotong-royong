@@ -71,7 +71,7 @@ graph TB
 |-------|-----------|
 | **Language** | Rust 2024 edition, MSRV 1.88.0 |
 | **HTTP Framework** | Axum 0.7 + Tokio async runtime + Tower/tower-http middleware |
-| **Database** | SurrealDB `=3.0.0-beta.4` (TiKV engine in prod, in-memory in dev) |
+| **Database** | SurrealDB `=3.0.0` (TiKV engine in prod, in-memory in dev) |
 | **Cache / Rate Limiting** | Redis 7+ (idempotency keys, rate controls, ephemeral fanout) |
 | **Object Storage** | S3-compatible (AWS S3 / MinIO / DigitalOcean Spaces) |
 | **Auth** | JWT (access + refresh tokens) + HMAC-SHA256 webhook signatures |

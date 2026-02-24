@@ -13,7 +13,7 @@ We lock the backend stack to:
 - Tokio runtime
 - Axum framework
 - Tower + tower-http middleware
-- SurrealDB server `v3.0.0-beta-4` with Rust SDK 3 beta channel
+- SurrealDB server `v3.0.0` with Rust SDK `surrealdb` `v3.0.0`
 - WebSocket primary realtime transport with SSE and polling fallback
 - Redis for ephemeral idempotency/rate/fanout support
 - S3-compatible object storage for evidence payloads
@@ -30,13 +30,13 @@ We lock the backend stack to:
 - Adapter boundary around SurrealDB limits beta risk and enables rollback.
 
 ## Consequences
-- Team accepts beta risk for SurrealDB SDK 3 in exchange for earlier adoption.
+- Team pins SurrealDB v3 runtime + SDK for predictable behavior.
 - All implementation tickets should assume this profile unless superseded by a later ADR.
 - Alternatives (Actix, SQLx, Diesel, SeaORM) remain reference-only and are deferred.
 
 ## Guardrails
 - No floating versions for toolchain, crates, or DB image tags.
-- Beta go/no-go gates and rollback triggers must pass before production rollout.
+- Go/no-go gates and rollback triggers must pass before production rollout.
 - Realtime contract tests (ordering, permission filtering, reconnect catch-up) are mandatory.
 
 ## Supersedes

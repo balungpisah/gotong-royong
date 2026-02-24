@@ -7,12 +7,12 @@ This guide defines the **current canonical local setup** for Gotong Royong.
 Stack lock:
 - Rust 2024
 - Axum + Tokio + Tower
-- SurrealDB `v3.0.0-beta.4`
+- SurrealDB server `v3.0.0` (Rust SDK `surrealdb` `=3.0.0`)
 - Redis
 - MinIO (S3-compatible object storage)
 
 Reference decision:
-- `docs/research/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
+- `docs/architecture/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
 
 Engine profile:
 - Local dev: SurrealDB in-memory engine (default).
@@ -25,8 +25,8 @@ Engine profile:
 |---|---|---|
 | Rust toolchain | 1.88.0+ | Build and run backend |
 | Cargo | bundled with Rust | Build tooling |
-| SurrealDB CLI/server | 3.0.0-beta.4 | Local database runtime |
-| Docker | 20.10+ | Run Redis + MinIO locally |
+| SurrealDB server | 3.0.0 | Local database runtime |
+| Docker Desktop | latest | Run SurrealDB + Redis (+ MinIO) locally |
 | Git | 2.30+ | Version control |
 
 Optional:
@@ -77,36 +77,27 @@ WORKER_BACKOFF_MAX_MS=60000
 
 ## Quick Start
 
-### 1. Start Redis and MinIO
+### 1. Start dev dependencies (Docker Desktop)
 
 ```bash
-docker run -d --name gotong-redis -p 6379:6379 redis:7-alpine
-docker run -d --name gotong-minio \
-  -p 9000:9000 -p 9001:9001 \
-  -e MINIO_ROOT_USER=minioadmin \
-  -e MINIO_ROOT_PASSWORD=minioadmin \
-  minio/minio:latest server /data --console-address ":9001"
+just dev-db-up
 ```
 
-### 2. Start SurrealDB 3 beta
+This starts:
+- SurrealDB on `ws://127.0.0.1:8000`
+- Redis on `redis://127.0.0.1:6379`
 
-Default local profile uses the in-memory engine. Use the pinned binary path if available:
+Optional local object storage (MinIO):
 
 ```bash
-./docs/research/samples/surrealdb/bin/surreal-v3.0.0-beta.4 start memory --user root --pass root --bind 127.0.0.1:8000
+docker compose -f compose.dev.yaml --profile storage up -d minio
 ```
 
-If using another installed binary, ensure it reports `3.0.0-beta.4`:
-
-```bash
-surreal version
-```
-
-### 3. Build and run backend
+### 2. Build and run backend
 
 ```bash
 cargo build
-cargo run -p gotong-api
+just api
 ```
 
 Hot reload (optional):
@@ -115,17 +106,17 @@ Hot reload (optional):
 cargo watch -x "run -p gotong-api"
 ```
 
-### 4. Verify dependencies
+### 3. Verify dependencies
 
 ```bash
-# Surreal
-./docs/research/samples/surrealdb/bin/surreal-v3.0.0-beta.4 is-ready --endpoint ws://127.0.0.1:8000
+# SurrealDB
+docker compose -f compose.dev.yaml exec -T surrealdb /surreal is-ready --endpoint ws://127.0.0.1:8000
 
 # Redis
 redis-cli ping
 
-# MinIO
-curl http://127.0.0.1:9000/minio/health/live
+# MinIO (optional)
+curl -fsS http://127.0.0.1:9000/minio/health/live
 ```
 
 ## Seed / Probe Data
@@ -133,10 +124,7 @@ curl http://127.0.0.1:9000/minio/health/live
 Run the Surreal pattern probe used by research:
 
 ```bash
-SURREAL_BIN=docs/research/samples/surrealdb/bin/surreal-v3.0.0-beta.4 \
-LOCKED_TARGET_VERSION=3.0.0-beta.4 \
-docs/research/samples/surrealdb/pattern_probe.sh \
-docs/research/surrealdb-pattern-sampling-v3-beta4.md
+just surreal-probe
 ```
 
 ## Operational Commands
@@ -144,7 +132,10 @@ docs/research/surrealdb-pattern-sampling-v3-beta4.md
 ### Stop local services
 
 ```bash
-docker rm -f gotong-redis gotong-minio
+just dev-db-down
+
+# If you enabled MinIO:
+docker compose -f compose.dev.yaml --profile storage down
 ```
 
 ### Reset local Surreal runtime
@@ -158,12 +149,12 @@ If using file-backed mode, remove the datastore file/path and restart.
 ### SurrealDB live query not streaming
 
 - Ensure app/CLI endpoint uses `ws://`, not `http://`.
-- Verify the server version is `3.0.0-beta.4`.
+- Verify the server version is `3.0.0`.
 
 ### Redis connection refused
 
 ```bash
-docker ps | rg gotong-redis
+docker compose -f compose.dev.yaml ps
 ```
 
 ### MinIO bucket missing
@@ -176,4 +167,3 @@ mc mb local/gotong-royong-evidence-dev
 ```
 
 ## Notes
-
