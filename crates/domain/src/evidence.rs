@@ -109,6 +109,29 @@ impl EvidenceService {
             "timestamp": format_rfc3339(evidence.created_at_ms),
         })
     }
+
+    pub fn into_co_witness_attested_payload(
+        evidence: &Evidence,
+        witness_count: u32,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "event_type": "co_witness_attested",
+            "actor": {
+                "user_id": evidence.actor_id,
+                "username": evidence.actor_username,
+            },
+            "subject": {
+                "contribution_id": evidence.contribution_id,
+                "evidence_id": evidence.evidence_id,
+                "attestation_type": to_evidence_type_name(&evidence.evidence_type),
+                "witness_count": witness_count,
+            },
+            "event_id": format!("evt_cowit_{}", &evidence.evidence_id[..16.min(evidence.evidence_id.len())]),
+            "schema_version": "1",
+            "request_id": evidence.request_id,
+            "timestamp": format_rfc3339(evidence.created_at_ms),
+        })
+    }
 }
 
 fn evidence_to_event_id(evidence_id: &str) -> String {

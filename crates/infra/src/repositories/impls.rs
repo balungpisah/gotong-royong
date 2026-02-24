@@ -324,6 +324,10 @@ pub struct SurrealWebhookOutboxRepository {
 }
 
 impl SurrealWebhookOutboxRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -780,6 +784,10 @@ pub struct SurrealContributionRepository {
 }
 
 impl SurrealContributionRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -1077,6 +1085,10 @@ pub struct SurrealEvidenceRepository {
 }
 
 impl SurrealEvidenceRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -1301,6 +1313,10 @@ pub struct SurrealVouchRepository {
 }
 
 impl SurrealVouchRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -1880,6 +1896,10 @@ pub struct SurrealOntologyRepository {
 }
 
 impl SurrealOntologyRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -2967,6 +2987,10 @@ pub struct SurrealAdaptivePathRepository {
 }
 
 impl SurrealAdaptivePathRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -3931,6 +3955,10 @@ pub struct SurrealDiscoveryFeedRepository {
 }
 
 impl SurrealDiscoveryFeedRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -4242,6 +4270,10 @@ pub struct SurrealDiscoveryNotificationRepository {
 }
 
 impl SurrealDiscoveryNotificationRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -4658,6 +4690,10 @@ pub struct SurrealVaultRepository {
 }
 
 impl SurrealVaultRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -5735,6 +5771,10 @@ pub struct SurrealSiagaRepository {
 }
 
 impl SurrealSiagaRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -6626,6 +6666,10 @@ pub struct SurrealModerationRepository {
 }
 
 impl SurrealModerationRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -7671,6 +7715,10 @@ pub struct SurrealChatRepository {
 }
 
 impl SurrealChatRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
@@ -7849,16 +7897,6 @@ struct SurrealChatThreadRow {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SurrealChatThreadCreateRow {
-    thread_id: String,
-    scope_id: String,
-    created_by: String,
-    privacy_level: String,
-    created_at: String,
-    updated_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 struct SurrealChatMemberRow {
     thread_id: String,
     user_id: String,
@@ -7963,40 +8001,42 @@ impl ChatRepositoryPort for SurrealChatRepository {
         &self,
         thread: &ChatThread,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<ChatThread>> {
-        let payload = match Self::to_rfc3339(thread.created_at_ms).and_then(|created_at| {
-            Self::to_rfc3339(thread.updated_at_ms).map(|updated_at| SurrealChatThreadCreateRow {
-                thread_id: thread.thread_id.clone(),
-                scope_id: thread.scope_id.clone(),
-                created_by: thread.created_by.clone(),
-                privacy_level: thread.privacy_level.clone(),
-                created_at,
-                updated_at,
-            })
-        }) {
-            Ok(payload) => payload,
+        let created_at = match Self::to_rfc3339(thread.created_at_ms) {
+            Ok(value) => value,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let updated_at = match Self::to_rfc3339(thread.updated_at_ms) {
+            Ok(value) => value,
             Err(err) => return Box::pin(async move { Err(err) }),
         };
         let client = self.client.clone();
-        let thread_id = thread.thread_id.clone();
+        let thread_value = thread.clone();
+        let thread_id = thread_value.thread_id.clone();
+        let scope_id = thread_value.scope_id.clone();
+        let created_by = thread_value.created_by.clone();
+        let privacy_level = thread_value.privacy_level.clone();
         Box::pin(async move {
-            let payload = to_value(payload)
-                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
-            let mut response = client
-                .query("CREATE chat_thread CONTENT $payload")
-                .bind(("payload", payload))
+            let response = client
+                .query(
+                    "CREATE chat_thread CONTENT {\n\
+                        thread_id: $thread_id,\n\
+                        scope_id: $scope_id,\n\
+                        created_by: $created_by,\n\
+                        privacy_level: $privacy_level,\n\
+                        created_at: <datetime>$created_at,\n\
+                        updated_at: <datetime>$updated_at\n\
+                    };",
+                )
+                .bind(("thread_id", thread_id))
+                .bind(("scope_id", scope_id))
+                .bind(("created_by", created_by))
+                .bind(("privacy_level", privacy_level))
+                .bind(("created_at", created_at))
+                .bind(("updated_at", updated_at))
                 .await
                 .map_err(Self::map_surreal_error)?;
-            let rows: Vec<Value> = response
-                .take(0)
-                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            let mut threads = Self::decode_thread_row(rows)?;
-            let thread = threads
-                .pop()
-                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))?;
-            if thread.thread_id != thread_id {
-                return Ok(thread);
-            }
-            Ok(thread)
+            response.check().map_err(Self::map_surreal_error)?;
+            Ok(thread_value)
         })
     }
 
@@ -8008,7 +8048,18 @@ impl ChatRepositoryPort for SurrealChatRepository {
         let client = self.client.clone();
         Box::pin(async move {
             let mut response = client
-                .query("SELECT * FROM chat_thread WHERE thread_id = $thread_id LIMIT 1")
+                .query(
+                    "SELECT\n\
+                        thread_id,\n\
+                        scope_id,\n\
+                        created_by,\n\
+                        privacy_level,\n\
+                        type::string(created_at) AS created_at,\n\
+                        type::string(updated_at) AS updated_at\n\
+                     FROM chat_thread\n\
+                     WHERE thread_id = $thread_id\n\
+                     LIMIT 1",
+                )
                 .bind(("thread_id", thread_id))
                 .await
                 .map_err(Self::map_surreal_error)?;
@@ -8038,7 +8089,16 @@ impl ChatRepositoryPort for SurrealChatRepository {
             );
             }
 
-            let mut query_sql = String::from("SELECT * FROM chat_thread");
+            let mut query_sql = String::from(
+                "SELECT\n\
+                    thread_id,\n\
+                    scope_id,\n\
+                    created_by,\n\
+                    privacy_level,\n\
+                    type::string(created_at) AS created_at,\n\
+                    type::string(updated_at) AS updated_at\n\
+                 FROM chat_thread",
+            );
             if !conditions.is_empty() {
                 query_sql.push_str(" WHERE ");
                 query_sql.push_str(&conditions.join(" AND "));
@@ -8069,7 +8129,19 @@ impl ChatRepositoryPort for SurrealChatRepository {
         Box::pin(async move {
             let mut response = client
                 .query(
-                    "SELECT * FROM chat_thread WHERE thread_id IN (SELECT thread_id FROM chat_member WHERE user_id = $user_id AND left_at IS NONE) ORDER BY created_at DESC, thread_id DESC",
+                    "SELECT\n\
+                        thread_id,\n\
+                        scope_id,\n\
+                        created_by,\n\
+                        privacy_level,\n\
+                        type::string(created_at) AS created_at,\n\
+                        type::string(updated_at) AS updated_at\n\
+                     FROM chat_thread\n\
+                     WHERE thread_id IN (\n\
+                        SELECT thread_id FROM chat_member\n\
+                        WHERE user_id = $user_id AND left_at IS NONE\n\
+                     )\n\
+                     ORDER BY created_at DESC, thread_id DESC",
                 )
                 .bind(("user_id", user_id))
                 .await
@@ -8144,8 +8216,15 @@ impl ChatRepositoryPort for SurrealChatRepository {
             left_at,
             mute_until,
         };
-        let thread_id = member.thread_id.clone();
-        let user_id = member.user_id.clone();
+        let member_value = member.clone();
+        let thread_id = member_value.thread_id.clone();
+        let user_id = member_value.user_id.clone();
+        let role = match member.role {
+            ChatMemberRole::Owner => "owner",
+            ChatMemberRole::Admin => "admin",
+            ChatMemberRole::Member => "member",
+        }
+        .to_string();
         let client = self.client.clone();
         Box::pin(async move {
             let mut existing_active = client
@@ -8164,20 +8243,27 @@ impl ChatRepositoryPort for SurrealChatRepository {
                 return Err(DomainError::Conflict);
             }
 
-            let payload = to_value(payload)
-                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
-            let mut response = client
-                .query("CREATE chat_member CONTENT $payload")
-                .bind(("payload", payload))
+            let response = client
+                .query(
+                    "CREATE chat_member CONTENT {\n\
+                        thread_id: $thread_id,\n\
+                        user_id: $user_id,\n\
+                        role: $role,\n\
+                        joined_at: <datetime>$joined_at,\n\
+                        left_at: IF $left_at IS NONE THEN NONE ELSE <datetime>$left_at END,\n\
+                        mute_until: IF $mute_until IS NONE THEN NONE ELSE <datetime>$mute_until END\n\
+                    };",
+                )
+                .bind(("thread_id", thread_id))
+                .bind(("user_id", user_id))
+                .bind(("role", role))
+                .bind(("joined_at", payload.joined_at))
+                .bind(("left_at", payload.left_at))
+                .bind(("mute_until", payload.mute_until))
                 .await
                 .map_err(Self::map_surreal_error)?;
-            let rows: Vec<Value> = response
-                .take(0)
-                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            let mut members = Self::decode_member_row(rows)?;
-            members
-                .pop()
-                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+            response.check().map_err(Self::map_surreal_error)?;
+            Ok(member_value)
         })
     }
 
@@ -8189,7 +8275,17 @@ impl ChatRepositoryPort for SurrealChatRepository {
         let client = self.client.clone();
         Box::pin(async move {
             let mut response = client
-                .query("SELECT * FROM chat_member WHERE thread_id = $thread_id AND left_at IS NONE")
+                .query(
+                    "SELECT\n\
+                        thread_id,\n\
+                        user_id,\n\
+                        role,\n\
+                        type::string(joined_at) AS joined_at,\n\
+                        IF left_at IS NONE THEN NONE ELSE type::string(left_at) END AS left_at,\n\
+                        IF mute_until IS NONE THEN NONE ELSE type::string(mute_until) END AS mute_until\n\
+                     FROM chat_member\n\
+                     WHERE thread_id = $thread_id AND left_at IS NONE",
+                )
                 .bind(("thread_id", thread_id))
                 .await
                 .map_err(Self::map_surreal_error)?;
@@ -8211,9 +8307,17 @@ impl ChatRepositoryPort for SurrealChatRepository {
         Box::pin(async move {
             let mut response = client
                 .query(
-                    "SELECT * FROM chat_member \
-                     WHERE thread_id = $thread_id AND user_id = $user_id AND left_at IS NONE \
-                     ORDER BY joined_at DESC LIMIT 1",
+                    "SELECT\n\
+                        thread_id,\n\
+                        user_id,\n\
+                        role,\n\
+                        type::string(joined_at) AS joined_at,\n\
+                        IF left_at IS NONE THEN NONE ELSE type::string(left_at) END AS left_at,\n\
+                        IF mute_until IS NONE THEN NONE ELSE type::string(mute_until) END AS mute_until\n\
+                     FROM chat_member\n\
+                     WHERE thread_id = $thread_id AND user_id = $user_id AND left_at IS NONE\n\
+                     ORDER BY joined_at DESC\n\
+                     LIMIT 1",
                 )
                 .bind(("thread_id", thread_id))
                 .bind(("user_id", user_id))
@@ -8253,7 +8357,20 @@ impl ChatRepositoryPort for SurrealChatRepository {
         Box::pin(async move {
             let mut existing = client
                 .query(
-                    "SELECT * FROM chat_message WHERE thread_id = $thread_id AND request_id = $request_id LIMIT 1",
+                    "SELECT\n\
+                        thread_id,\n\
+                        message_id,\n\
+                        author_id,\n\
+                        body,\n\
+                        attachments,\n\
+                        request_id,\n\
+                        correlation_id,\n\
+                        type::string(created_at) AS created_at,\n\
+                        IF edited_at IS NONE THEN NONE ELSE type::string(edited_at) END AS edited_at,\n\
+                        IF deleted_at IS NONE THEN NONE ELSE type::string(deleted_at) END AS deleted_at\n\
+                     FROM chat_message\n\
+                     WHERE thread_id = $thread_id AND request_id = $request_id\n\
+                     LIMIT 1",
                 )
                 .bind(("thread_id", thread_id.clone()))
                 .bind(("request_id", request_id))
@@ -8267,15 +8384,49 @@ impl ChatRepositoryPort for SurrealChatRepository {
                 return Ok(existing_message);
             }
 
-            let payload = to_value(payload)
-                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
             let mut response = client
-                .query("CREATE chat_message CONTENT $payload")
-                .bind(("payload", payload))
+                .query(
+                    "CREATE chat_message CONTENT {\n\
+                        thread_id: $thread_id,\n\
+                        message_id: $message_id,\n\
+                        author_id: $author_id,\n\
+                        body: $body,\n\
+                        attachments: $attachments,\n\
+                        request_id: $request_id,\n\
+                        correlation_id: $correlation_id,\n\
+                        created_at: <datetime>$created_at,\n\
+                        edited_at: IF $edited_at IS NONE THEN NONE ELSE <datetime>$edited_at END,\n\
+                        deleted_at: IF $deleted_at IS NONE THEN NONE ELSE <datetime>$deleted_at END\n\
+                    };\n\
+                     SELECT\n\
+                        thread_id,\n\
+                        message_id,\n\
+                        author_id,\n\
+                        body,\n\
+                        attachments,\n\
+                        request_id,\n\
+                        correlation_id,\n\
+                        type::string(created_at) AS created_at,\n\
+                        IF edited_at IS NONE THEN NONE ELSE type::string(edited_at) END AS edited_at,\n\
+                        IF deleted_at IS NONE THEN NONE ELSE type::string(deleted_at) END AS deleted_at\n\
+                     FROM chat_message\n\
+                     WHERE thread_id = $thread_id AND message_id = $message_id\n\
+                     LIMIT 1;",
+                )
+                .bind(("thread_id", payload.thread_id))
+                .bind(("message_id", payload.message_id))
+                .bind(("author_id", payload.author_id))
+                .bind(("body", payload.body))
+                .bind(("attachments", payload.attachments))
+                .bind(("request_id", payload.request_id))
+                .bind(("correlation_id", payload.correlation_id))
+                .bind(("created_at", payload.created_at))
+                .bind(("edited_at", payload.edited_at))
+                .bind(("deleted_at", payload.deleted_at))
                 .await
                 .map_err(Self::map_surreal_error)?;
             let rows: Vec<Value> = response
-                .take(0)
+                .take(1)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             let mut messages = Self::decode_message_row(rows)?;
             messages
@@ -8295,7 +8446,20 @@ impl ChatRepositoryPort for SurrealChatRepository {
         Box::pin(async move {
             let mut response = client
                 .query(
-                    "SELECT * FROM chat_message WHERE thread_id = $thread_id AND message_id = $message_id LIMIT 1",
+                    "SELECT\n\
+                        thread_id,\n\
+                        message_id,\n\
+                        author_id,\n\
+                        body,\n\
+                        attachments,\n\
+                        request_id,\n\
+                        correlation_id,\n\
+                        type::string(created_at) AS created_at,\n\
+                        IF edited_at IS NONE THEN NONE ELSE type::string(edited_at) END AS edited_at,\n\
+                        IF deleted_at IS NONE THEN NONE ELSE type::string(deleted_at) END AS deleted_at\n\
+                     FROM chat_message\n\
+                     WHERE thread_id = $thread_id AND message_id = $message_id\n\
+                     LIMIT 1",
                 )
                 .bind(("thread_id", thread_id))
                 .bind(("message_id", message_id))
@@ -8318,7 +8482,22 @@ impl ChatRepositoryPort for SurrealChatRepository {
         let client = self.client.clone();
         Box::pin(async move {
             let mut response = client
-                .query("SELECT * FROM chat_message WHERE thread_id = $thread_id AND request_id = $request_id LIMIT 1")
+                .query(
+                    "SELECT\n\
+                        thread_id,\n\
+                        message_id,\n\
+                        author_id,\n\
+                        body,\n\
+                        attachments,\n\
+                        request_id,\n\
+                        correlation_id,\n\
+                        type::string(created_at) AS created_at,\n\
+                        IF edited_at IS NONE THEN NONE ELSE type::string(edited_at) END AS edited_at,\n\
+                        IF deleted_at IS NONE THEN NONE ELSE type::string(deleted_at) END AS deleted_at\n\
+                     FROM chat_message\n\
+                     WHERE thread_id = $thread_id AND request_id = $request_id\n\
+                     LIMIT 1",
+                )
                 .bind(("thread_id", thread_id))
                 .bind(("request_id", request_id))
                 .await
@@ -8346,12 +8525,27 @@ impl ChatRepositoryPort for SurrealChatRepository {
             });
         }
         Box::pin(async move {
-            let mut statement =
-                String::from("SELECT * FROM chat_message WHERE thread_id = $thread_id");
+            let mut statement = String::from(
+                "SELECT\n\
+                    thread_id,\n\
+                    message_id,\n\
+                    author_id,\n\
+                    body,\n\
+                    attachments,\n\
+                    request_id,\n\
+                    correlation_id,\n\
+                    type::string(created_at) AS created_at,\n\
+                    IF edited_at IS NONE THEN NONE ELSE type::string(edited_at) END AS edited_at,\n\
+                    IF deleted_at IS NONE THEN NONE ELSE type::string(deleted_at) END AS deleted_at\n\
+                 FROM chat_message\n\
+                 WHERE thread_id = $thread_id",
+            );
             if let Some(since_created_at_ms) = cursor.since_created_at_ms {
                 let threshold = Self::to_rfc3339(since_created_at_ms)?;
                 if let Some(since_message_id) = cursor.since_message_id {
-                    statement.push_str(" AND (created_at > $threshold OR (created_at = $threshold AND message_id > $since_message_id))");
+                    statement.push_str(
+                        " AND (created_at > <datetime>$threshold OR (created_at = <datetime>$threshold AND message_id > $since_message_id))",
+                    );
                     let mut response = client
                         .query(format!(
                             "{statement} ORDER BY created_at ASC, message_id ASC LIMIT $limit"
@@ -8374,7 +8568,7 @@ impl ChatRepositoryPort for SurrealChatRepository {
                     messages.truncate(cursor.limit);
                     return Ok(messages);
                 }
-                statement.push_str(" AND created_at > $threshold");
+                statement.push_str(" AND created_at > <datetime>$threshold");
                 let mut response = client
                     .query(format!(
                         "{statement} ORDER BY created_at ASC, message_id ASC LIMIT $limit"
@@ -8390,7 +8584,23 @@ impl ChatRepositoryPort for SurrealChatRepository {
                 return Self::decode_message_row(rows);
             }
             let mut response = client
-                .query("SELECT * FROM chat_message WHERE thread_id = $thread_id ORDER BY created_at ASC, message_id ASC LIMIT $limit")
+                .query(
+                    "SELECT\n\
+                        thread_id,\n\
+                        message_id,\n\
+                        author_id,\n\
+                        body,\n\
+                        attachments,\n\
+                        request_id,\n\
+                        correlation_id,\n\
+                        type::string(created_at) AS created_at,\n\
+                        IF edited_at IS NONE THEN NONE ELSE type::string(edited_at) END AS edited_at,\n\
+                        IF deleted_at IS NONE THEN NONE ELSE type::string(deleted_at) END AS deleted_at\n\
+                     FROM chat_message\n\
+                     WHERE thread_id = $thread_id\n\
+                     ORDER BY created_at ASC, message_id ASC\n\
+                     LIMIT $limit",
+                )
                 .bind(("thread_id", thread_id))
                 .bind(("limit", cursor.limit as i64))
                 .await
@@ -8419,15 +8629,31 @@ impl ChatRepositoryPort for SurrealChatRepository {
         };
         let client = self.client.clone();
         Box::pin(async move {
-            let payload = to_value(payload)
-                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
             let mut response = client
-                .query("UPSERT chat_read_cursor CONTENT $payload")
-                .bind(("payload", payload))
+                .query(
+                    "UPSERT chat_read_cursor CONTENT {\n\
+                        thread_id: $thread_id,\n\
+                        user_id: $user_id,\n\
+                        last_read_message_id: $last_read_message_id,\n\
+                        last_read_at: <datetime>$last_read_at\n\
+                    };\n\
+                     SELECT\n\
+                        thread_id,\n\
+                        user_id,\n\
+                        last_read_message_id,\n\
+                        type::string(last_read_at) AS last_read_at\n\
+                     FROM chat_read_cursor\n\
+                     WHERE thread_id = $thread_id AND user_id = $user_id\n\
+                     LIMIT 1;",
+                )
+                .bind(("thread_id", payload.thread_id))
+                .bind(("user_id", payload.user_id))
+                .bind(("last_read_message_id", payload.last_read_message_id))
+                .bind(("last_read_at", payload.last_read_at))
                 .await
                 .map_err(Self::map_surreal_error)?;
             let rows: Vec<Value> = response
-                .take(0)
+                .take(1)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             let mut cursors = Self::decode_read_cursor_row(rows)?;
             cursors
@@ -8447,7 +8673,14 @@ impl ChatRepositoryPort for SurrealChatRepository {
         Box::pin(async move {
             let mut response = client
                 .query(
-                    "SELECT * FROM chat_read_cursor WHERE thread_id = $thread_id AND user_id = $user_id LIMIT 1",
+                    "SELECT\n\
+                        thread_id,\n\
+                        user_id,\n\
+                        last_read_message_id,\n\
+                        type::string(last_read_at) AS last_read_at\n\
+                     FROM chat_read_cursor\n\
+                     WHERE thread_id = $thread_id AND user_id = $user_id\n\
+                     LIMIT 1",
                 )
                 .bind(("thread_id", thread_id))
                 .bind(("user_id", user_id))
@@ -8479,21 +8712,31 @@ impl ChatRepositoryPort for SurrealChatRepository {
             Err(err) => return Box::pin(async move { Err(err) }),
         };
         let client = self.client.clone();
+        let event_value = event.clone();
         Box::pin(async move {
-            let payload = to_value(payload)
-                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
-            let mut response = client
-                .query("CREATE chat_delivery_event CONTENT $payload")
-                .bind(("payload", payload))
+            let response = client
+                .query(
+                    "CREATE chat_delivery_event CONTENT {\n\
+                        event_id: $event_id,\n\
+                        thread_id: $thread_id,\n\
+                        message_id: $message_id,\n\
+                        event_type: $event_type,\n\
+                        occurred_at: <datetime>$occurred_at,\n\
+                        request_id: $request_id,\n\
+                        correlation_id: $correlation_id\n\
+                    };",
+                )
+                .bind(("event_id", payload.event_id))
+                .bind(("thread_id", payload.thread_id))
+                .bind(("message_id", payload.message_id))
+                .bind(("event_type", payload.event_type))
+                .bind(("occurred_at", payload.occurred_at))
+                .bind(("request_id", payload.request_id))
+                .bind(("correlation_id", payload.correlation_id))
                 .await
                 .map_err(Self::map_surreal_error)?;
-            let rows: Vec<Value> = response
-                .take(0)
-                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            let mut events = Self::decode_delivery_event_row(rows)?;
-            events
-                .pop()
-                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+            response.check().map_err(Self::map_surreal_error)?;
+            Ok(event_value)
         })
     }
 
@@ -8508,7 +8751,17 @@ impl ChatRepositoryPort for SurrealChatRepository {
         Box::pin(async move {
             let mut response = client
                 .query(
-                    "SELECT * FROM chat_delivery_event WHERE thread_id = $thread_id AND request_id = $request_id LIMIT 1",
+                    "SELECT\n\
+                        event_id,\n\
+                        thread_id,\n\
+                        message_id,\n\
+                        event_type,\n\
+                        type::string(occurred_at) AS occurred_at,\n\
+                        request_id,\n\
+                        correlation_id\n\
+                     FROM chat_delivery_event\n\
+                     WHERE thread_id = $thread_id AND request_id = $request_id\n\
+                     LIMIT 1",
                 )
                 .bind(("thread_id", thread_id))
                 .bind(("request_id", request_id))

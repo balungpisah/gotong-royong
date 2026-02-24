@@ -24,6 +24,7 @@ use tracing::{Span, info_span};
 use uuid::Uuid;
 
 use gotong_domain::auth::Role;
+use gotong_infra::auth::SurrealDbSession;
 
 use crate::error::ApiError;
 use crate::observability;
@@ -39,6 +40,9 @@ pub struct CorrelationId(pub String);
 #[allow(dead_code)]
 pub struct AuthContext {
     pub user_id: Option<String>,
+    pub username: Option<String>,
+    pub access_token: Option<String>,
+    pub surreal_db_session: Option<SurrealDbSession>,
     pub role: Role,
     pub is_authenticated: bool,
 }
@@ -47,6 +51,9 @@ impl AuthContext {
     fn anonymous() -> Self {
         Self {
             user_id: None,
+            username: None,
+            access_token: None,
+            surreal_db_session: None,
             role: Role::Anonymous,
             is_authenticated: false,
         }
@@ -137,26 +144,60 @@ pub async fn auth_middleware(
     mut req: Request<Body>,
     next: Next,
 ) -> Response {
-    let token = match bearer_token(req.headers()) {
-        Some(token) => token,
+    let token = match auth_token(req.headers()) {
+        Some(token) => token.to_string(),
         None => {
             req.extensions_mut().insert(AuthContext::anonymous());
             return next.run(req).await;
         }
     };
 
+    if let Some(auth_service) = &state.auth_service {
+        let session = match auth_service.validate(&token).await {
+            Ok(session) => session,
+            Err(err) => {
+                tracing::warn!(error = %err, "invalid surreal auth token");
+                req.extensions_mut().insert(AuthContext::anonymous());
+                return next.run(req).await;
+            }
+        };
+        let role = match Role::parse(&session.identity.platform_role) {
+            Some(role) => role,
+            None => {
+                tracing::warn!(
+                    platform_role = %session.identity.platform_role,
+                    "token missing or invalid platform_role"
+                );
+                req.extensions_mut().insert(AuthContext::anonymous());
+                return next.run(req).await;
+            }
+        };
+
+        req.extensions_mut().insert(AuthContext {
+            user_id: Some(session.identity.user_id),
+            username: Some(session.identity.username),
+            access_token: Some(token),
+            surreal_db_session: Some(session.db_session),
+            role,
+            is_authenticated: true,
+        });
+
+        return next.run(req).await;
+    }
+
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;
 
     let data = match decode::<Claims>(
-        token,
+        &token,
         &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
         &validation,
     ) {
         Ok(data) => data,
         Err(err) => {
             tracing::warn!(error = %err, "invalid auth token");
-            return ApiError::Unauthorized.into_response();
+            req.extensions_mut().insert(AuthContext::anonymous());
+            return next.run(req).await;
         }
     };
 
@@ -164,12 +205,17 @@ pub async fn auth_middleware(
         Some(role) => role,
         None => {
             tracing::warn!("token missing or invalid role");
-            return ApiError::Unauthorized.into_response();
+            req.extensions_mut().insert(AuthContext::anonymous());
+            return next.run(req).await;
         }
     };
 
+    let user_id = data.claims.sub;
     req.extensions_mut().insert(AuthContext {
-        user_id: Some(data.claims.sub),
+        user_id: Some(user_id.clone()),
+        username: Some(user_id),
+        access_token: Some(token),
+        surreal_db_session: None,
         role,
         is_authenticated: true,
     });
@@ -236,4 +282,22 @@ fn bearer_token(headers: &HeaderMap) -> Option<&str> {
     value
         .strip_prefix("Bearer ")
         .or_else(|| value.strip_prefix("bearer "))
+}
+
+fn cookie_token(headers: &HeaderMap) -> Option<&str> {
+    let value = headers.get(header::COOKIE)?;
+    let value = value.to_str().ok()?;
+    for part in value.split(';') {
+        let mut it = part.trim().splitn(2, '=');
+        let name = it.next()?.trim();
+        let val = it.next()?.trim();
+        if name == "gr_session" {
+            return Some(val);
+        }
+    }
+    None
+}
+
+pub(crate) fn auth_token(headers: &HeaderMap) -> Option<&str> {
+    bearer_token(headers).or_else(|| cookie_token(headers))
 }

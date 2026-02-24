@@ -13,16 +13,6 @@ import {
 import { resolveAuthSession } from '$lib/auth/server';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 
-/** Mock session injected automatically in dev mode when no real JWT is present. */
-const DEV_MOCK_SESSION: AuthSession = {
-	token: 'dev-mock-token',
-	user: {
-		id: 'dev-user-001',
-		role: 'user',
-		exp: Math.floor(Date.now() / 1000) + 86400
-	}
-};
-
 const NO_STORE_CACHE_CONTROL = 'no-store, no-cache, must-revalidate, private, max-age=0';
 
 const stripBasePath = (pathname: string) => {
@@ -60,9 +50,7 @@ const noStoreRedirect = (location: string) =>
 	);
 
 const authHandle: Handle = async ({ event, resolve }) => {
-	const session =
-		(await resolveAuthSession(event.cookies, event.request.headers)) ??
-		(import.meta.env.DEV ? DEV_MOCK_SESSION : null);
+	const session = await resolveAuthSession(event.cookies, event.request.headers);
 	const user = session?.user ?? null;
 	const role = user?.role ?? 'anonymous';
 

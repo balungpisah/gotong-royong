@@ -1,15 +1,5 @@
-import { jwtVerify, type JWTPayload } from 'jose';
 import type { Cookies } from '@sveltejs/kit';
 import { type AuthSession, type SessionUser, isAuthRole, SESSION_COOKIE_NAME } from '$lib/auth';
-
-const JWT_ALGORITHM = 'HS256';
-const textEncoder = new TextEncoder();
-
-interface JwtClaims extends JWTPayload {
-	sub?: string;
-	role?: string;
-	exp?: number;
-}
 
 const getSessionCookieName = () => process.env.GR_SESSION_COOKIE_NAME ?? SESSION_COOKIE_NAME;
 
@@ -29,23 +19,59 @@ const parseBearerToken = (authorizationHeader: string | null) => {
 const getRequestToken = (cookies: Cookies, headers: Headers) =>
 	cookies.get(getSessionCookieName()) ?? parseBearerToken(headers.get('authorization'));
 
+const decodeBase64UrlJson = (segment: string): unknown => {
+	const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
+	const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+	const json = Buffer.from(padded, 'base64').toString('utf8');
+	return JSON.parse(json);
+};
+
+type JwtClaims = {
+	sub?: string;
+	role?: string;
+	exp?: number;
+	// SurrealDB record auth tokens commonly include these uppercase claims:
+	ID?: string;
+};
+
+const parseJwtPayload = (token: string): JwtClaims | null => {
+	const [, payload] = token.split('.');
+	if (!payload) {
+		return null;
+	}
+
+	try {
+		const parsed = decodeBase64UrlJson(payload);
+		if (!parsed || typeof parsed !== 'object') {
+			return null;
+		}
+		return parsed as JwtClaims;
+	} catch {
+		return null;
+	}
+};
+
 const toSessionUser = (payload: JwtClaims): SessionUser | null => {
-	if (!payload.sub || !payload.role || !payload.exp) {
+	const id = payload.sub ?? payload.ID;
+	const exp = payload.exp;
+	const role = payload.role;
+
+	if (!id || typeof id !== 'string') {
+		return null;
+	}
+	if (!exp || !Number.isFinite(exp)) {
 		return null;
 	}
 
-	if (!isAuthRole(payload.role) || payload.role === 'anonymous') {
-		return null;
-	}
+	// Role is an application concern; SurrealDB-issued tokens might not include it.
+	const resolvedRole = role && isAuthRole(role) && role !== 'anonymous' ? role : 'user';
 
-	if (!Number.isFinite(payload.exp)) {
-		return null;
-	}
+	const normalizedId = id.includes(':') ? id.split(':', 2)[1] : id;
 
 	return {
-		id: payload.sub,
-		role: payload.role,
-		exp: payload.exp
+		id: normalizedId,
+		role: resolvedRole,
+		exp
 	};
 };
 
@@ -58,26 +84,18 @@ export const resolveAuthSession = async (
 		return null;
 	}
 
-	const jwtSecret = process.env.JWT_SECRET;
-	if (!jwtSecret) {
+	const payload = parseJwtPayload(token);
+	if (!payload) {
 		return null;
 	}
 
-	try {
-		const { payload } = await jwtVerify<JwtClaims>(token, textEncoder.encode(jwtSecret), {
-			algorithms: [JWT_ALGORITHM]
-		});
-
-		const user = toSessionUser(payload);
-		if (!user) {
-			return null;
-		}
-
-		return {
-			token,
-			user
-		};
-	} catch {
+	const user = toSessionUser(payload);
+	if (!user) {
 		return null;
 	}
+
+	return {
+		token,
+		user
+	};
 };

@@ -53,7 +53,7 @@ impl AppConfig {
             .set_default("app_env", "development")?
             .set_default("port", 3000)?
             .set_default("log_level", "info")?
-            .set_default("surreal_endpoint", "ws://127.0.0.1:8000")?
+            .set_default("surreal_endpoint", "127.0.0.1:8000")?
             .set_default("data_backend", "memory")?
             .set_default("surreal_ns", "gotong")?
             .set_default("surreal_db", "chat")?

@@ -151,6 +151,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-stream"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7c24de15d275a1ecfd47a380fb4d5ec9bfe0933f309ed5e705b775596a3574d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.115",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1507,6 +1529,7 @@ name = "gotong-infra"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "config",
  "dotenvy",
  "gotong-domain",
@@ -1515,6 +1538,7 @@ dependencies = [
  "serde",
  "serde_json",
  "surrealdb",
+ "surrealdb-types",
  "thiserror 1.0.69",
  "time",
  "tokio",
@@ -2485,15 +2509,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "nanoid"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
-dependencies = [
- "rand 0.8.5",
 ]
 
 [[package]]
@@ -4379,10 +4394,11 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "surrealdb"
-version = "3.0.0-beta.4"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31b1bbe8315937d35dfdde3656d22669fca1da68ca5d661ca39a832feeb48f56"
+checksum = "2150ced737a7dd6b1ba97b9c3579282c9a18263f88a73700103de0e32f442666"
 dependencies = [
+ "anyhow",
  "async-channel",
  "boxcar",
  "chrono",
@@ -4400,7 +4416,6 @@ dependencies = [
  "serde_json",
  "surrealdb-core",
  "surrealdb-types",
- "thiserror 2.0.18",
  "tokio",
  "tokio-tungstenite 0.28.0",
  "tokio-tungstenite-wasm",
@@ -4416,9 +4431,9 @@ dependencies = [
 
 [[package]]
 name = "surrealdb-core"
-version = "3.0.0-beta.4"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c1da754c21441717ec81fd839d48816a46ba14dfb302261073eb64d9fee8461"
+checksum = "225816a998dff5f898b72925494487877dd42fdef9985799433801e5ea8113c8"
 dependencies = [
  "addr",
  "ahash 0.8.12",
@@ -4426,6 +4441,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "async-channel",
+ "async-stream",
  "async-trait",
  "base64 0.22.1",
  "bcrypt",
@@ -4452,7 +4468,6 @@ dependencies = [
  "lexicmp",
  "md-5",
  "mime",
- "nanoid",
  "ndarray",
  "ndarray-stats",
  "num-traits",
@@ -4526,9 +4541,9 @@ dependencies = [
 
 [[package]]
 name = "surrealdb-types"
-version = "3.0.0-beta.4"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2255408f28026ececae3bd03a0de811622f738a95a5a14c9852032125f54e274"
+checksum = "72231b6b94c1dbd6e2453c50266c679eb621701cd01cb8f8fc32923d3ce0a217"
 dependencies = [
  "anyhow",
  "bytes",
@@ -4537,8 +4552,8 @@ dependencies = [
  "geo 0.32.0",
  "hex",
  "http",
- "nanoid",
  "papaya",
+ "rand 0.8.5",
  "regex",
  "rstest",
  "rust_decimal",
@@ -4552,9 +4567,9 @@ dependencies = [
 
 [[package]]
 name = "surrealdb-types-derive"
-version = "3.0.0-beta.4"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07006723dba01f26fe984bc7357026b46cbfc129fd449a0d320960951c8e9968"
+checksum = "ef7818b988bb8a8d424751ba5c0fe6aabf3e41dc26fbc8a922803c1615ae641b"
 dependencies = [
  "proc-macro2",
  "quote",

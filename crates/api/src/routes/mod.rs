@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
@@ -59,6 +60,7 @@ use gotong_domain::{
         WebhookDeliveryLog, WebhookOutboxEvent, WebhookOutboxListQuery, WebhookOutboxStatus,
     },
 };
+use gotong_infra::auth::{SigninParams, SignupParams};
 use gotong_infra::markov_client::{CacheMetadata, CachedJson, MarkovClientError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -70,6 +72,7 @@ use validator::Validate;
 mod edgepod;
 
 use crate::middleware::AuthContext;
+use crate::request_repos;
 use crate::{
     error::ApiError, middleware as app_middleware, observability, state::AppState, validation,
 };
@@ -204,11 +207,34 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/v1/notifications", get(list_discovery_notifications))
         .route("/v1/tandang/me/profile", get(get_tandang_profile_snapshot))
+        .route("/v1/tandang/cv-hidup/qr", get(get_tandang_cv_hidup_qr))
+        .route(
+            "/v1/tandang/cv-hidup/export",
+            post(post_tandang_cv_hidup_export),
+        )
+        .route(
+            "/v1/tandang/cv-hidup/verify/:export_id",
+            get(get_tandang_cv_hidup_verify),
+        )
         .route("/v1/tandang/skills/search", get(search_tandang_skills))
+        .route("/v1/tandang/skills/nodes/:node_id", get(get_tandang_skill_node))
+        .route(
+            "/v1/tandang/skills/nodes/:node_id/labels",
+            get(get_tandang_skill_node_labels),
+        )
+        .route(
+            "/v1/tandang/skills/nodes/:node_id/relations",
+            get(get_tandang_skill_node_relations),
+        )
+        .route(
+            "/v1/tandang/skills/:skill_id/parent",
+            get(get_tandang_skill_parent),
+        )
         .route(
             "/v1/tandang/por/requirements/:task_type",
             get(get_tandang_por_requirements),
         )
+        .route("/v1/tandang/por/status/:evidence_id", get(get_tandang_por_status))
         .route(
             "/v1/tandang/por/triad-requirements/:track/:transition",
             get(get_tandang_por_triad_requirements),
@@ -221,6 +247,32 @@ pub fn router(state: AppState) -> Router {
             "/v1/tandang/reputation/distribution",
             get(get_tandang_reputation_distribution),
         )
+        .route("/v1/tandang/slash/gdf", get(get_tandang_gdf_weather))
+        .route(
+            "/v1/tandang/users/:user_id/vouch-budget",
+            get(get_tandang_vouch_budget),
+        )
+        .route(
+            "/v1/tandang/decay/warnings/:user_id",
+            get(get_tandang_decay_warnings),
+        )
+        .route(
+            "/v1/tandang/community/pulse/overview",
+            get(get_tandang_community_pulse_overview),
+        )
+        .route(
+            "/v1/tandang/community/pulse/insights",
+            get(get_tandang_community_pulse_insights),
+        )
+        .route(
+            "/v1/tandang/community/pulse/trends",
+            get(get_tandang_community_pulse_trends),
+        )
+        .route(
+            "/v1/tandang/hero/leaderboard",
+            get(get_tandang_hero_leaderboard),
+        )
+        .route("/v1/tandang/hero/:user_id", get(get_tandang_hero_status))
         .route("/v1/admin/webhooks/outbox", get(list_webhook_outbox))
         .route(
             "/v1/admin/webhooks/outbox/:event_id",
@@ -313,6 +365,11 @@ pub fn router(state: AppState) -> Router {
         .route("/health", get(health))
         .route("/metrics", get(metrics))
         .route("/v1/echo", post(echo))
+        .route("/v1/auth/signup", post(auth_signup))
+        .route("/v1/auth/signin", post(auth_signin))
+        .route("/v1/auth/refresh", post(auth_refresh))
+        .route("/v1/auth/logout", post(auth_logout))
+        .route("/v1/auth/me", get(auth_me))
         .merge(protected)
         .merge(api_edgepod_routes)
         .layer(middleware::from_fn(app_middleware::metrics_layer))
@@ -361,6 +418,168 @@ async fn metrics() -> Response {
         HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"),
     );
     response
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct AuthSignupRequest {
+    #[validate(length(min = 3, max = 256))]
+    email: String,
+    #[validate(length(min = 8, max = 256))]
+    pass: String,
+    #[validate(length(min = 3, max = 64))]
+    username: String,
+    #[validate(length(min = 1, max = 64))]
+    community_id: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct AuthSigninRequest {
+    #[validate(length(min = 3, max = 256))]
+    email: String,
+    #[validate(length(min = 1, max = 256))]
+    pass: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct AuthRefreshRequest {
+    #[validate(length(min = 8, max = 512))]
+    refresh: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AuthResponse {
+    access_token: String,
+    refresh_token: Option<String>,
+    user_id: String,
+    username: String,
+    role: String,
+}
+
+async fn auth_signup(
+    State(state): State<AppState>,
+    Json(payload): Json<AuthSignupRequest>,
+) -> Result<Json<AuthResponse>, ApiError> {
+    validation::validate(&payload)?;
+    let auth = state.auth_service.as_ref().ok_or(ApiError::Internal)?;
+    let (tokens, identity) = auth
+        .signup(SignupParams {
+            email: payload.email,
+            pass: payload.pass,
+            username: payload.username,
+            community_id: payload.community_id,
+        })
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = ?err, "auth signup failed");
+            map_auth_error(err)
+        })?;
+    Ok(Json(AuthResponse {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        user_id: identity.user_id,
+        username: identity.username,
+        role: identity.platform_role,
+    }))
+}
+
+async fn auth_signin(
+    State(state): State<AppState>,
+    Json(payload): Json<AuthSigninRequest>,
+) -> Result<Json<AuthResponse>, ApiError> {
+    validation::validate(&payload)?;
+    let auth = state.auth_service.as_ref().ok_or(ApiError::Internal)?;
+    let (tokens, identity) = auth
+        .signin_password(SigninParams {
+            email: payload.email,
+            pass: payload.pass,
+        })
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = ?err, "auth signin failed");
+            map_auth_error(err)
+        })?;
+    Ok(Json(AuthResponse {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        user_id: identity.user_id,
+        username: identity.username,
+        role: identity.platform_role,
+    }))
+}
+
+async fn auth_refresh(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<AuthRefreshRequest>,
+) -> Result<Json<AuthResponse>, ApiError> {
+    validation::validate(&payload)?;
+    let auth = state.auth_service.as_ref().ok_or(ApiError::Internal)?;
+    let access_token = crate::middleware::auth_token(&headers).ok_or(ApiError::Unauthorized)?;
+    let (tokens, identity) = auth
+        .refresh(access_token, &payload.refresh)
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = ?err, "auth refresh failed");
+            map_auth_error(err)
+        })?;
+    Ok(Json(AuthResponse {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        user_id: identity.user_id,
+        username: identity.username,
+        role: identity.platform_role,
+    }))
+}
+
+async fn auth_me(Extension(auth): Extension<AuthContext>) -> Result<Json<AuthResponse>, ApiError> {
+    if !auth.is_authenticated {
+        return Err(ApiError::Unauthorized);
+    }
+    Ok(Json(AuthResponse {
+        access_token: auth.access_token.unwrap_or_default(),
+        refresh_token: None,
+        user_id: auth.user_id.unwrap_or_default(),
+        username: auth.username.unwrap_or_default(),
+        role: auth.role.as_str().to_string(),
+    }))
+}
+
+async fn auth_logout(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<StatusCode, ApiError> {
+    if !auth.is_authenticated {
+        return Err(ApiError::Unauthorized);
+    }
+    let Some(access_token) = auth.access_token.as_deref() else {
+        return Err(ApiError::Unauthorized);
+    };
+    let Some(service) = &state.auth_service else {
+        return Err(ApiError::Internal);
+    };
+    service
+        .revoke_access_token(access_token)
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = ?err, "auth logout failed");
+            map_auth_error(err)
+        })?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+fn map_auth_error(err: anyhow::Error) -> ApiError {
+    let msg = err.to_string().to_ascii_lowercase();
+    if msg.contains("already exists")
+        || msg.contains("duplicate")
+        || msg.contains("unique")
+        || msg.contains("conflict")
+    {
+        return ApiError::Conflict;
+    }
+    if msg.contains("authentication") || msg.contains("unauthorized") || msg.contains("forbidden") {
+        return ApiError::Unauthorized;
+    }
+    ApiError::Internal
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -543,6 +762,7 @@ fn validate_ontology_feed(payload: &CreateOntologyFeedRequest) -> Result<String,
 
 async fn upsert_ontology_concept(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Json(payload): Json<UpsertOntologyConceptRequest>,
 ) -> Result<(StatusCode, Json<OntologyConcept>), ApiError> {
     validation::validate(&payload)?;
@@ -553,8 +773,7 @@ async fn upsert_ontology_concept(
         label_en: payload.label_en,
         verified: payload.verified.unwrap_or(false),
     };
-    let concept = state
-        .ontology_repo
+    let concept = request_repos::ontology_repo(&state, &auth)
         .upsert_concept(&concept)
         .await
         .map_err(map_domain_error)?;
@@ -563,10 +782,10 @@ async fn upsert_ontology_concept(
 
 async fn get_ontology_concept_by_qid(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(qid): Path<String>,
 ) -> Result<Json<OntologyConcept>, ApiError> {
-    let concept = state
-        .ontology_repo
+    let concept = request_repos::ontology_repo(&state, &auth)
         .get_concept_by_qid(&qid)
         .await
         .map_err(map_domain_error)?
@@ -576,10 +795,10 @@ async fn get_ontology_concept_by_qid(
 
 async fn add_ontology_broader_edge(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path((concept_id, broader_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
-    state
-        .ontology_repo
+    request_repos::ontology_repo(&state, &auth)
         .add_broader_edge(&concept_id, &broader_id)
         .await
         .map_err(map_domain_error)?;
@@ -588,10 +807,10 @@ async fn add_ontology_broader_edge(
 
 async fn list_ontology_hierarchy(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(concept_id): Path<String>,
 ) -> Result<Json<Vec<OntologyConcept>>, ApiError> {
-    let concepts = state
-        .ontology_repo
+    let concepts = request_repos::ontology_repo(&state, &auth)
         .list_broader_concepts(&concept_id)
         .await
         .map_err(map_domain_error)?;
@@ -607,8 +826,7 @@ async fn create_ontology_feed(
     let temporal_class = validate_ontology_feed(&payload)?;
     let actor = actor_identity(&auth)?;
 
-    let created_note = state
-        .ontology_repo
+    let created_note = request_repos::ontology_repo(&state, &auth)
         .create_note(&OntologyNoteCreate {
             note_id: payload.note_id,
             content: payload.content,
@@ -642,15 +860,13 @@ async fn create_ontology_feed(
         .collect::<Result<Vec<_>, ApiError>>()?;
 
     if !triples.is_empty() {
-        state
-            .ontology_repo
+        request_repos::ontology_repo(&state, &auth)
             .write_triples(&triples)
             .await
             .map_err(map_domain_error)?;
     }
 
-    let feedback = state
-        .ontology_repo
+    let feedback = request_repos::ontology_repo(&state, &auth)
         .note_feedback_counts(&created_note.note_id)
         .await
         .map_err(map_domain_error)?;
@@ -672,8 +888,7 @@ async fn vouch_ontology_note(
     Json(payload): Json<OntologyFeedbackRequest>,
 ) -> Result<(StatusCode, Json<OntologyFeedbackResponse>), ApiError> {
     let actor = actor_identity(&auth)?;
-    state
-        .ontology_repo
+    request_repos::ontology_repo(&state, &auth)
         .write_triples(&[OntologyTripleCreate {
             edge: OntologyEdgeKind::Vouches,
             from_id: format!("warga:{}", actor.user_id),
@@ -684,8 +899,7 @@ async fn vouch_ontology_note(
         .await
         .map_err(map_domain_error)?;
 
-    let counts = state
-        .ontology_repo
+    let counts = request_repos::ontology_repo(&state, &auth)
         .note_feedback_counts(&note_id)
         .await
         .map_err(map_domain_error)?;
@@ -706,8 +920,7 @@ async fn challenge_ontology_note(
     Json(payload): Json<OntologyFeedbackRequest>,
 ) -> Result<(StatusCode, Json<OntologyFeedbackResponse>), ApiError> {
     let actor = actor_identity(&auth)?;
-    state
-        .ontology_repo
+    request_repos::ontology_repo(&state, &auth)
         .write_triples(&[OntologyTripleCreate {
             edge: OntologyEdgeKind::Challenges,
             from_id: format!("warga:{}", actor.user_id),
@@ -718,8 +931,7 @@ async fn challenge_ontology_note(
         .await
         .map_err(map_domain_error)?;
 
-    let counts = state
-        .ontology_repo
+    let counts = request_repos::ontology_repo(&state, &auth)
         .note_feedback_counts(&note_id)
         .await
         .map_err(map_domain_error)?;
@@ -735,10 +947,10 @@ async fn challenge_ontology_note(
 
 async fn get_ontology_note_feedback(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(note_id): Path<String>,
 ) -> Result<Json<OntologyFeedbackResponse>, ApiError> {
-    let counts = state
-        .ontology_repo
+    let counts = request_repos::ontology_repo(&state, &auth)
         .note_feedback_counts(&note_id)
         .await
         .map_err(map_domain_error)?;
@@ -751,10 +963,10 @@ async fn get_ontology_note_feedback(
 
 async fn get_ontology_note_ranking(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(note_id): Path<String>,
 ) -> Result<Json<OntologyRankingResponse>, ApiError> {
-    let counts = state
-        .ontology_repo
+    let counts = request_repos::ontology_repo(&state, &auth)
         .note_feedback_counts(&note_id)
         .await
         .map_err(map_domain_error)?;
@@ -856,7 +1068,7 @@ async fn create_contribution(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = ContributionService::new(state.contribution_repo.clone());
+            let service = ContributionService::new(request_repos::contribution_repo(&state, &auth));
             let input = ContributionCreate {
                 mode: payload.mode,
                 contribution_type: payload.contribution_type,
@@ -935,7 +1147,7 @@ async fn list_contributions(
         return Err(ApiError::Validation("author_id is required".into()));
     }
 
-    let service = ContributionService::new(state.contribution_repo.clone());
+    let service = ContributionService::new(request_repos::contribution_repo(&state, &auth));
     let contributions = service
         .list_by_author(&author_id)
         .await
@@ -992,7 +1204,10 @@ async fn list_discovery_feed(
     Query(query): Query<FeedListQueryParams>,
 ) -> Result<Json<PagedFeed>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let service = DiscoveryService::new(
+        request_repos::feed_repo(&state, &auth),
+        request_repos::notification_repo(&state, &auth),
+    );
     let request = FeedListQuery {
         actor_id: actor.user_id,
         cursor: query.cursor,
@@ -1020,7 +1235,10 @@ async fn list_discovery_search(
         .filter(|query_text| !query_text.is_empty())
         .map(str::to_string)
         .ok_or_else(|| ApiError::Validation("query_text is required".into()))?;
-    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let service = DiscoveryService::new(
+        request_repos::feed_repo(&state, &auth),
+        request_repos::notification_repo(&state, &auth),
+    );
     let request = SearchListQuery {
         actor_id: actor.user_id,
         query_text,
@@ -1043,7 +1261,10 @@ async fn list_discovery_notifications(
     Query(query): Query<NotificationsListQueryParams>,
 ) -> Result<Json<PagedNotifications>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let service = DiscoveryService::new(
+        request_repos::feed_repo(&state, &auth),
+        request_repos::notification_repo(&state, &auth),
+    );
     let request = NotificationListQuery {
         actor_id: actor.user_id,
         cursor: query.cursor,
@@ -1063,7 +1284,10 @@ async fn mark_notification_read(
     Path(notification_id): Path<String>,
 ) -> Result<Json<InAppNotification>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let service = DiscoveryService::new(
+        request_repos::feed_repo(&state, &auth),
+        request_repos::notification_repo(&state, &auth),
+    );
     let response = service
         .mark_notification_read(&actor.user_id, &notification_id)
         .await
@@ -1076,7 +1300,10 @@ async fn discovery_unread_count(
     Extension(auth): Extension<AuthContext>,
 ) -> Result<Json<DiscoveryUnreadCountResponse>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let service = DiscoveryService::new(
+        request_repos::feed_repo(&state, &auth),
+        request_repos::notification_repo(&state, &auth),
+    );
     let response = service
         .unread_notification_count(&actor.user_id)
         .await
@@ -1092,7 +1319,10 @@ async fn discovery_weekly_digest(
     Query(query): Query<WeeklyDigestQuery>,
 ) -> Result<Json<WeeklyDigest>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let service = DiscoveryService::new(
+        request_repos::feed_repo(&state, &auth),
+        request_repos::notification_repo(&state, &auth),
+    );
     let response = service
         .weekly_digest(&actor.user_id, query.window_start_ms, query.window_end_ms)
         .await
@@ -1102,9 +1332,10 @@ async fn discovery_weekly_digest(
 
 async fn get_contribution(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(contribution_id): Path<String>,
 ) -> Result<Json<Contribution>, ApiError> {
-    let service = ContributionService::new(state.contribution_repo.clone());
+    let service = ContributionService::new(request_repos::contribution_repo(&state, &auth));
     let contribution = service
         .get(&contribution_id)
         .await
@@ -1132,7 +1363,7 @@ async fn submit_evidence(
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
 
-    ContributionService::new(state.contribution_repo.clone())
+    ContributionService::new(request_repos::contribution_repo(&state, &auth))
         .get(&payload.contribution_id)
         .await
         .map_err(map_domain_error)?;
@@ -1148,7 +1379,7 @@ async fn submit_evidence(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = EvidenceService::new(state.evidence_repo.clone());
+            let service = EvidenceService::new(request_repos::evidence_repo(&state, &auth));
             let input = EvidenceCreate {
                 contribution_id: payload.contribution_id,
                 evidence_type: payload.evidence_type,
@@ -1175,6 +1406,29 @@ async fn submit_evidence(
                         "failed to enqueue evidence webhook outbox event"
                     );
                 }
+
+                if matches!(evidence.evidence_type, EvidenceType::WitnessAttestation) {
+                    let witness_count = evidence
+                        .proof
+                        .get("witnesses")
+                        .and_then(|value| value.as_array())
+                        .map(|items| items.len() as u32)
+                        .unwrap_or(0);
+                    if let Err(err) = enqueue_webhook_outbox_event(
+                        &state,
+                        &request_id,
+                        &correlation_id,
+                        EvidenceService::into_co_witness_attested_payload(&evidence, witness_count),
+                    )
+                    .await
+                    {
+                        tracing::warn!(
+                            error = %err,
+                            event_type = "co_witness_attested",
+                            "failed to enqueue co-witness webhook outbox event"
+                        );
+                    }
+                }
             }
 
             let response = IdempotencyResponse {
@@ -1198,18 +1452,20 @@ async fn submit_evidence(
 
 async fn get_evidence(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(evidence_id): Path<String>,
 ) -> Result<Json<Evidence>, ApiError> {
-    let service = EvidenceService::new(state.evidence_repo.clone());
+    let service = EvidenceService::new(request_repos::evidence_repo(&state, &auth));
     let evidence = service.get(&evidence_id).await.map_err(map_domain_error)?;
     Ok(Json(evidence))
 }
 
 async fn list_evidence_by_contribution(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(contribution_id): Path<String>,
 ) -> Result<Json<Vec<Evidence>>, ApiError> {
-    let service = EvidenceService::new(state.evidence_repo.clone());
+    let service = EvidenceService::new(request_repos::evidence_repo(&state, &auth));
     let evidences = service
         .list_by_contribution(&contribution_id)
         .await
@@ -1435,18 +1691,18 @@ async fn enqueue_webhook_outbox_event(
     correlation_id: &str,
     payload: Value,
 ) -> Result<(), ApiError> {
-    let event = WebhookOutboxEvent::new(
+    let candidate = WebhookOutboxEvent::new(
         payload,
         request_id.to_string(),
         correlation_id.to_string(),
         state.config.webhook_max_attempts,
     )
     .map_err(|_| ApiError::Validation("invalid webhook payload".into()))?;
-    let event = match state.webhook_outbox_repo.create(&event).await {
+    let event = match state.webhook_outbox_repo.create(&candidate).await {
         Ok(event) => event,
         Err(gotong_domain::error::DomainError::Conflict) => state
             .webhook_outbox_repo
-            .get_by_request_id(request_id)
+            .get(&candidate.event_id)
             .await
             .map_err(|err| {
                 tracing::warn!(
@@ -1506,7 +1762,7 @@ async fn submit_vouch(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = VouchService::new(state.vouch_repo.clone());
+            let service = VouchService::new(request_repos::vouch_repo(&state, &auth));
             let input = VouchCreate {
                 vouchee_id: payload.vouchee_id,
                 skill_id: payload.skill_id,
@@ -1572,7 +1828,7 @@ async fn list_vouches(
     Extension(auth): Extension<AuthContext>,
     Query(query): Query<ListVouchesQuery>,
 ) -> Result<Json<Vec<Vouch>>, ApiError> {
-    let service = VouchService::new(state.vouch_repo.clone());
+    let service = VouchService::new(request_repos::vouch_repo(&state, &auth));
 
     let response = match (query.vouchee_id, query.voucher_id) {
         (Some(vouchee), None) => service
@@ -1623,7 +1879,7 @@ async fn apply_moderation(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = ModerationService::new(state.moderation_repo.clone());
+            let service = ModerationService::new(request_repos::moderation_repo(&state, &auth));
             let command = ModerationApplyCommand {
                 content_id: payload.content_id,
                 content_type: payload.content_type,
@@ -1712,8 +1968,8 @@ async fn get_moderation_view(
     Extension(auth): Extension<AuthContext>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let token_role = auth.role;
-    let service = ModerationService::new(state.moderation_repo.clone());
+    let token_role = auth.role.clone();
+    let service = ModerationService::new(request_repos::moderation_repo(&state, &auth));
     let view = service
         .get_moderation_view(&content_id, &actor, &token_role)
         .await
@@ -1731,9 +1987,9 @@ async fn list_moderation_review_queue(
     Extension(auth): Extension<AuthContext>,
     Query(query): Query<ModerationReviewQueueQuery>,
 ) -> Result<Json<Vec<ContentModeration>>, ApiError> {
-    let token_role = auth.role;
+    let token_role = auth.role.clone();
     let limit = query.limit.unwrap_or(50).clamp(1, 200);
-    let service = ModerationService::new(state.moderation_repo.clone());
+    let service = ModerationService::new(request_repos::moderation_repo(&state, &auth));
     let queue = service
         .list_review_queue(&token_role, limit)
         .await
@@ -1748,7 +2004,7 @@ async fn create_adaptive_path_plan(
     Json(payload): Json<CreateAdaptivePathPlanRequest>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let token_role = auth.role;
+    let token_role = auth.role.clone();
     let editor_roles = trusted_editor_roles(&token_role);
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
@@ -1772,7 +2028,7 @@ async fn create_adaptive_path_plan(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = CreateAdaptivePathInput {
                 entity_id,
                 payload: into_adaptive_path_payload_draft(payload.payload),
@@ -1804,9 +2060,10 @@ async fn create_adaptive_path_plan(
 
 async fn get_adaptive_path_plan(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(plan_id): Path<String>,
 ) -> Result<Json<AdaptivePathPlan>, ApiError> {
-    let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+    let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
     let plan = service.get_plan(&plan_id).await.map_err(map_domain_error)?;
     let plan = plan.ok_or(ApiError::NotFound)?;
     Ok(Json(plan))
@@ -1814,9 +2071,10 @@ async fn get_adaptive_path_plan(
 
 async fn get_adaptive_path_plan_by_entity(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(entity_id): Path<String>,
 ) -> Result<Json<AdaptivePathPlan>, ApiError> {
-    let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+    let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
     let plan = service
         .get_plan_by_entity(&entity_id)
         .await
@@ -1833,7 +2091,7 @@ async fn update_adaptive_path_plan(
     Json(payload): Json<UpdateAdaptivePathPlanRequest>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let token_role = auth.role;
+    let token_role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
     let editor_roles = trusted_editor_roles(&token_role);
@@ -1852,7 +2110,7 @@ async fn update_adaptive_path_plan(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = UpdateAdaptivePathInput {
                 plan_id,
                 expected_version: payload.expected_version,
@@ -1891,7 +2149,7 @@ async fn propose_adaptive_path_suggestion(
     Json(payload): Json<SuggestAdaptivePathPlanRequest>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let token_role = auth.role;
+    let token_role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
     let editor_roles = trusted_editor_roles(&token_role);
@@ -1910,7 +2168,7 @@ async fn propose_adaptive_path_suggestion(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = SuggestAdaptivePathInput {
                 plan_id,
                 base_version: payload.base_version,
@@ -1952,7 +2210,7 @@ async fn accept_adaptive_path_suggestion(
     Json(payload): Json<ReviewAdaptivePathSuggestionRequest>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let token_role = auth.role;
+    let token_role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
     let editor_roles = trusted_editor_roles(&token_role);
@@ -1971,7 +2229,7 @@ async fn accept_adaptive_path_suggestion(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = SuggestionReviewInput {
                 suggestion_id,
                 editor_roles,
@@ -2008,7 +2266,7 @@ async fn reject_adaptive_path_suggestion(
     Json(payload): Json<ReviewAdaptivePathSuggestionRequest>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let token_role = auth.role;
+    let token_role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
     let editor_roles = trusted_editor_roles(&token_role);
@@ -2027,7 +2285,7 @@ async fn reject_adaptive_path_suggestion(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = SuggestionReviewInput {
                 suggestion_id,
                 editor_roles,
@@ -2058,9 +2316,10 @@ async fn reject_adaptive_path_suggestion(
 
 async fn list_adaptive_path_events(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(plan_id): Path<String>,
 ) -> Result<Json<Vec<AdaptivePathEvent>>, ApiError> {
-    let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+    let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
     let events = service
         .list_events(&plan_id)
         .await
@@ -2070,9 +2329,10 @@ async fn list_adaptive_path_events(
 
 async fn list_adaptive_path_suggestions(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(plan_id): Path<String>,
 ) -> Result<Json<Vec<AdaptivePathSuggestion>>, ApiError> {
-    let service = AdaptivePathService::new(state.adaptive_path_repo.clone());
+    let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
     let suggestions = service
         .list_suggestions(&plan_id)
         .await
@@ -2088,7 +2348,7 @@ async fn create_vault_draft(
 ) -> Result<Response, ApiError> {
     validation::validate(&payload)?;
     let actor = actor_identity(&auth)?;
-    let role = auth.role;
+    let role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
 
@@ -2106,7 +2366,7 @@ async fn create_vault_draft(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = VaultService::new(state.vault_repo.clone());
+            let service = VaultService::new(request_repos::vault_repo(&state, &auth));
             let command = CreateVaultDraft {
                 payload: payload.payload,
                 attachment_refs: payload.attachment_refs,
@@ -2144,7 +2404,7 @@ async fn list_vaults(
     Extension(auth): Extension<AuthContext>,
 ) -> Result<Json<Vec<VaultEntry>>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = VaultService::new(state.vault_repo.clone());
+    let service = VaultService::new(request_repos::vault_repo(&state, &auth));
     let vaults = service
         .list_by_author(actor)
         .await
@@ -2158,7 +2418,7 @@ async fn get_vault_entry(
     Path(vault_entry_id): Path<String>,
 ) -> Result<Json<VaultEntry>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = VaultService::new(state.vault_repo.clone());
+    let service = VaultService::new(request_repos::vault_repo(&state, &auth));
     let entry = service
         .get(&vault_entry_id)
         .await
@@ -2189,7 +2449,7 @@ async fn delete_vault_draft(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = VaultService::new(state.vault_repo.clone());
+            let service = VaultService::new(request_repos::vault_repo(&state, &auth));
             let deleted = service
                 .delete_draft(actor, &vault_entry_id)
                 .await
@@ -2228,7 +2488,7 @@ async fn update_vault_entry(
 ) -> Result<Response, ApiError> {
     validation::validate(&payload)?;
     let actor = actor_identity(&auth)?;
-    let role = auth.role;
+    let role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
     let key = IdempotencyKey::new(
@@ -2245,7 +2505,7 @@ async fn update_vault_entry(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = VaultService::new(state.vault_repo.clone());
+            let service = VaultService::new(request_repos::vault_repo(&state, &auth));
             let command = UpdateVaultDraft {
                 payload: payload.payload,
                 attachment_refs: payload.attachment_refs,
@@ -2286,7 +2546,7 @@ async fn seal_vault_entry(
 ) -> Result<Response, ApiError> {
     validation::validate(&payload)?;
     let actor = actor_identity(&auth)?;
-    let role = auth.role;
+    let role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
     let key = IdempotencyKey::new(
@@ -2302,7 +2562,7 @@ async fn seal_vault_entry(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = VaultService::new(state.vault_repo.clone());
+            let service = VaultService::new(request_repos::vault_repo(&state, &auth));
             let command = SealVault {
                 sealed_hash: payload.sealed_hash,
                 encryption_key_id: payload.encryption_key_id,
@@ -2344,7 +2604,7 @@ async fn publish_vault_entry(
     Json(payload): Json<SimpleVaultIdempotentRequest>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let role = auth.role;
+    let role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
 
@@ -2362,7 +2622,7 @@ async fn publish_vault_entry(
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
             validation::validate(&payload)?;
-            let service = VaultService::new(state.vault_repo.clone());
+            let service = VaultService::new(request_repos::vault_repo(&state, &auth));
             let command = PublishVault {
                 request_id,
                 correlation_id,
@@ -2397,7 +2657,7 @@ async fn revoke_vault_entry(
     Json(payload): Json<SimpleVaultIdempotentRequest>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let role = auth.role;
+    let role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
 
@@ -2415,7 +2675,7 @@ async fn revoke_vault_entry(
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
             validation::validate(&payload)?;
-            let service = VaultService::new(state.vault_repo.clone());
+            let service = VaultService::new(request_repos::vault_repo(&state, &auth));
             let command = RevokeVault {
                 request_id,
                 correlation_id,
@@ -2450,7 +2710,7 @@ async fn expire_vault_entry(
     Json(payload): Json<SimpleVaultIdempotentRequest>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let role = auth.role;
+    let role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
 
@@ -2468,7 +2728,7 @@ async fn expire_vault_entry(
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
             validation::validate(&payload)?;
-            let service = VaultService::new(state.vault_repo.clone());
+            let service = VaultService::new(request_repos::vault_repo(&state, &auth));
             let command = ExpireVault {
                 request_id,
                 correlation_id,
@@ -2501,7 +2761,7 @@ async fn list_vault_timeline(
     Path(vault_entry_id): Path<String>,
 ) -> Result<Json<Vec<VaultTimelineEvent>>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = VaultService::new(state.vault_repo.clone());
+    let service = VaultService::new(request_repos::vault_repo(&state, &auth));
     let timeline = service
         .list_timeline(&vault_entry_id, actor)
         .await
@@ -2515,7 +2775,7 @@ async fn list_vault_trustees(
     Path(vault_entry_id): Path<String>,
 ) -> Result<Json<Vec<String>>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = VaultService::new(state.vault_repo.clone());
+    let service = VaultService::new(request_repos::vault_repo(&state, &auth));
     let entry = service
         .get(&vault_entry_id)
         .await
@@ -2535,7 +2795,7 @@ async fn add_vault_trustee(
 ) -> Result<Response, ApiError> {
     validation::validate(&payload)?;
     let actor = actor_identity(&auth)?;
-    let role = auth.role;
+    let role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
     let key = IdempotencyKey::new(
@@ -2551,7 +2811,7 @@ async fn add_vault_trustee(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = VaultService::new(state.vault_repo.clone());
+            let service = VaultService::new(request_repos::vault_repo(&state, &auth));
             let command = AddTrustee {
                 wali_id: payload.wali_id,
                 request_id,
@@ -2586,7 +2846,7 @@ async fn remove_vault_trustee(
     Path((vault_entry_id, wali_id)): Path<(String, String)>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    let role = auth.role;
+    let role = auth.role.clone();
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
     let key = IdempotencyKey::new(
@@ -2602,7 +2862,7 @@ async fn remove_vault_trustee(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = VaultService::new(state.vault_repo.clone());
+            let service = VaultService::new(request_repos::vault_repo(&state, &auth));
             let command = RemoveTrustee {
                 wali_id,
                 request_id,
@@ -2797,7 +3057,7 @@ async fn create_chat_thread(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = ChatService::new(state.chat_repo.clone());
+            let service = ChatService::new(request_repos::chat_repo(&state, &auth));
             let input = ChatThreadCreate {
                 scope_id: payload.scope_id,
                 privacy_level: payload.privacy_level,
@@ -2829,7 +3089,7 @@ async fn list_chat_threads(
     Query(query): Query<ChatThreadsQuery>,
 ) -> Result<Json<Vec<ChatThread>>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = ChatService::new(state.chat_repo.clone());
+    let service = ChatService::new(request_repos::chat_repo(&state, &auth));
     let threads = if let Some(scope_id) = query.scope_id {
         service
             .list_threads_by_scope(&actor, &scope_id)
@@ -2868,7 +3128,7 @@ async fn join_chat_thread(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = ChatService::new(state.chat_repo.clone());
+            let service = ChatService::new(request_repos::chat_repo(&state, &auth));
             let member = service
                 .join_thread(&actor, &thread_id)
                 .await
@@ -2914,7 +3174,7 @@ async fn leave_chat_thread(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = ChatService::new(state.chat_repo.clone());
+            let service = ChatService::new(request_repos::chat_repo(&state, &auth));
             let member = service
                 .leave_thread(&actor, &thread_id)
                 .await
@@ -2942,7 +3202,7 @@ async fn list_chat_members(
     Path(thread_id): Path<String>,
 ) -> Result<Json<Vec<ChatMember>>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = ChatService::new(state.chat_repo.clone());
+    let service = ChatService::new(request_repos::chat_repo(&state, &auth));
     service
         .assert_actor_is_member(&actor, &thread_id)
         .await
@@ -2961,7 +3221,8 @@ async fn list_chat_messages(
     Query(query): Query<ChatMessagesQuery>,
 ) -> Result<Json<Vec<ChatMessage>>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let messages = list_chat_messages_by_query(&state, &actor, &thread_id, query).await?;
+    let chat_repo = request_repos::chat_repo(&state, &auth);
+    let messages = list_chat_messages_by_query(chat_repo, &actor, &thread_id, query).await?;
     Ok(Json(messages))
 }
 
@@ -2972,17 +3233,18 @@ async fn poll_chat_messages(
     Query(query): Query<ChatMessagesQuery>,
 ) -> Result<Json<Vec<ChatMessage>>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let messages = list_chat_messages_by_query(&state, &actor, &thread_id, query).await?;
+    let chat_repo = request_repos::chat_repo(&state, &auth);
+    let messages = list_chat_messages_by_query(chat_repo, &actor, &thread_id, query).await?;
     Ok(Json(messages))
 }
 
 async fn list_chat_messages_by_query(
-    state: &AppState,
+    chat_repo: Arc<dyn gotong_domain::ports::chat::ChatRepository>,
     actor: &ActorIdentity,
     thread_id: &str,
     query: ChatMessagesQuery,
 ) -> Result<Vec<ChatMessage>, ApiError> {
-    let service = ChatService::new(state.chat_repo.clone());
+    let service = ChatService::new(chat_repo);
     let cursor = build_message_catchup_from_query(&query)?;
     let messages = service
         .list_messages(thread_id, actor, cursor)
@@ -2992,7 +3254,7 @@ async fn list_chat_messages_by_query(
 }
 
 async fn fetch_replay_messages(
-    state: &AppState,
+    chat_repo: Arc<dyn gotong_domain::ports::chat::ChatRepository>,
     actor: &ActorIdentity,
     thread_id: &str,
     since_created_at_ms: i64,
@@ -3003,7 +3265,7 @@ async fn fetch_replay_messages(
         since_message_id: Some(since_message_id),
         limit: None,
     };
-    list_chat_messages_by_query(state, actor, thread_id, replay_query).await
+    list_chat_messages_by_query(chat_repo, actor, thread_id, replay_query).await
 }
 
 async fn send_chat_message(
@@ -3031,7 +3293,7 @@ async fn send_chat_message(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = ChatService::new(state.chat_repo.clone());
+            let service = ChatService::new(request_repos::chat_repo(&state, &auth));
             let thread_id_for_input = thread_id.clone();
             let input = SendMessageInput {
                 thread_id: thread_id_for_input,
@@ -3092,7 +3354,7 @@ async fn mark_chat_read_cursor(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = ChatService::new(state.chat_repo.clone());
+            let service = ChatService::new(request_repos::chat_repo(&state, &auth));
             let cursor = service
                 .mark_read(&actor, &thread_id, payload.message_id)
                 .await
@@ -3122,16 +3384,16 @@ async fn stream_chat_messages_ws(
     ws: WebSocketUpgrade,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    assert_chat_stream_access(&state, &thread_id, &actor).await?;
+    let chat_repo = request_repos::chat_repo(&state, &auth);
+    assert_chat_stream_access(chat_repo.clone(), &thread_id, &actor).await?;
     let receiver = state.chat_realtime.subscribe(&thread_id).await;
-    let backlog = list_chat_messages_by_query(&state, &actor, &thread_id, query).await?;
-    let state_clone = state.clone();
+    let backlog = list_chat_messages_by_query(chat_repo.clone(), &actor, &thread_id, query).await?;
     let actor_clone = actor.clone();
     let thread_id_clone = thread_id.clone();
     Ok(ws.on_upgrade(move |socket| async move {
         handle_chat_websocket(
             socket,
-            state_clone,
+            chat_repo,
             thread_id_clone,
             actor_clone,
             backlog,
@@ -3148,10 +3410,12 @@ async fn stream_chat_messages_sse(
     Extension(auth): Extension<AuthContext>,
 ) -> Result<Response, ApiError> {
     let actor = actor_identity(&auth)?;
-    assert_chat_stream_access(&state, &thread_id, &actor).await?;
+    let chat_repo = request_repos::chat_repo(&state, &auth);
+    assert_chat_stream_access(chat_repo.clone(), &thread_id, &actor).await?;
     let (tx, rx) = mpsc::unbounded_channel::<Result<Event, Infallible>>();
     let mut receiver = state.chat_realtime.subscribe(&thread_id).await;
-    let mut messages = list_chat_messages_by_query(&state, &actor, &thread_id, query).await?;
+    let mut messages =
+        list_chat_messages_by_query(chat_repo.clone(), &actor, &thread_id, query).await?;
     let mut seen = HashSet::new();
     let mut replay_cursor = None::<(i64, String)>;
 
@@ -3162,8 +3426,8 @@ async fn stream_chat_messages_sse(
     }
 
     let sender = tx.clone();
-    let state_clone = state.clone();
     let thread_id = thread_id.clone();
+    let chat_repo = chat_repo.clone();
     let actor_id = actor.user_id.clone();
     let actor_name = actor.username.clone();
     let actor_identity = ActorIdentity {
@@ -3182,7 +3446,7 @@ async fn stream_chat_messages_sse(
                             if !seen_messages.insert(message.message_id.clone()) {
                                 continue;
                             }
-                            if assert_chat_stream_access(&state_clone, &thread_id, &actor_identity)
+                            if assert_chat_stream_access(chat_repo.clone(), &thread_id, &actor_identity)
                                 .await
                                 .is_err()
                             {
@@ -3201,7 +3465,7 @@ async fn stream_chat_messages_sse(
                                 continue;
                             };
 
-                            if assert_chat_stream_access(&state_clone, &thread_id, &actor_identity)
+                            if assert_chat_stream_access(chat_repo.clone(), &thread_id, &actor_identity)
                                 .await
                                 .is_err()
                             {
@@ -3213,7 +3477,7 @@ async fn stream_chat_messages_sse(
 
                             let replay_messages =
                                 match fetch_replay_messages(
-                                    &state_clone,
+                                    chat_repo.clone(),
                                     &actor_identity,
                                     &thread_id,
                                     since_created_at_ms,
@@ -3267,7 +3531,7 @@ async fn stream_chat_messages_sse(
 
 async fn handle_chat_websocket(
     socket: WebSocket,
-    state: AppState,
+    chat_repo: Arc<dyn gotong_domain::ports::chat::ChatRepository>,
     thread_id: String,
     actor: ActorIdentity,
     mut backlog: Vec<ChatMessage>,
@@ -3295,7 +3559,10 @@ async fn handle_chat_websocket(
             event = receiver.recv() => {
                 match event {
                     Ok(message) => {
-                        if assert_chat_stream_access(&state, &thread_id, &actor).await.is_err() {
+                        if assert_chat_stream_access(chat_repo.clone(), &thread_id, &actor)
+                            .await
+                            .is_err()
+                        {
                             let _ = sender
                                 .send(Message::Close(Some(CloseFrame {
                                     code: close_code::POLICY,
@@ -3336,7 +3603,10 @@ async fn handle_chat_websocket(
                             continue;
                         };
 
-                        if assert_chat_stream_access(&state, &thread_id, &actor).await.is_err() {
+                        if assert_chat_stream_access(chat_repo.clone(), &thread_id, &actor)
+                            .await
+                            .is_err()
+                        {
                             let _ = sender
                                 .send(Message::Close(Some(CloseFrame {
                                     code: close_code::POLICY,
@@ -3347,7 +3617,7 @@ async fn handle_chat_websocket(
                         }
 
                         let replay_messages = match fetch_replay_messages(
-                            &state,
+                            chat_repo.clone(),
                             &actor,
                             &thread_id,
                             since_created_at_ms,
@@ -3414,11 +3684,11 @@ async fn handle_chat_websocket(
 }
 
 async fn assert_chat_stream_access(
-    state: &AppState,
+    chat_repo: Arc<dyn gotong_domain::ports::chat::ChatRepository>,
     thread_id: &str,
     actor: &ActorIdentity,
 ) -> Result<(), ApiError> {
-    let service = ChatService::new(state.chat_repo.clone());
+    let service = ChatService::new(chat_repo);
     service
         .assert_actor_is_member(actor, thread_id)
         .await
@@ -3431,7 +3701,7 @@ async fn get_chat_read_cursor(
     Extension(auth): Extension<AuthContext>,
 ) -> Result<Json<ChatReadCursor>, ApiError> {
     let actor = actor_identity(&auth)?;
-    let service = ChatService::new(state.chat_repo.clone());
+    let service = ChatService::new(request_repos::chat_repo(&state, &auth));
     service
         .assert_actor_is_member(&actor, &thread_id)
         .await
@@ -3548,6 +3818,39 @@ async fn get_tandang_profile_snapshot(
     })))
 }
 
+async fn get_tandang_cv_hidup_qr(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_cv_hidup_qr()
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn post_tandang_cv_hidup_export(
+    State(state): State<AppState>,
+    Json(payload): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .post_cv_hidup_export(payload)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_cv_hidup_verify(
+    State(state): State<AppState>,
+    Path(export_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_cv_hidup_verify(&export_id)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
 async fn search_tandang_skills(
     State(state): State<AppState>,
     Query(query): Query<TandangSkillSearchQuery>,
@@ -3568,6 +3871,54 @@ async fn search_tandang_skills(
     Ok(Json(cached_json_value(result)))
 }
 
+async fn get_tandang_skill_node(
+    State(state): State<AppState>,
+    Path(node_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_skill_node(&node_id)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_skill_node_labels(
+    State(state): State<AppState>,
+    Path(node_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_skill_node_labels(&node_id)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_skill_node_relations(
+    State(state): State<AppState>,
+    Path(node_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_skill_node_relations(&node_id)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_skill_parent(
+    State(state): State<AppState>,
+    Path(skill_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_skill_parent(&skill_id)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
 async fn get_tandang_por_requirements(
     State(state): State<AppState>,
     Path(task_type): Path<String>,
@@ -3578,6 +3929,21 @@ async fn get_tandang_por_requirements(
     let result = state
         .markov_client
         .get_por_requirements(&task_type)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_por_status(
+    State(state): State<AppState>,
+    Path(evidence_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    if evidence_id.trim().is_empty() {
+        return Err(ApiError::Validation("evidence_id is required".into()));
+    }
+    let result = state
+        .markov_client
+        .get_por_status(&evidence_id)
         .await
         .map_err(map_markov_error)?;
     Ok(Json(cached_json_value(result)))
@@ -3623,6 +3989,130 @@ async fn get_tandang_reputation_distribution(
     Ok(Json(cached_json_value(result)))
 }
 
+fn require_self_or_admin(auth: &AuthContext, user_id: &str) -> Result<(), ApiError> {
+    let requested = user_id.trim();
+    if requested.is_empty() {
+        return Err(ApiError::Validation("user_id is required".into()));
+    }
+    let actor_id = auth
+        .user_id
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or_default();
+    if actor_id == requested {
+        return Ok(());
+    }
+    require_admin_role(&auth.role)
+}
+
+async fn get_tandang_gdf_weather(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_gdf_weather()
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_vouch_budget(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(user_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_self_or_admin(&auth, &user_id)?;
+    let result = state
+        .markov_client
+        .get_vouch_budget(&user_id)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_decay_warnings(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(user_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_self_or_admin(&auth, &user_id)?;
+    let result = state
+        .markov_client
+        .get_decay_warnings(&user_id)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_community_pulse_overview(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_community_pulse()
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_community_pulse_insights(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_community_pulse_insights()
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+#[derive(Debug, Deserialize)]
+struct TandangPulseTrendsQuery {
+    period: Option<String>,
+}
+
+async fn get_tandang_community_pulse_trends(
+    State(state): State<AppState>,
+    Query(query): Query<TandangPulseTrendsQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_community_pulse_trends(query.period.as_deref())
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+async fn get_tandang_hero_status(
+    State(state): State<AppState>,
+    Path(user_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    if user_id.trim().is_empty() {
+        return Err(ApiError::Validation("user_id is required".into()));
+    }
+    let result = state
+        .markov_client
+        .get_hero_status(&user_id)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
+#[derive(Debug, Deserialize)]
+struct TandangHeroLeaderboardQuery {
+    limit: Option<u32>,
+}
+
+async fn get_tandang_hero_leaderboard(
+    State(state): State<AppState>,
+    Query(query): Query<TandangHeroLeaderboardQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let result = state
+        .markov_client
+        .get_hero_leaderboard(query.limit)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(cached_json_value(result)))
+}
+
 fn cached_json_value(payload: CachedJson) -> Value {
     json!({
         "cache": cache_metadata_value(&payload.meta),
@@ -3645,9 +4135,14 @@ fn actor_identity(auth: &AuthContext) -> Result<ActorIdentity, ApiError> {
         .as_ref()
         .filter(|user_id| !user_id.trim().is_empty())
         .ok_or(ApiError::Unauthorized)?;
+    let username = auth
+        .username
+        .as_ref()
+        .filter(|username| !username.trim().is_empty())
+        .unwrap_or(user_id);
     Ok(ActorIdentity {
         user_id: user_id.to_string(),
-        username: user_id.to_string(),
+        username: username.to_string(),
     })
 }
 

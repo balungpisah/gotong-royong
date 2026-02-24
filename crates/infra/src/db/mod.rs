@@ -19,7 +19,7 @@ pub struct DbConfig {
 impl DbConfig {
     pub fn from_app_config(config: &AppConfig) -> Self {
         Self {
-            endpoint: config.surreal_endpoint.clone(),
+            endpoint: normalize_surreal_ws_endpoint(&config.surreal_endpoint),
             namespace: config.surreal_ns.clone(),
             database: config.surreal_db.clone(),
             username: config.surreal_user.clone(),
@@ -95,4 +95,62 @@ fn parse_socket_address(endpoint: &str) -> Result<String, DbError> {
         _ => 8000,
     });
     Ok(format!("{host}:{port}"))
+}
+
+/// Normalize a SurrealDB endpoint string into the `host:port` format expected by the Rust SDK when
+/// using `engine::remote::ws::Ws`.
+///
+/// The SDK will append `/rpc` automatically for the websocket engine when given `host:port`.
+fn normalize_surreal_ws_endpoint(endpoint: &str) -> String {
+    let endpoint = endpoint.trim();
+    if endpoint.is_empty() {
+        return endpoint.to_string();
+    }
+
+    if endpoint.contains("://") {
+        if let Ok(parsed) = Url::parse(endpoint) {
+            if let Some(host) = parsed.host_str() {
+                let scheme = parsed.scheme();
+                let port = parsed.port_or_known_default().unwrap_or(match scheme {
+                    "wss" | "https" => 443,
+                    "http" | "ws" => 8000,
+                    _ => 8000,
+                });
+                return format!("{host}:{port}");
+            }
+        }
+        return endpoint.to_string();
+    }
+
+    // Allow users to pass `host:port/rpc` or similar; the SDK wants `host:port`.
+    endpoint.split('/').next().unwrap_or(endpoint).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_surreal_ws_endpoint;
+
+    #[test]
+    fn normalizes_ws_url_to_host_port() {
+        assert_eq!(
+            normalize_surreal_ws_endpoint("ws://127.0.0.1:8000"),
+            "127.0.0.1:8000"
+        );
+        assert_eq!(
+            normalize_surreal_ws_endpoint("ws://127.0.0.1:8000/rpc"),
+            "127.0.0.1:8000"
+        );
+    }
+
+    #[test]
+    fn normalizes_bare_host_port() {
+        assert_eq!(
+            normalize_surreal_ws_endpoint("127.0.0.1:8000"),
+            "127.0.0.1:8000"
+        );
+        assert_eq!(
+            normalize_surreal_ws_endpoint("127.0.0.1:8000/rpc"),
+            "127.0.0.1:8000"
+        );
+    }
 }

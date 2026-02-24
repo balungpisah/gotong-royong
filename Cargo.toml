@@ -23,6 +23,7 @@ metrics = "0.23"
 metrics-exporter-prometheus = "0.15"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+base64 = "0.22"
 thiserror = "1"
 futures-util = "0.3"
 tokio = { version = "1", features = ["full"] }
@@ -36,7 +37,8 @@ tower_governor = "0.4"
 governor = "0.6"
 jsonwebtoken = "9"
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
-surrealdb = "=3.0.0-beta.4"
+surrealdb = "=3.0.0"
+surrealdb-types = "=3.0.0"
 tower = { version = "0.4", features = ["limit"] }
 tower-http = { version = "0.5", features = ["trace", "request-id", "timeout", "cors"] }
 tracing = "0.1"

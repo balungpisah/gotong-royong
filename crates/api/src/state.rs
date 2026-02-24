@@ -22,6 +22,7 @@ use gotong_domain::ports::{
 use gotong_domain::util::uuid_v7_without_dashes;
 use gotong_infra::config::AppConfig;
 use gotong_infra::db::DbConfig;
+use gotong_infra::auth::SurrealAuthService;
 use gotong_infra::idempotency::RedisIdempotencyStore;
 use gotong_infra::jobs::RedisJobQueue;
 use gotong_infra::markov_client::MarkovReadClient;
@@ -61,6 +62,7 @@ type SharedJobQueue = Option<Arc<dyn JobQueue>>;
 pub struct AppState {
     pub config: AppConfig,
     pub markov_client: Arc<MarkovReadClient>,
+    pub auth_service: Option<Arc<SurrealAuthService>>,
     pub idempotency: IdempotencyService,
     pub adaptive_path_repo: Arc<dyn AdaptivePathRepository>,
     pub contribution_repo: Arc<dyn ContributionRepository>,
@@ -398,6 +400,13 @@ impl ChatRealtimeBus {
 impl AppState {
     pub async fn new(config: AppConfig) -> anyhow::Result<Self> {
         let store = RedisIdempotencyStore::connect(&config.redis_url).await?;
+        let auth_service = match config.data_backend.trim().to_ascii_lowercase().as_str() {
+            "surreal" | "surrealdb" | "tikv" => {
+                let db_config = DbConfig::from_app_config(&config);
+                Some(Arc::new(SurrealAuthService::new(db_config).await?))
+            }
+            _ => None,
+        };
         let (
             adaptive_path_repo,
             contribution_repo,
@@ -419,6 +428,7 @@ impl AppState {
         Ok(Self {
             config,
             markov_client,
+            auth_service,
             idempotency,
             adaptive_path_repo,
             contribution_repo,
@@ -458,6 +468,7 @@ impl AppState {
         Self {
             config,
             markov_client,
+            auth_service: None,
             idempotency: IdempotencyService::new(store, IdempotencyConfig::default()),
             adaptive_path_repo,
             contribution_repo,
@@ -500,6 +511,7 @@ impl AppState {
         Self {
             config,
             markov_client,
+            auth_service: None,
             idempotency,
             adaptive_path_repo,
             contribution_repo,

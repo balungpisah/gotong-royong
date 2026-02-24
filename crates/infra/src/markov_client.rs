@@ -262,6 +262,41 @@ impl MarkovReadClient {
             .await
     }
 
+    pub async fn get_cv_hidup_qr(&self) -> Result<CachedJson, MarkovClientError> {
+        self.fetch_cached_json(
+            "cv-hidup/qr".to_string(),
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
+    }
+
+    pub async fn post_cv_hidup_export(
+        &self,
+        payload: Value,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let value = self
+            .post_from_origin("cv-hidup/export", payload, TokenPolicy::Required)
+            .await?;
+        Ok(uncached_json(value))
+    }
+
+    pub async fn get_cv_hidup_verify(
+        &self,
+        export_id: &str,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let export_id = export_id.trim();
+        if export_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "export_id must not be empty".to_string(),
+            ));
+        }
+        let path = format!("cv-hidup/verify/{export_id}");
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
+            .await
+    }
+
     pub async fn search_skills(
         &self,
         query: &str,
@@ -291,6 +326,63 @@ impl MarkovReadClient {
         .await
     }
 
+    pub async fn get_skill_node(&self, node_id: &str) -> Result<CachedJson, MarkovClientError> {
+        let node_id = node_id.trim();
+        if node_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "node_id must not be empty".to_string(),
+            ));
+        }
+        let path = format!("skills/nodes/{node_id}");
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
+            .await
+    }
+
+    pub async fn get_skill_node_labels(
+        &self,
+        node_id: &str,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let node_id = node_id.trim();
+        if node_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "node_id must not be empty".to_string(),
+            ));
+        }
+        let path = format!("skills/nodes/{node_id}/labels");
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
+            .await
+    }
+
+    pub async fn get_skill_node_relations(
+        &self,
+        node_id: &str,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let node_id = node_id.trim();
+        if node_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "node_id must not be empty".to_string(),
+            ));
+        }
+        let path = format!("skills/nodes/{node_id}/relations");
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
+            .await
+    }
+
+    pub async fn get_skill_parent(
+        &self,
+        skill_id: &str,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let skill_id = skill_id.trim();
+        if skill_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "skill_id must not be empty".to_string(),
+            ));
+        }
+        let path = format!("skills/{skill_id}/parent");
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
+            .await
+    }
+
     pub async fn get_por_requirements(
         &self,
         task_type: &str,
@@ -302,6 +394,26 @@ impl MarkovReadClient {
             ));
         }
         let path = format!("por/requirements/{task_type}");
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
+    }
+
+    pub async fn get_por_status(
+        &self,
+        evidence_id: &str,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let evidence_id = evidence_id.trim();
+        if evidence_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "evidence_id must not be empty".to_string(),
+            ));
+        }
+        let path = format!("por/status/{evidence_id}");
         self.fetch_cached_json(
             path,
             Vec::new(),
@@ -368,6 +480,112 @@ impl MarkovReadClient {
         self.fetch_cached_json(
             "reputation/distribution".to_string(),
             Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
+    }
+
+    pub async fn get_gdf_weather(&self) -> Result<CachedJson, MarkovClientError> {
+        self.fetch_cached_json(
+            "slash/gdf".to_string(),
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
+    }
+
+    pub async fn get_vouch_budget(&self, user_id: &str) -> Result<CachedJson, MarkovClientError> {
+        let user_id = user_id.trim();
+        if user_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "user_id must not be empty".to_string(),
+            ));
+        }
+        let path = format!("users/{user_id}/vouch-budget");
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
+            .await
+    }
+
+    pub async fn get_decay_warnings(
+        &self,
+        user_id: &str,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let user_id = user_id.trim();
+        if user_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "user_id must not be empty".to_string(),
+            ));
+        }
+        let path = format!("decay/warnings/{user_id}");
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
+            .await
+    }
+
+    pub async fn get_community_pulse(&self) -> Result<CachedJson, MarkovClientError> {
+        self.fetch_cached_json(
+            "community/pulse/overview".to_string(),
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
+    }
+
+    pub async fn get_community_pulse_insights(&self) -> Result<CachedJson, MarkovClientError> {
+        self.fetch_cached_json(
+            "community/pulse/insights".to_string(),
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
+    }
+
+    pub async fn get_community_pulse_trends(
+        &self,
+        period: Option<&str>,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let mut params = Vec::new();
+        if let Some(period) = period {
+            let period = period.trim();
+            if !period.is_empty() {
+                params.push(("period".to_string(), period.to_string()));
+            }
+        }
+        self.fetch_cached_json(
+            "community/pulse/trends".to_string(),
+            params,
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
+    }
+
+    pub async fn get_hero_status(&self, user_id: &str) -> Result<CachedJson, MarkovClientError> {
+        let user_id = user_id.trim();
+        if user_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "user_id must not be empty".to_string(),
+            ));
+        }
+        let path = format!("hero/{user_id}");
+        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
+            .await
+    }
+
+    pub async fn get_hero_leaderboard(
+        &self,
+        limit: Option<u32>,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let mut params = Vec::new();
+        if let Some(limit) = limit {
+            params.push(("limit".to_string(), limit.to_string()));
+        }
+        self.fetch_cached_json(
+            "hero/leaderboard".to_string(),
+            params,
             CacheClass::Gameplay,
             TokenPolicy::Required,
         )
@@ -663,6 +881,130 @@ impl MarkovReadClient {
         ))
     }
 
+    async fn post_from_origin(
+        &self,
+        path: &str,
+        payload: Value,
+        token_policy: TokenPolicy,
+    ) -> Result<Value, MarkovClientError> {
+        let attempts = self.retry_max_attempts.max(1);
+        let url = endpoint_url(&self.base_url, path);
+
+        for attempt in 0..attempts {
+            self.ensure_circuit_closed().await?;
+
+            let mut request = self
+                .http
+                .post(&url)
+                .header("accept", "application/json")
+                .json(&payload);
+
+            match (&self.platform_token, token_policy) {
+                (Some(token), TokenPolicy::Required) => {
+                    request = request.header(PLATFORM_TOKEN_HEADER, token);
+                }
+                (None, TokenPolicy::Required) => {
+                    return Err(MarkovClientError::Configuration(
+                        "markov platform token is required but not configured".to_string(),
+                    ));
+                }
+            }
+
+            let response = match request.send().await {
+                Ok(response) => response,
+                Err(err) => {
+                    if attempt + 1 < attempts {
+                        sleep(backoff_for_attempt(
+                            self.retry_backoff_base,
+                            self.retry_backoff_max,
+                            attempt,
+                        ))
+                        .await;
+                        continue;
+                    }
+                    self.record_transient_failure().await;
+                    return Err(MarkovClientError::Transport(err.to_string()));
+                }
+            };
+
+            let status = response.status();
+            if status.is_success() {
+                let body = response
+                    .json::<Value>()
+                    .await
+                    .map_err(|err| MarkovClientError::InvalidResponse(err.to_string()))?;
+                self.record_success().await;
+                return Ok(body);
+            }
+
+            let message = response.text().await.unwrap_or_default();
+            match status {
+                StatusCode::BAD_REQUEST => {
+                    self.record_success().await;
+                    return Err(MarkovClientError::BadRequest(message));
+                }
+                StatusCode::UNAUTHORIZED => {
+                    self.record_success().await;
+                    return Err(MarkovClientError::Unauthorized(message));
+                }
+                StatusCode::FORBIDDEN => {
+                    self.record_success().await;
+                    return Err(MarkovClientError::Forbidden(message));
+                }
+                StatusCode::NOT_FOUND => {
+                    self.record_success().await;
+                    return Err(MarkovClientError::NotFound(message));
+                }
+                StatusCode::TOO_MANY_REQUESTS => {
+                    if attempt + 1 < attempts {
+                        sleep(backoff_for_attempt(
+                            self.retry_backoff_base,
+                            self.retry_backoff_max,
+                            attempt,
+                        ))
+                        .await;
+                        continue;
+                    }
+                    self.record_transient_failure().await;
+                    return Err(MarkovClientError::Upstream(format!(
+                        "status {}: {}",
+                        status.as_u16(),
+                        message
+                    )));
+                }
+                _ if status.is_server_error() => {
+                    if attempt + 1 < attempts {
+                        sleep(backoff_for_attempt(
+                            self.retry_backoff_base,
+                            self.retry_backoff_max,
+                            attempt,
+                        ))
+                        .await;
+                        continue;
+                    }
+                    self.record_transient_failure().await;
+                    return Err(MarkovClientError::Upstream(format!(
+                        "status {}: {}",
+                        status.as_u16(),
+                        message
+                    )));
+                }
+                _ => {
+                    self.record_success().await;
+                    return Err(MarkovClientError::Upstream(format!(
+                        "status {}: {}",
+                        status.as_u16(),
+                        message
+                    )));
+                }
+            }
+        }
+
+        Err(MarkovClientError::Upstream(
+            "retry loop exited unexpectedly".to_string(),
+        ))
+    }
+
     async fn ensure_circuit_closed(&self) -> Result<(), MarkovClientError> {
         let now = Instant::now();
         let mut state = self.circuit.lock().await;
@@ -717,6 +1059,18 @@ impl MarkovReadClient {
         for (key, _) in keys_by_age.into_iter().take(evict_count) {
             cache.remove(&key);
         }
+    }
+}
+
+fn uncached_json(value: Value) -> CachedJson {
+    CachedJson {
+        value,
+        meta: CacheMetadata {
+            status: CacheStatus::Miss,
+            stale: false,
+            age_ms: 0,
+            cached_at_epoch_ms: now_epoch_ms(),
+        },
     }
 }
 
