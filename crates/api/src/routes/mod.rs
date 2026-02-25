@@ -1,16 +1,17 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
+use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Extension, Path, Query, State};
+use axum::extract::{Extension, Multipart, Path, Query, State};
 use axum::{
     Json, Router,
     extract::ws::close_code,
     http::{
         HeaderMap, StatusCode,
-        header::{CONTENT_TYPE, HeaderValue},
+        header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_TYPE, HeaderValue, LOCATION},
     },
     middleware,
     response::sse::{Event, KeepAlive, Sse},
@@ -33,8 +34,9 @@ use gotong_domain::{
     contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
     discovery::{
         DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_ONTOLOGY_NOTE, FEED_SOURCE_VOUCH,
-        FeedIngestInput, FeedListQuery, InAppNotification, NotificationListQuery, PagedFeed,
-        PagedNotifications, SearchListQuery, SearchPage, WeeklyDigest,
+        FeedIngestInput, FeedListQuery, FeedSuggestion, FeedSuggestionsQuery, InAppNotification,
+        NotificationListQuery, PagedFeed, PagedNotifications, SearchListQuery, SearchPage,
+        WeeklyDigest,
     },
     error::DomainError,
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
@@ -52,6 +54,7 @@ use gotong_domain::{
         ActionType, NoteFeedbackCounts, OntologyConcept, OntologyEdgeKind, OntologyNoteCreate,
         OntologyTripleCreate,
     },
+    ports::group::{GroupJoinRequestRecord, GroupMemberRecord, GroupRecord},
     ports::idempotency::{IdempotencyKey, IdempotencyResponse},
     ports::jobs::JobType,
     ranking::wilson_score,
@@ -65,9 +68,14 @@ use gotong_domain::{
     },
 };
 use gotong_infra::auth::{SigninParams, SignupParams};
-use gotong_infra::markov_client::{CacheMetadata, CachedJson, MarkovClientError};
+use gotong_infra::markov_client::{
+    CacheMetadata, CachedJson, MarkovClientError, MarkovProfileSnapshot,
+};
+use hmac::{Hmac, Mac};
+use rusty_s3::S3Action;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::Sha256;
 use tokio::sync::mpsc;
 use tokio::time::interval;
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -78,7 +86,12 @@ mod edgepod;
 use crate::middleware::AuthContext;
 use crate::request_repos;
 use crate::{
-    error::ApiError, middleware as app_middleware, observability, state::AppState, validation,
+    error::ApiError,
+    middleware as app_middleware, observability,
+    state::{
+        AppState, ChatAttachmentStorage, TriageSessionState, WitnessSignalEntry, WitnessSignalState,
+    },
+    validation,
 };
 
 pub fn router(state: AppState) -> Router {
@@ -165,6 +178,7 @@ pub fn router(state: AppState) -> Router {
             get(list_moderation_review_queue),
         )
         .route("/v1/moderations/:content_id", get(get_moderation_view))
+        .route("/v1/feed/suggestions", get(list_discovery_feed_suggestions))
         .route("/v1/feed", get(list_discovery_feed))
         .route("/v1/search", get(list_discovery_search))
         .route("/v1/ontology/concepts", post(upsert_ontology_concept))
@@ -210,7 +224,59 @@ pub fn router(state: AppState) -> Router {
             post(mark_notification_read),
         )
         .route("/v1/notifications", get(list_discovery_notifications))
+        .route("/v1/triage/sessions", post(start_triage_session))
+        .route(
+            "/v1/triage/sessions/:session_id/messages",
+            post(continue_triage_session),
+        )
+        .route(
+            "/v1/witnesses/:witness_id/signals",
+            post(create_witness_signal),
+        )
+        .route(
+            "/v1/witnesses/:witness_id/signals/:signal_type",
+            delete(remove_witness_signal),
+        )
+        .route(
+            "/v1/witnesses/:witness_id/signals/my-relation",
+            get(get_witness_signal_my_relation),
+        )
+        .route(
+            "/v1/witnesses/:witness_id/signals/counts",
+            get(get_witness_signal_counts),
+        )
+        .route(
+            "/v1/witnesses/:witness_id/signals/resolutions",
+            get(list_witness_signal_resolutions),
+        )
+        .route("/v1/groups", post(create_group).get(list_groups))
+        .route("/v1/groups/me", get(list_my_groups))
+        .route("/v1/groups/:group_id", get(get_group).patch(update_group))
+        .route("/v1/groups/:group_id/join", post(join_group))
+        .route("/v1/groups/:group_id/requests", post(request_group_join))
+        .route(
+            "/v1/groups/:group_id/requests/:request_id/approve",
+            post(approve_group_request),
+        )
+        .route(
+            "/v1/groups/:group_id/requests/:request_id/reject",
+            post(reject_group_request),
+        )
+        .route("/v1/groups/:group_id/invite", post(invite_group_member))
+        .route("/v1/groups/:group_id/leave", post(leave_group))
+        .route(
+            "/v1/groups/:group_id/members/:user_id/remove",
+            post(remove_group_member),
+        )
+        .route(
+            "/v1/groups/:group_id/members/:user_id/role",
+            post(update_group_member_role),
+        )
         .route("/v1/tandang/me/profile", get(get_tandang_profile_snapshot))
+        .route(
+            "/v1/tandang/users/:user_id/profile",
+            get(get_tandang_user_profile_snapshot),
+        )
         .route("/v1/tandang/cv-hidup/qr", get(get_tandang_cv_hidup_qr))
         .route(
             "/v1/tandang/cv-hidup/export",
@@ -310,6 +376,7 @@ pub fn router(state: AppState) -> Router {
             "/v1/chat/threads/:thread_id/messages/send",
             post(send_chat_message),
         )
+        .route("/v1/chat/attachments/upload", post(upload_chat_attachment))
         .route(
             "/v1/chat/threads/:thread_id/messages/poll",
             get(poll_chat_messages),
@@ -375,6 +442,10 @@ pub fn router(state: AppState) -> Router {
         .route("/health", get(health))
         .route("/metrics", get(metrics))
         .route("/v1/echo", post(echo))
+        .route(
+            "/v1/chat/attachments/:attachment_id/download",
+            get(download_chat_attachment),
+        )
         .route("/v1/auth/signup", post(auth_signup))
         .route("/v1/auth/signin", post(auth_signin))
         .route("/v1/auth/refresh", post(auth_refresh))
@@ -639,6 +710,1819 @@ async fn idempotent_echo(
             let response = IdempotencyResponse {
                 status_code: StatusCode::OK.as_u16(),
                 body: json!({ "message": payload.message }),
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+const TRIAGE_SESSION_TTL_MS: i64 = 4 * 60 * 60 * 1_000;
+const TRIAGE_SESSION_MAX_ITEMS: usize = 10_000;
+
+#[derive(Debug, Deserialize, Serialize, Validate)]
+struct TriageAttachmentInput {
+    #[validate(length(min = 1, max = 256))]
+    name: String,
+    #[validate(length(min = 1, max = 128))]
+    mime_type: String,
+    size_bytes: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct StartTriageSessionRequest {
+    #[validate(length(min = 1, max = 4_000))]
+    content: String,
+    #[validate(length(max = 10), nested)]
+    attachments: Option<Vec<TriageAttachmentInput>>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct ContinueTriageSessionRequest {
+    #[validate(length(min = 1, max = 4_000))]
+    answer: String,
+    #[validate(length(max = 10), nested)]
+    attachments: Option<Vec<TriageAttachmentInput>>,
+}
+
+#[derive(Clone, Copy)]
+struct DetectedTriageRoute {
+    route: &'static str,
+    trajectory_type: Option<&'static str>,
+}
+
+fn detect_triage_route(text: &str) -> DetectedTriageRoute {
+    let normalized = text.to_ascii_lowercase();
+
+    if normalized.contains("kelola")
+        || normalized.contains("kelompok")
+        || normalized.contains("mengatur kelompok")
+        || normalized.contains("manage a group")
+    {
+        return DetectedTriageRoute {
+            route: "kelola",
+            trajectory_type: None,
+        };
+    }
+
+    if normalized.contains("vault")
+        || normalized.contains("catatan saksi")
+        || normalized.contains("rahasia")
+    {
+        return DetectedTriageRoute {
+            route: "vault",
+            trajectory_type: Some("vault"),
+        };
+    }
+
+    if normalized.contains("siaga")
+        || normalized.contains("darurat")
+        || normalized.contains("bahaya")
+        || normalized.contains("peringatan")
+        || normalized.contains("emergency")
+    {
+        return DetectedTriageRoute {
+            route: "siaga",
+            trajectory_type: Some("siaga"),
+        };
+    }
+
+    if normalized.contains("catat")
+        || normalized.contains("data")
+        || normalized.contains("dokumentasi")
+        || normalized.contains("fakta")
+        || normalized.contains("bukti")
+        || normalized.contains("document")
+    {
+        return DetectedTriageRoute {
+            route: "catatan_komunitas",
+            trajectory_type: Some("data"),
+        };
+    }
+
+    if normalized.contains("musyawarah")
+        || normalized.contains("diskusi")
+        || normalized.contains("keputusan")
+        || normalized.contains("usul")
+        || normalized.contains("discussion")
+    {
+        return DetectedTriageRoute {
+            route: "komunitas",
+            trajectory_type: Some("mufakat"),
+        };
+    }
+
+    if normalized.contains("pantau")
+        || normalized.contains("awasi")
+        || normalized.contains("mengawasi")
+        || normalized.contains("monitor")
+    {
+        return DetectedTriageRoute {
+            route: "komunitas",
+            trajectory_type: Some("pantau"),
+        };
+    }
+
+    if normalized.contains("bantuan")
+        || normalized.contains("butuh")
+        || normalized.contains("pertolongan")
+        || normalized.contains("need help")
+    {
+        return DetectedTriageRoute {
+            route: "komunitas",
+            trajectory_type: Some("bantuan"),
+        };
+    }
+
+    if normalized.contains("rayakan")
+        || normalized.contains("kabar baik")
+        || normalized.contains("capai")
+        || normalized.contains("celebrate")
+        || normalized.contains("good news")
+    {
+        return DetectedTriageRoute {
+            route: "komunitas",
+            trajectory_type: Some("pencapaian"),
+        };
+    }
+
+    if normalized.contains("program")
+        || normalized.contains("jadwal")
+        || normalized.contains("kegiatan rutin")
+        || normalized.contains("organize")
+    {
+        return DetectedTriageRoute {
+            route: "komunitas",
+            trajectory_type: Some("program"),
+        };
+    }
+
+    if normalized.contains("masalah")
+        || normalized.contains("rusak")
+        || normalized.contains("keluhan")
+        || normalized.contains("problem")
+    {
+        return DetectedTriageRoute {
+            route: "komunitas",
+            trajectory_type: Some("aksi"),
+        };
+    }
+
+    DetectedTriageRoute {
+        route: "komunitas",
+        trajectory_type: Some("aksi"),
+    }
+}
+
+fn triage_label(route: &str) -> &'static str {
+    match route {
+        "kelola" => "Kelola Kelompok",
+        "siaga" => "Siaga Darurat",
+        "vault" => "Catatan Saksi",
+        "catatan_komunitas" => "Catatan Komunitas",
+        _ => "Komunitas",
+    }
+}
+
+fn triage_terminal_bar_state(route: &str) -> &'static str {
+    match route {
+        "siaga" => "siaga-ready",
+        "vault" => "vault-ready",
+        _ => "ready",
+    }
+}
+
+fn triage_budget(turn: u8) -> Value {
+    let total_tokens = 6_000_i64;
+    let used_tokens = (i64::from(turn) * 900).min(total_tokens);
+    let remaining_tokens = total_tokens.saturating_sub(used_tokens);
+    json!({
+        "total_tokens": total_tokens,
+        "used_tokens": used_tokens,
+        "remaining_tokens": remaining_tokens,
+        "budget_pct": (used_tokens as f64) / (total_tokens as f64),
+        "can_continue": remaining_tokens > 0 && turn < 8,
+        "turn_count": turn,
+        "max_turns": 8
+    })
+}
+
+fn triage_result_payload(route: &str, trajectory_type: Option<&str>, step: u8) -> Value {
+    let bar_state = if step >= 3 {
+        triage_terminal_bar_state(route)
+    } else if step == 2 {
+        "leaning"
+    } else {
+        "probing"
+    };
+    let score: f64 = if step >= 3 {
+        0.95
+    } else if step == 2 {
+        0.70
+    } else {
+        0.40
+    };
+    let mut payload = json!({
+        "bar_state": bar_state,
+        "route": route,
+        "confidence": {
+            "score": score,
+            "label": format!("{} · {}%", triage_label(route), (score * 100.0).round() as i64)
+        },
+        "budget": triage_budget(step),
+    });
+    if let Some(trajectory_type) = trajectory_type {
+        payload["trajectory_type"] = json!(trajectory_type);
+    }
+    if route == "kelola" && step >= 3 {
+        payload["kelola_result"] = json!({
+            "action": "create",
+            "group_detail": {
+                "name": "Karang Taruna RT 05",
+                "description": "Kelompok pemuda untuk kegiatan sosial dan pembangunan di lingkungan RT 05.",
+                "join_policy": "terbuka",
+                "entity_type": "kelompok"
+            }
+        });
+    }
+    payload
+}
+
+fn compact_triage_sessions(sessions: &mut HashMap<String, TriageSessionState>, now_ms: i64) {
+    sessions
+        .retain(|_, session| now_ms.saturating_sub(session.updated_at_ms) <= TRIAGE_SESSION_TTL_MS);
+
+    if sessions.len() <= TRIAGE_SESSION_MAX_ITEMS {
+        return;
+    }
+
+    let remove_count = sessions.len() - TRIAGE_SESSION_MAX_ITEMS;
+    let mut ordered = sessions
+        .iter()
+        .map(|(session_id, session)| (session_id.clone(), session.updated_at_ms))
+        .collect::<Vec<_>>();
+    ordered.sort_by_key(|(_, updated_at_ms)| *updated_at_ms);
+    for (session_id, _) in ordered.into_iter().take(remove_count) {
+        sessions.remove(&session_id);
+    }
+}
+
+async fn start_triage_session(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<StartTriageSessionRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "triage_session_start",
+        actor.user_id.clone(),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let detected = detect_triage_route(&payload.content);
+            let now_ms = gotong_domain::jobs::now_ms();
+            let session_id = format!("triage-sess-{request_id}");
+
+            {
+                let mut sessions = state.triage_sessions.write().await;
+                compact_triage_sessions(&mut sessions, now_ms);
+                sessions.insert(
+                    session_id.clone(),
+                    TriageSessionState {
+                        owner_user_id: actor.user_id.clone(),
+                        route: detected.route.to_string(),
+                        trajectory_type: detected.trajectory_type.map(str::to_string),
+                        step: 1,
+                        created_at_ms: now_ms,
+                        updated_at_ms: now_ms,
+                    },
+                );
+            }
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: json!({
+                    "session_id": session_id,
+                    "result": triage_result_payload(detected.route, detected.trajectory_type, 1)
+                }),
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn continue_triage_session(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<ContinueTriageSessionRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "triage_session_continue",
+        format!("{}:{session_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let (route, trajectory_type, step) = {
+                let mut sessions = state.triage_sessions.write().await;
+                compact_triage_sessions(&mut sessions, now_ms);
+                let session = sessions.get_mut(&session_id).ok_or(ApiError::NotFound)?;
+                if session.owner_user_id != actor.user_id {
+                    return Err(ApiError::Forbidden);
+                }
+                let _session_age_ms = now_ms.saturating_sub(session.created_at_ms);
+                let _answer = payload.answer.trim();
+                let _attachment_count = payload.attachments.as_ref().map_or(0, |items| items.len());
+                let _attachment_name_total =
+                    payload.attachments.as_ref().map_or(0_usize, |items| {
+                        items
+                            .iter()
+                            .map(|item| item.name.len() + item.mime_type.len())
+                            .sum()
+                    });
+                let _total_attachment_size_bytes =
+                    payload.attachments.as_ref().map_or(0_u64, |items| {
+                        items.iter().filter_map(|item| item.size_bytes).sum()
+                    });
+                session.step = session.step.saturating_add(1).min(3);
+                session.updated_at_ms = now_ms;
+                (
+                    session.route.clone(),
+                    session.trajectory_type.clone(),
+                    session.step,
+                )
+            };
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: json!({
+                    "result": triage_result_payload(&route, trajectory_type.as_deref(), step)
+                }),
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+const SIGNAL_REGISTRY_TTL_MS: i64 = 7 * 24 * 60 * 60 * 1_000;
+const SIGNAL_REGISTRY_MAX_ITEMS: usize = 50_000;
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateWitnessSignalRequest {
+    #[validate(length(min = 1, max = 32))]
+    signal_type: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct WitnessSignalDto {
+    signal_id: String,
+    witness_id: String,
+    user_id: String,
+    signal_type: String,
+    outcome: String,
+    created_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resolved_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    credit_delta: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+struct WitnessSignalRelationDto {
+    vouched: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vouch_type: Option<String>,
+    witnessed: bool,
+    flagged: bool,
+    supported: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vote_cast: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct WitnessSignalCountsDto {
+    vouch_positive: usize,
+    vouch_skeptical: usize,
+    witness_count: usize,
+    dukung_count: usize,
+    flags: usize,
+}
+
+fn normalize_content_signal_type(value: &str) -> Option<&'static str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "saksi" => Some("saksi"),
+        "perlu_dicek" => Some("perlu_dicek"),
+        _ => None,
+    }
+}
+
+fn witness_signal_active_key(user_id: &str, signal_type: &str) -> String {
+    format!("{user_id}:{signal_type}")
+}
+
+fn compact_witness_signal_registry(
+    registry: &mut HashMap<String, WitnessSignalState>,
+    now_ms: i64,
+) {
+    registry
+        .retain(|_, state| now_ms.saturating_sub(state.updated_at_ms) <= SIGNAL_REGISTRY_TTL_MS);
+
+    if registry.len() <= SIGNAL_REGISTRY_MAX_ITEMS {
+        return;
+    }
+
+    let remove_count = registry.len() - SIGNAL_REGISTRY_MAX_ITEMS;
+    let mut ordered = registry
+        .iter()
+        .map(|(witness_id, state)| (witness_id.clone(), state.updated_at_ms))
+        .collect::<Vec<_>>();
+    ordered.sort_by_key(|(_, updated_at_ms)| *updated_at_ms);
+    for (witness_id, _) in ordered.into_iter().take(remove_count) {
+        registry.remove(&witness_id);
+    }
+}
+
+fn to_signal_dto(signal: &WitnessSignalEntry) -> WitnessSignalDto {
+    WitnessSignalDto {
+        signal_id: signal.signal_id.clone(),
+        witness_id: signal.witness_id.clone(),
+        user_id: signal.user_id.clone(),
+        signal_type: signal.signal_type.clone(),
+        outcome: signal.outcome.clone(),
+        created_at: signal.created_at_ms,
+        resolved_at: signal.resolved_at_ms,
+        credit_delta: signal.credit_delta,
+    }
+}
+
+async fn create_witness_signal(
+    State(state): State<AppState>,
+    Path(witness_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateWitnessSignalRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+    let signal_type = normalize_content_signal_type(&payload.signal_type).ok_or_else(|| {
+        ApiError::Validation("signal_type must be 'saksi' or 'perlu_dicek'".into())
+    })?;
+
+    let key = IdempotencyKey::new(
+        "witness_signal_create",
+        format!("{}:{witness_id}:{signal_type}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let signal = {
+                let mut registry = state.witness_signals.write().await;
+                compact_witness_signal_registry(&mut registry, now_ms);
+                let witness_state = registry.entry(witness_id.clone()).or_default();
+                witness_state.updated_at_ms = now_ms;
+                let active_key = witness_signal_active_key(&actor.user_id, signal_type);
+                if let Some(existing) = witness_state.active_signals.get(&active_key) {
+                    existing.clone()
+                } else {
+                    let new_signal = WitnessSignalEntry {
+                        signal_id: format!("sig-{}", gotong_domain::util::uuid_v7_without_dashes()),
+                        witness_id: witness_id.clone(),
+                        user_id: actor.user_id.clone(),
+                        signal_type: signal_type.to_string(),
+                        outcome: "pending".to_string(),
+                        created_at_ms: now_ms,
+                        resolved_at_ms: None,
+                        credit_delta: None,
+                    };
+                    witness_state
+                        .active_signals
+                        .insert(active_key, new_signal.clone());
+                    new_signal
+                }
+            };
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(to_signal_dto(&signal))
+                    .map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn remove_witness_signal(
+    State(state): State<AppState>,
+    Path((witness_id, signal_type)): Path<(String, String)>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+    let signal_type = normalize_content_signal_type(&signal_type).ok_or_else(|| {
+        ApiError::Validation("signal_type must be 'saksi' or 'perlu_dicek'".into())
+    })?;
+
+    let key = IdempotencyKey::new(
+        "witness_signal_remove",
+        format!("{}:{witness_id}:{signal_type}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let removed = {
+                let mut registry = state.witness_signals.write().await;
+                compact_witness_signal_registry(&mut registry, now_ms);
+                if let Some(witness_state) = registry.get_mut(&witness_id) {
+                    witness_state.updated_at_ms = now_ms;
+                    let active_key = witness_signal_active_key(&actor.user_id, signal_type);
+                    witness_state.active_signals.remove(&active_key).is_some()
+                } else {
+                    false
+                }
+            };
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: json!({ "removed": removed }),
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn get_witness_signal_my_relation(
+    State(state): State<AppState>,
+    Path(witness_id): Path<String>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<WitnessSignalRelationDto>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let registry = state.witness_signals.read().await;
+    let witness_state = registry.get(&witness_id);
+    let witnessed = witness_state.is_some_and(|state| {
+        state
+            .active_signals
+            .contains_key(&witness_signal_active_key(&actor.user_id, "saksi"))
+    });
+    let flagged = witness_state.is_some_and(|state| {
+        state
+            .active_signals
+            .contains_key(&witness_signal_active_key(&actor.user_id, "perlu_dicek"))
+    });
+    Ok(Json(WitnessSignalRelationDto {
+        vouched: false,
+        vouch_type: None,
+        witnessed,
+        flagged,
+        supported: false,
+        vote_cast: None,
+    }))
+}
+
+async fn get_witness_signal_counts(
+    State(state): State<AppState>,
+    Path(witness_id): Path<String>,
+) -> Result<Json<WitnessSignalCountsDto>, ApiError> {
+    let registry = state.witness_signals.read().await;
+    let witness_state = registry.get(&witness_id);
+    let (witness_count, flags) = if let Some(state) = witness_state {
+        let witness_count = state
+            .active_signals
+            .values()
+            .filter(|signal| signal.signal_type == "saksi")
+            .count();
+        let flags = state
+            .active_signals
+            .values()
+            .filter(|signal| signal.signal_type == "perlu_dicek")
+            .count();
+        (witness_count, flags)
+    } else {
+        (0, 0)
+    };
+    Ok(Json(WitnessSignalCountsDto {
+        vouch_positive: 0,
+        vouch_skeptical: 0,
+        witness_count,
+        dukung_count: 0,
+        flags,
+    }))
+}
+
+async fn list_witness_signal_resolutions(
+    State(state): State<AppState>,
+    Path(witness_id): Path<String>,
+) -> Result<Json<Vec<WitnessSignalDto>>, ApiError> {
+    let registry = state.witness_signals.read().await;
+    let witness_state = registry.get(&witness_id);
+    let items = witness_state
+        .map(|state| {
+            state
+                .resolved_signals
+                .iter()
+                .map(to_signal_dto)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    Ok(Json(items))
+}
+
+#[derive(Debug, Deserialize)]
+struct GroupListQuery {
+    cursor: Option<String>,
+    limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateGroupRequest {
+    #[validate(length(min = 1, max = 128))]
+    name: String,
+    #[validate(length(min = 1, max = 2_000))]
+    description: String,
+    #[validate(length(min = 1, max = 32))]
+    entity_type: String,
+    #[validate(length(min = 1, max = 32))]
+    join_policy: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct UpdateGroupRequest {
+    #[validate(length(min = 1, max = 128))]
+    name: Option<String>,
+    #[validate(length(min = 1, max = 2_000))]
+    description: Option<String>,
+    #[validate(length(min = 1, max = 32))]
+    join_policy: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct RequestGroupJoinRequest {
+    #[validate(length(max = 512))]
+    message: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct InviteGroupMemberRequest {
+    #[validate(length(min = 1, max = 128))]
+    user_id: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct UpdateGroupMemberRoleRequest {
+    #[validate(length(min = 1, max = 32))]
+    role: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GroupEntityTagDto {
+    entity_id: String,
+    entity_type: String,
+    label: String,
+    followed: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct GroupSummaryDto {
+    group_id: String,
+    name: String,
+    description: String,
+    entity_type: String,
+    join_policy: String,
+    member_count: usize,
+    witness_count: usize,
+    entity_tag: GroupEntityTagDto,
+}
+
+#[derive(Debug, Serialize)]
+struct GroupMemberDto {
+    user_id: String,
+    name: String,
+    avatar_url: Option<String>,
+    role: String,
+    joined_at: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GroupJoinRequestDto {
+    request_id: String,
+    user_id: String,
+    name: String,
+    avatar_url: Option<String>,
+    message: Option<String>,
+    status: String,
+    requested_at: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GroupDetailDto {
+    #[serde(flatten)]
+    summary: GroupSummaryDto,
+    members: Vec<GroupMemberDto>,
+    pending_requests: Vec<GroupJoinRequestDto>,
+    my_role: Option<String>,
+    my_membership_status: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GroupListResponseDto {
+    items: Vec<GroupSummaryDto>,
+    total: usize,
+    cursor: Option<String>,
+}
+
+fn normalize_group_entity_type(value: &str) -> Option<&'static str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "kelompok" => Some("kelompok"),
+        "lembaga" => Some("lembaga"),
+        _ => None,
+    }
+}
+
+fn normalize_group_join_policy(value: &str) -> Option<&'static str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "terbuka" => Some("terbuka"),
+        "persetujuan" => Some("persetujuan"),
+        "undangan" => Some("undangan"),
+        _ => None,
+    }
+}
+
+fn normalize_group_member_role(value: &str) -> Option<&'static str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "admin" => Some("admin"),
+        "moderator" => Some("moderator"),
+        "anggota" => Some("anggota"),
+        _ => None,
+    }
+}
+
+fn normalize_non_empty(value: &str, field: &str) -> Result<String, ApiError> {
+    let normalized = value.trim();
+    if normalized.is_empty() {
+        return Err(ApiError::Validation(format!("{field} cannot be empty")));
+    }
+    Ok(normalized.to_string())
+}
+
+fn group_member_role<'a>(group: &'a GroupRecord, user_id: &str) -> Option<&'a str> {
+    group
+        .members
+        .iter()
+        .find(|member| member.user_id == user_id)
+        .map(|member| member.role.as_str())
+}
+
+fn group_admin_count(group: &GroupRecord) -> usize {
+    group
+        .members
+        .iter()
+        .filter(|member| member.role == "admin")
+        .count()
+}
+
+fn group_can_manage(role: Option<&str>) -> bool {
+    matches!(role, Some("admin" | "moderator"))
+}
+
+fn group_is_admin(role: Option<&str>) -> bool {
+    matches!(role, Some("admin"))
+}
+
+fn to_group_member_dto(member: &GroupMemberRecord) -> GroupMemberDto {
+    GroupMemberDto {
+        user_id: member.user_id.clone(),
+        name: member.name.clone(),
+        avatar_url: member.avatar_url.clone(),
+        role: member.role.clone(),
+        joined_at: gotong_domain::util::format_ms_rfc3339(member.joined_at_ms),
+    }
+}
+
+fn to_group_join_request_dto(request: &GroupJoinRequestRecord) -> GroupJoinRequestDto {
+    GroupJoinRequestDto {
+        request_id: request.request_id.clone(),
+        user_id: request.user_id.clone(),
+        name: request.name.clone(),
+        avatar_url: request.avatar_url.clone(),
+        message: request.message.clone(),
+        status: request.status.clone(),
+        requested_at: gotong_domain::util::format_ms_rfc3339(request.requested_at_ms),
+    }
+}
+
+fn to_group_summary_dto(group: &GroupRecord) -> GroupSummaryDto {
+    GroupSummaryDto {
+        group_id: group.group_id.clone(),
+        name: group.name.clone(),
+        description: group.description.clone(),
+        entity_type: group.entity_type.clone(),
+        join_policy: group.join_policy.clone(),
+        member_count: group.member_count,
+        witness_count: group.witness_count,
+        entity_tag: GroupEntityTagDto {
+            entity_id: group.group_id.clone(),
+            entity_type: group.entity_type.clone(),
+            label: group.name.clone(),
+            followed: false,
+        },
+    }
+}
+
+fn to_group_detail_dto(group: &GroupRecord, user_id: &str) -> GroupDetailDto {
+    let my_member = group
+        .members
+        .iter()
+        .find(|member| member.user_id == user_id);
+    let pending = group
+        .pending_requests
+        .iter()
+        .any(|request| request.user_id == user_id && request.status == "pending");
+    GroupDetailDto {
+        summary: to_group_summary_dto(group),
+        members: group
+            .members
+            .iter()
+            .map(to_group_member_dto)
+            .collect::<Vec<_>>(),
+        pending_requests: group
+            .pending_requests
+            .iter()
+            .filter(|request| request.status == "pending")
+            .map(to_group_join_request_dto)
+            .collect::<Vec<_>>(),
+        my_role: my_member.map(|member| member.role.clone()),
+        my_membership_status: if my_member.is_some() {
+            "approved".to_string()
+        } else if pending {
+            "pending".to_string()
+        } else {
+            "none".to_string()
+        },
+    }
+}
+
+fn sort_groups_desc(groups: &mut [GroupRecord]) {
+    groups.sort_by(|left, right| {
+        right
+            .updated_at_ms
+            .cmp(&left.updated_at_ms)
+            .then_with(|| left.group_id.cmp(&right.group_id))
+    });
+}
+
+fn ordered_groups(groups: Vec<GroupRecord>) -> Vec<GroupRecord> {
+    let mut items = groups;
+    sort_groups_desc(&mut items);
+    items
+}
+
+async fn create_group(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateGroupRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+    let entity_type = normalize_group_entity_type(&payload.entity_type).ok_or_else(|| {
+        ApiError::Validation("entity_type must be 'kelompok' or 'lembaga'".into())
+    })?;
+    let join_policy = normalize_group_join_policy(&payload.join_policy).ok_or_else(|| {
+        ApiError::Validation("join_policy must be 'terbuka', 'persetujuan', or 'undangan'".into())
+    })?;
+    let name = normalize_non_empty(&payload.name, "name")?;
+    let description = normalize_non_empty(&payload.description, "description")?;
+
+    let key = IdempotencyKey::new("group_create", actor.user_id.clone(), request_id);
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let group = GroupRecord {
+                group_id: format!("ent-{}", gotong_domain::util::uuid_v7_without_dashes()),
+                name: name.clone(),
+                description: description.clone(),
+                entity_type: entity_type.to_string(),
+                join_policy: join_policy.to_string(),
+                member_count: 1,
+                witness_count: 0,
+                members: vec![GroupMemberRecord {
+                    user_id: actor.user_id.clone(),
+                    name: actor.username.clone(),
+                    avatar_url: None,
+                    role: "admin".to_string(),
+                    joined_at_ms: now_ms,
+                }],
+                pending_requests: Vec::new(),
+                updated_at_ms: now_ms,
+            };
+            let persisted = state
+                .group_repo
+                .create_group(&group)
+                .await
+                .map_err(map_domain_error)?;
+            let detail = to_group_detail_dto(&persisted, &actor.user_id);
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(detail).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn list_groups(
+    State(state): State<AppState>,
+    Query(query): Query<GroupListQuery>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<GroupListResponseDto>, ApiError> {
+    let _actor = actor_identity(&auth)?;
+    let offset = query
+        .cursor
+        .as_deref()
+        .and_then(|cursor| cursor.parse::<usize>().ok())
+        .unwrap_or(0);
+    let limit = query.limit.unwrap_or(20).clamp(1, 100);
+    let groups = state
+        .group_repo
+        .list_groups()
+        .await
+        .map_err(map_domain_error)?;
+    let ordered = ordered_groups(groups)
+        .into_iter()
+        .filter(|group| group.join_policy != "undangan")
+        .collect::<Vec<_>>();
+    let total = ordered.len();
+    let items = ordered
+        .iter()
+        .skip(offset)
+        .take(limit)
+        .map(|group| to_group_summary_dto(group))
+        .collect::<Vec<_>>();
+    let next_offset = offset.saturating_add(items.len());
+    let cursor = if next_offset < total {
+        Some(next_offset.to_string())
+    } else {
+        None
+    };
+    Ok(Json(GroupListResponseDto {
+        items,
+        total,
+        cursor,
+    }))
+}
+
+async fn list_my_groups(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<Vec<GroupSummaryDto>>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let groups = state
+        .group_repo
+        .list_groups()
+        .await
+        .map_err(map_domain_error)?;
+    let items = ordered_groups(groups)
+        .into_iter()
+        .filter(|group| {
+            group
+                .members
+                .iter()
+                .any(|member| member.user_id == actor.user_id)
+        })
+        .map(|group| to_group_summary_dto(&group))
+        .collect::<Vec<_>>();
+    Ok(Json(items))
+}
+
+async fn get_group(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<GroupDetailDto>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let group = state
+        .group_repo
+        .get_group(&group_id)
+        .await
+        .map_err(map_domain_error)?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(to_group_detail_dto(&group, &actor.user_id)))
+}
+
+async fn update_group(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<UpdateGroupRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "group_update",
+        format!("{}:{group_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let mut group = state
+                .group_repo
+                .get_group(&group_id)
+                .await
+                .map_err(map_domain_error)?
+                .ok_or(ApiError::NotFound)?;
+            if !group_is_admin(group_member_role(&group, &actor.user_id)) {
+                return Err(ApiError::Forbidden);
+            }
+            if let Some(name) = payload.name.as_deref() {
+                group.name = normalize_non_empty(name, "name")?;
+            }
+            if let Some(description) = payload.description.as_deref() {
+                group.description = normalize_non_empty(description, "description")?;
+            }
+            if let Some(join_policy) = payload.join_policy.as_deref() {
+                group.join_policy = normalize_group_join_policy(join_policy)
+                    .ok_or_else(|| {
+                        ApiError::Validation(
+                            "join_policy must be 'terbuka', 'persetujuan', or 'undangan'".into(),
+                        )
+                    })?
+                    .to_string();
+            }
+            group.member_count = group.members.len();
+            group.updated_at_ms = now_ms;
+            let persisted = state
+                .group_repo
+                .update_group(&group)
+                .await
+                .map_err(map_domain_error)?;
+            let detail = to_group_detail_dto(&persisted, &actor.user_id);
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(detail).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn join_group(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "group_join",
+        format!("{}:{group_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let mut group = state
+                .group_repo
+                .get_group(&group_id)
+                .await
+                .map_err(map_domain_error)?
+                .ok_or(ApiError::NotFound)?;
+            if group.join_policy != "terbuka" {
+                return Err(ApiError::Validation(
+                    "group cannot be joined directly; use request flow".into(),
+                ));
+            }
+            let member = if let Some(existing) = group
+                .members
+                .iter()
+                .find(|member| member.user_id == actor.user_id)
+            {
+                to_group_member_dto(existing)
+            } else {
+                group.pending_requests.retain(|request| {
+                    !(request.user_id == actor.user_id && request.status == "pending")
+                });
+                let member = GroupMemberRecord {
+                    user_id: actor.user_id.clone(),
+                    name: actor.username.clone(),
+                    avatar_url: None,
+                    role: "anggota".to_string(),
+                    joined_at_ms: now_ms,
+                };
+                group.members.push(member.clone());
+                group.member_count = group.members.len();
+                group.updated_at_ms = now_ms;
+                state
+                    .group_repo
+                    .update_group(&group)
+                    .await
+                    .map_err(map_domain_error)?;
+                to_group_member_dto(&member)
+            };
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(member).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn request_group_join(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<RequestGroupJoinRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "group_request_join",
+        format!("{}:{group_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let mut group = state
+                .group_repo
+                .get_group(&group_id)
+                .await
+                .map_err(map_domain_error)?
+                .ok_or(ApiError::NotFound)?;
+            if group.join_policy != "persetujuan" {
+                return Err(ApiError::Validation(
+                    "group does not accept join requests".into(),
+                ));
+            }
+            if group
+                .members
+                .iter()
+                .any(|member| member.user_id == actor.user_id)
+            {
+                return Err(ApiError::Validation("already a member".into()));
+            }
+            let request = if let Some(existing) = group
+                .pending_requests
+                .iter()
+                .find(|request| request.user_id == actor.user_id && request.status == "pending")
+            {
+                to_group_join_request_dto(existing)
+            } else {
+                let request = GroupJoinRequestRecord {
+                    request_id: format!("req-{}", gotong_domain::util::uuid_v7_without_dashes()),
+                    user_id: actor.user_id.clone(),
+                    name: actor.username.clone(),
+                    avatar_url: None,
+                    message: payload
+                        .message
+                        .as_ref()
+                        .map(|value| value.trim().to_string()),
+                    status: "pending".to_string(),
+                    requested_at_ms: now_ms,
+                };
+                group.pending_requests.insert(0, request.clone());
+                group.updated_at_ms = now_ms;
+                state
+                    .group_repo
+                    .update_group(&group)
+                    .await
+                    .map_err(map_domain_error)?;
+                to_group_join_request_dto(&request)
+            };
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::to_value(request).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn approve_group_request(
+    State(state): State<AppState>,
+    Path((group_id, request_id_param)): Path<(String, String)>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "group_request_approve",
+        format!("{}:{group_id}:{request_id_param}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let mut group = state
+                .group_repo
+                .get_group(&group_id)
+                .await
+                .map_err(map_domain_error)?
+                .ok_or(ApiError::NotFound)?;
+            if !group_can_manage(group_member_role(&group, &actor.user_id)) {
+                return Err(ApiError::Forbidden);
+            }
+            let request = group
+                .pending_requests
+                .iter()
+                .find(|request| {
+                    request.request_id == request_id_param && request.status == "pending"
+                })
+                .cloned()
+                .ok_or(ApiError::NotFound)?;
+            let member = if let Some(existing) = group
+                .members
+                .iter()
+                .find(|member| member.user_id == request.user_id)
+            {
+                group
+                    .pending_requests
+                    .retain(|item| item.request_id != request_id_param);
+                group.updated_at_ms = now_ms;
+                state
+                    .group_repo
+                    .update_group(&group)
+                    .await
+                    .map_err(map_domain_error)?;
+                to_group_member_dto(existing)
+            } else {
+                let member = GroupMemberRecord {
+                    user_id: request.user_id.clone(),
+                    name: request.name.clone(),
+                    avatar_url: request.avatar_url.clone(),
+                    role: "anggota".to_string(),
+                    joined_at_ms: now_ms,
+                };
+                group.members.push(member.clone());
+                group.member_count = group.members.len();
+                group
+                    .pending_requests
+                    .retain(|item| item.request_id != request_id_param);
+                group.updated_at_ms = now_ms;
+                state
+                    .group_repo
+                    .update_group(&group)
+                    .await
+                    .map_err(map_domain_error)?;
+                to_group_member_dto(&member)
+            };
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: serde_json::to_value(member).map_err(|_| ApiError::Internal)?,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn reject_group_request(
+    State(state): State<AppState>,
+    Path((group_id, request_id_param)): Path<(String, String)>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "group_request_reject",
+        format!("{}:{group_id}:{request_id_param}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let mut group = state
+                .group_repo
+                .get_group(&group_id)
+                .await
+                .map_err(map_domain_error)?
+                .ok_or(ApiError::NotFound)?;
+            if !group_can_manage(group_member_role(&group, &actor.user_id)) {
+                return Err(ApiError::Forbidden);
+            }
+            let mut rejected = false;
+            for request in &mut group.pending_requests {
+                if request.request_id == request_id_param && request.status == "pending" {
+                    request.status = "rejected".to_string();
+                    rejected = true;
+                    break;
+                }
+            }
+            if !rejected {
+                return Err(ApiError::NotFound);
+            }
+            group.updated_at_ms = now_ms;
+            state
+                .group_repo
+                .update_group(&group)
+                .await
+                .map_err(map_domain_error)?;
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: json!({ "rejected": rejected }),
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn invite_group_member(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<InviteGroupMemberRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+    let invited_user_id = normalize_non_empty(&payload.user_id, "user_id")?;
+
+    let key = IdempotencyKey::new(
+        "group_invite",
+        format!("{}:{group_id}:{invited_user_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let mut group = state
+                .group_repo
+                .get_group(&group_id)
+                .await
+                .map_err(map_domain_error)?
+                .ok_or(ApiError::NotFound)?;
+            if !group_can_manage(group_member_role(&group, &actor.user_id)) {
+                return Err(ApiError::Forbidden);
+            }
+            let added = if group
+                .members
+                .iter()
+                .any(|member| member.user_id == invited_user_id)
+            {
+                false
+            } else {
+                let member = GroupMemberRecord {
+                    user_id: invited_user_id.clone(),
+                    name: invited_user_id.clone(),
+                    avatar_url: None,
+                    role: "anggota".to_string(),
+                    joined_at_ms: now_ms,
+                };
+                group.members.push(member);
+                group.member_count = group.members.len();
+                group.pending_requests.retain(|request| {
+                    !(request.user_id == invited_user_id && request.status == "pending")
+                });
+                group.updated_at_ms = now_ms;
+                state
+                    .group_repo
+                    .update_group(&group)
+                    .await
+                    .map_err(map_domain_error)?;
+                true
+            };
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: json!({ "added": added }),
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn leave_group(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "group_leave",
+        format!("{}:{group_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let mut group = state
+                .group_repo
+                .get_group(&group_id)
+                .await
+                .map_err(map_domain_error)?
+                .ok_or(ApiError::NotFound)?;
+            let is_last_admin_leaving =
+                matches!(group_member_role(&group, &actor.user_id), Some("admin"))
+                    && group_admin_count(&group) <= 1
+                    && group.members.len() > 1;
+            if is_last_admin_leaving {
+                return Err(ApiError::Conflict);
+            }
+            let previous_len = group.members.len();
+            group
+                .members
+                .retain(|member| member.user_id != actor.user_id);
+            let left = previous_len != group.members.len();
+            group.member_count = group.members.len();
+            group.pending_requests.retain(|request| {
+                !(request.user_id == actor.user_id && request.status == "pending")
+            });
+            group.updated_at_ms = now_ms;
+            state
+                .group_repo
+                .update_group(&group)
+                .await
+                .map_err(map_domain_error)?;
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: json!({ "left": left }),
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn remove_group_member(
+    State(state): State<AppState>,
+    Path((group_id, user_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "group_member_remove",
+        format!("{}:{group_id}:{user_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let mut group = state
+                .group_repo
+                .get_group(&group_id)
+                .await
+                .map_err(map_domain_error)?
+                .ok_or(ApiError::NotFound)?;
+            let actor_role =
+                group_member_role(&group, &actor.user_id).map(std::string::ToString::to_string);
+            let actor_can_manage = group_can_manage(actor_role.as_deref());
+            let actor_is_admin = group_is_admin(actor_role.as_deref());
+            if !actor_can_manage {
+                return Err(ApiError::Forbidden);
+            }
+            let target_role =
+                group_member_role(&group, &user_id).map(std::string::ToString::to_string);
+            let removed = if target_role.is_none() {
+                false
+            } else {
+                if matches!(target_role.as_deref(), Some("admin")) {
+                    if !actor_is_admin {
+                        return Err(ApiError::Forbidden);
+                    }
+                    if group_admin_count(&group) <= 1 {
+                        return Err(ApiError::Conflict);
+                    }
+                }
+                let previous_len = group.members.len();
+                group.members.retain(|member| member.user_id != user_id);
+                group.member_count = group.members.len();
+                group
+                    .pending_requests
+                    .retain(|request| !(request.user_id == user_id && request.status == "pending"));
+                group.updated_at_ms = now_ms;
+                state
+                    .group_repo
+                    .update_group(&group)
+                    .await
+                    .map_err(map_domain_error)?;
+                previous_len != group.members.len()
+            };
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: json!({ "removed": removed }),
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn update_group_member_role(
+    State(state): State<AppState>,
+    Path((group_id, user_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<UpdateGroupMemberRoleRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+    let role = normalize_group_member_role(&payload.role).ok_or_else(|| {
+        ApiError::Validation("role must be 'admin', 'moderator', or 'anggota'".into())
+    })?;
+
+    let key = IdempotencyKey::new(
+        "group_member_role_update",
+        format!("{}:{group_id}:{user_id}:{role}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let mut group = state
+                .group_repo
+                .get_group(&group_id)
+                .await
+                .map_err(map_domain_error)?
+                .ok_or(ApiError::NotFound)?;
+            if !group_is_admin(group_member_role(&group, &actor.user_id)) {
+                return Err(ApiError::Forbidden);
+            }
+            let target_idx = group
+                .members
+                .iter()
+                .position(|member| member.user_id == user_id)
+                .ok_or(ApiError::NotFound)?;
+            let current_role = group.members[target_idx].role.clone();
+            if current_role == "admin" && role != "admin" && group_admin_count(&group) <= 1 {
+                return Err(ApiError::Conflict);
+            }
+            group.members[target_idx].role = role.to_string();
+            group.updated_at_ms = now_ms;
+            state
+                .group_repo
+                .update_group(&group)
+                .await
+                .map_err(map_domain_error)?;
+            let updated = true;
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::OK.as_u16(),
+                body: json!({ "updated": updated }),
             };
             state
                 .idempotency
@@ -1494,6 +3378,15 @@ struct FeedListQueryParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct FeedSuggestionsQueryParams {
+    pub limit: Option<usize>,
+    pub scope_id: Option<String>,
+    pub privacy_level: Option<String>,
+    pub from_ms: Option<i64>,
+    pub to_ms: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
 struct SearchListQueryParams {
     #[serde(alias = "query")]
     pub query_text: Option<String>,
@@ -1546,6 +3439,31 @@ async fn list_discovery_feed(
         involvement_only: query.involvement_only.unwrap_or(false),
     };
     let response = service.list_feed(request).await.map_err(map_domain_error)?;
+    Ok(Json(response))
+}
+
+async fn list_discovery_feed_suggestions(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Query(query): Query<FeedSuggestionsQueryParams>,
+) -> Result<Json<Vec<FeedSuggestion>>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let service = DiscoveryService::new(
+        request_repos::feed_repo(&state, &auth),
+        request_repos::notification_repo(&state, &auth),
+    );
+    let request = FeedSuggestionsQuery {
+        actor_id: actor.user_id,
+        limit: query.limit,
+        scope_id: query.scope_id,
+        privacy_level: query.privacy_level,
+        from_ms: query.from_ms,
+        to_ms: query.to_ms,
+    };
+    let response = service
+        .list_feed_suggestions(request)
+        .await
+        .map_err(map_domain_error)?;
     Ok(Json(response))
 }
 
@@ -3319,6 +5237,9 @@ struct ChatThreadsQuery {
     scope_id: Option<String>,
 }
 
+const CHAT_ATTACHMENT_MAX_BYTES: usize = 20 * 1024 * 1024;
+const CHAT_ATTACHMENT_URL_TTL_MS: i64 = 24 * 60 * 60 * 1000;
+
 #[derive(Clone, Debug, Deserialize)]
 struct ChatMessagesQuery {
     since_created_at_ms: Option<i64>,
@@ -3326,10 +5247,65 @@ struct ChatMessagesQuery {
     limit: Option<usize>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ChatAttachmentDownloadQuery {
+    exp: i64,
+    sig: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ChatAttachmentStoredMetadata {
+    attachment_id: String,
+    file_name: String,
+    mime_type: String,
+    size_bytes: usize,
+    media_type: String,
+    uploaded_by: String,
+    created_at_ms: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct ChatAttachmentUploadResponse {
+    attachment_id: String,
+    file_name: String,
+    mime_type: String,
+    size_bytes: usize,
+    media_type: String,
+    url: String,
+    expires_at_ms: i64,
+}
+
 #[derive(Serialize)]
 struct ChatStreamEnvelope {
     event_type: &'static str,
     message: ChatMessage,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct ChatAuthorSnapshot {
+    user_id: String,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    avatar_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tier: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    role: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct ChatMessageView {
+    #[serde(flatten)]
+    message: ChatMessage,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    author: Option<ChatAuthorSnapshot>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatAuthorRow {
+    id: String,
+    username: Option<String>,
+    platform_role: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -3388,6 +5364,233 @@ fn websocket_payload(message: &ChatMessage) -> String {
         message: message.clone(),
     })
     .unwrap_or_else(|_| "{\"event_type\":\"error\",\"message\":{}}".to_string())
+}
+
+fn chat_attachment_file_path(root: &FsPath, attachment_id: &str) -> PathBuf {
+    root.join(format!("{attachment_id}.bin"))
+}
+
+fn chat_attachment_meta_path(root: &FsPath, attachment_id: &str) -> PathBuf {
+    root.join(format!("{attachment_id}.json"))
+}
+
+fn chat_attachment_s3_file_key(key_prefix: &str, attachment_id: &str) -> String {
+    format!("{key_prefix}/{attachment_id}.bin")
+}
+
+fn chat_attachment_s3_meta_key(key_prefix: &str, attachment_id: &str) -> String {
+    format!("{key_prefix}/{attachment_id}.json")
+}
+
+async fn save_chat_attachment_artifacts(
+    state: &AppState,
+    attachment_id: &str,
+    _mime_type: &str,
+    file_bytes: Vec<u8>,
+    metadata_bytes: Vec<u8>,
+) -> Result<(), ApiError> {
+    match &state.chat_attachment_storage {
+        ChatAttachmentStorage::Local { root } => {
+            tokio::fs::create_dir_all(root)
+                .await
+                .map_err(|_| ApiError::Internal)?;
+            let file_path = chat_attachment_file_path(root, attachment_id);
+            tokio::fs::write(file_path, file_bytes)
+                .await
+                .map_err(|_| ApiError::Internal)?;
+            let metadata_path = chat_attachment_meta_path(root, attachment_id);
+            tokio::fs::write(metadata_path, metadata_bytes)
+                .await
+                .map_err(|_| ApiError::Internal)?;
+            Ok(())
+        }
+        ChatAttachmentStorage::S3 {
+            client,
+            bucket,
+            credentials,
+            key_prefix,
+        } => {
+            let file_key = chat_attachment_s3_file_key(key_prefix, attachment_id);
+            let metadata_key = chat_attachment_s3_meta_key(key_prefix, attachment_id);
+            let file_put_url = bucket
+                .put_object(Some(credentials), &file_key)
+                .sign(Duration::from_secs(300));
+            let file_put_response = client
+                .put(file_put_url)
+                .body(file_bytes)
+                .send()
+                .await
+                .map_err(|_| ApiError::Internal)?;
+            if !file_put_response.status().is_success() {
+                return Err(ApiError::Internal);
+            }
+
+            let metadata_put_url = bucket
+                .put_object(Some(credentials), &metadata_key)
+                .sign(Duration::from_secs(300));
+            let metadata_put_response = client
+                .put(metadata_put_url)
+                .body(metadata_bytes)
+                .send()
+                .await
+                .map_err(|_| ApiError::Internal)?;
+            if !metadata_put_response.status().is_success() {
+                return Err(ApiError::Internal);
+            }
+            Ok(())
+        }
+    }
+}
+
+fn infer_chat_media_type(mime_type: &str) -> Option<&'static str> {
+    let normalized = mime_type.trim().to_ascii_lowercase();
+    if normalized.starts_with("image/") {
+        return Some("image");
+    }
+    if normalized.starts_with("video/") {
+        return Some("video");
+    }
+    if normalized.starts_with("audio/") {
+        return Some("audio");
+    }
+    None
+}
+
+fn sanitize_chat_attachment_filename(file_name: &str, media_type: &str) -> String {
+    let trimmed = file_name.trim();
+    if trimmed.is_empty() {
+        return format!("chat-attachment.{media_type}");
+    }
+
+    let mut sanitized = trimmed
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+
+    if sanitized.is_empty() {
+        sanitized = format!("chat-attachment.{media_type}");
+    }
+    sanitized
+}
+
+fn chat_attachment_signature(secret: &str, attachment_id: &str, expires_at_ms: i64) -> String {
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("hmac accepts any key length");
+    mac.update(format!("{attachment_id}:{expires_at_ms}").as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
+
+fn verify_chat_attachment_signature(
+    secret: &str,
+    attachment_id: &str,
+    expires_at_ms: i64,
+    signature: &str,
+) -> bool {
+    let expected = chat_attachment_signature(secret, attachment_id, expires_at_ms);
+    if expected.len() != signature.len() {
+        return false;
+    }
+    let expected_bytes = expected.as_bytes();
+    let provided_bytes = signature.as_bytes();
+    let mut diff: u8 = 0;
+    for (left, right) in expected_bytes.iter().zip(provided_bytes.iter()) {
+        diff |= left ^ right;
+    }
+    diff == 0
+}
+
+fn raw_record_id(value: &str) -> &str {
+    value.split_once(':').map(|(_, id)| id).unwrap_or(value)
+}
+
+async fn lookup_chat_author_snapshot(
+    session: &gotong_infra::auth::SurrealDbSession,
+    user_id: &str,
+) -> Option<ChatAuthorSnapshot> {
+    let mut response = session
+        .client()
+        .query(
+            "SELECT type::string(id) AS id, username, platform_role \
+             FROM type::record('warga', $user_id)",
+        )
+        .bind(("user_id", user_id.to_string()))
+        .await
+        .ok()?;
+    let rows: Vec<Value> = response.take(0).ok()?;
+    let row: ChatAuthorRow = serde_json::from_value(rows.into_iter().next()?).ok()?;
+    let resolved_user_id = raw_record_id(&row.id).to_string();
+    let name = row
+        .username
+        .clone()
+        .unwrap_or_else(|| resolved_user_id.clone());
+    Some(ChatAuthorSnapshot {
+        user_id: resolved_user_id,
+        name,
+        avatar_url: None,
+        tier: None,
+        role: row.platform_role,
+    })
+}
+
+async fn hydrate_chat_message_views(
+    auth: &AuthContext,
+    actor: &ActorIdentity,
+    messages: Vec<ChatMessage>,
+) -> Vec<ChatMessageView> {
+    let mut profiles = HashMap::<String, ChatAuthorSnapshot>::new();
+    if let Some(actor_user_id) = auth.user_id.as_deref() {
+        let actor_name = auth
+            .username
+            .clone()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| actor.username.clone());
+        profiles.insert(
+            actor_user_id.to_string(),
+            ChatAuthorSnapshot {
+                user_id: actor_user_id.to_string(),
+                name: actor_name,
+                avatar_url: None,
+                tier: None,
+                role: Some(auth.role.as_str().to_string()),
+            },
+        );
+    }
+
+    for message in &messages {
+        if profiles.contains_key(&message.author_id) {
+            continue;
+        }
+
+        let profile = if let Some(session) = auth.surreal_db_session.as_ref() {
+            lookup_chat_author_snapshot(session, &message.author_id).await
+        } else {
+            None
+        };
+        profiles.insert(
+            message.author_id.clone(),
+            profile.unwrap_or_else(|| ChatAuthorSnapshot {
+                user_id: message.author_id.clone(),
+                name: message.author_id.clone(),
+                avatar_url: None,
+                tier: None,
+                role: None,
+            }),
+        );
+    }
+
+    messages
+        .into_iter()
+        .map(|message| ChatMessageView {
+            author: profiles.get(&message.author_id).cloned(),
+            message,
+        })
+        .collect()
 }
 
 async fn create_chat_thread(
@@ -3576,11 +5779,12 @@ async fn list_chat_messages(
     Extension(auth): Extension<AuthContext>,
     Path(thread_id): Path<String>,
     Query(query): Query<ChatMessagesQuery>,
-) -> Result<Json<Vec<ChatMessage>>, ApiError> {
+) -> Result<Json<Vec<ChatMessageView>>, ApiError> {
     let actor = actor_identity(&auth)?;
     let chat_repo = request_repos::chat_repo(&state, &auth);
     let messages = list_chat_messages_by_query(chat_repo, &actor, &thread_id, query).await?;
-    Ok(Json(messages))
+    let views = hydrate_chat_message_views(&auth, &actor, messages).await;
+    Ok(Json(views))
 }
 
 async fn poll_chat_messages(
@@ -3588,11 +5792,12 @@ async fn poll_chat_messages(
     Extension(auth): Extension<AuthContext>,
     Path(thread_id): Path<String>,
     Query(query): Query<ChatMessagesQuery>,
-) -> Result<Json<Vec<ChatMessage>>, ApiError> {
+) -> Result<Json<Vec<ChatMessageView>>, ApiError> {
     let actor = actor_identity(&auth)?;
     let chat_repo = request_repos::chat_repo(&state, &auth);
     let messages = list_chat_messages_by_query(chat_repo, &actor, &thread_id, query).await?;
-    Ok(Json(messages))
+    let views = hydrate_chat_message_views(&auth, &actor, messages).await;
+    Ok(Json(views))
 }
 
 async fn list_chat_messages_by_query(
@@ -3625,6 +5830,230 @@ async fn fetch_replay_messages(
         limit: Some(200),
     };
     list_chat_messages_by_query(chat_repo, actor, thread_id, replay_query).await
+}
+
+async fn upload_chat_attachment(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    mut multipart: Multipart,
+) -> Result<Json<ChatAttachmentUploadResponse>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let mut uploaded_file: Option<(Vec<u8>, String, String)> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|_| ApiError::Validation("invalid multipart payload".into()))?
+    {
+        let Some(file_name) = field.file_name().map(str::to_string) else {
+            continue;
+        };
+        let mime_type = field
+            .content_type()
+            .map(str::to_string)
+            .ok_or_else(|| ApiError::Validation("attachment content_type is required".into()))?;
+        let bytes = field
+            .bytes()
+            .await
+            .map_err(|_| ApiError::Validation("failed to read attachment bytes".into()))?;
+        if bytes.is_empty() {
+            continue;
+        }
+        uploaded_file = Some((bytes.to_vec(), file_name, mime_type));
+        break;
+    }
+
+    let Some((file_bytes, raw_file_name, mime_type)) = uploaded_file else {
+        return Err(ApiError::Validation(
+            "multipart form file is required".into(),
+        ));
+    };
+
+    if file_bytes.len() > CHAT_ATTACHMENT_MAX_BYTES {
+        return Err(ApiError::Validation(format!(
+            "attachment exceeds max size of {CHAT_ATTACHMENT_MAX_BYTES} bytes"
+        )));
+    }
+
+    let Some(media_type) = infer_chat_media_type(&mime_type) else {
+        return Err(ApiError::Validation(
+            "unsupported attachment mime type; only image/video/audio are allowed".into(),
+        ));
+    };
+
+    let size_bytes = file_bytes.len();
+    let attachment_id = gotong_domain::util::uuid_v7_without_dashes();
+    let file_name = sanitize_chat_attachment_filename(&raw_file_name, media_type);
+    let created_at_ms = gotong_domain::jobs::now_ms();
+    let metadata = ChatAttachmentStoredMetadata {
+        attachment_id: attachment_id.clone(),
+        file_name: file_name.clone(),
+        mime_type: mime_type.clone(),
+        size_bytes,
+        media_type: media_type.to_string(),
+        uploaded_by: actor.user_id,
+        created_at_ms,
+    };
+    let metadata_bytes = serde_json::to_vec(&metadata).map_err(|_| ApiError::Internal)?;
+    save_chat_attachment_artifacts(
+        &state,
+        &attachment_id,
+        &mime_type,
+        file_bytes,
+        metadata_bytes,
+    )
+    .await?;
+
+    let expires_at_ms = created_at_ms + CHAT_ATTACHMENT_URL_TTL_MS;
+    let signature =
+        chat_attachment_signature(&state.config.jwt_secret, &attachment_id, expires_at_ms);
+    let url = format!(
+        "/v1/chat/attachments/{attachment_id}/download?exp={expires_at_ms}&sig={signature}"
+    );
+
+    Ok(Json(ChatAttachmentUploadResponse {
+        attachment_id,
+        file_name,
+        mime_type,
+        size_bytes,
+        media_type: media_type.to_string(),
+        url,
+        expires_at_ms,
+    }))
+}
+
+async fn download_chat_attachment(
+    State(state): State<AppState>,
+    Path(attachment_id): Path<String>,
+    Query(query): Query<ChatAttachmentDownloadQuery>,
+) -> Result<Response, ApiError> {
+    if attachment_id.trim().is_empty()
+        || !attachment_id
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '-')
+    {
+        return Err(ApiError::Validation("invalid attachment_id".into()));
+    }
+
+    let now_ms = gotong_domain::jobs::now_ms();
+    if query.exp < now_ms {
+        return Err(ApiError::Forbidden);
+    }
+    if !verify_chat_attachment_signature(
+        &state.config.jwt_secret,
+        &attachment_id,
+        query.exp,
+        query.sig.trim(),
+    ) {
+        return Err(ApiError::Forbidden);
+    }
+
+    let remaining_ms = query.exp.saturating_sub(now_ms).max(0);
+    let remaining_secs = remaining_ms / 1000;
+
+    match &state.chat_attachment_storage {
+        ChatAttachmentStorage::Local { root } => {
+            let metadata_path = chat_attachment_meta_path(root, &attachment_id);
+            let file_path = chat_attachment_file_path(root, &attachment_id);
+            let metadata_bytes = tokio::fs::read(metadata_path)
+                .await
+                .map_err(|_| ApiError::NotFound)?;
+            let metadata: ChatAttachmentStoredMetadata =
+                serde_json::from_slice(&metadata_bytes).map_err(|_| ApiError::Internal)?;
+            let file_bytes = tokio::fs::read(file_path)
+                .await
+                .map_err(|_| ApiError::NotFound)?;
+
+            let mut response = (StatusCode::OK, file_bytes).into_response();
+            response.headers_mut().insert(
+                CONTENT_TYPE,
+                HeaderValue::from_str(&metadata.mime_type)
+                    .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+            );
+            if let Ok(cache_control) =
+                HeaderValue::from_str(&format!("private, max-age={remaining_secs}"))
+            {
+                response.headers_mut().insert(CACHE_CONTROL, cache_control);
+            }
+            if let Ok(content_disposition) =
+                HeaderValue::from_str(&format!("inline; filename=\"{}\"", metadata.file_name))
+            {
+                response
+                    .headers_mut()
+                    .insert(CONTENT_DISPOSITION, content_disposition);
+            }
+            Ok(response)
+        }
+        ChatAttachmentStorage::S3 {
+            client,
+            bucket,
+            credentials,
+            key_prefix,
+        } => {
+            let metadata_key = chat_attachment_s3_meta_key(key_prefix, &attachment_id);
+            let metadata_get_url = bucket
+                .get_object(Some(credentials), &metadata_key)
+                .sign(Duration::from_secs(60));
+            let metadata_output = client
+                .get(metadata_get_url)
+                .send()
+                .await
+                .map_err(|_| ApiError::Internal)?;
+            if metadata_output.status() == StatusCode::NOT_FOUND {
+                return Err(ApiError::NotFound);
+            }
+            if !metadata_output.status().is_success() {
+                return Err(ApiError::Internal);
+            }
+            let metadata_bytes = metadata_output
+                .bytes()
+                .await
+                .map_err(|_| ApiError::Internal)?;
+            let metadata: ChatAttachmentStoredMetadata =
+                serde_json::from_slice(&metadata_bytes).map_err(|_| ApiError::Internal)?;
+            let file_key = chat_attachment_s3_file_key(key_prefix, &attachment_id);
+            let file_head_url = bucket
+                .head_object(Some(credentials), &file_key)
+                .sign(Duration::from_secs(60));
+            let file_head_response = client
+                .head(file_head_url)
+                .send()
+                .await
+                .map_err(|_| ApiError::Internal)?;
+            if file_head_response.status() == StatusCode::NOT_FOUND {
+                return Err(ApiError::NotFound);
+            }
+            if !file_head_response.status().is_success() {
+                return Err(ApiError::Internal);
+            }
+            let presign_secs = u64::try_from(remaining_secs.max(1))
+                .ok()
+                .map(|seconds| seconds.min(7 * 24 * 60 * 60))
+                .unwrap_or(60);
+            let mut signed_get = bucket.get_object(Some(credentials), &file_key);
+            let response_content_type = metadata.mime_type;
+            let response_content_disposition =
+                format!("inline; filename=\"{}\"", metadata.file_name);
+            signed_get
+                .query_mut()
+                .insert("response-content-type", response_content_type.as_str());
+            signed_get.query_mut().insert(
+                "response-content-disposition",
+                response_content_disposition.as_str(),
+            );
+            let presigned = signed_get.sign(Duration::from_secs(presign_secs));
+            let location =
+                HeaderValue::from_str(presigned.as_str()).map_err(|_| ApiError::Internal)?;
+            let mut response = StatusCode::TEMPORARY_REDIRECT.into_response();
+            response.headers_mut().insert(LOCATION, location);
+            if let Ok(cache_control) =
+                HeaderValue::from_str(&format!("private, max-age={remaining_secs}"))
+            {
+                response.headers_mut().insert(CACHE_CONTROL, cache_control);
+            }
+            Ok(response)
+        }
+    }
 }
 
 async fn send_chat_message(
@@ -3670,9 +6099,11 @@ async fn send_chat_message(
                 .chat_realtime
                 .publish(&thread_id, message.clone())
                 .await;
+            let mut views = hydrate_chat_message_views(&auth, &actor, vec![message]).await;
+            let response_body = views.pop().ok_or(ApiError::Internal)?;
             let response = IdempotencyResponse {
                 status_code: StatusCode::CREATED.as_u16(),
-                body: serde_json::to_value(&message).map_err(|_| ApiError::Internal)?,
+                body: serde_json::to_value(&response_body).map_err(|_| ApiError::Internal)?,
             };
             state
                 .idempotency
@@ -4150,17 +6581,52 @@ async fn get_tandang_profile_snapshot(
         .user_profile_snapshot(&actor.user_id)
         .await
         .map_err(map_markov_error)?;
+    Ok(Json(tandang_profile_snapshot_value(
+        snapshot,
+        &actor.user_id,
+    )))
+}
 
+async fn get_tandang_user_profile_snapshot(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(user_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let _actor = actor_identity(&auth)?;
+    let normalized_user_id = user_id
+        .trim()
+        .strip_prefix("gotong_royong:")
+        .unwrap_or(user_id.trim())
+        .trim();
+    if normalized_user_id.is_empty() {
+        return Err(ApiError::Validation("user_id is required".into()));
+    }
+    let snapshot = state
+        .markov_client
+        .user_profile_snapshot(normalized_user_id)
+        .await
+        .map_err(map_markov_error)?;
+    Ok(Json(tandang_profile_snapshot_value(
+        snapshot,
+        normalized_user_id,
+    )))
+}
+
+fn tandang_profile_snapshot_value(
+    snapshot: MarkovProfileSnapshot,
+    platform_user_id: &str,
+) -> Value {
     let reputation = snapshot.reputation;
     let tier = snapshot.tier;
     let activity = snapshot.activity;
     let cv_hidup = snapshot.cv_hidup;
     let top_level_cache = cache_metadata_value(&reputation.meta);
 
-    Ok(Json(json!({
+    json!({
         "cache": top_level_cache,
         "data": {
             "source": "tandang",
+            "platform_user_id": platform_user_id,
             "identity": snapshot.identity,
             "markov_user_id": snapshot.markov_user_id,
             "reputation": reputation.value,
@@ -4174,7 +6640,7 @@ async fn get_tandang_profile_snapshot(
                 "cv_hidup": cv_hidup.as_ref().map(|item| cache_metadata_value(&item.meta)),
             }
         }
-    })))
+    })
 }
 
 async fn get_tandang_cv_hidup_qr(
