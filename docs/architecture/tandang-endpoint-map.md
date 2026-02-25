@@ -76,6 +76,7 @@ These are the endpoints Gotong either calls directly via `MarkovReadClient` or e
 | Domain | Gotong endpoint | Upstream Tandang calls (current Gotong behavior) | Auth | Cache class | Gotong usage proposal |
 |---|---|---|---|---|---|
 | Users/CV | `GET /v1/tandang/me/profile` | 1) `GET /api/v1/users/{gotong_royong:user_id}/reputation` → derive `markov_user_id` from payload<br/>2) `GET /api/v1/users/{markov_user_id}/tier`<br/>3) `GET /api/v1/users/{markov_user_id}/activity`<br/>4) `GET /api/v1/cv-hidup/{markov_user_id}` | Platform token | Profile | **Primary “profile header” read**: tier badge, I/C/J axes, trend line, and the activity timeline slice. Keep UI resilient: show stale marker if cache is stale. |
+| Users/CV | `GET /v1/tandang/users/{user_id}/profile` | 1) `GET /api/v1/users/{gotong_royong:user_id}/reputation` → derive `markov_user_id` from payload<br/>2) `GET /api/v1/users/{markov_user_id}/tier`<br/>3) `GET /api/v1/users/{markov_user_id}/activity`<br/>4) `GET /api/v1/cv-hidup/{markov_user_id}` | Platform token | Profile | **Non-self profile read** for profile cards/pages without mock fallback. Keep cache metadata visible and default to platform-scoped identity. |
 
 Game-theory note:
 - This is the core “trust surface”. Optimize it for **explainability and anti-gaming**: show *why* credit was earned (activity), not just totals.

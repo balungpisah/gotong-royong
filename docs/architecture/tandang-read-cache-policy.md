@@ -80,6 +80,7 @@ Every cached Tandang payload returned by Gotong includes:
 This metadata is exposed on:
 
 - `GET /v1/tandang/me/profile`
+- `GET /v1/tandang/users/:user_id/profile`
 - `GET /v1/tandang/cv-hidup/qr`
 - `POST /v1/tandang/cv-hidup/export`
 - `GET /v1/tandang/cv-hidup/verify/:export_id`

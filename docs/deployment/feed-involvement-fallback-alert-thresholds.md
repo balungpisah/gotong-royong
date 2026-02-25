@@ -21,36 +21,33 @@ sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"
 
 ```promql
 # Edge error ratio
-sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m]))
+(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m])) or vector(0))
 /
-clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
 ```
 
 ```promql
 # Edge partial ratio
-sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m]))
+(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m])) or vector(0))
 /
-clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
 ```
 
 ```promql
 # Shadow mismatch growth (fallback-on stages only)
-increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])
+sum(increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])) or vector(0)
 ```
 
 ```promql
 # Feed p95 latency (seconds)
-histogram_quantile(
-  0.95,
-  sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le)
-)
+max(gotong_api_http_request_duration_seconds{route="/v1/feed",method="GET",quantile="0.95"})
 ```
 
 ```promql
 # Feed 5xx ratio
-sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m]))
+(sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m])) or vector(0))
 /
-clamp_min(sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])), 1)
+clamp_min((sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])) or vector(0)), 1)
 ```
 
 ```promql
@@ -82,9 +79,9 @@ groups:
       - alert: GotongFeedInvolvementEdgeErrorRatioHigh
         expr: |
           (
-            sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m]))
+            (sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m])) or vector(0))
             /
-            clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+            clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
           ) > 0.0005
         for: 10m
         labels:
@@ -95,9 +92,9 @@ groups:
       - alert: GotongFeedInvolvementEdgePartialRatioHigh
         expr: |
           (
-            sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m]))
+            (sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m])) or vector(0))
             /
-            clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+            clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
           ) > 0.002
         for: 10m
         labels:
@@ -107,10 +104,7 @@ groups:
 
       - alert: GotongFeedP95LatencySLOBreach
         expr: |
-          histogram_quantile(
-            0.95,
-            sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le)
-          ) > 0.18
+          max(gotong_api_http_request_duration_seconds{route="/v1/feed",method="GET",quantile="0.95"}) > 0.18
         for: 15m
         labels:
           severity: warning
@@ -120,9 +114,9 @@ groups:
       - alert: GotongFeed5xxRatioHigh
         expr: |
           (
-            sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m]))
+            (sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m])) or vector(0))
             /
-            clamp_min(sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])), 1)
+            clamp_min((sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])) or vector(0)), 1)
           ) > 0.01
         for: 10m
         labels:

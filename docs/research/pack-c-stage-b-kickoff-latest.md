@@ -1,6 +1,6 @@
 # Pack C Stage B Kickoff Report
 
-Date: 2026-02-25T10:15:16Z
+Date: 2026-02-25T18:05:26Z
 Namespace: `monitoring`
 Observation window target: 4h
 Stage summary: Canary rollout with fallback OFF on a subset of replicas.
@@ -13,8 +13,8 @@ Stage summary: Canary rollout with fallback OFF on a subset of replicas.
 | Kubernetes cluster status | unreachable |
 | Stage rule action mode | dry-run |
 | Stage rule action result | dry_run_only |
-| Go/no-go gate | fail |
-| Go/no-go mode | live |
+| Go/no-go gate | pass |
+| Go/no-go mode | dry-run |
 | Go/no-go window | 4h |
 | Go/no-go report | docs/research/pack-c-stage-b-go-no-go-latest.md |
 
@@ -22,7 +22,7 @@ Stage summary: Canary rollout with fallback OFF on a subset of replicas.
 
 1. `not run`
 2. `scripts/deploy/pack_c_prometheus_rules.sh --stage stage-b --namespace monitoring --dry-run`
-3. `scripts/deploy/pack_c_stage_go_no_go.sh --stage stage-b --prom-url http://127.0.0.1:9090 --window 4h --step 60s --output docs/research/pack-c-stage-b-go-no-go-latest.md`
+3. `scripts/deploy/pack_c_stage_go_no_go.sh --stage stage-b --prom-url http://127.0.0.1:9090 --window 4h --step 60s --output docs/research/pack-c-stage-b-go-no-go-latest.md --dry-run`
 
 ## Stage Checklist (4h)
 
@@ -31,9 +31,9 @@ Stage summary: Canary rollout with fallback OFF on a subset of replicas.
 - Watch lane distribution:
   - `sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) by (lane)`
 - Watch shadow mismatch:
-  - `increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])`
+  - `sum(increase(gotong_api_feed_involvement_shadow_mismatch_total[30m]))`
 - Watch feed SLO:
-  - `histogram_quantile(0.95, sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le))`
+  - `max(gotong_api_http_request_duration_seconds{route="/v1/feed",method="GET",quantile="0.95"})`
 
 References:
 - `docs/deployment/feed-involvement-fallback-removal-runbook.md`

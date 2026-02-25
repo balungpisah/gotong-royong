@@ -41,6 +41,7 @@ These are UI-critical but must not block chat/feed critical loops:
 | Path | Policy | Budget |
 |---|---|---|
 | `GET /v1/tandang/me/profile` | Serve cached snapshot with stale marker if upstream slow | Target `≤120 / ≤300 / ≤600 ms` |
+| `GET /v1/tandang/users/:user_id/profile` | Serve cached snapshot with stale marker if upstream slow | Target `≤120 / ≤300 / ≤600 ms` |
 | `GET /v1/tandang/users/:user_id/vouch-budget` | Cache + bounded TTL, fallback to last known value in UI | Target `≤120 / ≤300 / ≤600 ms` |
 | `GET /v1/tandang/decay/warnings/:user_id` | Same as above | Target `≤120 / ≤300 / ≤600 ms` |
 | `GET /v1/tandang/reputation/leaderboard` | Cache at list-level, async refresh | Target `≤150 / ≤350 / ≤700 ms` |

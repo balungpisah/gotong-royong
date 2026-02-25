@@ -115,6 +115,7 @@ Notes:
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/v1/feed` | List discovery feed (cursor pagination) |
+| GET | `/v1/feed/suggestions` | List follow suggestions derived from visible feed entities |
 | GET | `/v1/search` | Search discovery feed |
 | GET | `/v1/notifications` | List notifications (cursor pagination) |
 | POST | `/v1/notifications/:notification_id/read` | Mark notification read (idempotent) |
@@ -140,6 +141,7 @@ Notes:
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/v1/tandang/me/profile` | Profile snapshot |
+| GET | `/v1/tandang/users/:user_id/profile` | Profile snapshot by user ID |
 | GET | `/v1/tandang/cv-hidup/qr` | CV hidup QR |
 | POST | `/v1/tandang/cv-hidup/export` | CV hidup export |
 | GET | `/v1/tandang/cv-hidup/verify/:export_id` | Verify export |
@@ -252,6 +254,28 @@ This section is the contract we should treat as “frozen” while designing/ben
 - Notes with `rahasia_level > 0` remain queryable only via the ontology endpoints (until scope-based visibility rules exist for feed).
 - TTL cleanup marks expired ontology feed items with `payload.lifecycle.hidden=true` and feed/search visibility filters drop hidden items.
 
+### 2.1a Feed Suggestions — `GET /v1/feed/suggestions`
+
+**Query params** (current):
+- `limit?: number` (default 6, max 20)
+- `scope_id?: string`
+- `privacy_level?: string`
+- `from_ms?: number`
+- `to_ms?: number`
+
+**Response**: `FeedSuggestion[]`
+- `entity_id: string`
+- `entity_type: string` (`lingkungan|topik` only for now)
+- `label: string`
+- `followed: bool` (always `false`; followed entities are excluded)
+- `description?: string`
+- `witness_count: number`
+- `follower_count: number`
+
+**Derivation rule**:
+- Aggregates from entity tags in visible feed rows (`payload.enrichment.entity_tags` / `payload.entity_tags`) using current actor visibility rules.
+- Sorted by `witness_count DESC`, then `follower_count DESC`, then `label ASC`.
+
 ### 2.2 Notifications — `GET /v1/notifications`
 
 **Query params** (current):
@@ -304,17 +328,46 @@ Rule:
 - If neither `since_created_at_ms` nor `since_message_id` is provided, return the **latest** `limit` messages (still ordered ascending in the response).
 
 Response:
-- `ChatMessage[]` ordered ascending by `(created_at_ms, message_id)`.
+- `ChatMessageView[]` ordered ascending by `(created_at_ms, message_id)`.
+- `ChatMessageView = ChatMessage + optional author snapshot`:
+  - `author.user_id`
+  - `author.name`
+  - `author.avatar_url?`
+  - `author.tier?`
+  - `author.role?`
 
 **Send**: `POST /v1/chat/threads/:thread_id/messages/send`  
 Request:
 ```json
-{ "body": "string", "attachments": [] }
+{
+  "body": "string",
+  "attachments": [
+    {
+      "attachment_id": "string",
+      "type": "image|video|audio",
+      "url": "/v1/chat/attachments/:attachment_id/download?exp=...&sig=...",
+      "name": "string",
+      "mime_type": "string",
+      "size_bytes": 123
+    }
+  ]
+}
 ```
 Response: `ChatMessage`
+(`ChatMessageView`, same envelope as catch-up list)
 
 Idempotency:
 - Keyed by `(operation="chat_message_send", actor_id:thread_id, x-request-id)`.
+
+### 2.5a Chat attachments — upload + signed delivery
+
+- `POST /v1/chat/attachments/upload` (auth required, multipart)
+  - form-data: `file`
+  - response includes signed URL in `url` for message attachment payload.
+- `GET /v1/chat/attachments/:attachment_id/download?exp=...&sig=...` (no auth; signature-gated)
+  - local backend: API serves bytes directly.
+  - S3 backend: API validates signature then returns `307` redirect to short-lived S3/MinIO presigned object URL.
+  - backend selection: `CHAT_ATTACHMENT_STORAGE_BACKEND=auto|local|s3` (`auto` uses S3 when reachable, local fallback outside production).
 
 ### 2.6 Chat streaming — SSE + WebSocket
 
@@ -328,6 +381,7 @@ Both accept the same catch-up query params to seed a backlog, then stream new me
 These reads are not the chat/feed DB hot path, but they are render-critical for trust UI and must stay predictable:
 
 - `GET /v1/tandang/me/profile`
+- `GET /v1/tandang/users/:user_id/profile`
 - `GET /v1/tandang/reputation/leaderboard`
 - `GET /v1/tandang/users/:user_id/vouch-budget`
 - `GET /v1/tandang/decay/warnings/:user_id`

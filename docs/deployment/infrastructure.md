@@ -118,6 +118,8 @@ Required environment variables:
 - `CHAT_REALTIME_TRANSPORT` (`local` in dev, `redis` in multi-replica production)
 - `CHAT_REALTIME_CHANNEL_PREFIX`
 - `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`
+- `CHAT_ATTACHMENT_STORAGE_BACKEND` (`s3` recommended for staging/production)
+- `CHAT_ATTACHMENT_S3_PREFIX`
 - `JWT_SECRET`
 - `GOTONG_ROYONG_WEBHOOK_SECRET`
 
@@ -125,6 +127,9 @@ Rules:
 - Never use `latest` tags in staging/production.
 - Keep DB and SDK versions aligned with lock file and ADR.
 - Use TiKV-backed SurrealDB in staging/production; reserve memory/file-backed engines for local development.
+- For chat attachments, apply lifecycle retention policy from `docs/deployment/chat-attachment-storage-lifecycle-runbook.md`.
+  - Automation command: `scripts/deploy/chat_attachment_lifecycle_policy.sh` (or `just chat-attachment-lifecycle-apply`).
+  - Monitoring rule: `deploy/monitoring/prometheusrule-chat-attachment-lifecycle.yaml` (or `just chat-attachment-alerts-apply`).
 
 ## Reliability and Rollback
 
@@ -139,6 +144,22 @@ Execute locally/CI before production rollout:
 ```bash
 just release-gates-surreal
 ```
+
+Latest combined gate artifact:
+- `docs/research/release-gates-surreal-latest.md`
+
+CI wiring:
+- `.github/workflows/ci.yml` job `surreal-release-gates` runs this gate on `push` + `pull_request`.
+- Configure env-specific lifecycle inputs via repository variables:
+  - `RELEASE_GATES_APP_ENV`
+  - `RELEASE_GATES_CHAT_ATTACHMENT_S3_PREFIX`
+  - `RELEASE_GATES_CHAT_ATTACHMENT_REQUIRED_PREFIXES`
+  - `RELEASE_GATES_EXPIRE_DAYS`
+  - `RELEASE_GATES_EXPECT_EXPIRE_DAYS`
+  - `RELEASE_GATES_S3_BUCKET`
+- In GitHub branch protection, mark `CI / surreal-release-gates` as a required status check.
+  - Verification command: `just chat-attachment-branch-protection-check <owner/repo>`
+  - Verification artifact: `docs/research/branch-protection-surreal-release-gates-latest.md`
 
 Rollback triggers:
 - Any P0 gate failure in release candidate runs

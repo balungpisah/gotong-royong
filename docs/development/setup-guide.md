@@ -62,6 +62,8 @@ S3_BUCKET=gotong-royong-evidence-dev
 S3_ACCESS_KEY=minioadmin
 S3_SECRET_KEY=minioadmin
 S3_REGION=us-east-1
+CHAT_ATTACHMENT_STORAGE_BACKEND=auto
+CHAT_ATTACHMENT_S3_PREFIX=chat-attachments
 
 # Auth
 JWT_SECRET=dev_jwt_secret_32_chars_minimum
@@ -91,6 +93,25 @@ Optional local object storage (MinIO):
 
 ```bash
 docker compose -f compose.dev.yaml --profile storage up -d minio
+```
+
+`CHAT_ATTACHMENT_STORAGE_BACKEND` behavior:
+- `auto` (default): use S3/MinIO if reachable, otherwise fallback to local disk (non-production).
+- `local`: always use local disk (`tmp/gotong-chat-attachments/<env>`).
+- `s3`: fail startup if S3 bucket is unreachable (recommended for production/staging).
+
+Live attachment storage smoke (S3 path):
+
+```bash
+just smoke-chat-attachment-s3-live
+```
+
+Lifecycle policy plan/apply (for attachment prefix):
+
+```bash
+just chat-attachment-lifecycle-plan
+just chat-attachment-lifecycle-apply
+just chat-attachment-lifecycle-verify
 ```
 
 ### 2. Build and run backend

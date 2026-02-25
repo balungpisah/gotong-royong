@@ -121,7 +121,7 @@ Goal after full cutover:
 ### Shadow mismatch (while fallback ON stages)
 
 ```promql
-increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])
+sum(increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])) or vector(0)
 ```
 
 Goal:
@@ -130,10 +130,7 @@ Goal:
 ### Feed latency SLO
 
 ```promql
-histogram_quantile(
-  0.95,
-  sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le)
-)
+max(gotong_api_http_request_duration_seconds{route="/v1/feed",method="GET",quantile="0.95"})
 ```
 
 SLO gate:

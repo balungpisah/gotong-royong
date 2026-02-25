@@ -42,6 +42,14 @@ bunx playwright install chromium
 | --- | --- | --- | --- | --- |
 | `JWT_SECRET` | Yes for authenticated flows | none | `src/lib/auth/server.ts` | If unset, all requests are treated as unauthenticated. Use a 32+ character secret. |
 | `GR_SESSION_COOKIE_NAME` | No | `gr_session` | `src/lib/auth/server.ts` | Override only if cookie naming must differ by environment. |
+| `GR_API_PROXY_TARGET` | No | unset | `vite.config.ts` | When set (e.g. `http://127.0.0.1:3000`), `bun dev` proxies browser `/v1/*` calls to backend for live API wiring. |
+| `PUBLIC_GR_USE_API_NOTIFICATIONS` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
+| `PUBLIC_GR_USE_API_FEED` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
+| `PUBLIC_GR_USE_API_CHAT` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
+| `PUBLIC_GR_USE_API_USER` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
+| `PUBLIC_GR_USE_API_TRIAGE` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
+| `PUBLIC_GR_USE_API_SIGNAL` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
+| `PUBLIC_GR_USE_API_GROUP` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
 
 ## Daily Commands
 
@@ -64,6 +72,11 @@ Workflow: `.github/workflows/ci.yml` (`web` job)
 - `bun run test:unit`
 - `bun run test:e2e`
 - `bun run build`
+
+Notes:
+- App runtime defaults hot-path services to API-first (`PUBLIC_GR_USE_API_*` default `true`).
+- Production runtime enforces API-only service selection and disables API-service mock fallback paths.
+- Playwright config forces those toggles to `false` for deterministic frontend-only E2E in CI.
 
 ## Coding Conventions
 

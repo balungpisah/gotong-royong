@@ -60,6 +60,7 @@ Canonical decision:
 - [Tandang Integration Config](deployment/tandang-integration-config.md) - Required env vars, toggles, and safe defaults
 - [Webhook Backfill + Replay](deployment/webhook-backfill-replay.md) - Historical backfill and DLQ replay tooling
 - [Ontology Feed Expiry Backfill](deployment/ontology-feed-expiry-backfill.md) - One-time hide pass for already-expired ontology feed items
+- [Chat Attachment Storage Lifecycle Runbook](deployment/chat-attachment-storage-lifecycle-runbook.md) - Retention/lifecycle rollout for S3-backed chat attachments
 - [Feed Participant-Edge Backfill](deployment/feed-participant-edge-backfill.md) - Historical backfill for Pack C participant edge read-model
 - [Feed Involvement Fallback Removal](deployment/feed-involvement-fallback-removal-runbook.md) - Pack C cutover runbook for switching edge-only mode safely
 - [Feed Involvement Alert Thresholds](deployment/feed-involvement-fallback-alert-thresholds.md) - Grafana/Alertmanager thresholds for Pack C rollout stages
@@ -71,6 +72,12 @@ Canonical decision:
 - [Pack C Stage B Go/No-Go Report](research/pack-c-stage-b-go-no-go-latest.md) - Latest automated stage decision report from Prometheus thresholds
 - [Pack C Stage C Go/No-Go Report](research/pack-c-stage-c-go-no-go-latest.md) - Latest full-cutover decision report from Prometheus thresholds
 - [Pack C Live Gate Follow-up](research/pack-c-live-gate-followup-latest.md) - Current blocker and rerun steps for live Prometheus-backed stage gating
+- [Frontend Hot-Path Integration Debt](research/frontend-hot-path-integration-debt.md) - Tracked debt during staged feed/chat API cutover
+- [Surreal Release Gates Report](research/release-gates-surreal-latest.md) - Latest combined live gate artifact (go/no-go + lifecycle verify + S3 smoke)
+- [Chat Attachment S3 Smoke Report](research/chat-attachment-s3-smoke-latest.md) - Latest live smoke artifact for S3-backed chat attachment path
+- [Chat Attachment Lifecycle Policy Report](research/chat-attachment-lifecycle-policy-latest.md) - Latest lifecycle rule plan/apply artifact for chat attachment prefix
+- [Chat Attachment Lifecycle Verification Report](research/chat-attachment-lifecycle-verify-latest.md) - Latest required-prefix lifecycle verification artifact for release checks
+- [Chat Attachment Monitoring Rules](../deploy/monitoring/prometheusrule-chat-attachment-lifecycle.yaml) - PrometheusRule baseline for chat attachment API and storage-growth alerting
 - [Pack C Prometheus Rules](../deploy/monitoring/README.md) - Deployable stage A/B/C PrometheusRule manifests for fallback cutover
 - [Pack C Grafana Dashboard](../deploy/monitoring/grafana-pack-c-cutover-dashboard.json) - Importable cutover dashboard for lane/error/latency watch
 - [Tandang Observability SLOs](deployment/tandang-observability-slos.md) - Integration dashboards, SLOs, and alert rules

@@ -52,8 +52,8 @@ docker-compose up -d  # SurrealDB, Redis, MinIO
 # 4a. Start API (hot-reload)
 cargo watch -x run
 
-# 4b. Start frontend (separate terminal)
-cd apps/web && bun dev
+# 4b. Start frontend (separate terminal, proxied to API)
+cd apps/web && GR_API_PROXY_TARGET=http://127.0.0.1:3000 bun dev
 ```
 
 ## Project Structure
