@@ -1,12 +1,15 @@
 # Monitoring Manifests
 
-This directory contains deployable Prometheus Operator rule manifests for Pack C feed involvement fallback cutover.
+This directory contains deployable Prometheus Operator rule manifests for:
+- Pack C feed involvement fallback cutover.
+- Chat attachment lifecycle/runtime reliability monitoring.
 
 ## Files
 
 - `prometheusrule-pack-c-stage-a.yaml` — baseline stage (`DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=true`)
 - `prometheusrule-pack-c-stage-b.yaml` — canary stage (subset with fallback disabled)
 - `prometheusrule-pack-c-stage-c.yaml` — full cutover stage (`DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=false` on all replicas)
+- `prometheusrule-chat-attachment-lifecycle.yaml` — chat attachment upload/download error+latency and storage growth alerts
 - `grafana-pack-c-cutover-dashboard.json` — Grafana dashboard for Pack C lane/latency/error cutover watch
 
 ## Prerequisites
@@ -57,9 +60,16 @@ just pack-c-stage-a-end-to-end
 just pack-c-stage-b-end-to-end
 just pack-c-stage-c-end-to-end
 just pack-c-stage-end-to-end-dry-run stage-b
+just chat-attachment-alerts-plan
+just chat-attachment-alerts-apply
+just chat-attachment-alerts-verify
+just hot-path-rollout monitoring http://<prometheus-host>:9090
+just hot-path-rollout-dry-run
 ```
 
 `pack-c-stage-*-end-to-end` recipes run kickoff + stage go/no-go in one command, with default go/no-go windows matching stage targets (A=24h, B=4h, C=24h).
+
+`hot-path-rollout` orchestrates Pack C readiness + Stage A/B/C kickoff/go-no-go and chat attachment alert apply in one command (with explicit Prometheus URL).
 
 ## Validation
 
@@ -79,3 +89,4 @@ Grafana import:
 Runbook and threshold references:
 - `docs/deployment/feed-involvement-fallback-removal-runbook.md`
 - `docs/deployment/feed-involvement-fallback-alert-thresholds.md`
+- `docs/deployment/chat-attachment-storage-lifecycle-runbook.md`

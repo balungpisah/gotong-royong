@@ -150,7 +150,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\",lane=\"edge_error\"}[5m])) / clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\"}[5m])), 1)",
+          "expr": "(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\",lane=\"edge_error\"}[5m])) or vector(0)) / clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\"}[5m])) or vector(0)), 1)",
           "legendFormat": "edge_error_ratio",
           "range": true,
           "refId": "A"
@@ -214,7 +214,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\",lane=\"edge_partial\"}[5m])) / clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\"}[5m])), 1)",
+          "expr": "(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\",lane=\"edge_partial\"}[5m])) or vector(0)) / clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\"}[5m])) or vector(0)), 1)",
           "legendFormat": "edge_partial_ratio",
           "range": true,
           "refId": "A"
@@ -259,7 +259,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])",
+          "expr": "sum(increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])) or vector(0)",
           "legendFormat": "shadow_mismatch_30m",
           "range": true,
           "refId": "A"
@@ -321,7 +321,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(gotong_api_http_request_duration_seconds_bucket{route=\"/v1/feed\",method=\"GET\"}[5m])) by (le))",
+          "expr": "max(gotong_api_http_request_duration_seconds{route=\"/v1/feed\",method=\"GET\",quantile=\"0.95\"})",
           "legendFormat": "feed_p95",
           "range": true,
           "refId": "A"
@@ -383,7 +383,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(gotong_api_http_errors_total{route=\"/v1/feed\",method=\"GET\"}[5m])) / clamp_min(sum(rate(gotong_api_http_requests_total{route=\"/v1/feed\",method=\"GET\"}[5m])), 1)",
+          "expr": "(sum(rate(gotong_api_http_errors_total{route=\"/v1/feed\",method=\"GET\"}[5m])) or vector(0)) / clamp_min((sum(rate(gotong_api_http_requests_total{route=\"/v1/feed\",method=\"GET\"}[5m])) or vector(0)), 1)",
           "legendFormat": "feed_5xx_ratio",
           "range": true,
           "refId": "A"

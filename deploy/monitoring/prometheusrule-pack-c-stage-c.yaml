@@ -14,9 +14,9 @@ spec:
         - alert: GotongPackCStageCEdgeErrorRatioWarning
           expr: |
             (
-              sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m]))
+              (sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m])) or vector(0))
               /
-              clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+              clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
             ) > 0.0001
           for: 10m
           labels:
@@ -30,9 +30,9 @@ spec:
         - alert: GotongPackCStageCEdgeErrorRatioCritical
           expr: |
             (
-              sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m]))
+              (sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m])) or vector(0))
               /
-              clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+              clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
             ) > 0.0005
           for: 5m
           labels:
@@ -46,9 +46,9 @@ spec:
         - alert: GotongPackCStageCEdgePartialRatioWarning
           expr: |
             (
-              sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m]))
+              (sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m])) or vector(0))
               /
-              clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+              clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
             ) > 0.0005
           for: 10m
           labels:
@@ -62,9 +62,9 @@ spec:
         - alert: GotongPackCStageCEdgePartialRatioCritical
           expr: |
             (
-              sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m]))
+              (sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m])) or vector(0))
               /
-              clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+              clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
             ) > 0.002
           for: 5m
           labels:
@@ -77,10 +77,7 @@ spec:
             runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
         - alert: GotongPackCStageCFeedP95LatencyWarning
           expr: |
-            histogram_quantile(
-              0.95,
-              sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le)
-            ) > 0.18
+            max(gotong_api_http_request_duration_seconds{route="/v1/feed",method="GET",quantile="0.95"}) > 0.18
           for: 15m
           labels:
             severity: warning
@@ -92,10 +89,7 @@ spec:
             runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
         - alert: GotongPackCStageCFeedP95LatencyCritical
           expr: |
-            histogram_quantile(
-              0.95,
-              sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le)
-            ) > 0.25
+            max(gotong_api_http_request_duration_seconds{route="/v1/feed",method="GET",quantile="0.95"}) > 0.25
           for: 10m
           labels:
             severity: critical
@@ -108,9 +102,9 @@ spec:
         - alert: GotongPackCStageCFeed5xxRatioWarning
           expr: |
             (
-              sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m]))
+              (sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m])) or vector(0))
               /
-              clamp_min(sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])), 1)
+              clamp_min((sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])) or vector(0)), 1)
             ) > 0.01
           for: 10m
           labels:
@@ -124,9 +118,9 @@ spec:
         - alert: GotongPackCStageCFeed5xxRatioCritical
           expr: |
             (
-              sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m]))
+              (sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m])) or vector(0))
               /
-              clamp_min(sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])), 1)
+              clamp_min((sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])) or vector(0)), 1)
             ) > 0.02
           for: 5m
           labels:
@@ -139,7 +133,7 @@ spec:
             runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
         - alert: GotongPackCStageCFallbackLaneNonZero
           expr: |
-            sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane=~"fallback|legacy"}[5m])) > 0
+            (sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane=~"fallback|legacy"}[5m])) or vector(0)) > 0
           for: 15m
           labels:
             severity: critical
