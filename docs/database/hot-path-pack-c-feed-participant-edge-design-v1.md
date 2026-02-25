@@ -168,6 +168,7 @@ Add metrics:
 Add verification scripts:
 - ✅ `just feed-involvement-bench-surreal` now benchmarks both legacy OR lane and materialized edge lane in one run.
 - Default benchmark profile includes `NOISE_ROWS=80000` to stress worst-case global-table scans; override as needed for lighter local checks.
+- ✅ `just smoke-feed-involvement-edge-cutover-live` validates fallback-on vs edge-only runtime behavior against live Docker DB.
 - Keep historical pre-cutover baseline notes in `docs/research/surrealdb-feed-involvement-bench-latest.md` history for before/after comparison.
 
 ## 8) Risks and mitigations

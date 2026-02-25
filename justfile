@@ -98,6 +98,9 @@ feed-involvement-bench-surreal:
 smoke-ontology-enrichment-live:
 	scripts/smoke/ontology_enrichment_live.sh
 
+smoke-feed-involvement-edge-cutover-live:
+	scripts/smoke/feed_involvement_edge_cutover_live.sh
+
 ontology-enrichment-check:
 	scripts/docs/check_ontology_enrichment_guardrails.sh
 

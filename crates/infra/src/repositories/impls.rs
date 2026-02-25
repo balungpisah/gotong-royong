@@ -4629,7 +4629,9 @@ impl SurrealDiscoveryFeedRepository {
             );
         }
 
-        let mut statement = String::from("SELECT feed_id, occurred_at FROM feed_participant_edge");
+        let mut statement = String::from(
+            "SELECT feed_id, <string>occurred_at AS occurred_at FROM feed_participant_edge",
+        );
         if !clauses.is_empty() {
             statement.push_str(" WHERE ");
             statement.push_str(&clauses.join(" AND "));
