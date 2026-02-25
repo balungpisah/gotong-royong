@@ -154,6 +154,7 @@ Important edge-case:
 - ⏳ Remaining:
   - run/verify full historical backfill in target environments
   - remove fallback after sustained correctness + SLO window
+  - execute staged cutover runbook: `docs/deployment/feed-involvement-fallback-removal-runbook.md`
 
 ## 7) Operational checks
 

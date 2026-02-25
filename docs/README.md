@@ -61,6 +61,7 @@ Canonical decision:
 - [Webhook Backfill + Replay](deployment/webhook-backfill-replay.md) - Historical backfill and DLQ replay tooling
 - [Ontology Feed Expiry Backfill](deployment/ontology-feed-expiry-backfill.md) - One-time hide pass for already-expired ontology feed items
 - [Feed Participant-Edge Backfill](deployment/feed-participant-edge-backfill.md) - Historical backfill for Pack C participant edge read-model
+- [Feed Involvement Fallback Removal](deployment/feed-involvement-fallback-removal-runbook.md) - Pack C cutover runbook for switching edge-only mode safely
 - [Tandang Observability SLOs](deployment/tandang-observability-slos.md) - Integration dashboards, SLOs, and alert rules
 
 ### Development

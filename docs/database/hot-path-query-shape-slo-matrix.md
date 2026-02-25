@@ -80,3 +80,4 @@ Current state:
 
 Reference design:
 - `docs/database/hot-path-pack-c-feed-participant-edge-design-v1.md`
+- `docs/deployment/feed-involvement-fallback-removal-runbook.md`
