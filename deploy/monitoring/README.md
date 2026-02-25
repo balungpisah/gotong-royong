@@ -50,6 +50,9 @@ just pack-c-alerts-stage-c
 just pack-c-alerts-plan stage=stage-c
 just pack-c-alerts-verify
 just pack-c-slice-gate
+just pack-c-stage-a-go-no-go
+just pack-c-stage-b-go-no-go
+just pack-c-stage-c-go-no-go
 ```
 
 ## Validation

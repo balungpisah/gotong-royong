@@ -99,9 +99,15 @@ assert_contains "$monitoring_readme" "just pack-c-alerts-plan stage=stage-c" "mo
 assert_contains "$runbook" "just pack-c-alerts-stage-a" "runbook missing stage A command"
 assert_contains "$runbook" "just pack-c-alerts-stage-b" "runbook missing stage B command"
 assert_contains "$runbook" "just pack-c-alerts-stage-c" "runbook missing stage C command"
+assert_contains "$runbook" "just pack-c-stage-a-go-no-go" "runbook missing stage A go/no-go command"
+assert_contains "$runbook" "just pack-c-stage-b-go-no-go" "runbook missing stage B go/no-go command"
+assert_contains "$runbook" "just pack-c-stage-c-go-no-go" "runbook missing stage C go/no-go command"
 assert_contains "$runbook" "deploy/monitoring/grafana-pack-c-cutover-dashboard.json" "runbook missing dashboard reference"
 
 assert_contains "$docs_index" "Pack C Prometheus Rules" "docs index missing Pack C Prometheus link"
 assert_contains "$docs_index" "Pack C Grafana Dashboard" "docs index missing Pack C dashboard link"
+assert_contains "$docs_index" "Pack C Stage A Go/No-Go Report" "docs index missing Pack C Stage A go/no-go link"
+assert_contains "$docs_index" "Pack C Stage B Go/No-Go Report" "docs index missing Pack C Stage B go/no-go link"
+assert_contains "$docs_index" "Pack C Stage C Go/No-Go Report" "docs index missing Pack C Stage C go/no-go link"
 
 echo "Pack C monitoring assets verification: OK"

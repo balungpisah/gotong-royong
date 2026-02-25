@@ -61,6 +61,8 @@ Use staged rollout for API pods/instances.
   - lane usage
   - mismatch counter
   - feed/search latency
+- Before promoting to Stage B, run go/no-go gate:
+  - `just pack-c-stage-a-go-no-go`
 
 ### Stage B — Canary (fallback OFF on a subset)
 
@@ -71,6 +73,8 @@ Use staged rollout for API pods/instances.
 - Replace alert rules with Stage B profile:
   - `just pack-c-alerts-stage-b`
 - Run for 2–4h minimum, then increase to 25%, then 50% if stable.
+- Before promoting to Stage C, run go/no-go gate:
+  - `just pack-c-stage-b-go-no-go`
 
 ### Stage C — Full cutover
 
@@ -81,6 +85,8 @@ Use staged rollout for API pods/instances.
 - Replace alert rules with Stage C profile:
   - `just pack-c-alerts-stage-c`
 - Keep enhanced monitoring for at least 24h.
+- Before approving fallback-code removal, run go/no-go gate:
+  - `just pack-c-stage-c-go-no-go`
 
 ## 4) Metrics to watch
 

@@ -145,3 +145,15 @@ pack-c-stage-b-kickoff namespace="monitoring":
 
 pack-c-stage-c-kickoff namespace="monitoring":
 	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-c --namespace {{namespace}}
+
+pack-c-stage-go-no-go stage="stage-b" prom_url="http://127.0.0.1:9090" window="30m" step="60s":
+	scripts/deploy/pack_c_stage_go_no_go.sh --stage {{stage}} --prom-url {{prom_url}} --window {{window}} --step {{step}}
+
+pack-c-stage-a-go-no-go prom_url="http://127.0.0.1:9090" window="30m" step="60s":
+	scripts/deploy/pack_c_stage_go_no_go.sh --stage stage-a --prom-url {{prom_url}} --window {{window}} --step {{step}}
+
+pack-c-stage-b-go-no-go prom_url="http://127.0.0.1:9090" window="30m" step="60s":
+	scripts/deploy/pack_c_stage_go_no_go.sh --stage stage-b --prom-url {{prom_url}} --window {{window}} --step {{step}}
+
+pack-c-stage-c-go-no-go prom_url="http://127.0.0.1:9090" window="30m" step="60s":
+	scripts/deploy/pack_c_stage_go_no_go.sh --stage stage-c --prom-url {{prom_url}} --window {{window}} --step {{step}}

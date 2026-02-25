@@ -65,6 +65,11 @@ Canonical decision:
 - [Feed Involvement Alert Thresholds](deployment/feed-involvement-fallback-alert-thresholds.md) - Grafana/Alertmanager thresholds for Pack C rollout stages
 - [Pack C Cutover Readiness Report](research/pack-c-cutover-readiness-latest.md) - Latest one-command pre-cutover gate report
 - [Pack C Stage A Kickoff Report](research/pack-c-stage-a-kickoff-latest.md) - Latest Stage A rollout kickoff and observation checklist artifact
+- [Pack C Stage B Kickoff Report](research/pack-c-stage-b-kickoff-latest.md) - Latest Stage B rollout kickoff and observation checklist artifact
+- [Pack C Stage C Kickoff Report](research/pack-c-stage-c-kickoff-latest.md) - Latest Stage C rollout kickoff and observation checklist artifact
+- [Pack C Stage A Go/No-Go Report](research/pack-c-stage-a-go-no-go-latest.md) - Latest baseline-stage decision report from Prometheus thresholds
+- [Pack C Stage B Go/No-Go Report](research/pack-c-stage-b-go-no-go-latest.md) - Latest automated stage decision report from Prometheus thresholds
+- [Pack C Stage C Go/No-Go Report](research/pack-c-stage-c-go-no-go-latest.md) - Latest full-cutover decision report from Prometheus thresholds
 - [Pack C Prometheus Rules](../deploy/monitoring/README.md) - Deployable stage A/B/C PrometheusRule manifests for fallback cutover
 - [Pack C Grafana Dashboard](../deploy/monitoring/grafana-pack-c-cutover-dashboard.json) - Importable cutover dashboard for lane/error/latency watch
 - [Tandang Observability SLOs](deployment/tandang-observability-slos.md) - Integration dashboards, SLOs, and alert rules
