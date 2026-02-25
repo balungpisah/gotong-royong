@@ -2,7 +2,7 @@
  * Feed Store — manages the Pulse event-based feed state.
  *
  * Uses Svelte 5 runes ($state, $derived) for reactive state management.
- * Currently mock-backed — will be swapped to a FeedService when backend is ready.
+ * Feed list/suggestions are backed by FeedService (API-first in service factory).
  *
  * The feed is now a **polymorphic stream** — it can contain both witness activity
  * cards and inline system cards (suggestions, tips, milestones, prompts).
@@ -16,13 +16,20 @@ import type {
 	SystemCardData,
 	FollowableEntity
 } from '$lib/types';
+import type { FeedService } from '$lib/services/types';
 import { shouldAutoMonitor } from '$lib/types/feed';
-import { mockFeedItems, mockSuggestedEntities, mockSystemCards } from '$lib/fixtures';
+import { mockSystemCards } from '$lib/fixtures';
 
 /** How often to inject a system card into the stream (every Nth witness item). */
 const SYSTEM_CARD_INTERVAL = 3;
 
 export class FeedStore {
+	private readonly service: FeedService;
+
+	constructor(service: FeedService) {
+		this.service = service;
+	}
+
 	// ---------------------------------------------------------------------------
 	// Feed state
 	// ---------------------------------------------------------------------------
@@ -129,16 +136,14 @@ export class FeedStore {
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * Load the feed. Currently returns mock data.
-	 * TODO: Replace with FeedService.list() when backend is ready.
+	 * Load the feed via FeedService.
 	 */
 	async loadFeed() {
 		this.loading = true;
 		this.error = null;
 		try {
-			// Simulate network delay
-			await new Promise((resolve) => setTimeout(resolve, 400));
-			this.items = [...mockFeedItems];
+			const result = await this.service.list({ limit: 50 });
+			this.items = result.items;
 			this.systemCards = [...mockSystemCards];
 		} catch (err) {
 			this.error = err instanceof Error ? err.message : 'Gagal memuat feed';
@@ -149,15 +154,12 @@ export class FeedStore {
 
 	/**
 	 * Load suggested entities for onboarding.
-	 * TODO: Replace with FeedService.getSuggestions() when backend is ready.
 	 */
 	async loadSuggestions() {
 		this.suggestionsLoading = true;
 		try {
-			await new Promise((resolve) => setTimeout(resolve, 200));
-			this.suggestedEntities = [...mockSuggestedEntities];
+			this.suggestedEntities = await this.service.listSuggestions();
 		} catch {
-			// Suggestions are non-critical, silently fail
 			this.suggestedEntities = [];
 		} finally {
 			this.suggestionsLoading = false;
@@ -176,7 +178,7 @@ export class FeedStore {
 
 	/**
 	 * Toggle monitor (pantau) state for a witness.
-	 * TODO: Replace with API call when backend is ready.
+	 * Client-local until monitor write endpoint is finalized.
 	 */
 	toggleMonitor(witnessId: string) {
 		this.items = this.items.map((item) =>
@@ -191,15 +193,20 @@ export class FeedStore {
 	 * Uses the shouldAutoMonitor() contract to determine eligibility.
 	 * Only sets monitored=true (never removes — that's the user's choice).
 	 *
-	 * TODO: When backend is ready, this logic moves server-side.
-	 * The backend will auto-INSERT into user_monitors on qualifying actions.
+	 * TODO: Move this server-side when monitor-write endpoint is available.
 	 */
 	autoMonitorOnAction(witnessId: string, updatedRelation: Partial<import('$lib/types').MyRelation>) {
 		this.items = this.items.map((item) => {
 			if (item.witness_id !== witnessId) return item;
 
 			// Merge the new relation fields with existing
-			const merged = { ...item.my_relation, ...updatedRelation } as import('$lib/types').MyRelation;
+			const baseRelation: import('$lib/types').MyRelation = item.my_relation ?? {
+				vouched: false,
+				witnessed: false,
+				flagged: false,
+				supported: false
+			};
+			const merged = { ...baseRelation, ...updatedRelation } as import('$lib/types').MyRelation;
 
 			// Check if this action qualifies for auto-pantau
 			const shouldMonitor = shouldAutoMonitor(merged);
@@ -215,8 +222,7 @@ export class FeedStore {
 
 	/**
 	 * Toggle "dukung" (support) state for a witness.
-	 * Optimistic toggle — outside the Tandang signal pipeline.
-	 * TODO: Replace with API call when backend is ready.
+	 * Optimistic client-local toggle outside Tandang signal pipeline.
 	 */
 	toggleDukung(witnessId: string) {
 		this.items = this.items.map((item) => {
@@ -254,7 +260,7 @@ export class FeedStore {
 	/**
 	 * Toggle follow state for an entity.
 	 * Updates both feed item entity_tags and suggested entities.
-	 * TODO: Replace with API call when backend is ready.
+	 * Client-local until follow endpoint is finalized.
 	 */
 	async toggleFollow(entityId: string) {
 		// Toggle in suggested entities

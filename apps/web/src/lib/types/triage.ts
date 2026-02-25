@@ -51,6 +51,8 @@ export interface TriageConfidence {
  * This drives the context bar state and determines the entry route.
  */
 export interface TriageResult {
+	/** Backend triage session id for follow-up turns. */
+	session_id?: string;
 	/** Current context bar state. */
 	bar_state: ContextBarState;
 	/** Determined entry route. */

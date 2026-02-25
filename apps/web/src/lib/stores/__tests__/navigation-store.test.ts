@@ -25,7 +25,7 @@ import type { TabConfig, NavigationTag, TagSuggestion } from '../../types/naviga
 
 class NavigationStoreLogic {
 	tabs: TabConfig[] = [...DEFAULT_TABS];
-	activeTabId = 'pulse';
+	activeTabId = 'feed-semua';
 	suggestions: TagSuggestion[] = [];
 	addPanelOpen = false;
 
@@ -52,7 +52,7 @@ class NavigationStoreLogic {
 		if (!tab || tab.pinned) return;
 		this.tabs = this.tabs.filter((t) => t.id !== tabId);
 		if (this.activeTabId === tabId) {
-			this.activeTabId = 'pulse';
+			this.activeTabId = 'feed-semua';
 		}
 	}
 
@@ -114,17 +114,17 @@ function createStore() {
 
 describe('NavigationStore logic', () => {
 	describe('default state', () => {
-		it('starts with only the Pulse tab (pinned)', () => {
+		it('starts with the default pinned feed tabs', () => {
 			const store = createStore();
-			expect(store.tabs).toHaveLength(1);
-			expect(store.tabs[0].id).toBe('pulse');
+			expect(store.tabs).toHaveLength(6);
+			expect(store.tabs[0].id).toBe('feed-semua');
 			expect(store.tabs[0].pinned).toBe(true);
 			expect(store.tabs[0].tag).toBeNull();
 		});
 
-		it('has pulse as the active tab', () => {
+		it('has feed-semua as the active tab', () => {
 			const store = createStore();
-			expect(store.activeTabId).toBe('pulse');
+			expect(store.activeTabId).toBe('feed-semua');
 		});
 
 		it('starts with no suggestions and add panel closed', () => {
@@ -133,12 +133,12 @@ describe('NavigationStore logic', () => {
 			expect(store.addPanelOpen).toBe(false);
 		});
 
-		it('activeTab derived returns Pulse', () => {
+		it('activeTab derived returns feed-semua', () => {
 			const store = createStore();
-			expect(store.activeTab.id).toBe('pulse');
+			expect(store.activeTab.id).toBe('feed-semua');
 		});
 
-		it('dynamicTabs is empty (only pinned Pulse)', () => {
+		it('dynamicTabs is empty (only pinned feed tabs)', () => {
 			const store = createStore();
 			expect(store.dynamicTabs).toHaveLength(0);
 		});
@@ -148,25 +148,26 @@ describe('NavigationStore logic', () => {
 		it('adds a new tab with correct id and pinned=false', () => {
 			const store = createStore();
 			store.addTab({ label: 'Tuntaskan', iconName: 'flame', tag: 'tuntaskan' });
-			expect(store.tabs).toHaveLength(2);
-			expect(store.tabs[1].id).toBe('tag-tuntaskan');
-			expect(store.tabs[1].label).toBe('Tuntaskan');
-			expect(store.tabs[1].pinned).toBe(false);
-			expect(store.tabs[1].tag).toBe('tuntaskan');
+			expect(store.tabs).toHaveLength(DEFAULT_TABS.length + 1);
+			const added = store.tabs.at(-1);
+			expect(added?.id).toBe('tag-tuntaskan');
+			expect(added?.label).toBe('Tuntaskan');
+			expect(added?.pinned).toBe(false);
+			expect(added?.tag).toBe('tuntaskan');
 		});
 
 		it('prevents duplicate tabs by tag', () => {
 			const store = createStore();
 			store.addTab({ label: 'Tuntaskan', iconName: 'flame', tag: 'tuntaskan' });
 			store.addTab({ label: 'Tuntaskan Again', iconName: 'flame', tag: 'tuntaskan' });
-			expect(store.tabs).toHaveLength(2);
+			expect(store.tabs).toHaveLength(DEFAULT_TABS.length + 1);
 		});
 
 		it('allows multiple different tags', () => {
 			const store = createStore();
 			store.addTab({ label: 'Tuntaskan', iconName: 'flame', tag: 'tuntaskan' });
 			store.addTab({ label: 'Wujudkan', iconName: 'lightbulb', tag: 'wujudkan' });
-			expect(store.tabs).toHaveLength(3);
+			expect(store.tabs).toHaveLength(DEFAULT_TABS.length + 2);
 			expect(store.dynamicTabs).toHaveLength(2);
 		});
 	});
@@ -175,32 +176,32 @@ describe('NavigationStore logic', () => {
 		it('removes a non-pinned tab', () => {
 			const store = createStore();
 			store.addTab({ label: 'Tuntaskan', iconName: 'flame', tag: 'tuntaskan' });
-			expect(store.tabs).toHaveLength(2);
+			expect(store.tabs).toHaveLength(DEFAULT_TABS.length + 1);
 			store.removeTab('tag-tuntaskan');
-			expect(store.tabs).toHaveLength(1);
-			expect(store.tabs[0].id).toBe('pulse');
+			expect(store.tabs).toHaveLength(DEFAULT_TABS.length);
+			expect(store.tabs[0].id).toBe('feed-semua');
 		});
 
-		it('does not remove a pinned tab (Pulse)', () => {
+		it('does not remove a pinned tab', () => {
 			const store = createStore();
-			store.removeTab('pulse');
-			expect(store.tabs).toHaveLength(1);
-			expect(store.tabs[0].id).toBe('pulse');
+			store.removeTab('feed-semua');
+			expect(store.tabs).toHaveLength(DEFAULT_TABS.length);
+			expect(store.tabs[0].id).toBe('feed-semua');
 		});
 
-		it('resets activeTabId to pulse when the active tab is removed', () => {
+		it('resets activeTabId to feed-semua when the active tab is removed', () => {
 			const store = createStore();
 			store.addTab({ label: 'Tuntaskan', iconName: 'flame', tag: 'tuntaskan' });
 			store.setActiveTab('tag-tuntaskan');
 			expect(store.activeTabId).toBe('tag-tuntaskan');
 			store.removeTab('tag-tuntaskan');
-			expect(store.activeTabId).toBe('pulse');
+			expect(store.activeTabId).toBe('feed-semua');
 		});
 
 		it('does nothing for a non-existent tab id', () => {
 			const store = createStore();
 			store.removeTab('non-existent');
-			expect(store.tabs).toHaveLength(1);
+			expect(store.tabs).toHaveLength(DEFAULT_TABS.length);
 		});
 	});
 
@@ -216,7 +217,7 @@ describe('NavigationStore logic', () => {
 		it('does not update for non-existent tab', () => {
 			const store = createStore();
 			store.setActiveTab('non-existent');
-			expect(store.activeTabId).toBe('pulse');
+			expect(store.activeTabId).toBe('feed-semua');
 		});
 	});
 
@@ -225,19 +226,19 @@ describe('NavigationStore logic', () => {
 			const store = createStore();
 			store.addTab({ label: 'A', iconName: 'flame', tag: 'a' });
 			store.addTab({ label: 'B', iconName: 'search', tag: 'b' });
-			// [pulse, a, b] → move index 2 to index 1 → [pulse, b, a]
-			store.reorderTabs(2, 1);
-			expect(store.tabs[1].tag).toBe('b');
-			expect(store.tabs[2].tag).toBe('a');
+			// [...defaults, a, b] → move b before a
+			store.reorderTabs(DEFAULT_TABS.length + 1, DEFAULT_TABS.length);
+			expect(store.tabs[DEFAULT_TABS.length].tag).toBe('b');
+			expect(store.tabs[DEFAULT_TABS.length + 1].tag).toBe('a');
 		});
 
 		it('ignores out-of-bounds indices', () => {
 			const store = createStore();
 			store.addTab({ label: 'A', iconName: 'flame', tag: 'a' });
 			store.reorderTabs(-1, 0);
-			store.reorderTabs(0, 5);
-			expect(store.tabs).toHaveLength(2);
-			expect(store.tabs[0].id).toBe('pulse');
+			store.reorderTabs(0, 50);
+			expect(store.tabs).toHaveLength(DEFAULT_TABS.length + 1);
+			expect(store.tabs[0].id).toBe('feed-semua');
 		});
 	});
 
@@ -289,12 +290,15 @@ describe('NavigationStore logic', () => {
 	});
 
 	describe('DEFAULT_TABS constant', () => {
-		it('defines exactly one default tab (Pulse)', () => {
-			expect(DEFAULT_TABS).toHaveLength(1);
-			expect(DEFAULT_TABS[0].id).toBe('pulse');
+		it('defines six pinned feed tabs', () => {
+			expect(DEFAULT_TABS).toHaveLength(6);
+			expect(DEFAULT_TABS[0].id).toBe('feed-semua');
 			expect(DEFAULT_TABS[0].iconName).toBe('activity');
 			expect(DEFAULT_TABS[0].pinned).toBe(true);
 			expect(DEFAULT_TABS[0].tag).toBeNull();
+			expect(DEFAULT_TABS[0].feedFilter).toBe('semua');
+			expect(DEFAULT_TABS.at(-1)?.id).toBe('feed-discover');
+			expect(DEFAULT_TABS.at(-1)?.feedFilter).toBe('discover');
 		});
 	});
 

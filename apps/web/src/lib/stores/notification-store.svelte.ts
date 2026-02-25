@@ -52,22 +52,26 @@ export class NotificationStore {
 	}
 
 	async markRead(notificationId: string) {
+		this.error = null;
 		try {
 			await this.service.markRead(notificationId);
 			this.notifications = this.notifications.map((n) =>
 				n.notification_id === notificationId ? { ...n, read: true } : n
 			);
 		} catch (err) {
+			this.error = err instanceof Error ? err.message : 'Gagal menandai notifikasi';
 			console.error('[NotificationStore] markRead failed:', err);
 			throw err;
 		}
 	}
 
 	async markAllRead() {
+		this.error = null;
 		try {
 			await this.service.markAllRead();
 			this.notifications = this.notifications.map((n) => ({ ...n, read: true }));
 		} catch (err) {
+			this.error = err instanceof Error ? err.message : 'Gagal menandai semua notifikasi';
 			console.error('[NotificationStore] markAllRead failed:', err);
 			throw err;
 		}

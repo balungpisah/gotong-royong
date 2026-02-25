@@ -49,9 +49,10 @@ export class TriageStore {
 	async startTriage(content: string, attachments?: File[]) {
 		this.loading = true;
 		this.error = null;
-		this.sessionId = `triage-${Date.now()}`;
 		try {
-			this.result = await this.service.startTriage(content, attachments);
+			const result = await this.service.startTriage(content, attachments);
+			this.result = result;
+			this.sessionId = result.session_id ?? `triage-${Date.now()}`;
 		} catch (err) {
 			this.error = err instanceof Error ? err.message : 'Gagal memulai triase';
 		} finally {

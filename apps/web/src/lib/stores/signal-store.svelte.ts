@@ -26,6 +26,7 @@ export class SignalStore {
 	relations = $state<Map<string, MyRelation>>(new Map());
 	counts = $state<Map<string, SignalCounts>>(new Map());
 	resolutions = $state<Map<string, ContentSignal[]>>(new Map());
+	errors = $state<Map<string, string>>(new Map());
 	sending = $state(false);
 
 	constructor(service: SignalService) {
@@ -48,23 +49,63 @@ export class SignalStore {
 		return this.resolutions.get(witnessId) ?? [];
 	}
 
+	getError(witnessId: string): string | null {
+		return this.errors.get(witnessId) ?? null;
+	}
+
+	clearError(witnessId: string): void {
+		if (!this.errors.has(witnessId)) return;
+		const next = new Map(this.errors);
+		next.delete(witnessId);
+		this.errors = next;
+	}
+
+	private setError(witnessId: string, message: string): void {
+		this.errors = new Map(this.errors).set(witnessId, message);
+	}
+
+	private toErrorMessage(err: unknown, fallback: string): string {
+		return err instanceof Error ? err.message : fallback;
+	}
+
 	// ---------------------------------------------------------------------------
 	// Actions — load data
 	// ---------------------------------------------------------------------------
 
 	async loadRelation(witnessId: string): Promise<void> {
-		const relation = await this.service.getMyRelation(witnessId);
-		this.relations = new Map(this.relations).set(witnessId, relation);
+		try {
+			const relation = await this.service.getMyRelation(witnessId);
+			this.relations = new Map(this.relations).set(witnessId, relation);
+		} catch (err) {
+			this.setError(witnessId, this.toErrorMessage(err, 'Gagal memuat status sinyal'));
+			throw err;
+		}
 	}
 
 	async loadCounts(witnessId: string): Promise<void> {
-		const counts = await this.service.getSignalCounts(witnessId);
-		this.counts = new Map(this.counts).set(witnessId, counts);
+		try {
+			const counts = await this.service.getSignalCounts(witnessId);
+			this.counts = new Map(this.counts).set(witnessId, counts);
+		} catch (err) {
+			this.setError(witnessId, this.toErrorMessage(err, 'Gagal memuat hitungan sinyal'));
+			throw err;
+		}
 	}
 
 	async loadResolutions(witnessId: string): Promise<void> {
-		const resolved = await this.service.getResolutions(witnessId);
-		this.resolutions = new Map(this.resolutions).set(witnessId, resolved);
+		try {
+			const resolved = await this.service.getResolutions(witnessId);
+			this.resolutions = new Map(this.resolutions).set(witnessId, resolved);
+		} catch (err) {
+			this.setError(witnessId, this.toErrorMessage(err, 'Gagal memuat riwayat sinyal'));
+			throw err;
+		}
+	}
+
+	async refreshWitness(witnessId: string): Promise<void> {
+		this.clearError(witnessId);
+		await Promise.all([this.loadRelation(witnessId), this.loadCounts(witnessId)]);
+		this.clearError(witnessId);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -74,17 +115,18 @@ export class SignalStore {
 	async sendSignal(witnessId: string, signalType: ContentSignalType): Promise<ContentSignal | null> {
 		if (this.sending) return null;
 		this.sending = true;
+		this.clearError(witnessId);
 
 		try {
 			const signal = await this.service.sendSignal(witnessId, signalType);
 
 			// Optimistic update: refresh relation and counts from service
-			await Promise.all([
-				this.loadRelation(witnessId),
-				this.loadCounts(witnessId)
-			]);
+			await this.refreshWitness(witnessId);
 
 			return signal;
+		} catch (err) {
+			this.setError(witnessId, this.toErrorMessage(err, 'Gagal mengirim sinyal'));
+			throw err;
 		} finally {
 			this.sending = false;
 		}
@@ -93,15 +135,16 @@ export class SignalStore {
 	async removeSignal(witnessId: string, signalType: ContentSignalType): Promise<void> {
 		if (this.sending) return;
 		this.sending = true;
+		this.clearError(witnessId);
 
 		try {
 			await this.service.removeSignal(witnessId, signalType);
 
 			// Refresh relation and counts from service
-			await Promise.all([
-				this.loadRelation(witnessId),
-				this.loadCounts(witnessId)
-			]);
+			await this.refreshWitness(witnessId);
+		} catch (err) {
+			this.setError(witnessId, this.toErrorMessage(err, 'Gagal membatalkan sinyal'));
+			throw err;
 		} finally {
 			this.sending = false;
 		}
@@ -116,13 +159,14 @@ export class SignalStore {
 		const isActive = signalType === 'saksi'
 			? relation?.witnessed
 			: relation?.flagged;
+		if (this.sending) return Boolean(isActive);
 
 		if (isActive) {
 			await this.removeSignal(witnessId, signalType);
 			return false;
 		} else {
-			await this.sendSignal(witnessId, signalType);
-			return true;
+			const signal = await this.sendSignal(witnessId, signalType);
+			return signal ? true : Boolean(isActive);
 		}
 	}
 
