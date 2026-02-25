@@ -9,6 +9,7 @@ pub mod contributions;
 pub mod db;
 pub mod discovery;
 pub mod evidence;
+pub mod group;
 pub mod idempotency;
 pub mod jobs;
 pub mod moderation;

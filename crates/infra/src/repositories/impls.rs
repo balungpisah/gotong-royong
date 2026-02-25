@@ -32,6 +32,9 @@ use gotong_domain::ports::discovery::{
     NotificationRepositoryListQuery,
 };
 use gotong_domain::ports::evidence::EvidenceRepository;
+use gotong_domain::ports::group::{
+    GroupJoinRequestRecord, GroupMemberRecord, GroupRecord, GroupRepository,
+};
 use gotong_domain::ports::moderation::ModerationRepository;
 use gotong_domain::ports::ontology::OntologyRepository;
 use gotong_domain::ports::siaga::SiagaRepository;
@@ -70,6 +73,11 @@ const FEED_INVOLVEMENT_SHADOW_MISMATCH_TOTAL: &str =
 #[derive(Default)]
 pub struct InMemoryContributionRepository {
     store: Arc<RwLock<HashMap<String, Contribution>>>,
+}
+
+#[derive(Default)]
+pub struct InMemoryGroupRepository {
+    store: Arc<RwLock<HashMap<String, GroupRecord>>>,
 }
 
 #[derive(Default)]
@@ -545,13 +553,61 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
             Ok(row) => row,
             Err(err) => return Box::pin(async move { Err(err) }),
         };
+        let event_id = row.event_id.clone();
         let client = self.client.clone();
         Box::pin(async move {
-            let payload = to_value(row)
-                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            let mut query = String::from(
+                "CREATE webhook_outbox_event SET \
+                    event_id = $event_id, \
+                    event_type = $event_type, \
+                    payload = $payload, \
+                    actor_id = $actor_id, \
+                    actor_username = $actor_username, \
+                    request_id = $request_id, \
+                    correlation_id = $correlation_id, \
+                    status = $status, \
+                    attempts = $attempts, \
+                    max_attempts = $max_attempts, \
+                    last_status_code = $last_status_code, \
+                    last_error = $last_error, \
+                    created_at = <datetime>$created_at, \
+                    updated_at = <datetime>$updated_at",
+            );
+            if row.next_attempt_at.is_some() {
+                query.push_str(", next_attempt_at = <datetime>$next_attempt_at");
+            } else {
+                query.push_str(", next_attempt_at = NONE");
+            }
+            query.push_str(";");
+            let mut pending = client.query(&query);
+            pending = pending.bind(("event_id", row.event_id));
+            pending = pending.bind(("event_type", row.event_type));
+            pending = pending.bind(("payload", row.payload));
+            pending = pending.bind(("actor_id", row.actor_id));
+            pending = pending.bind(("actor_username", row.actor_username));
+            pending = pending.bind(("request_id", row.request_id));
+            pending = pending.bind(("correlation_id", row.correlation_id));
+            pending = pending.bind(("status", row.status));
+            pending = pending.bind(("attempts", row.attempts as i64));
+            pending = pending.bind(("max_attempts", row.max_attempts as i64));
+            pending = pending.bind(("last_status_code", row.last_status_code.map(i64::from)));
+            pending = pending.bind(("last_error", row.last_error));
+            pending = pending.bind(("created_at", row.created_at));
+            pending = pending.bind(("updated_at", row.updated_at));
+            if let Some(next_attempt_at) = row.next_attempt_at {
+                pending = pending.bind(("next_attempt_at", next_attempt_at));
+            }
+            pending.await.map_err(Self::map_surreal_error)?;
             let mut response = client
-                .query("CREATE webhook_outbox_event CONTENT $payload")
-                .bind(("payload", payload))
+                .query(
+                    "SELECT event_id, event_type, payload, actor_id, actor_username, request_id, correlation_id, \
+                            status, attempts, max_attempts, \
+                            IF next_attempt_at = NONE { NONE } ELSE { <string>next_attempt_at } AS next_attempt_at, \
+                            last_status_code, last_error, <string>created_at AS created_at, \
+                            <string>updated_at AS updated_at \
+                     FROM webhook_outbox_event WHERE event_id = $event_id LIMIT 1",
+                )
+                .bind(("event_id", event_id))
                 .await
                 .map_err(Self::map_surreal_error)?;
             let rows: Vec<Value> = response
@@ -572,7 +628,14 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
         let client = self.client.clone();
         Box::pin(async move {
             let mut response = client
-                .query("SELECT * FROM webhook_outbox_event WHERE event_id = $event_id LIMIT 1")
+                .query(
+                    "SELECT event_id, event_type, payload, actor_id, actor_username, request_id, correlation_id, \
+                            status, attempts, max_attempts, \
+                            IF next_attempt_at = NONE { NONE } ELSE { <string>next_attempt_at } AS next_attempt_at, \
+                            last_status_code, last_error, <string>created_at AS created_at, \
+                            <string>updated_at AS updated_at \
+                     FROM webhook_outbox_event WHERE event_id = $event_id LIMIT 1",
+                )
                 .bind(("event_id", event_id))
                 .await
                 .map_err(Self::map_surreal_error)?;
@@ -592,7 +655,14 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
         let client = self.client.clone();
         Box::pin(async move {
             let mut response = client
-                .query("SELECT * FROM webhook_outbox_event WHERE request_id = $request_id LIMIT 1")
+                .query(
+                    "SELECT event_id, event_type, payload, actor_id, actor_username, request_id, correlation_id, \
+                            status, attempts, max_attempts, \
+                            IF next_attempt_at = NONE { NONE } ELSE { <string>next_attempt_at } AS next_attempt_at, \
+                            last_status_code, last_error, <string>created_at AS created_at, \
+                            <string>updated_at AS updated_at \
+                     FROM webhook_outbox_event WHERE request_id = $request_id LIMIT 1",
+                )
                 .bind(("request_id", request_id))
                 .await
                 .map_err(Self::map_surreal_error)?;
@@ -614,14 +684,25 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
             let mut response = match query.status {
                 Some(status) => client
                     .query(
-                        "SELECT * FROM webhook_outbox_event WHERE status = $status ORDER BY created_at DESC, event_id DESC LIMIT $limit",
+                        "SELECT event_id, event_type, payload, actor_id, actor_username, request_id, correlation_id, \
+                                status, attempts, max_attempts, \
+                                IF next_attempt_at = NONE { NONE } ELSE { <string>next_attempt_at } AS next_attempt_at, \
+                                last_status_code, last_error, <string>created_at AS created_at, \
+                                <string>updated_at AS updated_at \
+                         FROM webhook_outbox_event WHERE status = $status \
+                         ORDER BY created_at DESC, event_id DESC LIMIT $limit",
                     )
                     .bind(("status", status.as_str()))
                     .bind(("limit", query.limit as i64))
                     .await,
                 None => client
                     .query(
-                        "SELECT * FROM webhook_outbox_event ORDER BY created_at DESC, event_id DESC LIMIT $limit",
+                        "SELECT event_id, event_type, payload, actor_id, actor_username, request_id, correlation_id, \
+                                status, attempts, max_attempts, \
+                                IF next_attempt_at = NONE { NONE } ELSE { <string>next_attempt_at } AS next_attempt_at, \
+                                last_status_code, last_error, <string>created_at AS created_at, \
+                                <string>updated_at AS updated_at \
+                         FROM webhook_outbox_event ORDER BY created_at DESC, event_id DESC LIMIT $limit",
                     )
                     .bind(("limit", query.limit as i64))
                     .await,
@@ -678,10 +759,10 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
                 " SET status = $status, attempts = $attempts, max_attempts = $max_attempts, ",
             );
             query.push_str(
-                "last_status_code = $last_status_code, last_error = $last_error, updated_at = $updated_at",
+                "last_status_code = $last_status_code, last_error = $last_error, updated_at = <datetime>$updated_at",
             );
             if update.next_attempt_at_ms.is_some() {
-                query.push_str(", next_attempt_at = $next_attempt_at");
+                query.push_str(", next_attempt_at = <datetime>$next_attempt_at");
             } else {
                 query.push_str(", next_attempt_at = NONE");
             }
@@ -691,7 +772,7 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
             if update.correlation_id.is_some() {
                 query.push_str(", correlation_id = $correlation_id");
             }
-            query.push_str(" WHERE event_id = $event_id RETURN AFTER *");
+            query.push_str(" WHERE event_id = $event_id");
             let updated_at = Self::to_rfc3339(gotong_domain::jobs::now_ms())?;
             let next_attempt_at = update
                 .next_attempt_at_ms
@@ -714,8 +795,20 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
             if let Some(correlation_id) = update.correlation_id.as_ref() {
                 pending = pending.bind(("correlation_id", correlation_id.to_string()));
             }
-            pending = pending.bind(("event_id", event_id_for_query));
-            let mut response = pending.await.map_err(Self::map_surreal_error)?;
+            pending = pending.bind(("event_id", event_id_for_query.clone()));
+            pending.await.map_err(Self::map_surreal_error)?;
+            let mut response = client
+                .query(
+                    "SELECT event_id, event_type, payload, actor_id, actor_username, request_id, correlation_id, \
+                            status, attempts, max_attempts, \
+                            IF next_attempt_at = NONE { NONE } ELSE { <string>next_attempt_at } AS next_attempt_at, \
+                            last_status_code, last_error, <string>created_at AS created_at, \
+                            <string>updated_at AS updated_at \
+                     FROM webhook_outbox_event WHERE event_id = $event_id LIMIT 1",
+                )
+                .bind(("event_id", event_id_for_query))
+                .await
+                .map_err(Self::map_surreal_error)?;
             let rows: Vec<Value> = response
                 .take(0)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
@@ -744,13 +837,45 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
                 Err(err) => return Box::pin(async move { Err(err) }),
             },
         };
+        let log_id = row.log_id.clone();
         let client = self.client.clone();
         Box::pin(async move {
-            let payload = to_value(row)
-                .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
+            client
+                .query(
+                    "CREATE webhook_delivery_log SET \
+                        log_id = $log_id, \
+                        event_id = $event_id, \
+                        attempt = $attempt, \
+                        outcome = $outcome, \
+                        status_code = $status_code, \
+                        request_id = $request_id, \
+                        correlation_id = $correlation_id, \
+                        request_body_sha256 = $request_body_sha256, \
+                        response_body_sha256 = $response_body_sha256, \
+                        error_message = $error_message, \
+                        created_at = <datetime>$created_at",
+                )
+                .bind(("log_id", row.log_id))
+                .bind(("event_id", row.event_id))
+                .bind(("attempt", row.attempt as i64))
+                .bind(("outcome", row.outcome))
+                .bind(("status_code", row.status_code.map(i64::from)))
+                .bind(("request_id", row.request_id))
+                .bind(("correlation_id", row.correlation_id))
+                .bind(("request_body_sha256", row.request_body_sha256))
+                .bind(("response_body_sha256", row.response_body_sha256))
+                .bind(("error_message", row.error_message))
+                .bind(("created_at", row.created_at))
+                .await
+                .map_err(Self::map_surreal_error)?;
             let mut response = client
-                .query("CREATE webhook_delivery_log CONTENT $payload")
-                .bind(("payload", payload))
+                .query(
+                    "SELECT log_id, event_id, attempt, outcome, status_code, request_id, correlation_id, \
+                            request_body_sha256, response_body_sha256, error_message, \
+                            <string>created_at AS created_at \
+                     FROM webhook_delivery_log WHERE log_id = $log_id LIMIT 1",
+                )
+                .bind(("log_id", log_id))
                 .await
                 .map_err(Self::map_surreal_error)?;
             let rows: Vec<Value> = response
@@ -771,7 +896,10 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
         Box::pin(async move {
             let mut response = client
                 .query(
-                    "SELECT * FROM webhook_delivery_log WHERE event_id = $event_id ORDER BY attempt DESC",
+                    "SELECT log_id, event_id, attempt, outcome, status_code, request_id, correlation_id, \
+                            request_body_sha256, response_body_sha256, error_message, \
+                            <string>created_at AS created_at \
+                     FROM webhook_delivery_log WHERE event_id = $event_id ORDER BY attempt DESC",
                 )
                 .bind(("event_id", event_id))
                 .await
@@ -780,6 +908,725 @@ impl WebhookOutboxRepository for SurrealWebhookOutboxRepository {
                 .take(0)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             Self::decode_delivery_logs(rows)
+        })
+    }
+}
+
+impl InMemoryGroupRepository {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl GroupRepository for InMemoryGroupRepository {
+    fn create_group(
+        &self,
+        group: &GroupRecord,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<GroupRecord>> {
+        let group = group.clone();
+        let store = self.store.clone();
+        Box::pin(async move {
+            let mut store = store.write().await;
+            if store.contains_key(&group.group_id) {
+                return Err(DomainError::Conflict);
+            }
+            store.insert(group.group_id.clone(), group.clone());
+            Ok(group)
+        })
+    }
+
+    fn get_group(
+        &self,
+        group_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<GroupRecord>>> {
+        let group_id = group_id.to_string();
+        let store = self.store.clone();
+        Box::pin(async move { Ok(store.read().await.get(&group_id).cloned()) })
+    }
+
+    fn list_groups(&self) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<GroupRecord>>> {
+        let store = self.store.clone();
+        Box::pin(async move { Ok(store.read().await.values().cloned().collect::<Vec<_>>()) })
+    }
+
+    fn update_group(
+        &self,
+        group: &GroupRecord,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<GroupRecord>> {
+        let group = group.clone();
+        let store = self.store.clone();
+        Box::pin(async move {
+            let mut store = store.write().await;
+            if !store.contains_key(&group.group_id) {
+                return Err(DomainError::NotFound);
+            }
+            store.insert(group.group_id.clone(), group.clone());
+            Ok(group)
+        })
+    }
+}
+
+#[cfg(test)]
+mod group_repository_tests {
+    use super::*;
+
+    fn sample_group(group_id: &str) -> GroupRecord {
+        GroupRecord {
+            group_id: group_id.to_string(),
+            name: "Karang Taruna".to_string(),
+            description: "Kelompok warga".to_string(),
+            entity_type: "kelompok".to_string(),
+            join_policy: "persetujuan".to_string(),
+            member_count: 1,
+            witness_count: 0,
+            members: vec![GroupMemberRecord {
+                user_id: "user-1".to_string(),
+                name: "user-1".to_string(),
+                avatar_url: None,
+                role: "admin".to_string(),
+                joined_at_ms: 1_700_000_000_000,
+            }],
+            pending_requests: Vec::new(),
+            updated_at_ms: 1_700_000_000_000,
+        }
+    }
+
+    #[tokio::test]
+    async fn in_memory_group_repository_create_get_update_list_roundtrip() {
+        let repo = InMemoryGroupRepository::new();
+        let group = sample_group("g-1");
+
+        let created = repo.create_group(&group).await.expect("create");
+        assert_eq!(created.group_id, "g-1");
+        assert_eq!(created.member_count, 1);
+
+        let fetched = repo.get_group("g-1").await.expect("get").expect("exists");
+        assert_eq!(fetched.join_policy, "persetujuan");
+
+        let mut updated = fetched.clone();
+        updated.join_policy = "terbuka".to_string();
+        updated.updated_at_ms += 1000;
+        let saved = repo.update_group(&updated).await.expect("update");
+        assert_eq!(saved.join_policy, "terbuka");
+
+        let listed = repo.list_groups().await.expect("list");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].group_id, "g-1");
+        assert_eq!(listed[0].join_policy, "terbuka");
+    }
+
+    #[tokio::test]
+    async fn in_memory_group_repository_create_conflict() {
+        let repo = InMemoryGroupRepository::new();
+        let group = sample_group("g-dup");
+        repo.create_group(&group).await.expect("first create");
+        let err = repo
+            .create_group(&group)
+            .await
+            .expect_err("duplicate should conflict");
+        assert!(matches!(err, DomainError::Conflict));
+    }
+}
+
+#[derive(Clone)]
+pub struct SurrealGroupRepository {
+    client: Arc<Surreal<Client>>,
+}
+
+impl SurrealGroupRepository {
+    pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
+        Self { client }
+    }
+
+    pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        let db = Surreal::<Client>::init();
+        db.connect::<Ws>(&db_config.endpoint).await?;
+        db.signin(Root {
+            username: db_config.username.clone(),
+            password: db_config.password.clone(),
+        })
+        .await?;
+        db.use_ns(&db_config.namespace)
+            .use_db(&db_config.database)
+            .await?;
+        Ok(Self {
+            client: Arc::new(db),
+        })
+    }
+
+    fn to_rfc3339(timestamp_ms: i64) -> DomainResult<String> {
+        let datetime =
+            OffsetDateTime::from_unix_timestamp_nanos((timestamp_ms as i128) * 1_000_000)
+                .map_err(|err| DomainError::Validation(format!("invalid timestamp: {err}")))?;
+        Ok(datetime
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()))
+    }
+
+    fn parse_datetime_ms(value: &str) -> DomainResult<i64> {
+        let datetime = OffsetDateTime::parse(value, &Rfc3339)
+            .map_err(|err| DomainError::Validation(format!("invalid datetime: {err}")))?;
+        Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
+    }
+
+    fn map_surreal_error(err: surrealdb::Error) -> DomainError {
+        let error_message = err.to_string().to_lowercase();
+        if error_message.contains("already exists")
+            || error_message.contains("duplicate")
+            || error_message.contains("unique")
+            || error_message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {error_message}"))
+    }
+
+    fn decode_summary_rows(rows: Vec<Value>) -> DomainResult<Vec<SurrealGroupSummaryRow>> {
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealGroupSummaryRow>(row).map_err(|err| {
+                    DomainError::Validation(format!("invalid group summary row: {err}"))
+                })
+            })
+            .collect()
+    }
+
+    fn decode_member_rows(rows: Vec<Value>) -> DomainResult<Vec<GroupMemberRecord>> {
+        rows.into_iter()
+            .map(|row| {
+                let row = serde_json::from_value::<SurrealGroupMemberRow>(row).map_err(|err| {
+                    DomainError::Validation(format!("invalid group member row: {err}"))
+                })?;
+                Ok(GroupMemberRecord {
+                    user_id: row.user_id,
+                    name: row.name,
+                    avatar_url: row.avatar_url,
+                    role: row.role,
+                    joined_at_ms: Self::parse_datetime_ms(&row.joined_at)?,
+                })
+            })
+            .collect()
+    }
+
+    fn decode_request_rows(rows: Vec<Value>) -> DomainResult<Vec<GroupJoinRequestRecord>> {
+        rows.into_iter()
+            .map(|row| {
+                let row =
+                    serde_json::from_value::<SurrealGroupJoinRequestRow>(row).map_err(|err| {
+                        DomainError::Validation(format!("invalid group request row: {err}"))
+                    })?;
+                Ok(GroupJoinRequestRecord {
+                    request_id: row.request_id,
+                    user_id: row.user_id,
+                    name: row.name,
+                    avatar_url: row.avatar_url,
+                    message: row.message,
+                    status: row.status,
+                    requested_at_ms: Self::parse_datetime_ms(&row.requested_at)?,
+                })
+            })
+            .collect()
+    }
+
+    fn map_group_record(
+        summary: SurrealGroupSummaryRow,
+        members: Vec<GroupMemberRecord>,
+        pending_requests: Vec<GroupJoinRequestRecord>,
+    ) -> DomainResult<GroupRecord> {
+        Ok(GroupRecord {
+            group_id: summary.group_id,
+            name: summary.name,
+            description: summary.description,
+            entity_type: summary.entity_type,
+            join_policy: summary.join_policy,
+            member_count: summary.member_count,
+            witness_count: summary.witness_count,
+            members,
+            pending_requests,
+            updated_at_ms: Self::parse_datetime_ms(&summary.updated_at)?,
+        })
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealGroupSummaryCreateRow {
+    group_id: String,
+    name: String,
+    description: String,
+    entity_type: String,
+    join_policy: String,
+    member_count: usize,
+    witness_count: usize,
+    updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealGroupSummaryRow {
+    group_id: String,
+    name: String,
+    description: String,
+    entity_type: String,
+    join_policy: String,
+    member_count: usize,
+    witness_count: usize,
+    updated_at: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealGroupMemberCreateRow {
+    group_id: String,
+    user_id: String,
+    name: String,
+    avatar_url: Option<String>,
+    role: String,
+    joined_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealGroupMemberRow {
+    user_id: String,
+    name: String,
+    avatar_url: Option<String>,
+    role: String,
+    joined_at: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SurrealGroupJoinRequestCreateRow {
+    request_id: String,
+    group_id: String,
+    user_id: String,
+    name: String,
+    avatar_url: Option<String>,
+    message: Option<String>,
+    status: String,
+    requested_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealGroupJoinRequestRow {
+    request_id: String,
+    user_id: String,
+    name: String,
+    avatar_url: Option<String>,
+    message: Option<String>,
+    status: String,
+    requested_at: String,
+}
+
+impl GroupRepository for SurrealGroupRepository {
+    fn create_group(
+        &self,
+        group: &GroupRecord,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<GroupRecord>> {
+        let group = group.clone();
+        let summary = match SurrealGroupRepository::to_rfc3339(group.updated_at_ms) {
+            Ok(updated_at) => SurrealGroupSummaryCreateRow {
+                group_id: group.group_id.clone(),
+                name: group.name.clone(),
+                description: group.description.clone(),
+                entity_type: group.entity_type.clone(),
+                join_policy: group.join_policy.clone(),
+                member_count: group.member_count,
+                witness_count: group.witness_count,
+                updated_at,
+            },
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+
+        let members = match group
+            .members
+            .iter()
+            .map(|member| {
+                Ok(SurrealGroupMemberCreateRow {
+                    group_id: group.group_id.clone(),
+                    user_id: member.user_id.clone(),
+                    name: member.name.clone(),
+                    avatar_url: member.avatar_url.clone(),
+                    role: member.role.clone(),
+                    joined_at: SurrealGroupRepository::to_rfc3339(member.joined_at_ms)?,
+                })
+            })
+            .collect::<DomainResult<Vec<_>>>()
+        {
+            Ok(members) => members,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+
+        let requests = match group
+            .pending_requests
+            .iter()
+            .map(|request| {
+                Ok(SurrealGroupJoinRequestCreateRow {
+                    request_id: request.request_id.clone(),
+                    group_id: group.group_id.clone(),
+                    user_id: request.user_id.clone(),
+                    name: request.name.clone(),
+                    avatar_url: request.avatar_url.clone(),
+                    message: request.message.clone(),
+                    status: request.status.clone(),
+                    requested_at: SurrealGroupRepository::to_rfc3339(request.requested_at_ms)?,
+                })
+            })
+            .collect::<DomainResult<Vec<_>>>()
+        {
+            Ok(requests) => requests,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+
+        let client = self.client.clone();
+        Box::pin(async move {
+            let summary_payload = to_value(summary).map_err(|err| {
+                DomainError::Validation(format!("invalid summary payload: {err}"))
+            })?;
+            let mut summary_response = client
+                .query("CREATE group_summary CONTENT $payload")
+                .bind(("payload", summary_payload))
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            let summary_rows: Vec<Value> = summary_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            if summary_rows.is_empty() {
+                return Err(DomainError::Validation(
+                    "create group summary returned no row".to_string(),
+                ));
+            }
+
+            for member in members {
+                let payload = to_value(member).map_err(|err| {
+                    DomainError::Validation(format!("invalid member payload: {err}"))
+                })?;
+                client
+                    .query("CREATE group_member CONTENT $payload")
+                    .bind(("payload", payload))
+                    .await
+                    .map_err(SurrealGroupRepository::map_surreal_error)?;
+            }
+
+            for request in requests {
+                let payload = to_value(request).map_err(|err| {
+                    DomainError::Validation(format!("invalid request payload: {err}"))
+                })?;
+                client
+                    .query("CREATE group_join_request CONTENT $payload")
+                    .bind(("payload", payload))
+                    .await
+                    .map_err(SurrealGroupRepository::map_surreal_error)?;
+            }
+
+            Ok(group)
+        })
+    }
+
+    fn get_group(
+        &self,
+        group_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<GroupRecord>>> {
+        let group_id = group_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut summary_response = client
+                .query(
+                    "SELECT group_id, name, description, entity_type, join_policy, member_count, witness_count, \
+                     <string>updated_at AS updated_at \
+                     FROM group_summary WHERE group_id = $group_id LIMIT 1",
+                )
+                .bind(("group_id", group_id.clone()))
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            let summary_rows: Vec<Value> = summary_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut summaries = SurrealGroupRepository::decode_summary_rows(summary_rows)?;
+            let Some(summary) = summaries.pop() else {
+                return Ok(None);
+            };
+
+            let mut member_response = client
+                .query(
+                    "SELECT user_id, name, avatar_url, role, <string>joined_at AS joined_at \
+                     FROM group_member WHERE group_id = $group_id \
+                     ORDER BY joined_at ASC, user_id ASC",
+                )
+                .bind(("group_id", group_id.clone()))
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            let member_rows: Vec<Value> = member_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let members = SurrealGroupRepository::decode_member_rows(member_rows)?;
+
+            let mut request_response = client
+                .query(
+                    "SELECT request_id, user_id, name, avatar_url, message, status, \
+                     <string>requested_at AS requested_at \
+                     FROM group_join_request WHERE group_id = $group_id \
+                     ORDER BY requested_at DESC, request_id DESC",
+                )
+                .bind(("group_id", group_id))
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            let request_rows: Vec<Value> = request_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let requests = SurrealGroupRepository::decode_request_rows(request_rows)?;
+
+            let record = SurrealGroupRepository::map_group_record(summary, members, requests)?;
+            Ok(Some(record))
+        })
+    }
+
+    fn list_groups(&self) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<GroupRecord>>> {
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut summary_response = client
+                .query(
+                    "SELECT group_id, name, description, entity_type, join_policy, member_count, witness_count, \
+                     <string>updated_at AS updated_at FROM group_summary",
+                )
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            let summary_rows: Vec<Value> = summary_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let summaries = SurrealGroupRepository::decode_summary_rows(summary_rows)?;
+
+            let mut member_response = client
+                .query(
+                    "SELECT group_id, user_id, name, avatar_url, role, <string>joined_at AS joined_at \
+                     FROM group_member ORDER BY joined_at ASC, user_id ASC",
+                )
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            let member_rows: Vec<Value> = member_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let parsed_members = member_rows
+                .into_iter()
+                .map(|row| {
+                    #[derive(Deserialize)]
+                    struct GroupMemberByGroupRow {
+                        group_id: String,
+                        user_id: String,
+                        name: String,
+                        avatar_url: Option<String>,
+                        role: String,
+                        joined_at: String,
+                    }
+                    let row =
+                        serde_json::from_value::<GroupMemberByGroupRow>(row).map_err(|err| {
+                            DomainError::Validation(format!("invalid group member row: {err}"))
+                        })?;
+                    Ok((
+                        row.group_id,
+                        GroupMemberRecord {
+                            user_id: row.user_id,
+                            name: row.name,
+                            avatar_url: row.avatar_url,
+                            role: row.role,
+                            joined_at_ms: SurrealGroupRepository::parse_datetime_ms(
+                                &row.joined_at,
+                            )?,
+                        },
+                    ))
+                })
+                .collect::<DomainResult<Vec<_>>>()?;
+            let mut members_by_group = HashMap::<String, Vec<GroupMemberRecord>>::new();
+            for (group_id, member) in parsed_members {
+                members_by_group.entry(group_id).or_default().push(member);
+            }
+
+            let mut request_response = client
+                .query(
+                    "SELECT group_id, request_id, user_id, name, avatar_url, message, status, \
+                     <string>requested_at AS requested_at FROM group_join_request \
+                     ORDER BY requested_at DESC, request_id DESC",
+                )
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            let request_rows: Vec<Value> = request_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let parsed_requests = request_rows
+                .into_iter()
+                .map(|row| {
+                    #[derive(Deserialize)]
+                    struct GroupRequestByGroupRow {
+                        group_id: String,
+                        request_id: String,
+                        user_id: String,
+                        name: String,
+                        avatar_url: Option<String>,
+                        message: Option<String>,
+                        status: String,
+                        requested_at: String,
+                    }
+                    let row =
+                        serde_json::from_value::<GroupRequestByGroupRow>(row).map_err(|err| {
+                            DomainError::Validation(format!("invalid group request row: {err}"))
+                        })?;
+                    Ok((
+                        row.group_id,
+                        GroupJoinRequestRecord {
+                            request_id: row.request_id,
+                            user_id: row.user_id,
+                            name: row.name,
+                            avatar_url: row.avatar_url,
+                            message: row.message,
+                            status: row.status,
+                            requested_at_ms: SurrealGroupRepository::parse_datetime_ms(
+                                &row.requested_at,
+                            )?,
+                        },
+                    ))
+                })
+                .collect::<DomainResult<Vec<_>>>()?;
+            let mut requests_by_group = HashMap::<String, Vec<GroupJoinRequestRecord>>::new();
+            for (group_id, request) in parsed_requests {
+                requests_by_group.entry(group_id).or_default().push(request);
+            }
+
+            summaries
+                .into_iter()
+                .map(|summary| {
+                    let members = members_by_group
+                        .remove(&summary.group_id)
+                        .unwrap_or_default();
+                    let requests = requests_by_group
+                        .remove(&summary.group_id)
+                        .unwrap_or_default();
+                    SurrealGroupRepository::map_group_record(summary, members, requests)
+                })
+                .collect::<DomainResult<Vec<_>>>()
+        })
+    }
+
+    fn update_group(
+        &self,
+        group: &GroupRecord,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<GroupRecord>> {
+        let group = group.clone();
+        let summary = match SurrealGroupRepository::to_rfc3339(group.updated_at_ms) {
+            Ok(updated_at) => SurrealGroupSummaryCreateRow {
+                group_id: group.group_id.clone(),
+                name: group.name.clone(),
+                description: group.description.clone(),
+                entity_type: group.entity_type.clone(),
+                join_policy: group.join_policy.clone(),
+                member_count: group.member_count,
+                witness_count: group.witness_count,
+                updated_at,
+            },
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let members = match group
+            .members
+            .iter()
+            .map(|member| {
+                Ok(SurrealGroupMemberCreateRow {
+                    group_id: group.group_id.clone(),
+                    user_id: member.user_id.clone(),
+                    name: member.name.clone(),
+                    avatar_url: member.avatar_url.clone(),
+                    role: member.role.clone(),
+                    joined_at: SurrealGroupRepository::to_rfc3339(member.joined_at_ms)?,
+                })
+            })
+            .collect::<DomainResult<Vec<_>>>()
+        {
+            Ok(members) => members,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let requests = match group
+            .pending_requests
+            .iter()
+            .map(|request| {
+                Ok(SurrealGroupJoinRequestCreateRow {
+                    request_id: request.request_id.clone(),
+                    group_id: group.group_id.clone(),
+                    user_id: request.user_id.clone(),
+                    name: request.name.clone(),
+                    avatar_url: request.avatar_url.clone(),
+                    message: request.message.clone(),
+                    status: request.status.clone(),
+                    requested_at: SurrealGroupRepository::to_rfc3339(request.requested_at_ms)?,
+                })
+            })
+            .collect::<DomainResult<Vec<_>>>()
+        {
+            Ok(requests) => requests,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+
+        let client = self.client.clone();
+        Box::pin(async move {
+            let summary_payload = to_value(summary).map_err(|err| {
+                DomainError::Validation(format!("invalid summary payload: {err}"))
+            })?;
+            let mut update_response = client
+                .query(
+                    "UPDATE group_summary SET \
+                        name = $name, \
+                        description = $description, \
+                        entity_type = $entity_type, \
+                        join_policy = $join_policy, \
+                        member_count = $member_count, \
+                        witness_count = $witness_count, \
+                        updated_at = <datetime>$updated_at \
+                     WHERE group_id = $group_id \
+                     RETURN AFTER",
+                )
+                .bind(("group_id", group.group_id.clone()))
+                .bind(("name", summary_payload["name"].clone()))
+                .bind(("description", summary_payload["description"].clone()))
+                .bind(("entity_type", summary_payload["entity_type"].clone()))
+                .bind(("join_policy", summary_payload["join_policy"].clone()))
+                .bind(("member_count", summary_payload["member_count"].clone()))
+                .bind(("witness_count", summary_payload["witness_count"].clone()))
+                .bind(("updated_at", summary_payload["updated_at"].clone()))
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            let updated_rows: Vec<Value> = update_response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            if updated_rows.is_empty() {
+                return Err(DomainError::NotFound);
+            }
+
+            client
+                .query("DELETE group_member WHERE group_id = $group_id")
+                .bind(("group_id", group.group_id.clone()))
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            for member in members {
+                let payload = to_value(member).map_err(|err| {
+                    DomainError::Validation(format!("invalid member payload: {err}"))
+                })?;
+                client
+                    .query("CREATE group_member CONTENT $payload")
+                    .bind(("payload", payload))
+                    .await
+                    .map_err(SurrealGroupRepository::map_surreal_error)?;
+            }
+
+            client
+                .query("DELETE group_join_request WHERE group_id = $group_id")
+                .bind(("group_id", group.group_id.clone()))
+                .await
+                .map_err(SurrealGroupRepository::map_surreal_error)?;
+            for request in requests {
+                let payload = to_value(request).map_err(|err| {
+                    DomainError::Validation(format!("invalid request payload: {err}"))
+                })?;
+                client
+                    .query("CREATE group_join_request CONTENT $payload")
+                    .bind(("payload", payload))
+                    .await
+                    .map_err(SurrealGroupRepository::map_surreal_error)?;
+            }
+
+            Ok(group)
         })
     }
 }
@@ -940,9 +1787,12 @@ struct SurrealContributionCreateRow {
     mode: String,
     contribution_type: String,
     title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     evidence_url: Option<String>,
     skill_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<HashMap<String, Value>>,
     request_id: String,
     correlation_id: String,
@@ -983,13 +1833,33 @@ impl ContributionRepository for SurrealContributionRepository {
             let payload = to_value(payload)
                 .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
             let mut response = client
-                .query("CREATE type::thing('contribution', $contribution_id) CONTENT $payload")
+                .query(
+                    "CREATE type::record('contribution', $contribution_id) SET \
+                        contribution_id = $payload.contribution_id, \
+                        author_id = $payload.author_id, \
+                        author_username = $payload.author_username, \
+                        mode = $payload.mode, \
+                        contribution_type = $payload.contribution_type, \
+                        title = $payload.title, \
+                        description = $payload.description, \
+                        evidence_url = $payload.evidence_url, \
+                        skill_ids = $payload.skill_ids, \
+                        metadata = $payload.metadata, \
+                        request_id = $payload.request_id, \
+                        correlation_id = $payload.correlation_id, \
+                        created_at = <datetime>$payload.created_at, \
+                        updated_at = <datetime>$payload.updated_at; \
+                     SELECT contribution_id, author_id, author_username, mode, contribution_type, title, \
+                            description, evidence_url, skill_ids, metadata, request_id, correlation_id, \
+                            <string>created_at AS created_at, <string>updated_at AS updated_at \
+                     FROM contribution WHERE contribution_id = $contribution_id LIMIT 1",
+                )
                 .bind(("contribution_id", contribution_id))
                 .bind(("payload", payload))
                 .await
                 .map_err(Self::map_surreal_error)?;
             let rows: Vec<Value> = response
-                .take(0)
+                .take(1)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             let mut contributions = Self::decode_rows(rows)?;
             contributions
@@ -1247,13 +2117,30 @@ impl EvidenceRepository for SurrealEvidenceRepository {
             let payload = to_value(payload)
                 .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
             let mut response = client
-                .query("CREATE type::thing('evidence', $evidence_id) CONTENT $payload")
+                .query(
+                    "CREATE type::record('evidence', $evidence_id) SET \
+                        evidence_id = $payload.evidence_id, \
+                        contribution_id = $payload.contribution_id, \
+                        actor_id = $payload.actor_id, \
+                        actor_username = $payload.actor_username, \
+                        evidence_type = $payload.evidence_type, \
+                        evidence_data = $payload.evidence_data, \
+                        proof = $payload.proof, \
+                        request_id = $payload.request_id, \
+                        correlation_id = $payload.correlation_id, \
+                        created_at = <datetime>$payload.created_at, \
+                        updated_at = <datetime>$payload.updated_at; \
+                     SELECT evidence_id, contribution_id, actor_id, actor_username, evidence_type, \
+                            evidence_data, proof, request_id, correlation_id, \
+                            <string>created_at AS created_at, <string>updated_at AS updated_at \
+                     FROM evidence WHERE evidence_id = $evidence_id LIMIT 1",
+                )
                 .bind(("evidence_id", evidence_id))
                 .bind(("payload", payload))
                 .await
                 .map_err(Self::map_surreal_error)?;
             let rows: Vec<Value> = response
-                .take(0)
+                .take(1)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             let mut evidences = Self::decode_rows(rows)?;
             evidences
@@ -1441,8 +2328,11 @@ struct SurrealVouchCreateRow {
     voucher_id: String,
     voucher_username: String,
     vouchee_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     skill_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     weight_hint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
     request_id: String,
     correlation_id: String,
@@ -1477,13 +2367,30 @@ impl VouchRepository for SurrealVouchRepository {
             let payload = to_value(payload)
                 .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
             let mut response = client
-                .query("CREATE type::thing('vouch', $vouch_id) CONTENT $payload")
+                .query(
+                    "CREATE type::record('vouch', $vouch_id) SET \
+                        vouch_id = $payload.vouch_id, \
+                        voucher_id = $payload.voucher_id, \
+                        voucher_username = $payload.voucher_username, \
+                        vouchee_id = $payload.vouchee_id, \
+                        skill_id = $payload.skill_id, \
+                        weight_hint = $payload.weight_hint, \
+                        message = $payload.message, \
+                        request_id = $payload.request_id, \
+                        correlation_id = $payload.correlation_id, \
+                        created_at = <datetime>$payload.created_at, \
+                        updated_at = <datetime>$payload.updated_at; \
+                     SELECT vouch_id, voucher_id, voucher_username, vouchee_id, skill_id, weight_hint, \
+                            message, request_id, correlation_id, \
+                            <string>created_at AS created_at, <string>updated_at AS updated_at \
+                     FROM vouch WHERE vouch_id = $vouch_id LIMIT 1",
+                )
                 .bind(("vouch_id", vouch_id))
                 .bind(("payload", payload))
                 .await
                 .map_err(Self::map_surreal_error)?;
             let rows: Vec<Value> = response
-                .take(0)
+                .take(1)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
             let mut vouches = Self::decode_rows(rows)?;
             vouches
@@ -6298,7 +7205,7 @@ impl VaultRepository for SurrealVaultRepository {
             })?;
 
             let mut response = client
-                .query("CREATE type::thing('vault_entry', $vault_entry_id) CONTENT $payload")
+                .query("CREATE type::record('vault_entry', $vault_entry_id) CONTENT $payload")
                 .bind(("payload", payload))
                 .bind(("vault_entry_id", vault_entry_id.clone()))
                 .await
@@ -6317,7 +7224,7 @@ impl VaultRepository for SurrealVaultRepository {
 
             let mut timeline_response = match client
                 .query(
-                    "CREATE type::thing('vault_timeline_event', $event_id) CONTENT $event_payload",
+                    "CREATE type::record('vault_timeline_event', $event_id) CONTENT $event_payload",
                 )
                 .bind(("event_id", event_id.clone()))
                 .bind(("event_payload", event_payload))
@@ -6396,7 +7303,7 @@ impl VaultRepository for SurrealVaultRepository {
             }
 
             let mut response = client
-                .query("UPDATE type::thing('vault_entry', $vault_entry_id) CONTENT $payload")
+                .query("UPDATE type::record('vault_entry', $vault_entry_id) CONTENT $payload")
                 .bind(("vault_entry_id", vault_entry_id.clone()))
                 .bind(("payload", payload))
                 .await
@@ -6415,7 +7322,7 @@ impl VaultRepository for SurrealVaultRepository {
 
             let mut timeline_response = client
                 .query(
-                    "CREATE type::thing('vault_timeline_event', $event_id) CONTENT $event_payload",
+                    "CREATE type::record('vault_timeline_event', $event_id) CONTENT $event_payload",
                 )
                 .bind(("event_id", event_id.clone()))
                 .bind(("event_payload", event_payload))
@@ -7363,7 +8270,7 @@ impl SiagaRepository for SurrealSiagaRepository {
             })?;
 
             let mut response = client
-                .query("CREATE type::thing('siaga_broadcast', $siaga_id) CONTENT $payload")
+                .query("CREATE type::record('siaga_broadcast', $siaga_id) CONTENT $payload")
                 .bind(("siaga_id", siaga_id.clone()))
                 .bind(("payload", payload))
                 .await
@@ -7382,7 +8289,7 @@ impl SiagaRepository for SurrealSiagaRepository {
 
             let mut timeline_response = match client
                 .query(
-                    "CREATE type::thing('siaga_timeline_event', $event_id) CONTENT $event_payload",
+                    "CREATE type::record('siaga_timeline_event', $event_id) CONTENT $event_payload",
                 )
                 .bind(("event_id", event.event_id.clone()))
                 .bind(("event_payload", event_payload))
@@ -7443,7 +8350,7 @@ impl SiagaRepository for SurrealSiagaRepository {
             })?;
 
             let mut response = client
-                .query("UPDATE type::thing('siaga_broadcast', $siaga_id) CONTENT $payload")
+                .query("UPDATE type::record('siaga_broadcast', $siaga_id) CONTENT $payload")
                 .bind(("siaga_id", siaga_id.clone()))
                 .bind(("payload", payload))
                 .await
@@ -7460,7 +8367,7 @@ impl SiagaRepository for SurrealSiagaRepository {
 
             let mut timeline_response = client
                 .query(
-                    "CREATE type::thing('siaga_timeline_event', $event_id) CONTENT $event_payload",
+                    "CREATE type::record('siaga_timeline_event', $event_id) CONTENT $event_payload",
                 )
                 .bind(("event_id", event.event_id.clone()))
                 .bind(("event_payload", event_payload))
@@ -8210,7 +9117,7 @@ impl ModerationRepository for SurrealModerationRepository {
             let payload = to_value(payload)
                 .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
             let mut response = client
-                .query("UPSERT type::thing('content_moderation', $content_id) CONTENT $payload")
+                .query("UPSERT type::record('content_moderation', $content_id) CONTENT $payload")
                 .bind(("content_id", content_id))
                 .bind(("payload", payload))
                 .await
@@ -8237,7 +9144,7 @@ impl ModerationRepository for SurrealModerationRepository {
         let client = self.client.clone();
         Box::pin(async move {
             let mut response = client
-                .query("SELECT * FROM type::thing('content_moderation', $content_id)")
+                .query("SELECT * FROM type::record('content_moderation', $content_id)")
                 .bind(("content_id", content_id))
                 .await
                 .map_err(Self::map_surreal_error)?;
@@ -8315,7 +9222,7 @@ impl ModerationRepository for SurrealModerationRepository {
             let payload = to_value(payload)
                 .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
             let mut response = client
-                .query("CREATE type::thing('moderation_decision', $decision_id) CONTENT $payload")
+                .query("CREATE type::record('moderation_decision', $decision_id) CONTENT $payload")
                 .bind(("decision_id", decision_id))
                 .bind(("payload", payload))
                 .await
