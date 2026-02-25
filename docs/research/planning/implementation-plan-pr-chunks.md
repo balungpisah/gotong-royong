@@ -250,7 +250,7 @@ Deliverables:
 - WS primary stream, SSE fallback, polling fallback.
 - Catch-up query flow on reconnect.
 - Dedupe and ordering strategy based on `created_at` + `message_id`.
-- Idempotent message write guard aligned to `(thread_id, request_id)`.
+- Idempotent message write guard aligned to `(request_id, thread_id)`.
 
 Validation:
 - Live stream tests (`DEFAULT`, `DIFF`, and permission-scoped behavior).

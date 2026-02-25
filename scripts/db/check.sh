@@ -58,6 +58,7 @@ CHECKS=(
   "0025_hot_path_pack_a_indexes_check.surql"
   "0026_hot_path_pack_b_indexes_check.surql"
   "0027_hot_path_pack_c_feed_participant_edge_check.surql"
+  "0028_chat_message_request_index_order_check.surql"
 )
 
 run_check() {

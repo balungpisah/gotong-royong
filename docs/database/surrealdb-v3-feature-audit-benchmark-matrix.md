@@ -210,7 +210,7 @@ These are not final schemas; they’re patterns we should benchmark.
 
 **Indexes to benchmark**
 - `(thread_id, created_at, message_id)` for message ordering.
-- `(thread_id, request_id)` or `(thread_id, request_id, actor_id)` for idempotency on send.
+- `(request_id, thread_id)` or `(request_id, thread_id, actor_id)` for idempotency on send.
 
 **Realtime**
 - Use backend WS fanout; Surreal live queries are an internal building block, not the public socket.

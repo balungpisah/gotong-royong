@@ -127,7 +127,7 @@ surreal_sql_root_json "REMOVE TABLE probe_chat_message_bench;" >/dev/null || tru
 surreal_sql_root_json "REMOVE TABLE probe_chat_member_bench;" >/dev/null || true
 surreal_sql_root_json "REMOVE TABLE probe_chat_cursor_bench;" >/dev/null || true
 
-surreal_sql_root_json $'DEFINE TABLE probe_chat_message_bench SCHEMAFULL;\nDEFINE FIELD thread_id ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD message_id ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD request_id ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD author_id ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD body ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD created_at ON TABLE probe_chat_message_bench TYPE datetime;\nDEFINE INDEX idx_probe_message_order ON TABLE probe_chat_message_bench FIELDS thread_id, created_at, message_id;\nDEFINE INDEX uniq_probe_message_request ON TABLE probe_chat_message_bench FIELDS thread_id, request_id UNIQUE;' >/dev/null
+surreal_sql_root_json $'DEFINE TABLE probe_chat_message_bench SCHEMAFULL;\nDEFINE FIELD thread_id ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD message_id ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD request_id ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD author_id ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD body ON TABLE probe_chat_message_bench TYPE string;\nDEFINE FIELD created_at ON TABLE probe_chat_message_bench TYPE datetime;\nDEFINE INDEX idx_probe_message_order ON TABLE probe_chat_message_bench FIELDS thread_id, created_at, message_id;\nDEFINE INDEX uniq_probe_message_request ON TABLE probe_chat_message_bench FIELDS request_id, thread_id UNIQUE;' >/dev/null
 
 surreal_sql_root_json $'DEFINE TABLE probe_chat_member_bench SCHEMAFULL;\nDEFINE FIELD thread_id ON TABLE probe_chat_member_bench TYPE string;\nDEFINE FIELD user_id ON TABLE probe_chat_member_bench TYPE string;\nDEFINE FIELD role ON TABLE probe_chat_member_bench TYPE string;\nDEFINE FIELD joined_at ON TABLE probe_chat_member_bench TYPE datetime;\nDEFINE FIELD left_at ON TABLE probe_chat_member_bench TYPE option<datetime>;\nDEFINE INDEX idx_probe_member_lookup ON TABLE probe_chat_member_bench FIELDS user_id, thread_id;' >/dev/null
 
@@ -250,7 +250,7 @@ LIMIT 1
 \`\`\`
 
 This probe uses structurally equivalent benchmark tables and indexes:
-- \`probe_chat_message_bench\`: \`idx_probe_message_order(thread_id, created_at, message_id)\`, \`uniq_probe_message_request(thread_id, request_id)\`
+- \`probe_chat_message_bench\`: \`idx_probe_message_order(thread_id, created_at, message_id)\`, \`uniq_probe_message_request(request_id, thread_id)\`
 - \`probe_chat_member_bench\`: \`idx_probe_member_lookup(user_id, thread_id)\`
 - \`probe_chat_cursor_bench\`: \`idx_probe_read_cursor_lookup(user_id, thread_id)\`
 

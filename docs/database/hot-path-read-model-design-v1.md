@@ -22,7 +22,7 @@ Out of scope:
 
 ### Chat (`0001`, `0002`)
 - `idx_message_order(thread_id, created_at, message_id)` supports catch-up/pagination.
-- `uniq_message_request(thread_id, request_id)` supports idempotent send.
+- `uniq_message_request(request_id, thread_id)` supports idempotent send without biasing thread-only catch-up scans.
 - `idx_member_lookup(user_id, thread_id)` supports membership checks.
 - `idx_read_cursor_lookup(user_id, thread_id)` supports read-cursor fetch/update.
 

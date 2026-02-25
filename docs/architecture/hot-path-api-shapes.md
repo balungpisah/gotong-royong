@@ -384,7 +384,7 @@ Critical indexes (must remain valid under benchmarks):
 - `idx_message_order` on `(thread_id, created_at, message_id)` (deterministic catch-up)
 - `idx_member_lookup` on `(user_id, thread_id)` (membership checks)
 - `idx_read_cursor_lookup` on `(user_id, thread_id)`
-- `uniq_message_request` on `(thread_id, request_id)` (idempotent send)
+- `uniq_message_request` on `(request_id, thread_id)` (idempotent send)
 
 Representative SurrealQL patterns (from `crates/infra/src/repositories/impls.rs`):
 - Catch-up:

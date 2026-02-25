@@ -103,6 +103,7 @@ for migration_file in \
   "0024_discovery_payload_flexible.surql" \
   "0025_hot_path_pack_a_indexes.surql" \
   "0026_hot_path_pack_b_indexes.surql" \
-  "0027_hot_path_pack_c_feed_participant_edge.surql"; do
+  "0027_hot_path_pack_c_feed_participant_edge.surql" \
+  "0028_chat_message_request_index_order.surql"; do
   run_migration "$migration_file"
 done
