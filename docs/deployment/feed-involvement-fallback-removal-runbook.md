@@ -51,6 +51,9 @@ Use staged rollout for API pods/instances.
 
 ### Stage A — Baseline (fallback ON)
 
+- Optional kickoff automation (recommended):
+  - `just pack-c-stage-a-kickoff`
+
 - Keep `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=true` on all replicas.
 - Apply Stage A alert rules:
   - `just pack-c-alerts-stage-a`

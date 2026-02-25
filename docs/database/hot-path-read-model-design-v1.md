@@ -114,5 +114,6 @@ Current benchmark artifacts:
 - Feed source benchmark: `just feed-index-bench-surreal`
 - Feed involvement benchmark: `just feed-involvement-bench-surreal`
 - Pack C cutover readiness gate: `just pack-c-cutover-readiness`
+- Pack C Stage A kickoff helper: `just pack-c-stage-a-kickoff`
 - Notification benchmark: `just notification-bench-surreal`
 - Re-run hot-path smoke/bench scripts after each migration pack.

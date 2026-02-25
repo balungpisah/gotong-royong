@@ -1,6 +1,6 @@
 # Pack C Cutover Readiness Report
 
-Date: 2026-02-25T09:08:28Z
+Date: 2026-02-25T09:16:46Z
 Namespace: `monitoring`
 Purpose: one-command execution of mandatory pre-cutover checks from `docs/deployment/feed-involvement-fallback-removal-runbook.md`.
 
@@ -8,10 +8,10 @@ Purpose: one-command execution of mandatory pre-cutover checks from `docs/deploy
 
 | Check | Status | Duration |
 |---|---|---|
-| Pack C monitoring asset gate | PASS | 1s |
-| Participant-edge backfill dry-run | PASS | 8s |
-| Involvement fallback on/off smoke | PASS | 53s |
-| Feed involvement benchmark | PASS | 237s |
+| Pack C monitoring asset gate | PASS | 0s |
+| Participant-edge backfill dry-run | PASS | 3s |
+| Involvement fallback on/off smoke | PASS | 56s |
+| Feed involvement benchmark | PASS | 208s |
 
 ## Executed Commands
 
