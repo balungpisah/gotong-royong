@@ -130,3 +130,6 @@ pack-c-alerts-verify:
 
 pack-c-slice-gate namespace="monitoring":
 	scripts/deploy/pack_c_slice_gate.sh {{namespace}}
+
+pack-c-cutover-readiness namespace="monitoring":
+	scripts/deploy/pack_c_cutover_readiness.sh --namespace {{namespace}}

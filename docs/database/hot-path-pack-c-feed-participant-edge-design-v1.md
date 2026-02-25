@@ -167,6 +167,7 @@ Add metrics:
 - `feed_participant_edge_backfill_progress_ratio` (optional derived metric from backfill runs)
 
 Add verification scripts:
+- ✅ `just pack-c-cutover-readiness` runs the full mandatory pre-cutover checks and writes `docs/research/pack-c-cutover-readiness-latest.md`.
 - ✅ `just feed-involvement-bench-surreal` now benchmarks both legacy OR lane and materialized edge lane in one run.
 - Default benchmark profile includes `NOISE_ROWS=80000` to stress worst-case global-table scans; override as needed for lighter local checks.
 - ✅ `just smoke-feed-involvement-edge-cutover-live` validates fallback-on vs edge-only runtime behavior against live Docker DB.

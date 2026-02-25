@@ -63,6 +63,7 @@ Canonical decision:
 - [Feed Participant-Edge Backfill](deployment/feed-participant-edge-backfill.md) - Historical backfill for Pack C participant edge read-model
 - [Feed Involvement Fallback Removal](deployment/feed-involvement-fallback-removal-runbook.md) - Pack C cutover runbook for switching edge-only mode safely
 - [Feed Involvement Alert Thresholds](deployment/feed-involvement-fallback-alert-thresholds.md) - Grafana/Alertmanager thresholds for Pack C rollout stages
+- [Pack C Cutover Readiness Report](research/pack-c-cutover-readiness-latest.md) - Latest one-command pre-cutover gate report
 - [Pack C Prometheus Rules](../deploy/monitoring/README.md) - Deployable stage A/B/C PrometheusRule manifests for fallback cutover
 - [Pack C Grafana Dashboard](../deploy/monitoring/grafana-pack-c-cutover-dashboard.json) - Importable cutover dashboard for lane/error/latency watch
 - [Tandang Observability SLOs](deployment/tandang-observability-slos.md) - Integration dashboards, SLOs, and alert rules

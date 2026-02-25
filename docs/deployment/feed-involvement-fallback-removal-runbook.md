@@ -27,6 +27,12 @@ References:
 From repo root:
 
 ```bash
+just pack-c-cutover-readiness
+```
+
+Equivalent explicit commands:
+
+```bash
 just pack-c-slice-gate
 just feed-participant-edge-backfill --dry-run --page-size 1000 --progress-every 1000
 just smoke-feed-involvement-edge-cutover-live

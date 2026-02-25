@@ -93,6 +93,7 @@ Detailed Pack C design reference:
    - ✅ backfill command added (`feed-participant-edge-backfill`),
    - ✅ explicit lane/shadow counters added for involvement reads,
    - ✅ live benchmark script compares legacy OR lane vs materialized edge lane (`just feed-involvement-bench-surreal`),
+   - ✅ one-command readiness gate runs mandatory pre-cutover checks (`just pack-c-cutover-readiness`),
    - ✅ runtime fallback switch available (`DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED`),
    - ⏳ remove fallback after sustained correctness/SLO verification.
 
@@ -101,6 +102,7 @@ Current benchmark artifacts:
 - `docs/research/surrealdb-chat-bench-latest.md`
 - `docs/research/surrealdb-feed-index-bench-latest.md`
 - `docs/research/surrealdb-feed-involvement-bench-latest.md`
+- `docs/research/pack-c-cutover-readiness-latest.md`
 - `docs/research/surrealdb-notification-bench-latest.md`
 
 ## 6) Validation Gates
@@ -111,5 +113,6 @@ Current benchmark artifacts:
 - Chat benchmark: `just chat-bench-surreal`
 - Feed source benchmark: `just feed-index-bench-surreal`
 - Feed involvement benchmark: `just feed-involvement-bench-surreal`
+- Pack C cutover readiness gate: `just pack-c-cutover-readiness`
 - Notification benchmark: `just notification-bench-surreal`
 - Re-run hot-path smoke/bench scripts after each migration pack.
