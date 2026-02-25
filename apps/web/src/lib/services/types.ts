@@ -15,6 +15,8 @@ import type {
 	DiffResponse,
 	UserProfile,
 	AppNotification,
+	FeedItem,
+	FollowableEntity,
 	TriageResult,
 	TandangProfile,
 	ContentSignal,
@@ -128,6 +130,11 @@ export interface NotificationService {
 
 	/** Get the count of unread notifications. */
 	getUnreadCount(): Promise<number>;
+}
+
+export interface FeedService {
+	list(opts?: { cursor?: string; limit?: number }): Promise<Paginated<FeedItem>>;
+	listSuggestions(): Promise<FollowableEntity[]>;
 }
 
 // ---------------------------------------------------------------------------
