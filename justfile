@@ -121,3 +121,6 @@ pack-c-alerts-plan stage="stage-a" namespace="monitoring":
 
 pack-c-alerts-verify:
 	scripts/deploy/verify_pack_c_monitoring_assets.sh
+
+pack-c-slice-gate namespace="monitoring":
+	scripts/deploy/pack_c_slice_gate.sh {{namespace}}

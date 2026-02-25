@@ -49,11 +49,13 @@ just pack-c-alerts-stage-b
 just pack-c-alerts-stage-c
 just pack-c-alerts-plan stage=stage-c
 just pack-c-alerts-verify
+just pack-c-slice-gate
 ```
 
 ## Validation
 
 ```bash
+just pack-c-slice-gate
 just pack-c-alerts-verify
 kubectl get prometheusrule -n monitoring | rg gotong-pack-c-cutover
 kubectl describe prometheusrule gotong-pack-c-cutover-stage-c -n monitoring
