@@ -79,6 +79,7 @@ fn test_config() -> AppConfig {
         markov_cache_profile_stale_while_revalidate_ms: 1_200_000,
         markov_cache_gameplay_ttl_ms: 45_000,
         markov_cache_gameplay_stale_while_revalidate_ms: 180_000,
+        discovery_feed_involvement_fallback_enabled: true,
     }
 }
 

@@ -75,6 +75,7 @@ Current state:
   - backfill command available (`feed-participant-edge-backfill`),
   - explicit lane/shadow counters are emitted from involvement read paths,
   - live benchmark now compares legacy OR lane vs edge lane (`just feed-involvement-bench-surreal`),
+  - runtime switch available: `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED` (`true`=fallback on, `false`=edge-only),
   - fallback removal remains pending final verification window.
 
 Reference design:

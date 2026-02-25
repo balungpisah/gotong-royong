@@ -33,9 +33,10 @@ use gotong_infra::repositories::{
     InMemorySiagaRepository, InMemoryVaultRepository, InMemoryVouchRepository,
     InMemoryWebhookOutboxRepository, SurrealAdaptivePathRepository, SurrealChatRepository,
     SurrealContributionRepository, SurrealDiscoveryFeedRepository,
-    SurrealDiscoveryNotificationRepository, SurrealEvidenceRepository, SurrealModerationRepository,
-    SurrealOntologyRepository, SurrealSiagaRepository, SurrealVaultRepository,
-    SurrealVouchRepository, SurrealWebhookOutboxRepository,
+    SurrealDiscoveryFeedRepositoryOptions, SurrealDiscoveryNotificationRepository,
+    SurrealEvidenceRepository, SurrealModerationRepository, SurrealOntologyRepository,
+    SurrealSiagaRepository, SurrealVaultRepository, SurrealVouchRepository,
+    SurrealWebhookOutboxRepository,
 };
 use redis::Client;
 use serde::{Deserialize, Serialize};
@@ -553,7 +554,14 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
             let moderation_repo = SurrealModerationRepository::new(&db_config).await?;
             let ontology_repo = SurrealOntologyRepository::new(&db_config).await?;
             let siaga_repo = SurrealSiagaRepository::new(&db_config).await?;
-            let feed_repo = SurrealDiscoveryFeedRepository::new(&db_config).await?;
+            let feed_repo = SurrealDiscoveryFeedRepository::new_with_options(
+                &db_config,
+                SurrealDiscoveryFeedRepositoryOptions {
+                    involvement_fallback_enabled: config
+                        .discovery_feed_involvement_fallback_enabled,
+                },
+            )
+            .await?;
             let notification_repo = SurrealDiscoveryNotificationRepository::new(&db_config).await?;
             let webhook_outbox_repo = SurrealWebhookOutboxRepository::new(&db_config).await?;
             Ok((
@@ -662,6 +670,7 @@ mod tests {
             markov_cache_profile_stale_while_revalidate_ms: 1_200_000,
             markov_cache_gameplay_ttl_ms: 45_000,
             markov_cache_gameplay_stale_while_revalidate_ms: 180_000,
+            discovery_feed_involvement_fallback_enabled: true,
         }
     }
 

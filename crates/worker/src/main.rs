@@ -30,8 +30,8 @@ use gotong_infra::{
     jobs::{JobQueueMetricsSnapshot, RedisJobQueue},
     logging::init_tracing,
     repositories::{
-        SurrealDiscoveryFeedRepository, SurrealModerationRepository, SurrealOntologyRepository,
-        SurrealWebhookOutboxRepository,
+        SurrealDiscoveryFeedRepository, SurrealDiscoveryFeedRepositoryOptions,
+        SurrealModerationRepository, SurrealOntologyRepository, SurrealWebhookOutboxRepository,
     },
 };
 use hmac::{Hmac, Mac};
@@ -110,7 +110,13 @@ async fn main() -> anyhow::Result<()> {
         let webhook_repository = SurrealWebhookOutboxRepository::new(&db_config).await?;
         webhook_outbox_repo =
             Some(Arc::new(webhook_repository) as Arc<dyn WebhookOutboxRepository>);
-        let feed_repository = SurrealDiscoveryFeedRepository::new(&db_config).await?;
+        let feed_repository = SurrealDiscoveryFeedRepository::new_with_options(
+            &db_config,
+            SurrealDiscoveryFeedRepositoryOptions {
+                involvement_fallback_enabled: config.discovery_feed_involvement_fallback_enabled,
+            },
+        )
+        .await?;
         feed_repo = Some(Arc::new(feed_repository) as Arc<dyn FeedRepository>);
     }
 
@@ -595,8 +601,15 @@ async fn run_feed_participant_edge_backfill_mode(
 ) -> anyhow::Result<()> {
     let options = parse_feed_participant_edge_backfill_options(args)?;
     let db_config = DbConfig::from_app_config(config);
-    let feed_repo: Arc<dyn FeedRepository> =
-        Arc::new(SurrealDiscoveryFeedRepository::new(&db_config).await?);
+    let feed_repo: Arc<dyn FeedRepository> = Arc::new(
+        SurrealDiscoveryFeedRepository::new_with_options(
+            &db_config,
+            SurrealDiscoveryFeedRepositoryOptions {
+                involvement_fallback_enabled: config.discovery_feed_involvement_fallback_enabled,
+            },
+        )
+        .await?,
+    );
     let mut summary = FeedParticipantEdgeBackfillSummary::default();
     let mut cursor_occurred_at_ms: Option<i64> = None;
     let mut cursor_feed_id: Option<String> = None;
@@ -717,8 +730,15 @@ async fn run_ontology_feed_backfill_mode(
 ) -> anyhow::Result<()> {
     let options = parse_ontology_feed_backfill_options(args)?;
     let db_config = DbConfig::from_app_config(config);
-    let feed_repo: Arc<dyn FeedRepository> =
-        Arc::new(SurrealDiscoveryFeedRepository::new(&db_config).await?);
+    let feed_repo: Arc<dyn FeedRepository> = Arc::new(
+        SurrealDiscoveryFeedRepository::new_with_options(
+            &db_config,
+            SurrealDiscoveryFeedRepositoryOptions {
+                involvement_fallback_enabled: config.discovery_feed_involvement_fallback_enabled,
+            },
+        )
+        .await?,
+    );
     let ontology_repo = SurrealOntologyRepository::new(&db_config).await?;
     let cutoff_ms = options.cutoff_ms.unwrap_or_else(now_ms);
     let mut summary = OntologyFeedBackfillSummary::default();

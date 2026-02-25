@@ -44,6 +44,7 @@ pub struct AppConfig {
     pub markov_cache_profile_stale_while_revalidate_ms: u64,
     pub markov_cache_gameplay_ttl_ms: u64,
     pub markov_cache_gameplay_stale_while_revalidate_ms: u64,
+    pub discovery_feed_involvement_fallback_enabled: bool,
 }
 
 impl AppConfig {
@@ -101,6 +102,7 @@ impl AppConfig {
                 "markov_cache_gameplay_stale_while_revalidate_ms",
                 180_000u64,
             )?
+            .set_default("discovery_feed_involvement_fallback_enabled", true)?
             .add_source(config::Environment::default().separator("__"))
             .build()?;
         let config = cfg.try_deserialize::<AppConfig>()?;

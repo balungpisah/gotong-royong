@@ -93,6 +93,7 @@ Detailed Pack C design reference:
    - ✅ backfill command added (`feed-participant-edge-backfill`),
    - ✅ explicit lane/shadow counters added for involvement reads,
    - ✅ live benchmark script compares legacy OR lane vs materialized edge lane (`just feed-involvement-bench-surreal`),
+   - ✅ runtime fallback switch available (`DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED`),
    - ⏳ remove fallback after sustained correctness/SLO verification.
 
 Current benchmark artifacts:

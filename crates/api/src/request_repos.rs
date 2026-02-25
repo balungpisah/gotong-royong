@@ -13,10 +13,10 @@ use gotong_domain::ports::vouches::VouchRepository;
 use gotong_domain::ports::webhook::WebhookOutboxRepository;
 use gotong_infra::repositories::{
     SurrealAdaptivePathRepository, SurrealChatRepository, SurrealContributionRepository,
-    SurrealDiscoveryFeedRepository, SurrealDiscoveryNotificationRepository,
-    SurrealEvidenceRepository, SurrealModerationRepository, SurrealOntologyRepository,
-    SurrealSiagaRepository, SurrealVaultRepository, SurrealVouchRepository,
-    SurrealWebhookOutboxRepository,
+    SurrealDiscoveryFeedRepository, SurrealDiscoveryFeedRepositoryOptions,
+    SurrealDiscoveryNotificationRepository, SurrealEvidenceRepository, SurrealModerationRepository,
+    SurrealOntologyRepository, SurrealSiagaRepository, SurrealVaultRepository,
+    SurrealVouchRepository, SurrealWebhookOutboxRepository,
 };
 
 use crate::middleware::AuthContext;
@@ -88,8 +88,13 @@ pub fn siaga_repo(state: &AppState, auth: &AuthContext) -> Arc<dyn SiagaReposito
 
 pub fn feed_repo(state: &AppState, auth: &AuthContext) -> Arc<dyn FeedRepository> {
     match &auth.surreal_db_session {
-        Some(session) => Arc::new(SurrealDiscoveryFeedRepository::with_client(
+        Some(session) => Arc::new(SurrealDiscoveryFeedRepository::with_client_and_options(
             session.client(),
+            SurrealDiscoveryFeedRepositoryOptions {
+                involvement_fallback_enabled: state
+                    .config
+                    .discovery_feed_involvement_fallback_enabled,
+            },
         )),
         None => state.feed_repo.clone(),
     }

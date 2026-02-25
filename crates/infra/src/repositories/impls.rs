@@ -4371,17 +4371,45 @@ impl NotificationRepository for InMemoryDiscoveryNotificationRepository {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct SurrealDiscoveryFeedRepositoryOptions {
+    pub involvement_fallback_enabled: bool,
+}
+
+impl Default for SurrealDiscoveryFeedRepositoryOptions {
+    fn default() -> Self {
+        Self {
+            involvement_fallback_enabled: true,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct SurrealDiscoveryFeedRepository {
     client: Arc<Surreal<Client>>,
+    options: SurrealDiscoveryFeedRepositoryOptions,
 }
 
 impl SurrealDiscoveryFeedRepository {
     pub fn with_client(client: Arc<Surreal<Client>>) -> Self {
-        Self { client }
+        Self::with_client_and_options(client, SurrealDiscoveryFeedRepositoryOptions::default())
+    }
+
+    pub fn with_client_and_options(
+        client: Arc<Surreal<Client>>,
+        options: SurrealDiscoveryFeedRepositoryOptions,
+    ) -> Self {
+        Self { client, options }
     }
 
     pub async fn new(db_config: &DbConfig) -> anyhow::Result<Self> {
+        Self::new_with_options(db_config, SurrealDiscoveryFeedRepositoryOptions::default()).await
+    }
+
+    pub async fn new_with_options(
+        db_config: &DbConfig,
+        options: SurrealDiscoveryFeedRepositoryOptions,
+    ) -> anyhow::Result<Self> {
         let db = Surreal::<Client>::init();
         db.connect::<Ws>(&db_config.endpoint).await?;
         db.signin(Root {
@@ -4394,6 +4422,7 @@ impl SurrealDiscoveryFeedRepository {
             .await?;
         Ok(Self {
             client: Arc::new(db),
+            options,
         })
     }
 
@@ -4742,6 +4771,10 @@ impl SurrealDiscoveryFeedRepository {
         {
             Ok(feed_ids) => feed_ids,
             Err(err) => {
+                if !self.options.involvement_fallback_enabled {
+                    Self::register_involvement_lane("feed", "edge_error");
+                    return Err(err);
+                }
                 tracing::warn!(
                     actor_id = %query.actor_id,
                     error = %err,
@@ -4754,6 +4787,10 @@ impl SurrealDiscoveryFeedRepository {
         let edge_rows = match self.hydrate_feed_rows_by_ids(&edge_feed_ids).await {
             Ok(rows) => rows,
             Err(err) => {
+                if !self.options.involvement_fallback_enabled {
+                    Self::register_involvement_lane("feed", "edge_error");
+                    return Err(err);
+                }
                 tracing::warn!(
                     actor_id = %query.actor_id,
                     error = %err,
@@ -4765,6 +4802,16 @@ impl SurrealDiscoveryFeedRepository {
         };
         if edge_rows.len() >= query.limit {
             Self::register_involvement_lane("feed", "edge");
+            return Ok(edge_rows);
+        }
+        if !self.options.involvement_fallback_enabled {
+            tracing::warn!(
+                actor_id = %query.actor_id,
+                edge_count = edge_rows.len(),
+                requested_limit = query.limit,
+                "discovery feed involvement edge lane returned partial page with fallback disabled"
+            );
+            Self::register_involvement_lane("feed", "edge_partial");
             return Ok(edge_rows);
         }
 
@@ -4890,6 +4937,10 @@ impl SurrealDiscoveryFeedRepository {
         {
             Ok(feed_ids) => feed_ids,
             Err(err) => {
+                if !self.options.involvement_fallback_enabled {
+                    Self::register_involvement_lane("search", "edge_error");
+                    return Err(err);
+                }
                 tracing::warn!(
                     actor_id = %query.actor_id,
                     error = %err,
@@ -4902,6 +4953,10 @@ impl SurrealDiscoveryFeedRepository {
         let edge_rows = match self.hydrate_feed_rows_by_ids(&edge_feed_ids).await {
             Ok(rows) => rows,
             Err(err) => {
+                if !self.options.involvement_fallback_enabled {
+                    Self::register_involvement_lane("search", "edge_error");
+                    return Err(err);
+                }
                 tracing::warn!(
                     actor_id = %query.actor_id,
                     error = %err,
@@ -4913,6 +4968,16 @@ impl SurrealDiscoveryFeedRepository {
         };
         if edge_rows.len() >= query.limit {
             Self::register_involvement_lane("search", "edge");
+            return Ok(edge_rows);
+        }
+        if !self.options.involvement_fallback_enabled {
+            tracing::warn!(
+                actor_id = %query.actor_id,
+                edge_count = edge_rows.len(),
+                requested_limit = query.limit,
+                "discovery search involvement edge lane returned partial page with fallback disabled"
+            );
+            Self::register_involvement_lane("search", "edge_partial");
             return Ok(edge_rows);
         }
 

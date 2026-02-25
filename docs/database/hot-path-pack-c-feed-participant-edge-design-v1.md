@@ -148,6 +148,9 @@ Important edge-case:
   - explicit counters:
     - `gotong_api_feed_involvement_lane_requests_total{endpoint,lane}`
     - `gotong_api_feed_involvement_shadow_mismatch_total{endpoint,mismatch}`
+  - runtime cutover switch: `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED` (default `true`)
+    - `true`: edge-first with legacy fallback
+    - `false`: edge-only lane (no legacy fallback)
 - ⏳ Remaining:
   - run/verify full historical backfill in target environments
   - remove fallback after sustained correctness + SLO window
