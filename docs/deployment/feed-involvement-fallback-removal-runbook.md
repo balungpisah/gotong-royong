@@ -10,6 +10,8 @@ References:
 - Design/status: `docs/database/hot-path-pack-c-feed-participant-edge-design-v1.md`
 - SLO matrix: `docs/database/hot-path-query-shape-slo-matrix.md`
 - Backfill runbook: `docs/deployment/feed-participant-edge-backfill.md`
+- Alert thresholds: `docs/deployment/feed-involvement-fallback-alert-thresholds.md`
+- Deployable Prometheus rules: `deploy/monitoring/README.md`
 - Benchmark artifact: `docs/research/surrealdb-feed-involvement-bench-latest.md`
 
 ## 1) Preconditions
@@ -42,6 +44,8 @@ Use staged rollout for API pods/instances.
 ### Stage A — Baseline (fallback ON)
 
 - Keep `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=true` on all replicas.
+- Apply Stage A alert rules:
+  - `kubectl apply -f deploy/monitoring/prometheusrule-pack-c-stage-a.yaml`
 - Observe for at least 24h:
   - lane usage
   - mismatch counter
@@ -50,14 +54,21 @@ Use staged rollout for API pods/instances.
 ### Stage B — Canary (fallback OFF on a subset)
 
 - Set `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=false` on 5–10% of replicas.
+- Replace alert rules with Stage B profile:
+  - `kubectl apply -f deploy/monitoring/prometheusrule-pack-c-stage-b.yaml`
 - Run for 2–4h minimum, then increase to 25%, then 50% if stable.
 
 ### Stage C — Full cutover
 
 - Set `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=false` on all replicas.
+- Replace alert rules with Stage C profile:
+  - `kubectl apply -f deploy/monitoring/prometheusrule-pack-c-stage-c.yaml`
 - Keep enhanced monitoring for at least 24h.
 
 ## 4) Metrics to watch
+
+Threshold sheet:
+- `docs/deployment/feed-involvement-fallback-alert-thresholds.md`
 
 ### Lane distribution
 
@@ -127,4 +138,3 @@ Only remove fallback logic in code when:
 - Full cutover has run stable for a defined window (recommended: >= 7 days),
 - `fallback` / `legacy` lanes are effectively zero,
 - no unresolved edge coverage incidents remain.
-

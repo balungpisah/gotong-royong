@@ -1,0 +1,162 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gotong-pack-c-cutover-stage-b
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: gotong-royong
+    app.kubernetes.io/component: monitoring
+    gotong.packc.stage: stage-b
+spec:
+  groups:
+    - name: gotong-pack-c-cutover-stage-b
+      interval: 30s
+      rules:
+        - alert: GotongPackCStageBEdgeErrorRatioWarning
+          expr: |
+            (
+              sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m]))
+              /
+              clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+            ) > 0.0005
+          for: 10m
+          labels:
+            severity: warning
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B edge_error ratio is elevated"
+            description: "edge_error ratio exceeded 0.05% during canary stage."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
+        - alert: GotongPackCStageBEdgeErrorRatioCritical
+          expr: |
+            (
+              sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m]))
+              /
+              clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+            ) > 0.002
+          for: 5m
+          labels:
+            severity: critical
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B edge_error ratio is critical"
+            description: "edge_error ratio exceeded 0.2% during canary stage."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
+        - alert: GotongPackCStageBEdgePartialRatioWarning
+          expr: |
+            (
+              sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m]))
+              /
+              clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+            ) > 0.001
+          for: 10m
+          labels:
+            severity: warning
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B edge_partial ratio is elevated"
+            description: "edge_partial ratio exceeded 0.1% during canary stage."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
+        - alert: GotongPackCStageBEdgePartialRatioCritical
+          expr: |
+            (
+              sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m]))
+              /
+              clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+            ) > 0.005
+          for: 5m
+          labels:
+            severity: critical
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B edge_partial ratio is critical"
+            description: "edge_partial ratio exceeded 0.5% during canary stage."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
+        - alert: GotongPackCStageBShadowMismatchWarning
+          expr: increase(gotong_api_feed_involvement_shadow_mismatch_total[30m]) > 1
+          for: 5m
+          labels:
+            severity: warning
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B shadow mismatch growth detected"
+            description: "Shadow mismatch increased by more than 1 over 30 minutes."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
+        - alert: GotongPackCStageBShadowMismatchCritical
+          expr: increase(gotong_api_feed_involvement_shadow_mismatch_total[30m]) > 5
+          for: 5m
+          labels:
+            severity: critical
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B shadow mismatch growth is critical"
+            description: "Shadow mismatch increased by more than 5 over 30 minutes."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
+        - alert: GotongPackCStageBFeedP95LatencyWarning
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le)
+            ) > 0.18
+          for: 15m
+          labels:
+            severity: warning
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B feed p95 latency above SLO"
+            description: "GET /v1/feed p95 latency exceeded 180ms."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
+        - alert: GotongPackCStageBFeedP95LatencyCritical
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le)
+            ) > 0.25
+          for: 10m
+          labels:
+            severity: critical
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B feed p95 latency is critical"
+            description: "GET /v1/feed p95 latency exceeded 250ms."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
+        - alert: GotongPackCStageBFeed5xxRatioWarning
+          expr: |
+            (
+              sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m]))
+              /
+              clamp_min(sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])), 1)
+            ) > 0.01
+          for: 10m
+          labels:
+            severity: warning
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B feed 5xx ratio is elevated"
+            description: "GET /v1/feed 5xx ratio exceeded 1%."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
+        - alert: GotongPackCStageBFeed5xxRatioCritical
+          expr: |
+            (
+              sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m]))
+              /
+              clamp_min(sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])), 1)
+            ) > 0.02
+          for: 5m
+          labels:
+            severity: critical
+            service: gotong-api
+            pack_c_stage: stage-b
+          annotations:
+            summary: "Pack C stage B feed 5xx ratio is critical"
+            description: "GET /v1/feed 5xx ratio exceeded 2%."
+            runbook: "docs/deployment/feed-involvement-fallback-removal-runbook.md"
