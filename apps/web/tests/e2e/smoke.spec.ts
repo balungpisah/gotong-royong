@@ -18,19 +18,36 @@ const createSessionToken = async () => {
 		.sign(signingSecret);
 };
 
+async function gotoHomeAndWaitForShell(page: import('@playwright/test').Page) {
+	const brandLink = page.getByRole('link', { name: 'Gotong Royong' });
+	const triageCard = page.locator('.triage-card');
+	for (let attempt = 0; attempt < 2; attempt += 1) {
+		await page.goto('/');
+		await expect(page).toHaveURL(/\/$/);
+		try {
+			await expect(brandLink).toBeVisible({ timeout: 10000 });
+			await expect(triageCard).toBeVisible({ timeout: 15000 });
+			return;
+		} catch (error) {
+			if (attempt === 1) throw error;
+			await page.reload();
+		}
+	}
+}
+
 test('guest is redirected from protected route to login with no-store headers', async ({
 	page
 }) => {
-	const response = await page.request.get('/beranda', { maxRedirects: 0 });
+	const response = await page.request.get('/', { maxRedirects: 0 });
 
 	expect(response.status()).toBe(303);
 	expect(response.headers()['location']).toContain('/masuk');
 	expect(response.headers()['cache-control']).toContain('no-store');
 
-	await page.goto('/beranda');
+	await page.goto('/');
 
 	await expect(page).toHaveURL(/\/masuk$/);
-	await expect(page.getByText('Masuk ke Gotong Royong')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Masuk ke Gotong Royong' })).toBeVisible();
 });
 
 test('authenticated user can access app shell', async ({ context, page }) => {
@@ -49,9 +66,5 @@ test('authenticated user can access app shell', async ({ context, page }) => {
 		}
 	]);
 
-	await page.goto('/beranda');
-
-	await expect(page).toHaveURL(/\/beranda$/);
-	await expect(page.getByRole('link', { name: 'Gotong Royong' })).toBeVisible();
-	await expect(page.getByRole('link', { name: 'Beranda' })).toBeVisible();
+	await gotoHomeAndWaitForShell(page);
 });

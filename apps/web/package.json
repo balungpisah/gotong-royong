@@ -15,6 +15,7 @@
 		"test:unit": "bun run i18n:compile && vitest run",
 		"test:unit:watch": "bun run i18n:compile && vitest",
 		"test:e2e": "playwright test",
+		"test:e2e:live-api": "PLAYWRIGHT_LIVE_API=true playwright test tests/e2e/live-api-proxy.spec.ts",
 		"format": "prettier --write .",
 		"i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy cookie baseLocale --emit-ts-declarations"
 	},

@@ -14,6 +14,8 @@ const sensitiveRouteDenylist = [
 	/^\/admin(?:[/?]|$)/
 ];
 
+const apiProxyTarget = process.env.GR_API_PROXY_TARGET?.trim();
+
 export default defineConfig({
 	optimizeDeps: {
 		include: ['svelte-bricks']
@@ -21,6 +23,16 @@ export default defineConfig({
 	ssr: {
 		noExternal: ['svelte-bricks']
 	},
+	server: apiProxyTarget
+		? {
+				proxy: {
+					'/v1': {
+						target: apiProxyTarget,
+						changeOrigin: true
+					}
+				}
+			}
+		: undefined,
 	plugins: [
 		paraglideVitePlugin({
 			project: './project.inlang',

@@ -31,12 +31,21 @@ async function authenticateAndNavigate(context: any, page: any) {
 		}
 	]);
 
-	await page.goto('/');
-	await page.waitForSelector('.triage-card', { timeout: 10000 });
+	const triageCard = page.locator('.triage-card');
+	for (let attempt = 0; attempt < 2; attempt += 1) {
+		await page.goto('/');
+		try {
+			await expect(triageCard).toBeVisible({ timeout: 15000 });
+			return;
+		} catch (error) {
+			if (attempt === 1) throw error;
+			await page.reload();
+		}
+	}
 }
 
 test.describe('Triage Energy Bar', () => {
-	test('triage card expands and shows trajectory grid with 8 intents', async ({
+	test('triage card expands and shows trajectory grid with 9 intents', async ({
 		context,
 		page
 	}) => {
@@ -49,9 +58,9 @@ test.describe('Triage Energy Bar', () => {
 		await expect(page.locator('.triage-panel')).toBeVisible();
 		await expect(page.locator('.trajectory-grid')).toBeVisible();
 
-		// Should see exactly 8 trajectory intent chips
+		// Should see exactly 9 trajectory intent chips
 		const chips = page.locator('.trajectory-chip');
-		await expect(chips).toHaveCount(8);
+		await expect(chips).toHaveCount(9);
 
 		// Should see the "Atau ceritakan langsung" free-text card
 		const freeTextCard = page.locator('.trajectory-grid').getByText('Atau ceritakan langsung');

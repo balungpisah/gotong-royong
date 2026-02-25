@@ -19,6 +19,33 @@ bun run test:e2e
 bun run build
 ```
 
+## Service Toggles
+
+- `PUBLIC_GR_USE_API_NOTIFICATIONS=true` enables real notifications from `/v1/notifications`.
+- `PUBLIC_GR_USE_API_FEED=true` enables real feed items from `/v1/feed`.
+- `PUBLIC_GR_USE_API_CHAT=true` enables witness chat send/poll via `/v1/chat/threads/*`.
+- `PUBLIC_GR_USE_API_USER=true` enables user profile reads via `/v1/auth/me` + `/v1/tandang/me/profile` + `/v1/tandang/users/:user_id/profile`.
+- `PUBLIC_GR_USE_API_TRIAGE=true` enables triage session flows via `/v1/triage/sessions*`.
+- `PUBLIC_GR_USE_API_SIGNAL=true` enables witness signal flows via `/v1/witnesses/:witness_id/signals*`.
+- `PUBLIC_GR_USE_API_GROUP=true` enables group lifecycle flows via `/v1/groups*`.
+- `GR_API_PROXY_TARGET=http://127.0.0.1:3000` proxies browser `/v1/*` calls to local backend during `bun dev` (recommended for live API wiring).
+- Default (unset) is API-first; set any of these to `false` only for local dev/test mock runs.
+- Production guard: runtime rejects `PUBLIC_GR_USE_API_*=false` and disables API-service mock fallback paths.
+- Cutover tracker and remaining debt: `../../docs/research/frontend-service-api-cutover-backlog.md`.
+
+## Live API Proxy Smoke
+
+Run this when you want proof that frontend hot paths are hitting real backend APIs via Vite proxy:
+
+```sh
+GR_API_PROXY_TARGET=http://127.0.0.1:3100 \
+bun run test:e2e:live-api
+```
+
+Notes:
+- Requires `gotong-api` running at `GR_API_PROXY_TARGET`.
+- Test bootstraps a real user by calling `POST /v1/auth/signup`, then asserts authenticated `200` responses for `/v1/auth/me`, `/v1/feed`, and `/v1/notifications`.
+
 ## Baseline Structure
 
 ```text
