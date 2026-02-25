@@ -952,6 +952,7 @@ async fn run_webhook_backfill_mode(config: &AppConfig, args: &[String]) -> anyho
                 continue;
             }
         };
+        let payload = attach_source_platform_id(payload, &config.webhook_source_platform_id);
 
         let event_id = payload
             .get("event_id")
@@ -1076,6 +1077,33 @@ async fn run_webhook_backfill_mode(config: &AppConfig, args: &[String]) -> anyho
         options.dry_run
     );
     Ok(())
+}
+
+fn attach_source_platform_id(
+    mut payload: serde_json::Value,
+    platform_id: &str,
+) -> serde_json::Value {
+    let platform_id = platform_id.trim();
+    if platform_id.is_empty() {
+        return payload;
+    }
+
+    let Some(payload_map) = payload.as_object_mut() else {
+        return payload;
+    };
+
+    let has_existing = payload_map
+        .get("source_platform_id")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty());
+    if !has_existing {
+        payload_map.insert(
+            "source_platform_id".to_string(),
+            serde_json::Value::String(platform_id.to_string()),
+        );
+    }
+    payload
 }
 
 async fn run_webhook_replay_mode(config: &AppConfig, args: &[String]) -> anyhow::Result<()> {

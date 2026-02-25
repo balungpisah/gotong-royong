@@ -12,6 +12,9 @@ use crate::config::AppConfig;
 
 const PLATFORM_TOKEN_HEADER: &str = "X-Platform-Token";
 const PLATFORM_ID_PREFIX: &str = "gotong_royong:";
+const SCOPE_QUERY_KEY: &str = "view_scope";
+const SCOPE_QUERY_PLATFORM_VALUE: &str = "platform";
+const SCOPE_QUERY_PLATFORM_ID_KEY: &str = "platform_id";
 const MARKOV_CACHE_MAX_ENTRIES: usize = 4_096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -162,6 +165,7 @@ pub struct MarkovReadClient {
     profile_stale_window: Duration,
     gameplay_ttl: Duration,
     gameplay_stale_window: Duration,
+    read_scope_query_params: Vec<(String, String)>,
     cache: Arc<RwLock<HashMap<String, CacheEntry>>>,
     revalidating_keys: Arc<Mutex<HashSet<String>>>,
     inflight_fetches: Arc<Mutex<HashMap<String, Arc<Notify>>>>,
@@ -177,6 +181,20 @@ impl MarkovReadClient {
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
         let token = config.markov_read_platform_token.trim().to_string();
+        let read_scope_query_params = if config.markov_read_explicit_scope_query_enabled {
+            vec![
+                (
+                    SCOPE_QUERY_KEY.to_string(),
+                    SCOPE_QUERY_PLATFORM_VALUE.to_string(),
+                ),
+                (
+                    SCOPE_QUERY_PLATFORM_ID_KEY.to_string(),
+                    config.markov_read_platform_id.trim().to_string(),
+                ),
+            ]
+        } else {
+            Vec::new()
+        };
         Self {
             http,
             base_url: config
@@ -201,6 +219,7 @@ impl MarkovReadClient {
                     .markov_cache_gameplay_stale_while_revalidate_ms
                     .max(config.markov_cache_gameplay_ttl_ms.max(1)),
             ),
+            read_scope_query_params,
             cache: Arc::new(RwLock::new(HashMap::new())),
             revalidating_keys: Arc::new(Mutex::new(HashSet::new())),
             inflight_fetches: Arc::new(Mutex::new(HashMap::new())),
@@ -224,6 +243,14 @@ impl MarkovReadClient {
         Self::platform_identity(trimmed)
     }
 
+    fn with_scope_query(&self, mut query_params: Vec<(String, String)>) -> Vec<(String, String)> {
+        if self.read_scope_query_params.is_empty() {
+            return query_params;
+        }
+        query_params.extend(self.read_scope_query_params.iter().cloned());
+        query_params
+    }
+
     pub async fn get_user_reputation(
         &self,
         gotong_user_id: &str,
@@ -243,8 +270,13 @@ impl MarkovReadClient {
         identity: &str,
     ) -> Result<CachedJson, MarkovClientError> {
         let path = format!("users/{identity}/reputation");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            self.with_scope_query(Vec::new()),
+            CacheClass::Profile,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn get_user_tier(
@@ -252,8 +284,13 @@ impl MarkovReadClient {
         markov_user_id: &str,
     ) -> Result<CachedJson, MarkovClientError> {
         let path = format!("users/{markov_user_id}/tier");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            self.with_scope_query(Vec::new()),
+            CacheClass::Profile,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn get_user_activity(
@@ -261,8 +298,13 @@ impl MarkovReadClient {
         markov_user_id: &str,
     ) -> Result<CachedJson, MarkovClientError> {
         let path = format!("users/{markov_user_id}/activity");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            self.with_scope_query(Vec::new()),
+            CacheClass::Profile,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn get_cv_hidup(
@@ -270,8 +312,13 @@ impl MarkovReadClient {
         markov_user_id: &str,
     ) -> Result<CachedJson, MarkovClientError> {
         let path = format!("cv-hidup/{markov_user_id}");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Profile, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            self.with_scope_query(Vec::new()),
+            CacheClass::Profile,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn get_cv_hidup_qr(
@@ -518,6 +565,7 @@ impl MarkovReadClient {
                 params.push(("rank_by".to_string(), rank_by.to_string()));
             }
         }
+        let params = self.with_scope_query(params);
         self.fetch_cached_json(
             "reputation/leaderboard".to_string(),
             params,
@@ -530,7 +578,7 @@ impl MarkovReadClient {
     pub async fn get_reputation_distribution(&self) -> Result<CachedJson, MarkovClientError> {
         self.fetch_cached_json(
             "reputation/distribution".to_string(),
-            Vec::new(),
+            self.with_scope_query(Vec::new()),
             CacheClass::Gameplay,
             TokenPolicy::Required,
         )
@@ -558,7 +606,7 @@ impl MarkovReadClient {
         let path = format!("users/{identity}/vouch-budget");
         self.fetch_cached_json(
             path,
-            Vec::new(),
+            self.with_scope_query(Vec::new()),
             CacheClass::Gameplay,
             TokenPolicy::Required,
         )
@@ -576,7 +624,7 @@ impl MarkovReadClient {
         let path = format!("users/{identity}/decay/warnings");
         self.fetch_cached_json(
             path,
-            Vec::new(),
+            self.with_scope_query(Vec::new()),
             CacheClass::Gameplay,
             TokenPolicy::Required,
         )

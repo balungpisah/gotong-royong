@@ -47,6 +47,14 @@ Tandang endpoints use two different user identifier shapes:
 
 For Gotong’s user-keyed trusted reads (`/api/v1/users/{id}/vouch-budget`, `/api/v1/users/{id}/decay/warnings`, `/api/v1/cv-hidup/{user_id}/qr`, `/api/v1/cv-hidup/{user_id}/export`), Tandang accepts **either** form and resolves platform identities via account links.
 
+### Phase-2 query handshake (read-side readiness)
+
+For explicit rollout visibility, Gotong can append these query params on reputation-family reads:
+- `view_scope=platform`
+- `platform_id=gotong_royong`
+
+This handshake is optional and should stay disabled until Tandang read handlers accept it.
+
 ---
 
 ## A) Gotong → Tandang (Write Paths)

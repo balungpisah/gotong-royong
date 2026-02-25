@@ -45,6 +45,7 @@
 - `event_id` (idempotency)
 - `schema_version` (required contract version; positive integer or numeric string)
 - `request_id` (required trace ID; must match `X-Request-ID`)
+- `source_platform_id` (required for platform-partitioned aggregation; default `gotong_royong`)
 - `event_type`
 - `actor.user_id`
 - `subject` (event-specific)
@@ -150,6 +151,9 @@ Required behavior:
   - Platform token → platform-scoped aggregates only.
   - User JWT (self) + consent → unified aggregates.
   - Admin/system → full canonical view.
+- Optional explicit handshake (recommended for rollout clarity):
+  - Gotong can send `view_scope=platform` and `platform_id=gotong_royong` on reputation-family reads.
+  - Keep this disabled until Tandang handlers accept/query these parameters, then enable for cutover validation.
 
 ### Phase 3 (Product decision): Consent + policy gates for unified view
 

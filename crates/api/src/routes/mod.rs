@@ -2018,6 +2018,7 @@ async fn enqueue_webhook_outbox_event(
     correlation_id: &str,
     payload: Value,
 ) -> Result<(), ApiError> {
+    let payload = attach_source_platform_id(payload, &state.config.webhook_source_platform_id);
     let candidate = WebhookOutboxEvent::new(
         payload,
         request_id.to_string(),
@@ -2065,6 +2066,30 @@ async fn enqueue_webhook_outbox_event(
         ApiError::Internal
     })?;
     Ok(())
+}
+
+fn attach_source_platform_id(mut payload: Value, platform_id: &str) -> Value {
+    let platform_id = platform_id.trim();
+    if platform_id.is_empty() {
+        return payload;
+    }
+
+    let Some(payload_map) = payload.as_object_mut() else {
+        return payload;
+    };
+
+    let has_existing = payload_map
+        .get("source_platform_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty());
+    if !has_existing {
+        payload_map.insert(
+            "source_platform_id".to_string(),
+            Value::String(platform_id.to_string()),
+        );
+    }
+    payload
 }
 
 async fn submit_vouch(

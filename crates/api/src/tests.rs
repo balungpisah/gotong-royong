@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -6,8 +7,11 @@ use axum::body::Body;
 use axum::body::to_bytes;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{Request, StatusCode};
-use axum::routing::get;
-use axum::{Router, extract::Path};
+use axum::routing::{get, post};
+use axum::{
+    Router,
+    extract::{Path, Query},
+};
 use gotong_domain::discovery::{
     DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_ONTOLOGY_NOTE, FeedIngestInput,
     FeedListQuery, NOTIF_TYPE_SYSTEM, NotificationIngestInput, SearchListQuery,
@@ -67,8 +71,11 @@ fn test_config() -> AppConfig {
         webhook_markov_url: "http://127.0.0.1:8080/webhook".to_string(),
         webhook_secret: "dev_webhook_secret_32_chars_minimum".to_string(),
         webhook_max_attempts: 5,
+        webhook_source_platform_id: "gotong_royong".to_string(),
         markov_read_base_url: "http://127.0.0.1:3000/api/v1".to_string(),
         markov_read_platform_token: "test-platform-token".to_string(),
+        markov_read_platform_id: "gotong_royong".to_string(),
+        markov_read_explicit_scope_query_enabled: false,
         markov_read_timeout_ms: 2_500,
         markov_read_retry_max_attempts: 3,
         markov_read_retry_backoff_base_ms: 200,
@@ -138,8 +145,16 @@ fn test_app_state_router_webhook_enabled() -> (AppState, axum::Router) {
 }
 
 fn test_app_with_markov_base(markov_base_url: String) -> axum::Router {
+    test_app_with_markov_base_and_scope(markov_base_url, false)
+}
+
+fn test_app_with_markov_base_and_scope(
+    markov_base_url: String,
+    explicit_scope_query_enabled: bool,
+) -> axum::Router {
     let mut config = test_config();
     config.markov_read_base_url = markov_base_url;
+    config.markov_read_explicit_scope_query_enabled = explicit_scope_query_enabled;
     config.markov_cache_profile_ttl_ms = 60_000;
     config.markov_cache_profile_stale_while_revalidate_ms = 120_000;
     config.markov_cache_gameplay_ttl_ms = 60_000;
@@ -150,36 +165,110 @@ fn test_app_with_markov_base(markov_base_url: String) -> axum::Router {
 }
 
 async fn spawn_markov_stub_base_url() -> String {
-    async fn user_reputation(Path(identity): Path<String>) -> AxumJson<serde_json::Value> {
+    async fn user_reputation(
+        Path(identity): Path<String>,
+        Query(query): Query<HashMap<String, String>>,
+    ) -> AxumJson<serde_json::Value> {
+        let view_scope = query.get("view_scope").cloned();
+        let platform_id = query.get("platform_id").cloned();
         AxumJson(json!({
             "user_id": "markov-user-123",
             "identity": identity,
             "tier": "Contributor",
-            "total_reputation": "0.77"
+            "total_reputation": "0.77",
+            "view_scope": view_scope,
+            "platform_id": platform_id
         }))
     }
 
-    async fn user_tier(Path(user_id): Path<String>) -> AxumJson<serde_json::Value> {
+    async fn user_tier(
+        Path(user_id): Path<String>,
+        Query(query): Query<HashMap<String, String>>,
+    ) -> AxumJson<serde_json::Value> {
+        let view_scope = query.get("view_scope").cloned();
+        let platform_id = query.get("platform_id").cloned();
         AxumJson(json!({
             "user_id": user_id,
             "tier": "Contributor",
-            "tier_symbol": "◆◆◇◇"
+            "tier_symbol": "◆◆◇◇",
+            "view_scope": view_scope,
+            "platform_id": platform_id
         }))
     }
 
-    async fn user_activity(Path(user_id): Path<String>) -> AxumJson<serde_json::Value> {
+    async fn user_activity(
+        Path(user_id): Path<String>,
+        Query(query): Query<HashMap<String, String>>,
+    ) -> AxumJson<serde_json::Value> {
+        let view_scope = query.get("view_scope").cloned();
+        let platform_id = query.get("platform_id").cloned();
         AxumJson(json!({
             "user_id": user_id,
             "solutions_submitted": 4,
-            "vouches_given": 2
+            "vouches_given": 2,
+            "view_scope": view_scope,
+            "platform_id": platform_id
         }))
     }
 
-    async fn cv_hidup(Path(user_id): Path<String>) -> AxumJson<serde_json::Value> {
+    async fn cv_hidup(
+        Path(user_id): Path<String>,
+        Query(query): Query<HashMap<String, String>>,
+    ) -> AxumJson<serde_json::Value> {
+        let view_scope = query.get("view_scope").cloned();
+        let platform_id = query.get("platform_id").cloned();
         AxumJson(json!({
             "user_id": user_id,
             "username": "markov-user",
-            "tier": "Contributor"
+            "tier": "Contributor",
+            "view_scope": view_scope,
+            "platform_id": platform_id
+        }))
+    }
+
+    async fn cv_hidup_qr(Path(user_id): Path<String>) -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "user_id": user_id,
+            "qr_url": "https://markov.test/qr.png"
+        }))
+    }
+
+    async fn cv_hidup_export(
+        Path(user_id): Path<String>,
+        AxumJson(payload): AxumJson<serde_json::Value>,
+    ) -> AxumJson<serde_json::Value> {
+        AxumJson(json!({
+            "user_id": user_id,
+            "export_id": "exp-123",
+            "payload": payload
+        }))
+    }
+
+    async fn vouch_budget(
+        Path(user_id): Path<String>,
+        Query(query): Query<HashMap<String, String>>,
+    ) -> AxumJson<serde_json::Value> {
+        let view_scope = query.get("view_scope").cloned();
+        let platform_id = query.get("platform_id").cloned();
+        AxumJson(json!({
+            "user_id": user_id,
+            "remaining": 3,
+            "view_scope": view_scope,
+            "platform_id": platform_id
+        }))
+    }
+
+    async fn decay_warnings(
+        Path(user_id): Path<String>,
+        Query(query): Query<HashMap<String, String>>,
+    ) -> AxumJson<serde_json::Value> {
+        let view_scope = query.get("view_scope").cloned();
+        let platform_id = query.get("platform_id").cloned();
+        AxumJson(json!({
+            "user_id": user_id,
+            "warnings": [],
+            "view_scope": view_scope,
+            "platform_id": platform_id
         }))
     }
 
@@ -208,21 +297,33 @@ async fn spawn_markov_stub_base_url() -> String {
         }))
     }
 
-    async fn leaderboard() -> AxumJson<serde_json::Value> {
+    async fn leaderboard(
+        Query(query): Query<HashMap<String, String>>,
+    ) -> AxumJson<serde_json::Value> {
+        let view_scope = query.get("view_scope").cloned();
+        let platform_id = query.get("platform_id").cloned();
         AxumJson(json!({
             "entries": [],
-            "total_users": 42
+            "total_users": 42,
+            "view_scope": view_scope,
+            "platform_id": platform_id
         }))
     }
 
-    async fn distribution() -> AxumJson<serde_json::Value> {
+    async fn distribution(
+        Query(query): Query<HashMap<String, String>>,
+    ) -> AxumJson<serde_json::Value> {
+        let view_scope = query.get("view_scope").cloned();
+        let platform_id = query.get("platform_id").cloned();
         AxumJson(json!({
             "keystone": 1,
             "pillar": 3,
             "contributor": 10,
             "novice": 28,
             "shadow": 0,
-            "total": 42
+            "total": 42,
+            "view_scope": view_scope,
+            "platform_id": platform_id
         }))
     }
 
@@ -230,7 +331,11 @@ async fn spawn_markov_stub_base_url() -> String {
         .route("/api/v1/users/:id/reputation", get(user_reputation))
         .route("/api/v1/users/:id/tier", get(user_tier))
         .route("/api/v1/users/:id/activity", get(user_activity))
+        .route("/api/v1/users/:id/vouch-budget", get(vouch_budget))
+        .route("/api/v1/users/:id/decay/warnings", get(decay_warnings))
         .route("/api/v1/cv-hidup/:user_id", get(cv_hidup))
+        .route("/api/v1/cv-hidup/:user_id/qr", get(cv_hidup_qr))
+        .route("/api/v1/cv-hidup/:user_id/export", post(cv_hidup_export))
         .route("/api/v1/skills/search", get(skills_search))
         .route("/api/v1/por/requirements/:task_type", get(por_requirements))
         .route(
@@ -1463,6 +1568,13 @@ async fn contribution_webhook_outbox_payload_includes_schema_and_request_id() {
             .get("request_id")
             .and_then(|value| value.as_str()),
         Some(request_id)
+    );
+    assert_eq!(
+        event
+            .payload
+            .get("source_platform_id")
+            .and_then(|value| value.as_str()),
+        Some("gotong_royong")
     );
 }
 
@@ -3886,6 +3998,220 @@ async fn tandang_routes_match_read_contract_shapes() {
             "missing field {field} in distribution response"
         );
     }
+}
+
+#[tokio::test]
+async fn tandang_user_keyed_routes_normalize_platform_identity() {
+    let markov_base_url = spawn_markov_stub_base_url().await;
+    let app = test_app_with_markov_base(markov_base_url);
+    let token = test_token_with_identity("test-secret", "user", "user-abc");
+
+    let vouch_budget_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/users/user-abc/vouch-budget")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("vouch budget request");
+    let vouch_budget_response = app
+        .clone()
+        .oneshot(vouch_budget_request)
+        .await
+        .expect("vouch budget response");
+    assert_eq!(vouch_budget_response.status(), StatusCode::OK);
+    let vouch_budget_json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(vouch_budget_response.into_body(), usize::MAX)
+            .await
+            .expect("vouch budget body"),
+    )
+    .expect("vouch budget json");
+    assert_eq!(
+        vouch_budget_json
+            .get("data")
+            .and_then(|value| value.get("user_id"))
+            .and_then(|value| value.as_str()),
+        Some("gotong_royong:user-abc")
+    );
+
+    let decay_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/decay/warnings/user-abc")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("decay request");
+    let decay_response = app.clone().oneshot(decay_request).await.expect("decay");
+    assert_eq!(decay_response.status(), StatusCode::OK);
+    let decay_json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(decay_response.into_body(), usize::MAX)
+            .await
+            .expect("decay body"),
+    )
+    .expect("decay json");
+    assert_eq!(
+        decay_json
+            .get("data")
+            .and_then(|value| value.get("user_id"))
+            .and_then(|value| value.as_str()),
+        Some("gotong_royong:user-abc")
+    );
+
+    let qr_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/cv-hidup/qr")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("qr request");
+    let qr_response = app.clone().oneshot(qr_request).await.expect("qr");
+    assert_eq!(qr_response.status(), StatusCode::OK);
+    let qr_json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(qr_response.into_body(), usize::MAX)
+            .await
+            .expect("qr body"),
+    )
+    .expect("qr json");
+    assert_eq!(
+        qr_json
+            .get("data")
+            .and_then(|value| value.get("user_id"))
+            .and_then(|value| value.as_str()),
+        Some("gotong_royong:user-abc")
+    );
+
+    let export_request = Request::builder()
+        .method("POST")
+        .uri("/v1/tandang/cv-hidup/export")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(r#"{"format":"json"}"#))
+        .expect("export request");
+    let export_response = app.clone().oneshot(export_request).await.expect("export");
+    assert_eq!(export_response.status(), StatusCode::OK);
+    let export_json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(export_response.into_body(), usize::MAX)
+            .await
+            .expect("export body"),
+    )
+    .expect("export json");
+    assert_eq!(
+        export_json
+            .get("data")
+            .and_then(|value| value.get("user_id"))
+            .and_then(|value| value.as_str()),
+        Some("gotong_royong:user-abc")
+    );
+}
+
+#[tokio::test]
+async fn tandang_user_keyed_routes_require_self_or_admin() {
+    let markov_base_url = spawn_markov_stub_base_url().await;
+    let app = test_app_with_markov_base(markov_base_url);
+    let user_token = test_token_with_identity("test-secret", "user", "user-123");
+    let admin_token = test_token_with_identity("test-secret", "admin", "admin-1");
+
+    for endpoint in [
+        "/v1/tandang/users/other-user/vouch-budget",
+        "/v1/tandang/decay/warnings/other-user",
+    ] {
+        let forbidden_request = Request::builder()
+            .method("GET")
+            .uri(endpoint)
+            .header("authorization", format!("Bearer {user_token}"))
+            .body(Body::empty())
+            .expect("forbidden request");
+        let forbidden_response = app
+            .clone()
+            .oneshot(forbidden_request)
+            .await
+            .expect("forbidden response");
+        assert_eq!(forbidden_response.status(), StatusCode::FORBIDDEN);
+
+        let admin_request = Request::builder()
+            .method("GET")
+            .uri(endpoint)
+            .header("authorization", format!("Bearer {admin_token}"))
+            .body(Body::empty())
+            .expect("admin request");
+        let admin_response = app
+            .clone()
+            .oneshot(admin_request)
+            .await
+            .expect("admin response");
+        assert_eq!(admin_response.status(), StatusCode::OK);
+    }
+}
+
+#[tokio::test]
+async fn tandang_reads_send_explicit_platform_scope_query_when_enabled() {
+    let markov_base_url = spawn_markov_stub_base_url().await;
+    let app = test_app_with_markov_base_and_scope(markov_base_url, true);
+    let token = test_token_with_identity("test-secret", "user", "user-abc");
+
+    let profile_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/me/profile")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("profile request");
+    let profile_response = app
+        .clone()
+        .oneshot(profile_request)
+        .await
+        .expect("profile response");
+    assert_eq!(profile_response.status(), StatusCode::OK);
+    let profile_json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(profile_response.into_body(), usize::MAX)
+            .await
+            .expect("profile body"),
+    )
+    .expect("profile json");
+    let reputation = profile_json
+        .get("data")
+        .and_then(|value| value.get("reputation"))
+        .expect("reputation");
+    assert_eq!(
+        reputation
+            .get("view_scope")
+            .and_then(|value| value.as_str()),
+        Some("platform")
+    );
+    assert_eq!(
+        reputation
+            .get("platform_id")
+            .and_then(|value| value.as_str()),
+        Some("gotong_royong")
+    );
+
+    let distribution_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/reputation/distribution")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("distribution request");
+    let distribution_response = app
+        .clone()
+        .oneshot(distribution_request)
+        .await
+        .expect("distribution response");
+    assert_eq!(distribution_response.status(), StatusCode::OK);
+    let distribution_json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(distribution_response.into_body(), usize::MAX)
+            .await
+            .expect("distribution body"),
+    )
+    .expect("distribution json");
+    assert_eq!(
+        distribution_json
+            .get("data")
+            .and_then(|value| value.get("view_scope"))
+            .and_then(|value| value.as_str()),
+        Some("platform")
+    );
+    assert_eq!(
+        distribution_json
+            .get("data")
+            .and_then(|value| value.get("platform_id"))
+            .and_then(|value| value.as_str()),
+        Some("gotong_royong")
+    );
 }
 
 #[tokio::test]

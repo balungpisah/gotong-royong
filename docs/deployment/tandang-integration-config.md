@@ -1,6 +1,6 @@
 # Gotong ↔ Tandang Deployment Config Matrix
 
-Last updated: 2026-02-17
+Last updated: 2026-02-25
 
 This document is the deployment source of truth for integration-specific env vars, toggles, and safe defaults.
 
@@ -12,8 +12,11 @@ This document is the deployment source of truth for integration-specific env var
 | `WEBHOOK_MARKOV_URL` | Yes when `WEBHOOK_ENABLED=true` | `https://api.markov.local/v1/platforms/gotong_royong/webhook` | Set to real Tandang URL (`/api/v1/platforms/gotong_royong/webhook`). |
 | `WEBHOOK_SECRET` | Yes when `WEBHOOK_ENABLED=true` | `dev_webhook_secret_32_chars_minimum` | 32+ random bytes from secrets manager. |
 | `WEBHOOK_MAX_ATTEMPTS` | Yes | `5` | Keep `5` unless SLO tuning requires change. |
+| `WEBHOOK_SOURCE_PLATFORM_ID` | Yes | `gotong_royong` | Keep stable across environments; emitted on every webhook payload as `source_platform_id` for Phase-2 platform-partitioned reputation. |
 | `MARKOV_READ_BASE_URL` | Yes | `http://127.0.0.1:3000/api/v1` | Set real Tandang API base URL. |
 | `MARKOV_READ_PLATFORM_TOKEN` | Yes when Markov read APIs are enabled | empty string | Required for Gotong server-to-server read routes. If Gotong uses `POST /api/v1/cv-hidup/{user_id}/export`, this token must include `write` scope too. |
+| `MARKOV_READ_PLATFORM_ID` | Yes | `gotong_royong` | Platform ID used by explicit read-scope handshake query params. Keep aligned with trusted platform registration in Tandang. |
+| `MARKOV_READ_EXPLICIT_SCOPE_QUERY_ENABLED` | No | `false` | Keep `false` until Tandang read handlers accept explicit scope query params (`view_scope=platform&platform_id=...`). Turn on during Phase-2 cutover. |
 | `MARKOV_READ_TIMEOUT_MS` | Yes | `2500` | Keep `2000-4000` based on latency profile. |
 | `MARKOV_READ_RETRY_MAX_ATTEMPTS` | Yes | `3` | Keep low to avoid fan-out storms. |
 | `MARKOV_READ_RETRY_BACKOFF_BASE_MS` | Yes | `200` | Keep exponential retry base small. |
@@ -53,7 +56,9 @@ Notes:
    - `TRUSTED_PLATFORM_IDS=gotong_royong`
 3. Deploy Gotong with webhook/read integration toggles:
    - `WEBHOOK_ENABLED=true`
+   - `WEBHOOK_SOURCE_PLATFORM_ID=gotong_royong`
    - `MARKOV_READ_PLATFORM_TOKEN=<issued token>`
+   - Keep `MARKOV_READ_EXPLICIT_SCOPE_QUERY_ENABLED=false` unless Tandang Phase-2 query contract is deployed.
 4. Validate:
    - webhook delivery success > 99%
    - no signature/auth failures

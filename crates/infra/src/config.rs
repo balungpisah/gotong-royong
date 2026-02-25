@@ -32,8 +32,11 @@ pub struct AppConfig {
     pub webhook_markov_url: String,
     pub webhook_secret: String,
     pub webhook_max_attempts: u32,
+    pub webhook_source_platform_id: String,
     pub markov_read_base_url: String,
     pub markov_read_platform_token: String,
+    pub markov_read_platform_id: String,
+    pub markov_read_explicit_scope_query_enabled: bool,
     pub markov_read_timeout_ms: u64,
     pub markov_read_retry_max_attempts: u32,
     pub markov_read_retry_backoff_base_ms: u64,
@@ -84,8 +87,11 @@ impl AppConfig {
             )?
             .set_default("webhook_secret", "dev_webhook_secret_32_chars_minimum")?
             .set_default("webhook_max_attempts", 5u32)?
+            .set_default("webhook_source_platform_id", "gotong_royong")?
             .set_default("markov_read_base_url", "http://127.0.0.1:3000/api/v1")?
             .set_default("markov_read_platform_token", "")?
+            .set_default("markov_read_platform_id", "gotong_royong")?
+            .set_default("markov_read_explicit_scope_query_enabled", false)?
             .set_default("markov_read_timeout_ms", 2_500u64)?
             .set_default("markov_read_retry_max_attempts", 3u32)?
             .set_default("markov_read_retry_backoff_base_ms", 200u64)?
@@ -116,9 +122,19 @@ impl AppConfig {
                 "webhook is enabled but webhook_secret is too short".to_string(),
             ));
         }
+        if config.webhook_source_platform_id.trim().is_empty() {
+            return Err(config::ConfigError::Message(
+                "webhook_source_platform_id must not be empty".to_string(),
+            ));
+        }
         if config.markov_read_base_url.trim().is_empty() {
             return Err(config::ConfigError::Message(
                 "markov_read_base_url must not be empty".to_string(),
+            ));
+        }
+        if config.markov_read_platform_id.trim().is_empty() {
+            return Err(config::ConfigError::Message(
+                "markov_read_platform_id must not be empty".to_string(),
             ));
         }
         if config.markov_read_retry_max_attempts == 0 {

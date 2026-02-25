@@ -22,6 +22,7 @@ All events share these top-level fields:
 | `event_id` | string | Yes | Unique event ID (for idempotency) |
 | `schema_version` | string | Yes | Event schema version (current: `1`) |
 | `request_id` | string | Yes | Request trace ID; must match webhook `X-Request-ID` |
+| `source_platform_id` | string | Yes | Source platform identifier (Gotong default: `gotong_royong`) |
 | `timestamp` | string (RFC3339) | No | Event creation time |
 
 ### Actor Object
@@ -40,7 +41,7 @@ All events share these top-level fields:
 ```json
 {
   "type": "object",
-  "required": ["event_type", "actor", "subject", "event_id", "schema_version", "request_id"],
+  "required": ["event_type", "actor", "subject", "event_id", "schema_version", "request_id", "source_platform_id"],
   "properties": {
     "event_type": {
       "type": "string",
@@ -55,6 +56,10 @@ All events share these top-level fields:
       "minLength": 1
     },
     "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_platform_id": {
       "type": "string",
       "minLength": 1
     },
@@ -136,6 +141,7 @@ Common metadata fields (all optional):
   "event_id": "evt_a1b2c3d4e5f6789a",
   "schema_version": "1",
   "request_id": "req_contrib_001",
+  "source_platform_id": "gotong_royong",
   "actor": {
     "user_id": "user_123",
     "username": "alice"
@@ -158,6 +164,7 @@ Common metadata fields (all optional):
   "event_id": "evt_b2c3d4e5f6789012",
   "schema_version": "1",
   "request_id": "req_contrib_002",
+  "source_platform_id": "gotong_royong",
   "actor": {
     "user_id": "farmer_001",
     "username": "budi_farmer"
@@ -188,6 +195,7 @@ Common metadata fields (all optional):
   "event_id": "evt_c3d4e5f6789abc12",
   "schema_version": "1",
   "request_id": "req_contrib_003",
+  "source_platform_id": "gotong_royong",
   "actor": {
     "user_id": "mentor_005",
     "username": "dr_siti"
@@ -238,7 +246,7 @@ Common metadata fields (all optional):
 ```json
 {
   "type": "object",
-  "required": ["event_type", "actor", "subject", "event_id", "schema_version", "request_id"],
+  "required": ["event_type", "actor", "subject", "event_id", "schema_version", "request_id", "source_platform_id"],
   "properties": {
     "event_type": {
       "type": "string",
@@ -253,6 +261,10 @@ Common metadata fields (all optional):
       "minLength": 1
     },
     "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_platform_id": {
       "type": "string",
       "minLength": 1
     },
@@ -298,6 +310,7 @@ Common metadata fields (all optional):
   "event_id": "evt_d4e5f6789abc1234",
   "schema_version": "1",
   "request_id": "req_vouch_001",
+  "source_platform_id": "gotong_royong",
   "actor": {
     "user_id": "expert_002",
     "username": "dr_siti"
@@ -319,6 +332,7 @@ Common metadata fields (all optional):
   "event_id": "evt_e5f6789abc123456",
   "schema_version": "1",
   "request_id": "req_vouch_002",
+  "source_platform_id": "gotong_royong",
   "actor": {
     "user_id": "coordinator_001",
     "username": "pak_ahmad"
@@ -359,7 +373,7 @@ Common metadata fields (all optional):
 ```json
 {
   "type": "object",
-  "required": ["event_type", "actor", "subject", "proof", "event_id", "schema_version", "request_id"],
+  "required": ["event_type", "actor", "subject", "proof", "event_id", "schema_version", "request_id", "source_platform_id"],
   "properties": {
     "event_type": {
       "type": "string",
@@ -374,6 +388,10 @@ Common metadata fields (all optional):
       "minLength": 1
     },
     "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_platform_id": {
       "type": "string",
       "minLength": 1
     },
@@ -439,6 +457,7 @@ Common metadata fields (all optional):
   "event_id": "evt_f6789abc12345678",
   "schema_version": "1",
   "request_id": "req_por_001",
+  "source_platform_id": "gotong_royong",
   "actor": {
     "user_id": "farmer_001",
     "username": "budi"
@@ -481,6 +500,7 @@ Common metadata fields (all optional):
   "event_id": "evt_g789abc123456789",
   "schema_version": "1",
   "request_id": "req_por_002",
+  "source_platform_id": "gotong_royong",
   "actor": {
     "user_id": "farmer_001",
     "username": "budi"
@@ -529,6 +549,7 @@ Common metadata fields (all optional):
   "event_id": "evt_h89abc1234567890",
   "schema_version": "1",
   "request_id": "req_por_003",
+  "source_platform_id": "gotong_royong",
   "actor": {
     "user_id": "farmer_001",
     "username": "budi"

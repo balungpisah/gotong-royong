@@ -1,6 +1,6 @@
 # SurrealDB Pattern Sampling Report
 
-Date: 2026-02-25T06:10:48Z
+Date: 2026-02-25T08:46:29Z
 Environment: onnxruntime cpuid_info warning: Unknown CPU vendor. cpuinfo_vendor value: 0
 3.0.0 for linux on aarch64
 Namespace/DB: gotong_probe/chat
@@ -23,17 +23,17 @@ DEFINE INDEX uniq_entity_request ON TABLE chat_delivery_event FIELDS entity_id, 
 
 First insert output:
 ~~~json
-[[{"correlation_id":"corr-1","entity_id":"thread:alpha","id":"chat_delivery_event:b9w7jpgpea1o2njxzqzp","occurred_at":"2026-02-25T06:10:52.925010877Z","request_id":"req-123"}]]
+[[{"correlation_id":"corr-1","entity_id":"thread:alpha","id":"chat_delivery_event:3tj87g6exm6nchg08k10","occurred_at":"2026-02-25T08:46:34.412272089Z","request_id":"req-123"}]]
 ~~~
 
 Duplicate insert output:
 ~~~json
-["Database index `uniq_entity_request` already contains ['thread:alpha', 'req-123'], with record `chat_delivery_event:b9w7jpgpea1o2njxzqzp`"]
+["Database index `uniq_entity_request` already contains ['thread:alpha', 'req-123'], with record `chat_delivery_event:3tj87g6exm6nchg08k10`"]
 ~~~
 
 Rows after duplicate attempt:
 ~~~json
-[[{"correlation_id":"corr-1","entity_id":"thread:alpha","id":"chat_delivery_event:b9w7jpgpea1o2njxzqzp","occurred_at":"2026-02-25T06:10:52.925010877Z","request_id":"req-123"}]]
+[[{"correlation_id":"corr-1","entity_id":"thread:alpha","id":"chat_delivery_event:3tj87g6exm6nchg08k10","occurred_at":"2026-02-25T08:46:34.412272089Z","request_id":"req-123"}]]
 ~~~
 
 ## Pattern 2: Deterministic ordering and reconnect catch-up
@@ -61,10 +61,10 @@ Unable to perform the realtime query
 WS endpoint live query result:
 ~~~text
 onnxruntime cpuid_info warning: Unknown CPU vendor. cpuinfo_vendor value: 0
-[u'e38bdfaa-d957-4f5e-809b-e5c5507929c8']
+[u'150f9b2a-bf4f-40b0-a8f9-48eb21a05377']
 
 
-{ action: 'CREATE', id: u'e38bdfaa-d957-4f5e-809b-e5c5507929c8', result: { author_id: 'user:live', body: 'live event', created_at: d'2026-02-25T06:10:57.955107754Z', id: chat_message:c8575jjsqn09w9jhqfq7, message_id: 'msg-live-1', thread_id: 'thread:live' } }
+{ action: 'CREATE', id: u'150f9b2a-bf4f-40b0-a8f9-48eb21a05377', result: { author_id: 'user:live', body: 'live event', created_at: d'2026-02-25T08:46:39.989027259Z', id: chat_message:4q0z4o0vnd5pl8h2koj0, message_id: 'msg-live-1', thread_id: 'thread:live' } }
 ~~~
 
 Observation:
@@ -74,13 +74,13 @@ Observation:
 WS DIFF live query result:
 ~~~text
 onnxruntime cpuid_info warning: Unknown CPU vendor. cpuinfo_vendor value: 0
-[u'af82961c-8333-4103-a67a-232c5eb3be11']
+[u'231a0102-3cf1-4153-bdf1-ecdbb612205e']
 
 
-{ action: 'CREATE', id: u'af82961c-8333-4103-a67a-232c5eb3be11', result: [{ op: 'replace', path: '', value: { author_id: 'user:diff', body: 'hello', id: chat_message:q7f2dijm2r1iqolgffeh, message_id: 'msg-diff-1', thread_id: 'thread:diff' } }] }
+{ action: 'CREATE', id: u'231a0102-3cf1-4153-bdf1-ecdbb612205e', result: [{ op: 'replace', path: '', value: { author_id: 'user:diff', body: 'hello', id: chat_message:xb2sjvbdb5k0204e1khu, message_id: 'msg-diff-1', thread_id: 'thread:diff' } }] }
 
 
-{ action: 'UPDATE', id: u'af82961c-8333-4103-a67a-232c5eb3be11', result: [{ op: 'change', path: '/body', value: '@@ -1,5 +1,12 @@\n hello\n+ edited\n' }] }
+{ action: 'UPDATE', id: u'231a0102-3cf1-4153-bdf1-ecdbb612205e', result: [{ op: 'change', path: '/body', value: '@@ -1,5 +1,12 @@\n hello\n+ edited\n' }] }
 ~~~
 
 Observation:
@@ -88,16 +88,16 @@ Observation:
 
 ## Pattern 5: Permission-filtered live subscriptions
 Token auth setup:
-- Alice record id: user:mfl9qq10sp15g05lnzsz
-- Bob record id: user:f5ln5a8e45ptf77iiab0
+- Alice record id: user:6zby7t9i2ajh6xnwf4ki
+- Bob record id: user:vh5sfxagmbnuivd8u5o9
 
 Alice live query result while inserting Bob then Alice rows:
 ~~~text
 onnxruntime cpuid_info warning: Unknown CPU vendor. cpuinfo_vendor value: 0
-[u'3aa804ae-c9e3-4b8c-a3ed-1fa6d8232dad']
+[u'81cfa4fb-82ea-4fb2-80fc-82575ab613ab']
 
 
-{ action: 'CREATE', id: u'3aa804ae-c9e3-4b8c-a3ed-1fa6d8232dad', result: { body: 'alice private', id: chat_private:11e84qo70fccp49dsrfm, owner: user:mfl9qq10sp15g05lnzsz } }
+{ action: 'CREATE', id: u'81cfa4fb-82ea-4fb2-80fc-82575ab613ab', result: { body: 'alice private', id: chat_private:ku4km05dg6408h2h81ku, owner: user:6zby7t9i2ajh6xnwf4ki } }
 ~~~
 
 Observation:
