@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::observability;
@@ -12,6 +13,7 @@ use gotong_domain::ports::{
     contributions::ContributionRepository,
     discovery::{FeedRepository, NotificationRepository},
     evidence::EvidenceRepository,
+    group::GroupRepository,
     jobs::JobQueue,
     ontology::OntologyRepository,
     siaga::SiagaRepository,
@@ -29,16 +31,18 @@ use gotong_infra::markov_client::MarkovReadClient;
 use gotong_infra::repositories::{
     InMemoryAdaptivePathRepository, InMemoryChatRepository, InMemoryContributionRepository,
     InMemoryDiscoveryFeedRepository, InMemoryDiscoveryNotificationRepository,
-    InMemoryEvidenceRepository, InMemoryModerationRepository, InMemoryOntologyRepository,
-    InMemorySiagaRepository, InMemoryVaultRepository, InMemoryVouchRepository,
-    InMemoryWebhookOutboxRepository, SurrealAdaptivePathRepository, SurrealChatRepository,
-    SurrealContributionRepository, SurrealDiscoveryFeedRepository,
+    InMemoryEvidenceRepository, InMemoryGroupRepository, InMemoryModerationRepository,
+    InMemoryOntologyRepository, InMemorySiagaRepository, InMemoryVaultRepository,
+    InMemoryVouchRepository, InMemoryWebhookOutboxRepository, SurrealAdaptivePathRepository,
+    SurrealChatRepository, SurrealContributionRepository, SurrealDiscoveryFeedRepository,
     SurrealDiscoveryFeedRepositoryOptions, SurrealDiscoveryNotificationRepository,
-    SurrealEvidenceRepository, SurrealModerationRepository, SurrealOntologyRepository,
-    SurrealSiagaRepository, SurrealVaultRepository, SurrealVouchRepository,
-    SurrealWebhookOutboxRepository,
+    SurrealEvidenceRepository, SurrealGroupRepository, SurrealModerationRepository,
+    SurrealOntologyRepository, SurrealSiagaRepository, SurrealVaultRepository,
+    SurrealVouchRepository, SurrealWebhookOutboxRepository,
 };
 use redis::Client;
+use reqwest::Client as HttpClient;
+use rusty_s3::{Bucket as S3Bucket, Credentials as S3Credentials, S3Action, UrlStyle};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{RwLock, broadcast};
 use tracing::warn;
@@ -56,8 +60,10 @@ type RepositoryBundle = (
     Arc<dyn FeedRepository>,
     Arc<dyn NotificationRepository>,
     Arc<dyn WebhookOutboxRepository>,
+    Arc<dyn GroupRepository>,
 );
 type SharedJobQueue = Option<Arc<dyn JobQueue>>;
+const CHAT_ATTACHMENT_STORAGE_DIR: &str = "gotong-chat-attachments";
 
 #[derive(Clone)]
 pub struct AppState {
@@ -78,8 +84,54 @@ pub struct AppState {
     pub feed_repo: Arc<dyn FeedRepository>,
     pub notification_repo: Arc<dyn NotificationRepository>,
     pub webhook_outbox_repo: Arc<dyn WebhookOutboxRepository>,
+    pub group_repo: Arc<dyn GroupRepository>,
     pub chat_realtime: ChatRealtimeBus,
+    pub chat_attachment_storage: ChatAttachmentStorage,
+    pub triage_sessions: Arc<RwLock<HashMap<String, TriageSessionState>>>,
+    pub witness_signals: Arc<RwLock<HashMap<String, WitnessSignalState>>>,
     pub job_queue: SharedJobQueue,
+}
+
+#[derive(Clone, Debug)]
+pub struct TriageSessionState {
+    pub owner_user_id: String,
+    pub route: String,
+    pub trajectory_type: Option<String>,
+    pub step: u8,
+    pub created_at_ms: i64,
+    pub updated_at_ms: i64,
+}
+
+#[derive(Clone, Debug)]
+pub struct WitnessSignalEntry {
+    pub signal_id: String,
+    pub witness_id: String,
+    pub user_id: String,
+    pub signal_type: String,
+    pub outcome: String,
+    pub created_at_ms: i64,
+    pub resolved_at_ms: Option<i64>,
+    pub credit_delta: Option<f64>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct WitnessSignalState {
+    pub updated_at_ms: i64,
+    pub active_signals: HashMap<String, WitnessSignalEntry>,
+    pub resolved_signals: Vec<WitnessSignalEntry>,
+}
+
+#[derive(Clone)]
+pub enum ChatAttachmentStorage {
+    Local {
+        root: PathBuf,
+    },
+    S3 {
+        client: HttpClient,
+        bucket: S3Bucket,
+        credentials: S3Credentials,
+        key_prefix: String,
+    },
 }
 
 #[derive(Clone)]
@@ -421,11 +473,15 @@ impl AppState {
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
+            group_repo,
         ) = repositories_for_config(&config).await?;
         let job_queue = job_queue_for_config(&config).await?;
         let idempotency = IdempotencyService::new(Arc::new(store), IdempotencyConfig::default());
         let chat_realtime = ChatRealtimeBus::new(&config);
+        let chat_attachment_storage = chat_attachment_storage_for_config(&config).await?;
         let markov_client = Arc::new(MarkovReadClient::from_config(&config));
+        let triage_sessions = Arc::new(RwLock::new(HashMap::new()));
+        let witness_signals = Arc::new(RwLock::new(HashMap::new()));
         Ok(Self {
             config,
             markov_client,
@@ -443,7 +499,11 @@ impl AppState {
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
+            group_repo,
             chat_realtime,
+            chat_attachment_storage,
+            triage_sessions,
+            witness_signals,
             job_queue,
         })
     }
@@ -463,9 +523,13 @@ impl AppState {
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
+            group_repo,
         ) = memory_repositories();
         let chat_realtime = ChatRealtimeBus::new(&config);
+        let chat_attachment_storage = chat_attachment_local_storage(&config);
         let markov_client = Arc::new(MarkovReadClient::from_config(&config));
+        let triage_sessions = Arc::new(RwLock::new(HashMap::new()));
+        let witness_signals = Arc::new(RwLock::new(HashMap::new()));
         Self {
             config,
             markov_client,
@@ -483,7 +547,11 @@ impl AppState {
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
+            group_repo,
             chat_realtime,
+            chat_attachment_storage,
+            triage_sessions,
+            witness_signals,
             job_queue: None,
         }
     }
@@ -505,10 +573,14 @@ impl AppState {
         feed_repo: Arc<dyn FeedRepository>,
         notification_repo: Arc<dyn NotificationRepository>,
         webhook_outbox_repo: Arc<dyn WebhookOutboxRepository>,
+        group_repo: Arc<dyn GroupRepository>,
     ) -> Self {
         let idempotency = IdempotencyService::new(store, IdempotencyConfig::default());
         let chat_realtime = ChatRealtimeBus::new(&config);
+        let chat_attachment_storage = chat_attachment_local_storage(&config);
         let markov_client = Arc::new(MarkovReadClient::from_config(&config));
+        let triage_sessions = Arc::new(RwLock::new(HashMap::new()));
+        let witness_signals = Arc::new(RwLock::new(HashMap::new()));
         Self {
             config,
             markov_client,
@@ -526,8 +598,110 @@ impl AppState {
             feed_repo,
             notification_repo,
             webhook_outbox_repo,
+            group_repo,
             chat_realtime,
+            chat_attachment_storage,
+            triage_sessions,
+            witness_signals,
             job_queue: None,
+        }
+    }
+}
+
+fn chat_attachment_local_storage(config: &AppConfig) -> ChatAttachmentStorage {
+    ChatAttachmentStorage::Local {
+        root: std::env::temp_dir()
+            .join(CHAT_ATTACHMENT_STORAGE_DIR)
+            .join(config.app_env.trim().to_ascii_lowercase()),
+    }
+}
+
+fn normalized_chat_attachment_prefix(config: &AppConfig) -> String {
+    let base_prefix = config.chat_attachment_s3_prefix.trim().trim_matches('/');
+    let base_prefix = if base_prefix.is_empty() {
+        "chat-attachments"
+    } else {
+        base_prefix
+    };
+    format!(
+        "{base_prefix}/{}",
+        config.app_env.trim().to_ascii_lowercase()
+    )
+}
+
+async fn build_chat_attachment_s3_storage(
+    config: &AppConfig,
+) -> anyhow::Result<ChatAttachmentStorage> {
+    let bucket_name = config.s3_bucket.trim();
+    if bucket_name.is_empty() {
+        anyhow::bail!("s3_bucket is empty");
+    }
+    if config.s3_endpoint.trim().is_empty() {
+        anyhow::bail!("s3_endpoint is empty");
+    }
+
+    let endpoint = config
+        .s3_endpoint
+        .trim()
+        .parse::<reqwest::Url>()
+        .map_err(|err| anyhow::anyhow!("invalid s3_endpoint '{}': {err}", config.s3_endpoint))?;
+    let bucket = S3Bucket::new(
+        endpoint,
+        UrlStyle::Path,
+        bucket_name.to_string(),
+        config.s3_region.clone(),
+    )
+    .map_err(|err| anyhow::anyhow!("invalid S3 bucket configuration: {err}"))?;
+    let credentials =
+        S3Credentials::new(config.s3_access_key.clone(), config.s3_secret_key.clone());
+    let client = HttpClient::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+    let head_bucket_url = bucket
+        .head_bucket(Some(&credentials))
+        .sign(std::time::Duration::from_secs(30));
+    let head_bucket_response = client.head(head_bucket_url).send().await?;
+    if !head_bucket_response.status().is_success() {
+        anyhow::bail!(
+            "S3 head bucket failed with status {}",
+            head_bucket_response.status()
+        );
+    }
+
+    Ok(ChatAttachmentStorage::S3 {
+        client,
+        bucket,
+        credentials,
+        key_prefix: normalized_chat_attachment_prefix(config),
+    })
+}
+
+async fn chat_attachment_storage_for_config(
+    config: &AppConfig,
+) -> anyhow::Result<ChatAttachmentStorage> {
+    let requested_backend = config
+        .chat_attachment_storage_backend
+        .trim()
+        .to_ascii_lowercase();
+    if requested_backend == "local"
+        || (requested_backend == "auto" && config.app_env.eq_ignore_ascii_case("test"))
+    {
+        return Ok(chat_attachment_local_storage(config));
+    }
+
+    match build_chat_attachment_s3_storage(config).await {
+        Ok(storage) => Ok(storage),
+        Err(err) => {
+            if requested_backend == "s3" || config.is_production() {
+                return Err(anyhow::anyhow!(
+                    "failed to initialize S3 chat attachment storage: {err}"
+                ));
+            }
+            warn!(
+                error = %err,
+                "falling back to local chat attachment storage (set CHAT_ATTACHMENT_STORAGE_BACKEND=s3 to fail hard)"
+            );
+            Ok(chat_attachment_local_storage(config))
         }
     }
 }
@@ -564,6 +738,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
             .await?;
             let notification_repo = SurrealDiscoveryNotificationRepository::new(&db_config).await?;
             let webhook_outbox_repo = SurrealWebhookOutboxRepository::new(&db_config).await?;
+            let group_repo = SurrealGroupRepository::new(&db_config).await?;
             Ok((
                 Arc::new(adaptive_path_repo),
                 Arc::new(contribution_repo),
@@ -577,6 +752,7 @@ async fn repositories_for_config(config: &AppConfig) -> anyhow::Result<Repositor
                 Arc::new(feed_repo),
                 Arc::new(notification_repo),
                 Arc::new(webhook_outbox_repo),
+                Arc::new(group_repo),
             ))
         }
         _ => anyhow::bail!("unsupported DATA_BACKEND '{}'", config.data_backend),
@@ -597,6 +773,7 @@ fn memory_repositories() -> RepositoryBundle {
         Arc::new(InMemoryDiscoveryFeedRepository::new()),
         Arc::new(InMemoryDiscoveryNotificationRepository::new()),
         Arc::new(InMemoryWebhookOutboxRepository::new()),
+        Arc::new(InMemoryGroupRepository::new()),
     )
 }
 
@@ -644,6 +821,8 @@ mod tests {
             s3_region: "us-east-1".to_string(),
             s3_access_key: "test-access-key".to_string(),
             s3_secret_key: "test-secret-key".to_string(),
+            chat_attachment_storage_backend: "local".to_string(),
+            chat_attachment_s3_prefix: "chat-attachments".to_string(),
             chat_realtime_transport: "local".to_string(),
             chat_realtime_channel_prefix: "gotong:chat:realtime:test".to_string(),
             worker_queue_prefix: "gotong:jobs".to_string(),
@@ -695,6 +874,26 @@ mod tests {
         let test_config = app_config("test", "memory");
         assert!(repositories_for_config(&dev_config).await.is_ok());
         assert!(repositories_for_config(&test_config).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn chat_attachment_storage_auto_uses_local_for_test_env() {
+        let mut config = app_config("test", "memory");
+        config.chat_attachment_storage_backend = "auto".to_string();
+        let storage = chat_attachment_storage_for_config(&config)
+            .await
+            .expect("storage");
+        assert!(matches!(storage, ChatAttachmentStorage::Local { .. }));
+    }
+
+    #[tokio::test]
+    async fn chat_attachment_storage_allows_explicit_local_backend() {
+        let mut config = app_config("production", "surreal");
+        config.chat_attachment_storage_backend = "local".to_string();
+        let storage = chat_attachment_storage_for_config(&config)
+            .await
+            .expect("storage");
+        assert!(matches!(storage, ChatAttachmentStorage::Local { .. }));
     }
 
     #[tokio::test]

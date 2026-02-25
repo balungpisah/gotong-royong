@@ -18,6 +18,8 @@ pub struct AppConfig {
     pub s3_region: String,
     pub s3_access_key: String,
     pub s3_secret_key: String,
+    pub chat_attachment_storage_backend: String,
+    pub chat_attachment_s3_prefix: String,
     pub chat_realtime_transport: String,
     pub chat_realtime_channel_prefix: String,
     pub worker_queue_prefix: String,
@@ -70,6 +72,8 @@ impl AppConfig {
             .set_default("s3_region", "us-east-1")?
             .set_default("s3_access_key", "minioadmin")?
             .set_default("s3_secret_key", "minioadmin")?
+            .set_default("chat_attachment_storage_backend", "auto")?
+            .set_default("chat_attachment_s3_prefix", "chat-attachments")?
             .set_default("chat_realtime_transport", "local")?
             .set_default("chat_realtime_channel_prefix", "gotong:chat:realtime")?
             .set_default("worker_queue_prefix", "gotong:jobs")?
@@ -159,6 +163,18 @@ impl AppConfig {
         {
             return Err(config::ConfigError::Message(
                 "markov_cache_gameplay_stale_while_revalidate_ms must be >= markov_cache_gameplay_ttl_ms".to_string(),
+            ));
+        }
+        let chat_attachment_storage_backend = config
+            .chat_attachment_storage_backend
+            .trim()
+            .to_ascii_lowercase();
+        if !matches!(
+            chat_attachment_storage_backend.as_str(),
+            "auto" | "local" | "s3"
+        ) {
+            return Err(config::ConfigError::Message(
+                "chat_attachment_storage_backend must be one of: auto|local|s3".to_string(),
             ));
         }
         Ok(config)
