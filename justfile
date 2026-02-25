@@ -20,6 +20,10 @@ check:
 web-test:
     cd {{web}} && npx vitest run
 
+# Run Playwright live API proxy smoke against a running backend
+web-test-e2e-live-api target="http://127.0.0.1:3100":
+    cd {{web}} && GR_API_PROXY_TARGET={{target}} bun run test:e2e:live-api
+
 # Production build web
 web-build:
     cd {{web}} && npx vite build
@@ -87,7 +91,7 @@ surreal-ontology-probe:
 release-gates-surreal:
 	SURREAL_BIN=scripts/tools/surreal-docker.sh \
 	LOCKED_TARGET_VERSION=3.0.0 \
-	scripts/surrealdb-go-no-go.sh docs/research/surrealdb-go-no-go-latest.md
+	scripts/release-gates-surreal.sh docs/research/release-gates-surreal-latest.md
 
 chat-bench-surreal:
 	scripts/surrealdb-chat-bench.sh docs/research/surrealdb-chat-bench-latest.md
@@ -103,6 +107,33 @@ notification-bench-surreal:
 
 smoke-ontology-enrichment-live:
 	scripts/smoke/ontology_enrichment_live.sh
+
+smoke-chat-attachment-s3-live:
+	scripts/smoke/chat_attachment_s3_live.sh
+
+chat-attachment-lifecycle-plan:
+	scripts/deploy/chat_attachment_lifecycle_policy.sh --dry-run
+
+chat-attachment-lifecycle-apply:
+	scripts/deploy/chat_attachment_lifecycle_policy.sh
+
+chat-attachment-lifecycle-verify:
+	scripts/deploy/verify_chat_attachment_lifecycle_rules.sh
+
+chat-attachment-alerts-apply namespace="monitoring":
+	scripts/deploy/chat_attachment_prometheus_rules.sh --namespace {{namespace}}
+
+chat-attachment-alerts-plan namespace="monitoring":
+	scripts/deploy/chat_attachment_prometheus_rules.sh --namespace {{namespace}} --dry-run
+
+chat-attachment-alerts-verify:
+	scripts/deploy/verify_chat_attachment_monitoring_assets.sh
+
+chat-attachment-branch-protection-check repo branch="main":
+	scripts/deploy/verify_surreal_release_gate_branch_protection.sh --repo {{repo}} --branch {{branch}}
+
+chat-attachment-branch-protection-plan repo branch="main":
+	scripts/deploy/verify_surreal_release_gate_branch_protection.sh --repo {{repo}} --branch {{branch}} --dry-run
 
 smoke-feed-involvement-edge-cutover-live:
 	scripts/smoke/feed_involvement_edge_cutover_live.sh
@@ -181,3 +212,9 @@ pack-c-stage-b-go-no-go prom_url="http://127.0.0.1:9090" window="30m" step="60s"
 
 pack-c-stage-c-go-no-go prom_url="http://127.0.0.1:9090" window="30m" step="60s":
 	scripts/deploy/pack_c_stage_go_no_go.sh --stage stage-c --prom-url {{prom_url}} --window {{window}} --step {{step}}
+
+hot-path-rollout namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s" go_no_go_dry_run="false" apply_chat_alerts="true" apply_chat_lifecycle="false" require_cluster="true" run_readiness="true":
+	scripts/deploy/hot_path_rollout.sh --namespace {{namespace}} --prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run {{go_no_go_dry_run}} --apply-chat-alerts {{apply_chat_alerts}} --apply-chat-lifecycle {{apply_chat_lifecycle}} --require-cluster {{require_cluster}} --run-readiness {{run_readiness}}
+
+hot-path-rollout-dry-run namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s":
+	scripts/deploy/hot_path_rollout.sh --namespace {{namespace}} --prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run true --apply-chat-alerts true --apply-chat-lifecycle false --require-cluster false --run-readiness false

@@ -42,6 +42,88 @@ jobs:
       - name: Ontology enrichment guardrails
         run: scripts/docs/check_ontology_enrichment_guardrails.sh
 
+  surreal-release-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      APP_ENV: ${{ vars.RELEASE_GATES_APP_ENV }}
+      CHAT_ATTACHMENT_S3_PREFIX: ${{ vars.RELEASE_GATES_CHAT_ATTACHMENT_S3_PREFIX }}
+      CHAT_ATTACHMENT_REQUIRED_PREFIXES: ${{ vars.RELEASE_GATES_CHAT_ATTACHMENT_REQUIRED_PREFIXES }}
+      EXPIRE_DAYS: ${{ vars.RELEASE_GATES_EXPIRE_DAYS }}
+      EXPECT_EXPIRE_DAYS: ${{ vars.RELEASE_GATES_EXPECT_EXPIRE_DAYS }}
+      S3_BUCKET: ${{ vars.RELEASE_GATES_S3_BUCKET }}
+      S3_ACCESS_KEY: ${{ vars.RELEASE_GATES_S3_ACCESS_KEY }}
+      S3_SECRET_KEY: ${{ vars.RELEASE_GATES_S3_SECRET_KEY }}
+      S3_ENDPOINT: http://127.0.0.1:9000
+      SURREAL_BIN: scripts/tools/surreal-docker.sh
+      LOCKED_TARGET_VERSION: 3.0.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+
+      - name: Resolve release-gate inputs
+        run: |
+          : "${APP_ENV:=ci}"
+          : "${CHAT_ATTACHMENT_S3_PREFIX:=chat-attachments}"
+          : "${EXPIRE_DAYS:=45}"
+          : "${EXPECT_EXPIRE_DAYS:=${EXPIRE_DAYS}}"
+          : "${S3_BUCKET:=gotong-royong-evidence-ci}"
+          : "${S3_ACCESS_KEY:=minioadmin}"
+          : "${S3_SECRET_KEY:=minioadmin}"
+          default_required_prefix="${CHAT_ATTACHMENT_S3_PREFIX%/}/${APP_ENV}/"
+          : "${CHAT_ATTACHMENT_REQUIRED_PREFIXES:=${default_required_prefix}}"
+          {
+            echo "APP_ENV=${APP_ENV}"
+            echo "CHAT_ATTACHMENT_S3_PREFIX=${CHAT_ATTACHMENT_S3_PREFIX}"
+            echo "EXPIRE_DAYS=${EXPIRE_DAYS}"
+            echo "EXPECT_EXPIRE_DAYS=${EXPECT_EXPIRE_DAYS}"
+            echo "S3_BUCKET=${S3_BUCKET}"
+            echo "S3_ACCESS_KEY=${S3_ACCESS_KEY}"
+            echo "S3_SECRET_KEY=${S3_SECRET_KEY}"
+            echo "CHAT_ATTACHMENT_REQUIRED_PREFIXES=${CHAT_ATTACHMENT_REQUIRED_PREFIXES}"
+            echo "MINIO_ROOT_USER=${S3_ACCESS_KEY}"
+            echo "MINIO_ROOT_PASSWORD=${S3_SECRET_KEY}"
+          } >> "$GITHUB_ENV"
+
+      - name: Start dev DB + storage
+        run: |
+          docker compose -f compose.dev.yaml up -d surrealdb redis
+          docker compose -f compose.dev.yaml --profile storage up -d minio
+
+      - name: Ensure attachment bucket exists
+        run: |
+          docker run --rm \
+            --add-host=host.docker.internal:host-gateway \
+            --entrypoint /bin/sh \
+            minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            -c "mc alias set local http://host.docker.internal:9000 '${S3_ACCESS_KEY}' '${S3_SECRET_KEY}' >/dev/null && mc mb --ignore-existing 'local/${S3_BUCKET}' >/dev/null"
+
+      - name: Apply lifecycle policy for required prefix
+        run: |
+          scripts/deploy/chat_attachment_lifecycle_policy.sh \
+            --expire-days "${EXPIRE_DAYS}" \
+            --prefix "${CHAT_ATTACHMENT_S3_PREFIX%/}/${APP_ENV}/"
+
+      - name: Run Surreal release gates
+        run: |
+          scripts/release-gates-surreal.sh docs/research/release-gates-surreal-latest.md
+
+      - name: Upload release-gate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surreal-release-gates-artifacts
+          path: |
+            docs/research/release-gates-surreal-latest.md
+            docs/research/surrealdb-go-no-go-latest.md
+            docs/research/chat-attachment-lifecycle-policy-latest.md
+            docs/research/chat-attachment-lifecycle-verify-latest.md
+            docs/research/chat-attachment-s3-smoke-latest.md
+
   web:
     runs-on: ubuntu-latest
     defaults:
