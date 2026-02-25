@@ -100,6 +100,7 @@ Current benchmark artifacts:
 - `docs/research/surrealdb-live-db-probe-latest.md`
 - `docs/research/surrealdb-feed-index-bench-latest.md`
 - `docs/research/surrealdb-feed-involvement-bench-latest.md`
+- `docs/research/surrealdb-notification-bench-latest.md`
 
 ## 6) Validation Gates
 
@@ -108,4 +109,5 @@ Current benchmark artifacts:
 - Release checks: `just release-gates-surreal`
 - Feed source benchmark: `just feed-index-bench-surreal`
 - Feed involvement benchmark: `just feed-involvement-bench-surreal`
+- Notification benchmark: `just notification-bench-surreal`
 - Re-run hot-path smoke/bench scripts after each migration pack.

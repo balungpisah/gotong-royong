@@ -95,6 +95,9 @@ feed-index-bench-surreal:
 feed-involvement-bench-surreal:
 	scripts/surrealdb-feed-involvement-bench.sh docs/research/surrealdb-feed-involvement-bench-latest.md
 
+notification-bench-surreal:
+	scripts/surrealdb-notification-bench.sh docs/research/surrealdb-notification-bench-latest.md
+
 smoke-ontology-enrichment-live:
 	scripts/smoke/ontology_enrichment_live.sh
 

@@ -350,6 +350,8 @@ Reference outputs:
   - Re-run: `just feed-index-bench-surreal`
 - Feed involvement benchmark (`involvement_only` legacy OR vs materialized edge lane): `docs/research/surrealdb-feed-involvement-bench-latest.md`
   - Re-run: `just feed-involvement-bench-surreal`
+- Notification hot-path benchmark (list unread/list all/unread count): `docs/research/surrealdb-notification-bench-latest.md`
+  - Re-run: `just notification-bench-surreal`
 
 ---
 
