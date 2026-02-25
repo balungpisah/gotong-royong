@@ -27,12 +27,14 @@ References:
 From repo root:
 
 ```bash
+just pack-c-alerts-verify
 just feed-participant-edge-backfill --dry-run --page-size 1000 --progress-every 1000
 just smoke-feed-involvement-edge-cutover-live
 just feed-involvement-bench-surreal
 ```
 
 Expected:
+- Pack C monitoring assets check passes (`just pack-c-alerts-verify`).
 - Backfill dry-run completes without unexpected failures.
 - Cutover smoke passes both modes (fallback-on and edge-only).
 - Benchmark still shows edge lane avoiding participant-membership scan behavior under noisy datasets.

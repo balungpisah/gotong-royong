@@ -118,3 +118,6 @@ pack-c-alerts-stage-c namespace="monitoring":
 
 pack-c-alerts-plan stage="stage-a" namespace="monitoring":
 	scripts/deploy/pack_c_prometheus_rules.sh --stage {{stage}} --namespace {{namespace}} --dry-run
+
+pack-c-alerts-verify:
+	scripts/deploy/verify_pack_c_monitoring_assets.sh
