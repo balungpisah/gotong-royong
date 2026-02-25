@@ -146,6 +146,30 @@ pack-c-stage-b-kickoff namespace="monitoring":
 pack-c-stage-c-kickoff namespace="monitoring":
 	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-c --namespace {{namespace}}
 
+pack-c-stage-end-to-end stage="stage-b" namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s" go_no_go_dry_run="false":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage {{stage}} --namespace {{namespace}} --run-go-no-go true --go-no-go-prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run {{go_no_go_dry_run}}
+
+pack-c-stage-end-to-end-dry-run stage="stage-b" namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage {{stage}} --namespace {{namespace}} --run-go-no-go true --go-no-go-prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run true
+
+pack-c-stage-a-end-to-end namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s" go_no_go_dry_run="false":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-a --namespace {{namespace}} --run-go-no-go true --go-no-go-prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run {{go_no_go_dry_run}}
+
+pack-c-stage-a-end-to-end-dry-run namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-a --namespace {{namespace}} --run-go-no-go true --go-no-go-prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run true
+
+pack-c-stage-b-end-to-end namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s" go_no_go_dry_run="false":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-b --namespace {{namespace}} --run-go-no-go true --go-no-go-prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run {{go_no_go_dry_run}}
+
+pack-c-stage-b-end-to-end-dry-run namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-b --namespace {{namespace}} --run-go-no-go true --go-no-go-prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run true
+
+pack-c-stage-c-end-to-end namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s" go_no_go_dry_run="false":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-c --namespace {{namespace}} --run-go-no-go true --go-no-go-prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run {{go_no_go_dry_run}}
+
+pack-c-stage-c-end-to-end-dry-run namespace="monitoring" prom_url="http://127.0.0.1:9090" go_no_go_step="60s":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-c --namespace {{namespace}} --run-go-no-go true --go-no-go-prom-url {{prom_url}} --go-no-go-step {{go_no_go_step}} --go-no-go-dry-run true
+
 pack-c-stage-go-no-go stage="stage-b" prom_url="http://127.0.0.1:9090" window="30m" step="60s":
 	scripts/deploy/pack_c_stage_go_no_go.sh --stage {{stage}} --prom-url {{prom_url}} --window {{window}} --step {{step}}
 

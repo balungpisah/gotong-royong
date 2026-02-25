@@ -53,7 +53,13 @@ just pack-c-slice-gate
 just pack-c-stage-a-go-no-go
 just pack-c-stage-b-go-no-go
 just pack-c-stage-c-go-no-go
+just pack-c-stage-a-end-to-end
+just pack-c-stage-b-end-to-end
+just pack-c-stage-c-end-to-end
+just pack-c-stage-end-to-end-dry-run stage-b
 ```
+
+`pack-c-stage-*-end-to-end` recipes run kickoff + stage go/no-go in one command, with default go/no-go windows matching stage targets (A=24h, B=4h, C=24h).
 
 ## Validation
 

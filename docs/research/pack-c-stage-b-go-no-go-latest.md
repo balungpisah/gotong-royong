@@ -1,9 +1,9 @@
 # Pack C Stage B Go/No-Go Report
 
-Date: 2026-02-25T09:39:53Z
+Date: 2026-02-25T09:52:21Z
 Stage: `stage-b`
 Prometheus URL: `http://127.0.0.1:9090`
-Window: `30m`
+Window: `4h`
 Step: `60s`
 Mode: `dry-run`
 

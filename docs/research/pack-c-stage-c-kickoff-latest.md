@@ -1,6 +1,6 @@
 # Pack C Stage C Kickoff Report
 
-Date: 2026-02-25T09:26:35Z
+Date: 2026-02-25T09:52:30Z
 Namespace: `monitoring`
 Observation window target: 24h
 Stage summary: Full rollout with fallback OFF on all replicas.
@@ -13,11 +13,16 @@ Stage summary: Full rollout with fallback OFF on all replicas.
 | Kubernetes cluster status | unreachable |
 | Stage rule action mode | dry-run |
 | Stage rule action result | dry_run_only |
+| Go/no-go gate | pass |
+| Go/no-go mode | dry-run |
+| Go/no-go window | 24h |
+| Go/no-go report | docs/research/pack-c-stage-c-go-no-go-latest.md |
 
 ## Commands Executed
 
 1. `not run`
 2. `scripts/deploy/pack_c_prometheus_rules.sh --stage stage-c --namespace monitoring --dry-run`
+3. `scripts/deploy/pack_c_stage_go_no_go.sh --stage stage-c --prom-url http://127.0.0.1:9090 --window 24h --step 60s --output docs/research/pack-c-stage-c-go-no-go-latest.md --dry-run`
 
 ## Stage Checklist (24h)
 
@@ -34,3 +39,4 @@ References:
 - `docs/deployment/feed-involvement-fallback-removal-runbook.md`
 - `docs/deployment/feed-involvement-fallback-alert-thresholds.md`
 - `docs/research/pack-c-cutover-readiness-latest.md`
+- `docs/research/pack-c-stage-c-go-no-go-latest.md`

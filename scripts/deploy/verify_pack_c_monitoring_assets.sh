@@ -95,6 +95,10 @@ assert_contains "$monitoring_readme" "just pack-c-alerts-stage-a" "monitoring RE
 assert_contains "$monitoring_readme" "just pack-c-alerts-stage-b" "monitoring README missing stage B just shortcut"
 assert_contains "$monitoring_readme" "just pack-c-alerts-stage-c" "monitoring README missing stage C just shortcut"
 assert_contains "$monitoring_readme" "just pack-c-alerts-plan stage=stage-c" "monitoring README missing dry-run just shortcut"
+assert_contains "$monitoring_readme" "just pack-c-stage-a-end-to-end" "monitoring README missing stage A end-to-end shortcut"
+assert_contains "$monitoring_readme" "just pack-c-stage-b-end-to-end" "monitoring README missing stage B end-to-end shortcut"
+assert_contains "$monitoring_readme" "just pack-c-stage-c-end-to-end" "monitoring README missing stage C end-to-end shortcut"
+assert_contains "$monitoring_readme" "just pack-c-stage-end-to-end-dry-run stage-b" "monitoring README missing generic dry-run end-to-end shortcut"
 
 assert_contains "$runbook" "just pack-c-alerts-stage-a" "runbook missing stage A command"
 assert_contains "$runbook" "just pack-c-alerts-stage-b" "runbook missing stage B command"
@@ -102,6 +106,10 @@ assert_contains "$runbook" "just pack-c-alerts-stage-c" "runbook missing stage C
 assert_contains "$runbook" "just pack-c-stage-a-go-no-go" "runbook missing stage A go/no-go command"
 assert_contains "$runbook" "just pack-c-stage-b-go-no-go" "runbook missing stage B go/no-go command"
 assert_contains "$runbook" "just pack-c-stage-c-go-no-go" "runbook missing stage C go/no-go command"
+assert_contains "$runbook" "just pack-c-stage-a-end-to-end" "runbook missing stage A end-to-end command"
+assert_contains "$runbook" "just pack-c-stage-b-end-to-end" "runbook missing stage B end-to-end command"
+assert_contains "$runbook" "just pack-c-stage-c-end-to-end" "runbook missing stage C end-to-end command"
+assert_contains "$runbook" "just pack-c-stage-end-to-end-dry-run stage-b" "runbook missing dry-run end-to-end command"
 assert_contains "$runbook" "deploy/monitoring/grafana-pack-c-cutover-dashboard.json" "runbook missing dashboard reference"
 
 assert_contains "$docs_index" "Pack C Prometheus Rules" "docs index missing Pack C Prometheus link"

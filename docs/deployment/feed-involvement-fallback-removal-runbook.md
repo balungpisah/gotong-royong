@@ -49,6 +49,9 @@ Expected:
 
 Use staged rollout for API pods/instances.
 
+Local/dev fallback:
+- Use `just pack-c-stage-end-to-end-dry-run stage-b` (or stage-specific `*-dry-run` variants) to validate automation wiring without live Prometheus gating.
+
 ### Stage A — Baseline (fallback ON)
 
 - Optional kickoff automation (recommended):
@@ -63,6 +66,9 @@ Use staged rollout for API pods/instances.
   - feed/search latency
 - Before promoting to Stage B, run go/no-go gate:
   - `just pack-c-stage-a-go-no-go`
+- One-command stage gate at end of observation window:
+  - `just pack-c-stage-a-end-to-end`
+  - Uses default go/no-go window aligned to Stage A observation target (`24h`).
 
 ### Stage B — Canary (fallback OFF on a subset)
 
@@ -75,6 +81,9 @@ Use staged rollout for API pods/instances.
 - Run for 2–4h minimum, then increase to 25%, then 50% if stable.
 - Before promoting to Stage C, run go/no-go gate:
   - `just pack-c-stage-b-go-no-go`
+- One-command stage gate at end of observation window:
+  - `just pack-c-stage-b-end-to-end`
+  - Uses default go/no-go window aligned to Stage B observation target (`4h`).
 
 ### Stage C — Full cutover
 
@@ -87,6 +96,9 @@ Use staged rollout for API pods/instances.
 - Keep enhanced monitoring for at least 24h.
 - Before approving fallback-code removal, run go/no-go gate:
   - `just pack-c-stage-c-go-no-go`
+- One-command stage gate at end of observation window:
+  - `just pack-c-stage-c-end-to-end`
+  - Uses default go/no-go window aligned to Stage C observation target (`24h`).
 
 ## 4) Metrics to watch
 
