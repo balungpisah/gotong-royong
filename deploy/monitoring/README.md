@@ -7,6 +7,7 @@ This directory contains deployable Prometheus Operator rule manifests for Pack C
 - `prometheusrule-pack-c-stage-a.yaml` — baseline stage (`DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=true`)
 - `prometheusrule-pack-c-stage-b.yaml` — canary stage (subset with fallback disabled)
 - `prometheusrule-pack-c-stage-c.yaml` — full cutover stage (`DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=false` on all replicas)
+- `grafana-pack-c-cutover-dashboard.json` — Grafana dashboard for Pack C lane/latency/error cutover watch
 
 ## Prerequisites
 
@@ -55,6 +56,12 @@ just pack-c-alerts-plan stage=stage-c
 kubectl get prometheusrule -n monitoring | rg gotong-pack-c-cutover
 kubectl describe prometheusrule gotong-pack-c-cutover-stage-c -n monitoring
 ```
+
+Grafana import:
+
+- Dashboard UID: `gotong-pack-c-cutover`
+- Import file: `deploy/monitoring/grafana-pack-c-cutover-dashboard.json`
+- Datasource placeholder in JSON: `${DS_PROMETHEUS}`
 
 Runbook and threshold references:
 - `docs/deployment/feed-involvement-fallback-removal-runbook.md`

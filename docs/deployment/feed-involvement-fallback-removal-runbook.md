@@ -69,6 +69,7 @@ Use staged rollout for API pods/instances.
 
 Threshold sheet:
 - `docs/deployment/feed-involvement-fallback-alert-thresholds.md`
+- `deploy/monitoring/grafana-pack-c-cutover-dashboard.json`
 
 ### Lane distribution
 
