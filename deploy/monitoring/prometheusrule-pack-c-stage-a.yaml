@@ -2,7 +2,6 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: gotong-pack-c-cutover-stage-a
-  namespace: monitoring
   labels:
     app.kubernetes.io/name: gotong-royong
     app.kubernetes.io/component: monitoring

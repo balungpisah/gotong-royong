@@ -19,25 +19,34 @@ This directory contains deployable Prometheus Operator rule manifests for Pack C
 Stage A:
 
 ```bash
-kubectl apply -f deploy/monitoring/prometheusrule-pack-c-stage-a.yaml
-kubectl delete -f deploy/monitoring/prometheusrule-pack-c-stage-b.yaml --ignore-not-found
-kubectl delete -f deploy/monitoring/prometheusrule-pack-c-stage-c.yaml --ignore-not-found
+scripts/deploy/pack_c_prometheus_rules.sh --stage stage-a --namespace monitoring
 ```
 
 Stage B:
 
 ```bash
-kubectl apply -f deploy/monitoring/prometheusrule-pack-c-stage-b.yaml
-kubectl delete -f deploy/monitoring/prometheusrule-pack-c-stage-a.yaml --ignore-not-found
-kubectl delete -f deploy/monitoring/prometheusrule-pack-c-stage-c.yaml --ignore-not-found
+scripts/deploy/pack_c_prometheus_rules.sh --stage stage-b --namespace monitoring
 ```
 
 Stage C:
 
 ```bash
-kubectl apply -f deploy/monitoring/prometheusrule-pack-c-stage-c.yaml
-kubectl delete -f deploy/monitoring/prometheusrule-pack-c-stage-a.yaml --ignore-not-found
-kubectl delete -f deploy/monitoring/prometheusrule-pack-c-stage-b.yaml --ignore-not-found
+scripts/deploy/pack_c_prometheus_rules.sh --stage stage-c --namespace monitoring
+```
+
+Dry-run plan:
+
+```bash
+scripts/deploy/pack_c_prometheus_rules.sh --stage stage-b --namespace monitoring --dry-run
+```
+
+Equivalent `just` shortcuts:
+
+```bash
+just pack-c-alerts-stage-a
+just pack-c-alerts-stage-b
+just pack-c-alerts-stage-c
+just pack-c-alerts-plan stage=stage-c
 ```
 
 ## Validation

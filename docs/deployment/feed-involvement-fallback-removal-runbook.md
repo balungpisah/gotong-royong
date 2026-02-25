@@ -45,7 +45,7 @@ Use staged rollout for API pods/instances.
 
 - Keep `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=true` on all replicas.
 - Apply Stage A alert rules:
-  - `kubectl apply -f deploy/monitoring/prometheusrule-pack-c-stage-a.yaml`
+  - `just pack-c-alerts-stage-a`
 - Observe for at least 24h:
   - lane usage
   - mismatch counter
@@ -55,14 +55,14 @@ Use staged rollout for API pods/instances.
 
 - Set `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=false` on 5–10% of replicas.
 - Replace alert rules with Stage B profile:
-  - `kubectl apply -f deploy/monitoring/prometheusrule-pack-c-stage-b.yaml`
+  - `just pack-c-alerts-stage-b`
 - Run for 2–4h minimum, then increase to 25%, then 50% if stable.
 
 ### Stage C — Full cutover
 
 - Set `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=false` on all replicas.
 - Replace alert rules with Stage C profile:
-  - `kubectl apply -f deploy/monitoring/prometheusrule-pack-c-stage-c.yaml`
+  - `just pack-c-alerts-stage-c`
 - Keep enhanced monitoring for at least 24h.
 
 ## 4) Metrics to watch

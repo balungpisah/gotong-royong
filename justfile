@@ -106,3 +106,15 @@ ontology-enrichment-check:
 
 ontology-enrichment-check-full:
 	scripts/docs/check_ontology_enrichment_guardrails.sh --with-tests
+
+pack-c-alerts-stage-a namespace="monitoring":
+	scripts/deploy/pack_c_prometheus_rules.sh --stage stage-a --namespace {{namespace}}
+
+pack-c-alerts-stage-b namespace="monitoring":
+	scripts/deploy/pack_c_prometheus_rules.sh --stage stage-b --namespace {{namespace}}
+
+pack-c-alerts-stage-c namespace="monitoring":
+	scripts/deploy/pack_c_prometheus_rules.sh --stage stage-c --namespace {{namespace}}
+
+pack-c-alerts-plan stage="stage-a" namespace="monitoring":
+	scripts/deploy/pack_c_prometheus_rules.sh --stage {{stage}} --namespace {{namespace}} --dry-run
