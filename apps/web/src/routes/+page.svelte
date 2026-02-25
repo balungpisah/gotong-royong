@@ -29,6 +29,20 @@
 		feedStore.loadSuggestions();
 	});
 
+	async function retryFeedLoad() {
+		await feedStore.loadFeed();
+		await feedStore.loadSuggestions();
+	}
+
+	async function retryWitnessListLoad() {
+		await witnessStore.loadList();
+	}
+
+	async function retryWitnessDetailLoad() {
+		if (!selectedWitnessId) return;
+		await witnessStore.loadDetail(selectedWitnessId);
+	}
+
 	const sortedWitnesses = $derived(
 		[...witnessStore.witnesses].sort(
 			(a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
@@ -254,6 +268,29 @@
 						<p class="text-xs">{m.pulse_loading_detail()}</p>
 					</div>
 				</div>
+			{:else if selectedWitnessId && witnessStore.detailError}
+				<div class="flex h-full items-center justify-center p-6">
+					<div class="w-full max-w-sm rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-center">
+						<p class="text-sm font-semibold text-foreground">Gagal memuat detail tandang</p>
+						<p class="mt-1 text-xs text-muted-foreground">{witnessStore.detailError}</p>
+						<div class="mt-3 flex justify-center gap-2">
+							<button
+								type="button"
+								class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+								onclick={retryWitnessDetailLoad}
+							>
+								Coba lagi
+							</button>
+							<button
+								type="button"
+								class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"
+								onclick={closeDetail}
+							>
+								Tutup
+							</button>
+						</div>
+					</div>
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -273,6 +310,57 @@
 	>
 		<!-- Feed content -->
 		<section class="flex flex-1 flex-col gap-3">
+			{#if feedStore.error && feedStore.filteredStream.length > 0}
+				<div
+					class="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2"
+					role="status"
+					aria-live="polite"
+				>
+					<p class="text-xs text-destructive">{feedStore.error}</p>
+					<button
+						type="button"
+						class="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+						onclick={retryFeedLoad}
+					>
+						Coba lagi
+					</button>
+				</div>
+			{/if}
+
+			{#if witnessStore.listError}
+				<div
+					class="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2"
+					role="status"
+					aria-live="polite"
+				>
+					<p class="text-xs text-destructive">{witnessStore.listError}</p>
+					<button
+						type="button"
+						class="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+						onclick={retryWitnessListLoad}
+					>
+						Coba lagi
+					</button>
+				</div>
+			{/if}
+
+			{#if selectedWitnessId && witnessStore.detailError}
+				<div
+					class="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2"
+					role="status"
+					aria-live="polite"
+				>
+					<p class="text-xs text-destructive">{witnessStore.detailError}</p>
+					<button
+						type="button"
+						class="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+						onclick={retryWitnessDetailLoad}
+					>
+						Coba lagi
+					</button>
+				</div>
+			{/if}
+
 			{#if feedStore.isDiscoverActive}
 				<div role="group" aria-label="Discover">
 					<DiscoverView />
@@ -303,6 +391,26 @@
 						</div>
 					{/snippet}
 				</Masonry>
+			{:else if feedStore.error && feedStore.filteredStream.length === 0}
+				<div
+					class="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 py-12 text-center"
+					role="status"
+					aria-live="polite"
+				>
+					<div
+						class="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive"
+					>
+						<Activity class="size-6" />
+					</div>
+					<p class="max-w-xs text-sm text-muted-foreground">{feedStore.error}</p>
+					<button
+						type="button"
+						class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+						onclick={retryFeedLoad}
+					>
+						Coba lagi
+					</button>
+				</div>
 			{:else if feedStore.filteredStream.length === 0}
 				<div
 					class="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/40 bg-muted/10 py-12 text-center"

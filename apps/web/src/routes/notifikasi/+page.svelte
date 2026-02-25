@@ -67,6 +67,10 @@
 			// store.error is already set by the store
 		}
 	}
+
+	async function handleRetryLoad() {
+		await store.loadNotifications();
+	}
 </script>
 
 <div class="mx-auto w-full max-w-2xl space-y-6">
@@ -94,6 +98,17 @@
 		{/if}
 	</motion.div>
 
+	{#if store.error && store.notifications.length > 0}
+		<div
+			class="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2"
+			role="status"
+			aria-live="polite"
+		>
+			<p class="text-xs text-destructive">{store.error}</p>
+			<Button variant="outline" size="sm" onclick={handleRetryLoad}>Coba lagi</Button>
+		</div>
+	{/if}
+
 	<!-- Loading state -->
 	{#if store.loading}
 		<div class="flex flex-col items-center justify-center py-16 text-muted-foreground">
@@ -103,18 +118,34 @@
 
 	<!-- Empty state -->
 	{:else if store.notifications.length === 0}
-		<motion.div
-			class="flex flex-col items-center justify-center rounded-2xl border border-border/30 bg-muted/10 py-16"
-			initial={{ opacity: 0, scale: 0.95 }}
-			animate={{ opacity: 1, scale: 1 }}
-			transition={{ duration: 0.3 }}
-		>
-			<div class="flex size-14 items-center justify-center rounded-full bg-muted/20">
-				<Inbox class="size-7 text-muted-foreground" />
-			</div>
-			<p class="mt-4 text-sm font-medium text-foreground">Tidak ada notifikasi</p>
-			<p class="mt-1 text-caption text-muted-foreground">Semua sudah bersih!</p>
-		</motion.div>
+		{#if store.error}
+			<motion.div
+				class="flex flex-col items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/5 px-6 py-12 text-center"
+				initial={{ opacity: 0, scale: 0.95 }}
+				animate={{ opacity: 1, scale: 1 }}
+				transition={{ duration: 0.3 }}
+			>
+				<div class="flex size-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+					<Inbox class="size-7" />
+				</div>
+				<p class="mt-4 text-sm font-semibold text-foreground">Gagal memuat notifikasi</p>
+				<p class="mt-1 max-w-sm text-caption text-muted-foreground">{store.error}</p>
+				<Button variant="outline" size="sm" class="mt-4" onclick={handleRetryLoad}>Coba lagi</Button>
+			</motion.div>
+		{:else}
+			<motion.div
+				class="flex flex-col items-center justify-center rounded-2xl border border-border/30 bg-muted/10 py-16"
+				initial={{ opacity: 0, scale: 0.95 }}
+				animate={{ opacity: 1, scale: 1 }}
+				transition={{ duration: 0.3 }}
+			>
+				<div class="flex size-14 items-center justify-center rounded-full bg-muted/20">
+					<Inbox class="size-7 text-muted-foreground" />
+				</div>
+				<p class="mt-4 text-sm font-medium text-foreground">Tidak ada notifikasi</p>
+				<p class="mt-1 text-caption text-muted-foreground">Semua sudah bersih!</p>
+			</motion.div>
+		{/if}
 
 	<!-- Notification list -->
 	{:else}

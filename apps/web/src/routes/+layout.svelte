@@ -33,7 +33,7 @@
 	import { TooltipProvider } from '$lib/components/ui/tooltip';
 
 	// ---------------------------------------------------------------------------
-	// Service & Store initialization (mock-first, swap to API later)
+	// Service & Store initialization (hot-path API-first with per-slice toggles)
 	// ---------------------------------------------------------------------------
 
 	const services = createServices();
@@ -42,7 +42,7 @@
 	const notificationStore = new NotificationStore(services.notification);
 	const triageStore = new TriageStore(services.triage);
 	const navigationStore = new NavigationStore();
-	const feedStore = new FeedStore();
+	const feedStore = new FeedStore(services.feed);
 	const themeStore = new ThemeStore();
 	const preferencesStore = new PreferencesStore();
 	const communityStore = new CommunityStore();
