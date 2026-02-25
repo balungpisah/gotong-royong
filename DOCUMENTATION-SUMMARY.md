@@ -6,7 +6,7 @@ This document provides a summary of the comprehensive technical specification cr
 
 ## Stack Lock Addendum (2026-02-15)
 
-Current implementation stack is locked to Rust 2024 + Axum + SurrealDB `v3.0.0-beta.4`.
+Current implementation stack is locked to Rust 2024 + Axum + SurrealDB `v3.0.0` (stable).
 
 Canonical references:
 - `docs/research/adr/ADR-001-rust-axum-surrealdb-stack-lock.md`
@@ -14,6 +14,7 @@ Canonical references:
 
 Notes:
 - Older summary sections describing PostgreSQL/MySQL/Knex/Alembic/Diesel defaults are historical and superseded for new implementation work.
+- The documentation tree snapshot below is also historical; use `docs/README.md` for the authoritative table of contents.
 - Updated canonical operational docs are:
   - `docs/development/setup-guide.md`
   - `docs/deployment/infrastructure.md`

@@ -110,10 +110,10 @@ Status legend: `existing` means already supported in `docs/api/event-payloads.md
 | Profile header | `/api/v1/users/{id}/reputation`, `/api/v1/users/{id}/tier` | Reputation and tier badge |
 | Activity feed | `/api/v1/users/{id}/activity` | Timeline of contributions and vouches |
 | Live CV panel | `/api/v1/cv-hidup/{user_id}` | CV data |
-| Share CV | `/api/v1/cv-hidup/{user_id}/export`, `/api/v1/cv-hidup/{user_id}/qr` | Shareable CV |
-| Skills tab | `/api/v1/skills/search`, `/api/v1/skills/nodes` | Skills and graph |
-| PoR guidance | `/api/v1/por/requirements`, `/api/v1/por/triad-requirements` | Evidence guidance |
-| PoR status | `/api/v1/por/status?user_id=...` | Verification status |
+| Share CV | `POST /api/v1/cv-hidup/export`, `GET /api/v1/cv-hidup/qr`, `GET /api/v1/cv-hidup/verify/{export_id}`, `GET /api/v1/cv-hidup/qr/{export_id}` | Shareable CV artifacts (note: export + auth-user QR are JWT-only today) |
+| Skills tab | `/api/v1/skills/search`, `/api/v1/skills/nodes/{id}`, `/api/v1/skills/{id}/parent` | Skills and graph |
+| PoR guidance | `/api/v1/por/requirements/{task_type}`, `/api/v1/por/triad-requirements/{track}/{transition}` | Evidence guidance |
+| PoR status | `/api/v1/por/status/{evidence_id}` | Verification status (JWT-only today) |
 | Leaderboards | `/api/v1/reputation/leaderboard` | Rankings |
 | Distribution | `/api/v1/reputation/distribution` | Global reputation curve |
 

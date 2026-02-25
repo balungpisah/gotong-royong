@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use crate::db::DbConfig;
@@ -21,8 +21,8 @@ use gotong_domain::moderation::{
     ModerationStatus, ModerationViolation,
 };
 use gotong_domain::ontology::{
-    NoteFeedbackCounts, OntologyConcept, OntologyEdgeKind, OntologyNote, OntologyNoteCreate,
-    OntologyTripleCreate,
+    NoteFeedbackCounts, OntologyActionRef, OntologyConcept, OntologyEdgeKind, OntologyNote,
+    OntologyNoteCreate, OntologyPlaceRef, OntologyTripleCreate,
 };
 use gotong_domain::ports::adaptive_path::AdaptivePathRepository;
 use gotong_domain::ports::chat::ChatRepository as ChatRepositoryPort;
@@ -50,6 +50,7 @@ use gotong_domain::webhook::{
     WebhookDeliveryLog, WebhookDeliveryResult, WebhookOutboxEvent, WebhookOutboxListQuery,
     WebhookOutboxStatus, WebhookOutboxUpdate,
 };
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, to_value};
 use surrealdb::{
@@ -60,6 +61,11 @@ use surrealdb::{
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 use tokio::sync::RwLock;
+
+const FEED_INVOLVEMENT_LANE_REQUESTS_TOTAL: &str =
+    "gotong_api_feed_involvement_lane_requests_total";
+const FEED_INVOLVEMENT_SHADOW_MISMATCH_TOTAL: &str =
+    "gotong_api_feed_involvement_shadow_mismatch_total";
 
 #[derive(Default)]
 pub struct InMemoryContributionRepository {
@@ -1763,8 +1769,47 @@ impl OntologyRepository for InMemoryOntologyRepository {
                     ));
                 }
             }
-            store.write().await.extend(triples);
+            let mut store = store.write().await;
+            for triple in triples {
+                let is_unique_feedback = matches!(
+                    triple.edge,
+                    OntologyEdgeKind::Vouches | OntologyEdgeKind::Challenges
+                );
+                if is_unique_feedback {
+                    let from_id = Self::normalize_record_id(&triple.from_id, "warga");
+                    let to_id = Self::normalize_record_id(&triple.to_id, "note");
+                    if store.iter().any(|existing| {
+                        existing.edge == triple.edge
+                            && Self::normalize_record_id(&existing.from_id, "warga") == from_id
+                            && Self::normalize_record_id(&existing.to_id, "note") == to_id
+                    }) {
+                        continue;
+                    }
+                }
+                store.push(triple);
+            }
             Ok(())
+        })
+    }
+
+    fn list_note_edge_targets(
+        &self,
+        note_id: &str,
+        edge: OntologyEdgeKind,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<String>>> {
+        let note_record = Self::normalize_record_id(note_id, "note");
+        let triples = self.triples.clone();
+        Box::pin(async move {
+            let triples = triples.read().await;
+            Ok(triples
+                .iter()
+                .filter(|triple| {
+                    triple.edge == edge
+                        && Self::normalize_record_id(&triple.from_id, "note") == note_record
+                })
+                .map(|triple| triple.to_id.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .collect())
         })
     }
 
@@ -1783,6 +1828,62 @@ impl OntologyRepository for InMemoryOntologyRepository {
             let concepts_by_id = concepts_by_id.read().await;
             Ok(concepts_by_id.get(concept_id).cloned())
         })
+    }
+
+    fn get_concepts_by_qids(
+        &self,
+        qids: &[String],
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<OntologyConcept>>> {
+        let qids = qids.to_vec();
+        let concepts_by_qid = self.concepts_by_qid.clone();
+        let concepts_by_id = self.concepts_by_id.clone();
+        Box::pin(async move {
+            let by_qid = concepts_by_qid.read().await;
+            let by_id = concepts_by_id.read().await;
+            Ok(qids
+                .into_iter()
+                .filter_map(|qid| by_qid.get(&qid).and_then(|id| by_id.get(id)).cloned())
+                .collect())
+        })
+    }
+
+    fn get_actions_by_types(
+        &self,
+        action_types: &[String],
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<OntologyActionRef>>> {
+        let action_types = action_types.to_vec();
+        Box::pin(async move {
+            let mut refs = Vec::new();
+            for raw in action_types {
+                let action_type = raw.trim();
+                if action_type.is_empty() {
+                    continue;
+                }
+                let (maps_to_mode, display_label) = match action_type {
+                    "schema:InformAction" => ("catatan_komunitas", Some("Informasi")),
+                    "schema:RepairAction" => ("komunitas", Some("Tuntaskan")),
+                    "schema:CreateAction" => ("komunitas", Some("Wujudkan")),
+                    "schema:SearchAction" => ("komunitas", Some("Telusuri")),
+                    "schema:AchieveAction" => ("komunitas", Some("Rayakan")),
+                    "schema:AssessAction" => ("komunitas", Some("Musyawarah")),
+                    "schema:AlertAction" => ("siaga", Some("Siaga")),
+                    _ => continue,
+                };
+                refs.push(OntologyActionRef {
+                    action_type: action_type.to_string(),
+                    maps_to_mode: maps_to_mode.to_string(),
+                    display_label: display_label.map(ToString::to_string),
+                });
+            }
+            Ok(refs)
+        })
+    }
+
+    fn get_places_by_ids(
+        &self,
+        _place_ids: &[String],
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<OntologyPlaceRef>>> {
+        Box::pin(async move { Ok(Vec::new()) })
     }
 
     fn list_broader_concepts(
@@ -1841,7 +1942,7 @@ impl OntologyRepository for InMemoryOntologyRepository {
     fn cleanup_expired_notes(
         &self,
         cutoff_ms: i64,
-    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<usize>> {
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<String>>> {
         let notes = self.notes.clone();
         let triples = self.triples.clone();
         Box::pin(async move {
@@ -1867,7 +1968,7 @@ impl OntologyRepository for InMemoryOntologyRepository {
             }
 
             if expired_notes.is_empty() {
-                return Ok(0);
+                return Ok(Vec::new());
             }
 
             let mut normalized_expired = Vec::with_capacity(expired_notes.len() * 2);
@@ -1885,7 +1986,9 @@ impl OntologyRepository for InMemoryOntologyRepository {
                     .any(|candidate| triple.from_id == *candidate || triple.to_id == *candidate)
             });
             let _removed_triples = before.saturating_sub(triples.len());
-            Ok(expired_notes.len())
+            expired_notes.sort();
+            expired_notes.dedup();
+            Ok(expired_notes)
         })
     }
 }
@@ -1940,13 +2043,22 @@ impl SurrealOntologyRepository {
     }
 
     fn parse_datetime_ms(value: &str) -> DomainResult<i64> {
-        let datetime = OffsetDateTime::parse(value, &Rfc3339)
-            .map_err(|err| DomainError::Validation(format!("invalid datetime '{value}': {err}")))?;
+        let datetime = OffsetDateTime::parse(value, &Rfc3339).map_err(|err| {
+            DomainError::Validation(format!("invalid ontology datetime '{value}': {err}"))
+        })?;
         Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
     }
 
     fn map_surreal_error(err: surrealdb::Error) -> DomainError {
-        DomainError::Validation(format!("surreal query failed: {err}"))
+        let message = err.to_string().to_lowercase();
+        if message.contains("already exists")
+            || message.contains("duplicate")
+            || message.contains("unique")
+            || message.contains("conflict")
+        {
+            return DomainError::Conflict;
+        }
+        DomainError::Validation(format!("surreal query failed: {message}"))
     }
 
     fn decode_rows<T>(rows: Vec<Value>, entity: &str) -> DomainResult<Vec<T>>
@@ -1975,6 +2087,69 @@ impl SurrealOntologyRepository {
             .ok_or_else(|| DomainError::Validation(format!("missing count '{key}'")))?;
         Ok(count as usize)
     }
+
+    pub async fn note_ttl_expires_ms_by_note_ids(
+        &self,
+        note_ids: &[String],
+    ) -> DomainResult<HashMap<String, i64>> {
+        let normalized_note_ids = {
+            let mut values: Vec<String> = note_ids
+                .iter()
+                .map(|value| Self::normalize_id_part(value.trim()))
+                .filter(|value| !value.is_empty())
+                .collect();
+            values.sort();
+            values.dedup();
+            values
+        };
+        if normalized_note_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let record_ids: Vec<String> = normalized_note_ids
+            .iter()
+            .map(|note_id| format!("note:{note_id}"))
+            .collect();
+        let mut response = self
+            .client
+            .query(
+                "SELECT note_id, type::string(id) AS record_id, <string>ttl_expires AS ttl_expires\n\
+                 FROM note\n\
+                 WHERE ttl_expires IS NOT NONE\n\
+                 AND (note_id IN $note_ids OR type::string(id) IN $record_ids)",
+            )
+            .bind(("note_ids", normalized_note_ids))
+            .bind(("record_ids", record_ids))
+            .await
+            .map_err(Self::map_surreal_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        let rows: Vec<SurrealOntologyNoteTtlRow> = Self::decode_rows(rows, "note ttl")?;
+
+        let mut ttl_by_note_id = HashMap::new();
+        for row in rows {
+            let Some(ttl_expires) = row.ttl_expires else {
+                continue;
+            };
+            let ttl_expires_ms = Self::parse_datetime_ms(&ttl_expires)?;
+            let key = row
+                .note_id
+                .as_deref()
+                .map(Self::normalize_id_part)
+                .filter(|value| !value.is_empty())
+                .or_else(|| {
+                    row.record_id
+                        .as_deref()
+                        .map(Self::normalize_id_part)
+                        .filter(|value| !value.is_empty())
+                });
+            if let Some(key) = key {
+                ttl_by_note_id.insert(key, ttl_expires_ms);
+            }
+        }
+        Ok(ttl_by_note_id)
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -1986,16 +2161,23 @@ struct SurrealOntologyConceptRow {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct SurrealOntologyNoteRow {
+struct SurrealOntologyActionRow {
+    action_type: String,
+    maps_to_mode: String,
+    display_label: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct SurrealOntologyPlaceRow {
+    place_id: String,
+    name: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct SurrealOntologyNoteTtlRow {
     note_id: Option<String>,
-    content: String,
-    community_id: String,
-    temporal_class: String,
+    record_id: Option<String>,
     ttl_expires: Option<String>,
-    ai_readable: Option<bool>,
-    rahasia_level: Option<i64>,
-    confidence: Option<f64>,
-    created_at: String,
 }
 
 impl OntologyRepository for SurrealOntologyRepository {
@@ -2016,7 +2198,7 @@ impl OntologyRepository for SurrealOntologyRepository {
             };
             let mut response = client
                 .query(
-                    "UPDATE type::thing('concept', $concept_id) MERGE {\n\
+                    "UPDATE type::record('concept', $concept_id) MERGE {\n\
                        qid: $qid,\n\
                        label_id: $label_id,\n\
                        label_en: $label_en,\n\
@@ -2060,7 +2242,9 @@ impl OntologyRepository for SurrealOntologyRepository {
         Box::pin(async move {
             client
                 .query(
-                    "RELATE type::thing('concept', $narrower_id) -> BROADER -> type::thing('concept', $broader_id)",
+                    "CREATE BROADER SET \
+                     in = type::record('concept', $narrower_id), \
+                     out = type::record('concept', $broader_id)",
                 )
                 .bind(("narrower_id", narrower_id))
                 .bind(("broader_id", broader_id))
@@ -2087,57 +2271,51 @@ impl OntologyRepository for SurrealOntologyRepository {
                 .clone()
                 .unwrap_or_else(gotong_domain::util::uuid_v7_without_dashes);
             let note_id = Self::normalize_id_part(&note_id);
+            let content = note.content.trim().to_string();
+            let author_id = note.author_id.trim().to_string();
+            let community_id = note.community_id.trim().to_string();
+            let temporal_class = note.temporal_class.trim().to_string();
             let created_at_ms = gotong_domain::jobs::now_ms();
             let created_at = Self::to_rfc3339(created_at_ms)?;
             let ttl_expires = note.ttl_expires_ms.map(Self::to_rfc3339).transpose()?;
-            let mut response = client
+            client
                 .query(
-                    "CREATE type::thing('note', $note_id) SET\n\
+                    "CREATE type::record('note', $note_id) SET\n\
                        note_id = $note_id,\n\
                        content = $content,\n\
-                       author = type::thing('warga', $author_id),\n\
+                       author = type::record('warga', $author_id),\n\
                        community_id = $community_id,\n\
-                       created_at = $created_at,\n\
+                       created_at = <datetime>$created_at,\n\
                        temporal_class = $temporal_class,\n\
-                       ttl_expires = $ttl_expires,\n\
+                       ttl_expires = IF $ttl_expires = NONE THEN NONE ELSE <datetime>$ttl_expires END,\n\
                        ai_readable = $ai_readable,\n\
                        rahasia_level = $rahasia_level,\n\
                        confidence = $confidence RETURN AFTER",
                 )
                 .bind(("note_id", note_id.clone()))
-                .bind(("content", note.content.trim().to_string()))
-                .bind(("author_id", note.author_id.trim().to_string()))
-                .bind(("community_id", note.community_id.trim().to_string()))
+                .bind(("content", content.clone()))
+                .bind(("author_id", author_id.clone()))
+                .bind(("community_id", community_id.clone()))
                 .bind(("created_at", created_at))
-                .bind(("temporal_class", note.temporal_class.trim().to_string()))
+                .bind(("temporal_class", temporal_class.clone()))
                 .bind(("ttl_expires", ttl_expires))
                 .bind(("ai_readable", note.ai_readable))
                 .bind(("rahasia_level", note.rahasia_level))
                 .bind(("confidence", note.confidence))
                 .await
                 .map_err(Self::map_surreal_error)?;
-            let rows: Vec<Value> = response
-                .take(0)
-                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            let mut rows: Vec<SurrealOntologyNoteRow> = Self::decode_rows(rows, "note")?;
-            let row = rows
-                .pop()
-                .ok_or_else(|| DomainError::Validation("create returned no note".to_string()))?;
+
             Ok(OntologyNote {
-                note_id: row.note_id.unwrap_or(note_id),
-                content: row.content,
-                author_id: note.author_id,
-                community_id: row.community_id,
-                temporal_class: row.temporal_class,
-                ttl_expires_ms: row
-                    .ttl_expires
-                    .as_deref()
-                    .map(Self::parse_datetime_ms)
-                    .transpose()?,
-                ai_readable: row.ai_readable.unwrap_or(true),
-                rahasia_level: row.rahasia_level.unwrap_or(0),
-                confidence: row.confidence.unwrap_or(0.0),
-                created_at_ms: Self::parse_datetime_ms(&row.created_at)?,
+                note_id,
+                content,
+                author_id,
+                community_id,
+                temporal_class,
+                ttl_expires_ms: note.ttl_expires_ms,
+                ai_readable: note.ai_readable,
+                rahasia_level: note.rahasia_level,
+                confidence: note.confidence,
+                created_at_ms,
             })
         })
     }
@@ -2153,22 +2331,56 @@ impl OntologyRepository for SurrealOntologyRepository {
                 let (from_table, from_id) = Self::normalize_record_id(&triple.from_id, "note");
                 let (to_table, to_id) = Self::normalize_record_id(&triple.to_id, "concept");
                 let statement = format!(
-                    "RELATE type::thing('{from_table}', $from_id) -> {} -> type::thing('{to_table}', $to_id) CONTENT $payload",
+                    "CREATE {} SET \
+                     in = type::record('{from_table}', $from_id), \
+                     out = type::record('{to_table}', $to_id), \
+                     predicate = IF $predicate = NULL THEN NONE ELSE $predicate END, \
+                     metadata = IF $metadata = NULL THEN NONE ELSE $metadata END",
                     triple.edge.as_table_name()
                 );
-                let payload = serde_json::json!({
-                    "predicate": triple.predicate,
-                    "metadata": triple.metadata,
-                });
                 client
                     .query(statement)
                     .bind(("from_id", from_id))
                     .bind(("to_id", to_id))
-                    .bind(("payload", payload))
+                    .bind(("predicate", triple.predicate.clone()))
+                    .bind(("metadata", triple.metadata.clone()))
                     .await
                     .map_err(Self::map_surreal_error)?;
             }
             Ok(())
+        })
+    }
+
+    fn list_note_edge_targets(
+        &self,
+        note_id: &str,
+        edge: OntologyEdgeKind,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<String>>> {
+        let client = self.client.clone();
+        let note_id = Self::normalize_id_part(note_id);
+        let edge_table = edge.as_table_name().to_string();
+        Box::pin(async move {
+            let mut response = client
+                .query(format!(
+                    "SELECT VALUE out FROM {edge_table} WHERE in = type::record('note', $note_id)",
+                ))
+                .bind(("note_id", note_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            Ok(rows
+                .into_iter()
+                .filter_map(|value| {
+                    value.as_str().map(ToString::to_string).or_else(|| {
+                        value
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .map(ToString::to_string)
+                    })
+                })
+                .collect())
         })
     }
 
@@ -2198,6 +2410,106 @@ impl OntologyRepository for SurrealOntologyRepository {
         })
     }
 
+    fn get_concepts_by_qids(
+        &self,
+        qids: &[String],
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<OntologyConcept>>> {
+        let client = self.client.clone();
+        let qids = qids.to_vec();
+        Box::pin(async move {
+            if qids.is_empty() {
+                return Ok(Vec::new());
+            }
+            let mut response = client
+                .query("SELECT qid, label_id, label_en, verified FROM concept WHERE qid IN $qids")
+                .bind(("qids", qids))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let rows: Vec<SurrealOntologyConceptRow> = Self::decode_rows(rows, "concept")?;
+            Ok(rows
+                .into_iter()
+                .map(|row| OntologyConcept {
+                    concept_id: row.qid.clone(),
+                    qid: row.qid,
+                    label_id: row.label_id,
+                    label_en: row.label_en,
+                    verified: row.verified.unwrap_or(false),
+                })
+                .collect())
+        })
+    }
+
+    fn get_actions_by_types(
+        &self,
+        action_types: &[String],
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<OntologyActionRef>>> {
+        let client = self.client.clone();
+        let action_types = action_types.to_vec();
+        Box::pin(async move {
+            if action_types.is_empty() {
+                return Ok(Vec::new());
+            }
+            let mut response = client
+                .query(
+                    "SELECT action_type, maps_to_mode, display_label FROM action WHERE action_type IN $action_types",
+                )
+                .bind(("action_types", action_types))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let rows: Vec<SurrealOntologyActionRow> = Self::decode_rows(rows, "action")?;
+            Ok(rows
+                .into_iter()
+                .map(|row| OntologyActionRef {
+                    action_type: row.action_type,
+                    maps_to_mode: row.maps_to_mode,
+                    display_label: row.display_label,
+                })
+                .collect())
+        })
+    }
+
+    fn get_places_by_ids(
+        &self,
+        place_ids: &[String],
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<OntologyPlaceRef>>> {
+        let client = self.client.clone();
+        let place_ids = place_ids.to_vec();
+        Box::pin(async move {
+            let place_ids: Vec<String> = place_ids
+                .into_iter()
+                .map(|id| id.trim().to_string())
+                .filter(|id| id.starts_with("place:"))
+                .collect();
+            if place_ids.is_empty() {
+                return Ok(Vec::new());
+            }
+            let mut response = client
+                .query(
+                    "SELECT type::string(id) AS place_id, name FROM place WHERE id IN $place_ids",
+                )
+                .bind(("place_ids", place_ids))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let rows: Vec<SurrealOntologyPlaceRow> = Self::decode_rows(rows, "place")?;
+            Ok(rows
+                .into_iter()
+                .map(|row| OntologyPlaceRef {
+                    place_id: row.place_id,
+                    name: row.name,
+                })
+                .collect())
+        })
+    }
+
     fn list_broader_concepts(
         &self,
         concept_id: &str,
@@ -2208,7 +2520,7 @@ impl OntologyRepository for SurrealOntologyRepository {
             let mut response = client
                 .query(
                     "SELECT out.qid AS qid, out.label_id AS label_id, out.label_en AS label_en, out.verified AS verified \
-                     FROM BROADER WHERE in = type::thing('concept', $concept_id)",
+                     FROM BROADER WHERE in = type::record('concept', $concept_id)",
                 )
                 .bind(("concept_id", concept_id))
                 .await
@@ -2239,8 +2551,8 @@ impl OntologyRepository for SurrealOntologyRepository {
         Box::pin(async move {
             let mut response = client
                 .query(
-                    "SELECT count() AS vouch_count FROM VOUCHES WHERE out = type::thing('note', $note_id) GROUP ALL;\n\
-                     SELECT count() AS challenge_count FROM CHALLENGES WHERE out = type::thing('note', $note_id) GROUP ALL;",
+                    "SELECT count() AS vouch_count FROM VOUCHES WHERE out = type::record('note', $note_id) GROUP ALL;\n\
+                     SELECT count() AS challenge_count FROM CHALLENGES WHERE out = type::record('note', $note_id) GROUP ALL;",
                 )
                 .bind(("note_id", note_id))
                 .await
@@ -2261,7 +2573,7 @@ impl OntologyRepository for SurrealOntologyRepository {
     fn cleanup_expired_notes(
         &self,
         cutoff_ms: i64,
-    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<usize>> {
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<String>>> {
         let client = self.client.clone();
         Box::pin(async move {
             if cutoff_ms < 0 {
@@ -2292,13 +2604,13 @@ impl OntologyRepository for SurrealOntologyRepository {
                 })
                 .collect();
             if expired_note_ids.is_empty() {
-                return Ok(0);
+                return Ok(Vec::new());
             }
 
             for raw_note_id in &expired_note_ids {
                 let note_id = Self::normalize_id_part(raw_note_id);
                 let _deleted_note_rows: Vec<Value> = client
-                    .query("DELETE note WHERE id = type::thing('note', $note_id)")
+                    .query("DELETE note WHERE id = type::record('note', $note_id)")
                     .bind(("note_id", note_id.clone()))
                     .await
                     .map_err(Self::map_surreal_error)?
@@ -2317,7 +2629,7 @@ impl OntologyRepository for SurrealOntologyRepository {
                 ] {
                     client
                         .query(format!(
-                            "DELETE {edge} WHERE in = type::thing('note', $note_id) OR out = type::thing('note', $note_id)"
+                            "DELETE {edge} WHERE in = type::record('note', $note_id) OR out = type::record('note', $note_id)"
                         ))
                         .bind(("note_id", note_id.clone()))
                         .await
@@ -2329,7 +2641,7 @@ impl OntologyRepository for SurrealOntologyRepository {
                 }
 
                 let _deleted_measurement_rows: Vec<Value> = client
-                    .query("DELETE measurement WHERE note = type::thing('note', $note_id)")
+                    .query("DELETE measurement WHERE note = type::record('note', $note_id)")
                     .bind(("note_id", note_id))
                     .await
                     .map_err(Self::map_surreal_error)?
@@ -2339,7 +2651,13 @@ impl OntologyRepository for SurrealOntologyRepository {
                     })?;
             }
 
-            Ok(expired_note_ids.len())
+            let mut normalized_expired_note_ids = expired_note_ids
+                .into_iter()
+                .map(|raw_note_id| Self::normalize_id_part(&raw_note_id))
+                .collect::<Vec<_>>();
+            normalized_expired_note_ids.sort();
+            normalized_expired_note_ids.dedup();
+            Ok(normalized_expired_note_ids)
         })
     }
 }
@@ -2519,11 +2837,11 @@ mod ontology_repository_tests {
         .await
         .expect("write triples");
 
-        let removed = repo
+        let removed_note_ids = repo
             .cleanup_expired_notes(now)
             .await
             .expect("cleanup expired notes");
-        assert_eq!(removed, 1);
+        assert_eq!(removed_note_ids, vec!["expired-note".to_string()]);
 
         let expired_feedback = repo
             .note_feedback_counts(&expired_note.note_id)
@@ -3587,11 +3905,48 @@ impl VaultRepository for InMemoryVaultRepository {
 }
 
 type FeedSourceRequestKey = (String, String, String);
+type FeedParticipantEdgeKey = (String, String);
+
+fn feed_participant_actor_ids(item: &FeedItem) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut actor_ids = Vec::new();
+    for actor_id in std::iter::once(item.actor_id.as_str())
+        .chain(item.participant_ids.iter().map(String::as_str))
+    {
+        let actor_id = actor_id.trim();
+        if actor_id.is_empty() {
+            continue;
+        }
+        if seen.insert(actor_id.to_string()) {
+            actor_ids.push(actor_id.to_string());
+        }
+    }
+    actor_ids
+}
+
+fn deep_merge_json(base: &mut Value, patch: Value) {
+    match (base, patch) {
+        (Value::Object(base_map), Value::Object(patch_map)) => {
+            for (key, patch_value) in patch_map {
+                match base_map.get_mut(&key) {
+                    Some(existing) => deep_merge_json(existing, patch_value),
+                    None => {
+                        base_map.insert(key, patch_value);
+                    }
+                }
+            }
+        }
+        (base_slot, patch_value) => {
+            *base_slot = patch_value;
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct InMemoryDiscoveryFeedRepository {
     by_id: Arc<RwLock<HashMap<String, FeedItem>>>,
     by_source_request: Arc<RwLock<HashMap<FeedSourceRequestKey, String>>>,
+    by_participant_edge: Arc<RwLock<HashSet<FeedParticipantEdgeKey>>>,
 }
 
 impl InMemoryDiscoveryFeedRepository {
@@ -3628,6 +3983,22 @@ impl FeedRepository for InMemoryDiscoveryFeedRepository {
         })
     }
 
+    fn upsert_participant_edges_for_item(
+        &self,
+        item: &FeedItem,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<()>> {
+        let actor_ids = feed_participant_actor_ids(item);
+        let feed_id = item.feed_id.clone();
+        let by_participant_edge = self.by_participant_edge.clone();
+        Box::pin(async move {
+            let mut by_participant_edge = by_participant_edge.write().await;
+            for actor_id in actor_ids {
+                by_participant_edge.insert((actor_id, feed_id.clone()));
+            }
+            Ok(())
+        })
+    }
+
     fn get_by_source_request(
         &self,
         source_type: &str,
@@ -3647,6 +4018,57 @@ impl FeedRepository for InMemoryDiscoveryFeedRepository {
                 return Ok(None);
             };
             Ok(by_id.read().await.get(feed_id).cloned())
+        })
+    }
+
+    fn get_by_feed_id(
+        &self,
+        feed_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<FeedItem>>> {
+        let feed_id = feed_id.to_string();
+        let by_id = self.by_id.clone();
+        Box::pin(async move { Ok(by_id.read().await.get(&feed_id).cloned()) })
+    }
+
+    fn get_latest_by_source(
+        &self,
+        source_type: &str,
+        source_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<FeedItem>>> {
+        let source_type = source_type.to_string();
+        let source_id = source_id.to_string();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let items = by_id.read().await;
+            Ok(items
+                .values()
+                .filter(|item| item.source_type == source_type && item.source_id == source_id)
+                .max_by(|left, right| {
+                    left.occurred_at_ms
+                        .cmp(&right.occurred_at_ms)
+                        .then_with(|| left.feed_id.cmp(&right.feed_id))
+                })
+                .cloned())
+        })
+    }
+
+    fn merge_payload(
+        &self,
+        feed_id: &str,
+        payload_patch: Value,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<FeedItem>> {
+        let feed_id = feed_id.to_string();
+        let by_id = self.by_id.clone();
+        Box::pin(async move {
+            let mut by_id = by_id.write().await;
+            let item = by_id.get_mut(&feed_id).ok_or(DomainError::NotFound)?;
+            let mut payload = item
+                .payload
+                .clone()
+                .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+            deep_merge_json(&mut payload, payload_patch);
+            item.payload = Some(payload);
+            Ok(item.clone())
         })
     }
 
@@ -3981,6 +4403,22 @@ impl SurrealDiscoveryFeedRepository {
         Ok((datetime.unix_timestamp_nanos() / 1_000_000) as i64)
     }
 
+    fn parse_datetime_value(value: &Value) -> DomainResult<i64> {
+        if let Some(raw) = value.as_str() {
+            return Self::parse_datetime_ms(raw);
+        }
+        if let Some(obj) = value.as_object() {
+            for nested in obj.values() {
+                if let Some(raw) = nested.as_str() {
+                    return Self::parse_datetime_ms(raw);
+                }
+            }
+        }
+        Err(DomainError::Validation(format!(
+            "invalid datetime payload: {value}"
+        )))
+    }
+
     fn to_rfc3339(timestamp_ms: i64) -> DomainResult<String> {
         let datetime =
             OffsetDateTime::from_unix_timestamp_nanos((timestamp_ms as i128) * 1_000_000)
@@ -3990,14 +4428,20 @@ impl SurrealDiscoveryFeedRepository {
             .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()))
     }
 
+    fn feed_select_projection() -> &'static str {
+        "feed_id, source_type, source_id, actor_id, actor_username, title, summary, scope_id, \
+         privacy_level, <string>occurred_at AS occurred_at, <string>created_at AS created_at, \
+         request_id, correlation_id, participant_ids, payload"
+    }
+
     fn map_rows(rows: Vec<Value>) -> DomainResult<Vec<FeedItem>> {
         rows.into_iter()
             .map(|row| {
                 serde_json::from_value::<SurrealDiscoveryFeedRow>(row)
                     .map_err(|err| DomainError::Validation(format!("invalid feed row: {err}")))
                     .and_then(|row| {
-                        let occurred_at_ms = Self::parse_datetime_ms(&row.occurred_at)?;
-                        let created_at_ms = Self::parse_datetime_ms(&row.created_at)?;
+                        let occurred_at_ms = Self::parse_datetime_value(&row.occurred_at)?;
+                        let created_at_ms = Self::parse_datetime_value(&row.created_at)?;
                         Ok(FeedItem {
                             feed_id: row.feed_id,
                             source_type: row.source_type,
@@ -4042,6 +4486,467 @@ impl SurrealDiscoveryFeedRepository {
         })
     }
 
+    fn register_involvement_lane(endpoint: &str, lane: &str) {
+        counter!(
+            FEED_INVOLVEMENT_LANE_REQUESTS_TOTAL,
+            "endpoint" => endpoint.to_string(),
+            "lane" => lane.to_string()
+        )
+        .increment(1);
+    }
+
+    fn register_involvement_shadow_mismatch(endpoint: &str, mismatch: &str) {
+        counter!(
+            FEED_INVOLVEMENT_SHADOW_MISMATCH_TOTAL,
+            "endpoint" => endpoint.to_string(),
+            "mismatch" => mismatch.to_string()
+        )
+        .increment(1);
+    }
+
+    fn sort_feed_items_desc(items: &mut [FeedItem]) {
+        items.sort_by(|left, right| {
+            right
+                .occurred_at_ms
+                .cmp(&left.occurred_at_ms)
+                .then_with(|| right.feed_id.cmp(&left.feed_id))
+        });
+    }
+
+    fn merge_feed_items(
+        primary: Vec<FeedItem>,
+        fallback: Vec<FeedItem>,
+        limit: usize,
+    ) -> Vec<FeedItem> {
+        let mut merged = Vec::with_capacity(primary.len().saturating_add(fallback.len()));
+        let mut seen_feed_ids = HashSet::new();
+
+        for item in primary.into_iter().chain(fallback.into_iter()) {
+            if seen_feed_ids.insert(item.feed_id.clone()) {
+                merged.push(item);
+            }
+        }
+
+        Self::sort_feed_items_desc(&mut merged);
+        if merged.len() > limit {
+            merged.truncate(limit);
+        }
+        merged
+    }
+
+    async fn hydrate_feed_rows_by_ids(&self, feed_ids: &[String]) -> DomainResult<Vec<FeedItem>> {
+        if feed_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let projection = Self::feed_select_projection();
+        let mut response = self
+            .client
+            .query(format!(
+                "SELECT {projection} FROM discovery_feed_item WHERE feed_id IN $feed_ids",
+            ))
+            .bind(("feed_ids", feed_ids.to_vec()))
+            .await
+            .map_err(Self::map_surreal_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        let hydrated_rows = Self::map_rows(rows)?;
+        let mut by_feed_id: HashMap<String, FeedItem> = hydrated_rows
+            .into_iter()
+            .map(|item| (item.feed_id.clone(), item))
+            .collect();
+
+        let mut ordered = Vec::with_capacity(feed_ids.len());
+        for feed_id in feed_ids {
+            if let Some(item) = by_feed_id.remove(feed_id) {
+                ordered.push(item);
+            }
+        }
+        Ok(ordered)
+    }
+
+    async fn list_participant_edge_feed_ids(
+        &self,
+        actor_id: &str,
+        scope_id: Option<&str>,
+        privacy_level: Option<&str>,
+        from_ms: Option<i64>,
+        to_ms: Option<i64>,
+        cursor_occurred_at_ms: Option<i64>,
+        cursor_feed_id: Option<&str>,
+        exclude_source_type: Option<&str>,
+        limit: usize,
+    ) -> DomainResult<Vec<String>> {
+        let mut clauses = vec!["actor_id = $actor_id"];
+        if scope_id.is_some() {
+            clauses.push("scope_id = $scope_id");
+        }
+        if privacy_level.is_some() {
+            clauses.push("privacy_level = $privacy_level");
+        }
+        if from_ms.is_some() {
+            clauses.push("occurred_at >= <datetime>$from_occurred_at");
+        }
+        if to_ms.is_some() {
+            clauses.push("occurred_at <= <datetime>$to_occurred_at");
+        }
+        if exclude_source_type.is_some() {
+            clauses.push("source_type != $exclude_source_type");
+        }
+        if cursor_occurred_at_ms.is_some() && cursor_feed_id.is_some() {
+            clauses.push(
+                "(occurred_at < <datetime>$cursor_occurred_at OR (occurred_at = <datetime>$cursor_occurred_at AND feed_id < $cursor_feed_id))",
+            );
+        }
+
+        let mut statement = String::from("SELECT feed_id, occurred_at FROM feed_participant_edge");
+        if !clauses.is_empty() {
+            statement.push_str(" WHERE ");
+            statement.push_str(&clauses.join(" AND "));
+        }
+        statement.push_str(" ORDER BY occurred_at DESC, feed_id DESC LIMIT $limit");
+
+        let mut db_query = self
+            .client
+            .query(statement)
+            .bind(("actor_id", actor_id.to_string()))
+            .bind(("limit", limit as i64));
+
+        if let Some(scope_id) = scope_id {
+            db_query = db_query.bind(("scope_id", scope_id.to_string()));
+        }
+        if let Some(privacy_level) = privacy_level {
+            db_query = db_query.bind(("privacy_level", privacy_level.to_string()));
+        }
+        if let Some(from_ms) = from_ms {
+            let from_occurred_at = Self::to_rfc3339(from_ms)?;
+            db_query = db_query.bind(("from_occurred_at", from_occurred_at));
+        }
+        if let Some(to_ms) = to_ms {
+            let to_occurred_at = Self::to_rfc3339(to_ms)?;
+            db_query = db_query.bind(("to_occurred_at", to_occurred_at));
+        }
+        if let Some(exclude_source_type) = exclude_source_type {
+            db_query = db_query.bind(("exclude_source_type", exclude_source_type.to_string()));
+        }
+        if let (Some(cursor_ms), Some(cursor_feed_id)) = (cursor_occurred_at_ms, cursor_feed_id) {
+            let cursor_occurred_at = Self::to_rfc3339(cursor_ms)?;
+            db_query = db_query
+                .bind(("cursor_occurred_at", cursor_occurred_at))
+                .bind(("cursor_feed_id", cursor_feed_id.to_string()));
+        }
+
+        let mut response = db_query.await.map_err(Self::map_surreal_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+
+        rows.into_iter()
+            .map(|row| {
+                serde_json::from_value::<SurrealFeedParticipantEdgeCandidateRow>(row)
+                    .map(|row| row.feed_id)
+                    .map_err(|err| {
+                        DomainError::Validation(format!("invalid feed participant row: {err}"))
+                    })
+            })
+            .collect()
+    }
+
+    async fn list_feed_legacy(&self, query: &FeedRepositoryQuery) -> DomainResult<Vec<FeedItem>> {
+        let mut clauses = Vec::new();
+        if query.scope_id.is_some() {
+            clauses.push("scope_id = $scope_id");
+        }
+        if query.privacy_level.is_some() {
+            clauses.push("privacy_level = $privacy_level");
+        }
+        if query.from_ms.is_some() {
+            clauses.push("occurred_at >= <datetime>$from_occurred_at");
+        }
+        if query.to_ms.is_some() {
+            clauses.push("occurred_at <= <datetime>$to_occurred_at");
+        }
+        if query.involvement_only {
+            clauses.push("(actor_id = $actor_id OR $actor_id IN participant_ids)");
+        }
+        if query.cursor_occurred_at_ms.is_some() && query.cursor_feed_id.is_some() {
+            clauses.push(
+                "(occurred_at < <datetime>$cursor_occurred_at OR (occurred_at = <datetime>$cursor_occurred_at AND feed_id < $cursor_feed_id))",
+            );
+        }
+
+        let projection = Self::feed_select_projection();
+        let mut statement = format!("SELECT {projection} FROM discovery_feed_item");
+        if !clauses.is_empty() {
+            statement.push_str(" WHERE ");
+            statement.push_str(&clauses.join(" AND "));
+        }
+        statement.push_str(" ORDER BY occurred_at DESC, feed_id DESC LIMIT $limit");
+
+        let mut db_query = self
+            .client
+            .query(statement)
+            .bind(("limit", query.limit as i64));
+
+        if let Some(scope_id) = query.scope_id.as_deref() {
+            db_query = db_query.bind(("scope_id", scope_id.to_string()));
+        }
+        if let Some(privacy_level) = query.privacy_level.as_deref() {
+            db_query = db_query.bind(("privacy_level", privacy_level.to_string()));
+        }
+        if let Some(from_ms) = query.from_ms {
+            let cursor = Self::to_rfc3339(from_ms)?;
+            db_query = db_query.bind(("from_occurred_at", cursor));
+        }
+        if let Some(to_ms) = query.to_ms {
+            let cursor = Self::to_rfc3339(to_ms)?;
+            db_query = db_query.bind(("to_occurred_at", cursor));
+        }
+        if query.involvement_only {
+            db_query = db_query.bind(("actor_id", query.actor_id.clone()));
+        }
+        if let (Some(cursor_ms), Some(cursor_feed_id)) =
+            (query.cursor_occurred_at_ms, query.cursor_feed_id.as_deref())
+        {
+            let cursor = Self::to_rfc3339(cursor_ms)?;
+            db_query = db_query
+                .bind(("cursor_occurred_at", cursor))
+                .bind(("cursor_feed_id", cursor_feed_id.to_string()));
+        }
+
+        let mut response = db_query.await.map_err(Self::map_surreal_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        Self::map_rows(rows)
+    }
+
+    async fn list_feed_involvement_edge_first(
+        &self,
+        query: &FeedRepositoryQuery,
+    ) -> DomainResult<Vec<FeedItem>> {
+        let edge_feed_ids = match self
+            .list_participant_edge_feed_ids(
+                &query.actor_id,
+                query.scope_id.as_deref(),
+                query.privacy_level.as_deref(),
+                query.from_ms,
+                query.to_ms,
+                query.cursor_occurred_at_ms,
+                query.cursor_feed_id.as_deref(),
+                None,
+                query.limit,
+            )
+            .await
+        {
+            Ok(feed_ids) => feed_ids,
+            Err(err) => {
+                tracing::warn!(
+                    actor_id = %query.actor_id,
+                    error = %err,
+                    "failed edge candidate query for involvement feed; falling back to legacy lane"
+                );
+                Self::register_involvement_lane("feed", "legacy");
+                return self.list_feed_legacy(query).await;
+            }
+        };
+        let edge_rows = match self.hydrate_feed_rows_by_ids(&edge_feed_ids).await {
+            Ok(rows) => rows,
+            Err(err) => {
+                tracing::warn!(
+                    actor_id = %query.actor_id,
+                    error = %err,
+                    "failed edge hydration for involvement feed; falling back to legacy lane"
+                );
+                Self::register_involvement_lane("feed", "legacy");
+                return self.list_feed_legacy(query).await;
+            }
+        };
+        if edge_rows.len() >= query.limit {
+            Self::register_involvement_lane("feed", "edge");
+            return Ok(edge_rows);
+        }
+
+        let mut fallback_query = query.clone();
+        fallback_query.limit = query
+            .limit
+            .saturating_mul(2)
+            .max(query.limit.saturating_add(1))
+            .max(1);
+        let legacy_rows = self.list_feed_legacy(&fallback_query).await?;
+        Self::register_involvement_lane("feed", "fallback");
+
+        if !edge_rows.is_empty() {
+            let edge_feed_ids: Vec<&str> =
+                edge_rows.iter().map(|item| item.feed_id.as_str()).collect();
+            let legacy_head: Vec<&str> = legacy_rows
+                .iter()
+                .take(edge_feed_ids.len())
+                .map(|item| item.feed_id.as_str())
+                .collect();
+            if edge_feed_ids != legacy_head {
+                Self::register_involvement_shadow_mismatch("feed", "ordering_prefix");
+                tracing::warn!(
+                    actor_id = %query.actor_id,
+                    edge_count = edge_feed_ids.len(),
+                    fallback_count = legacy_rows.len(),
+                    "discovery feed involvement edge lane diverges from legacy ordering"
+                );
+            }
+        }
+
+        Ok(Self::merge_feed_items(edge_rows, legacy_rows, query.limit))
+    }
+
+    async fn search_feed_legacy(
+        &self,
+        query: &FeedRepositorySearchQuery,
+    ) -> DomainResult<Vec<FeedItem>> {
+        let mut clauses = Vec::new();
+        if query.scope_id.is_some() {
+            clauses.push("scope_id = $scope_id");
+        }
+        if query.privacy_level.is_some() {
+            clauses.push("privacy_level = $privacy_level");
+        }
+        if query.exclude_vault {
+            clauses.push("source_type != $exclude_source_type");
+        }
+        if query.from_ms.is_some() {
+            clauses.push("occurred_at >= <datetime>$from_occurred_at");
+        }
+        if query.to_ms.is_some() {
+            clauses.push("occurred_at <= <datetime>$to_occurred_at");
+        }
+        if query.involvement_only {
+            clauses.push("(actor_id = $actor_id OR $actor_id IN participant_ids)");
+        }
+
+        let projection = Self::feed_select_projection();
+        let mut statement = format!("SELECT {projection} FROM discovery_feed_item");
+        if !clauses.is_empty() {
+            statement.push_str(" WHERE ");
+            statement.push_str(&clauses.join(" AND "));
+        }
+        statement.push_str(" ORDER BY occurred_at DESC, feed_id DESC LIMIT $limit");
+
+        let mut db_query = self
+            .client
+            .query(statement)
+            .bind(("limit", query.limit as i64));
+
+        if let Some(scope_id) = query.scope_id.as_deref() {
+            db_query = db_query.bind(("scope_id", scope_id.to_string()));
+        }
+        if let Some(privacy_level) = query.privacy_level.as_deref() {
+            db_query = db_query.bind(("privacy_level", privacy_level.to_string()));
+        }
+        if query.exclude_vault {
+            db_query = db_query.bind(("exclude_source_type", FEED_SOURCE_VAULT.to_string()));
+        }
+        if let Some(from_ms) = query.from_ms {
+            let from = Self::to_rfc3339(from_ms)?;
+            db_query = db_query.bind(("from_occurred_at", from));
+        }
+        if let Some(to_ms) = query.to_ms {
+            let to = Self::to_rfc3339(to_ms)?;
+            db_query = db_query.bind(("to_occurred_at", to));
+        }
+        if query.involvement_only {
+            db_query = db_query.bind(("actor_id", query.actor_id.clone()));
+        }
+
+        let mut response = db_query.await.map_err(Self::map_surreal_error)?;
+        let rows: Vec<Value> = response
+            .take(0)
+            .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+        let mut rows = Self::map_rows(rows)?;
+        Self::sort_feed_items_desc(&mut rows);
+        Ok(rows)
+    }
+
+    async fn search_feed_involvement_edge_first(
+        &self,
+        query: &FeedRepositorySearchQuery,
+    ) -> DomainResult<Vec<FeedItem>> {
+        let edge_feed_ids = match self
+            .list_participant_edge_feed_ids(
+                &query.actor_id,
+                query.scope_id.as_deref(),
+                query.privacy_level.as_deref(),
+                query.from_ms,
+                query.to_ms,
+                None,
+                None,
+                if query.exclude_vault {
+                    Some(FEED_SOURCE_VAULT)
+                } else {
+                    None
+                },
+                query.limit,
+            )
+            .await
+        {
+            Ok(feed_ids) => feed_ids,
+            Err(err) => {
+                tracing::warn!(
+                    actor_id = %query.actor_id,
+                    error = %err,
+                    "failed edge candidate query for involvement search; falling back to legacy lane"
+                );
+                Self::register_involvement_lane("search", "legacy");
+                return self.search_feed_legacy(query).await;
+            }
+        };
+        let edge_rows = match self.hydrate_feed_rows_by_ids(&edge_feed_ids).await {
+            Ok(rows) => rows,
+            Err(err) => {
+                tracing::warn!(
+                    actor_id = %query.actor_id,
+                    error = %err,
+                    "failed edge hydration for involvement search; falling back to legacy lane"
+                );
+                Self::register_involvement_lane("search", "legacy");
+                return self.search_feed_legacy(query).await;
+            }
+        };
+        if edge_rows.len() >= query.limit {
+            Self::register_involvement_lane("search", "edge");
+            return Ok(edge_rows);
+        }
+
+        let mut fallback_query = query.clone();
+        fallback_query.limit = query
+            .limit
+            .saturating_mul(2)
+            .max(query.limit.saturating_add(1))
+            .max(1);
+        let legacy_rows = self.search_feed_legacy(&fallback_query).await?;
+        Self::register_involvement_lane("search", "fallback");
+
+        if !edge_rows.is_empty() {
+            let edge_feed_ids: Vec<&str> =
+                edge_rows.iter().map(|item| item.feed_id.as_str()).collect();
+            let legacy_head: Vec<&str> = legacy_rows
+                .iter()
+                .take(edge_feed_ids.len())
+                .map(|item| item.feed_id.as_str())
+                .collect();
+            if edge_feed_ids != legacy_head {
+                Self::register_involvement_shadow_mismatch("search", "ordering_prefix");
+                tracing::warn!(
+                    actor_id = %query.actor_id,
+                    edge_count = edge_feed_ids.len(),
+                    fallback_count = legacy_rows.len(),
+                    "discovery search involvement edge lane diverges from legacy ordering"
+                );
+            }
+        }
+
+        Ok(Self::merge_feed_items(edge_rows, legacy_rows, query.limit))
+    }
+
     fn map_surreal_error(err: surrealdb::Error) -> DomainError {
         let error_message = err.to_string().to_lowercase();
         if error_message.contains("already exists")
@@ -4069,17 +4974,83 @@ impl FeedRepository for SurrealDiscoveryFeedRepository {
         Box::pin(async move {
             let payload = to_value(payload)
                 .map_err(|err| DomainError::Validation(format!("invalid payload: {err}")))?;
-            let mut response = client
-                .query("CREATE discovery_feed_item CONTENT $payload")
+            client
+                .query(
+                    "CREATE discovery_feed_item SET \
+                     feed_id = $payload.feed_id, \
+                     source_type = $payload.source_type, \
+                     source_id = $payload.source_id, \
+                     actor_id = $payload.actor_id, \
+                     actor_username = $payload.actor_username, \
+                     title = $payload.title, \
+                     summary = IF $payload.summary = NULL THEN NONE ELSE $payload.summary END, \
+                     scope_id = IF $payload.scope_id = NULL THEN NONE ELSE $payload.scope_id END, \
+                     privacy_level = IF $payload.privacy_level = NULL THEN NONE ELSE $payload.privacy_level END, \
+                     occurred_at = <datetime>$payload.occurred_at, \
+                     created_at = <datetime>$payload.created_at, \
+                     request_id = $payload.request_id, \
+                     correlation_id = $payload.correlation_id, \
+                     participant_ids = $payload.participant_ids, \
+                     payload = IF $payload.payload = NULL THEN NONE ELSE $payload.payload END",
+                )
                 .bind(("payload", payload))
                 .await
                 .map_err(Self::map_surreal_error)?;
-            let rows: Vec<Value> = response
-                .take(0)
-                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            let mut rows = Self::map_rows(rows)?;
-            rows.pop()
-                .ok_or_else(|| DomainError::Validation("create returned no row".to_string()))
+            Ok(item)
+        })
+    }
+
+    fn upsert_participant_edges_for_item(
+        &self,
+        item: &FeedItem,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<()>> {
+        let item = item.clone();
+        let actor_ids = feed_participant_actor_ids(&item);
+        let occurred_at = match Self::to_rfc3339(item.occurred_at_ms) {
+            Ok(value) => value,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let created_at = match Self::to_rfc3339(item.created_at_ms) {
+            Ok(value) => value,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
+        let client = self.client.clone();
+        Box::pin(async move {
+            for actor_id in actor_ids {
+                let edge_id = format!("{actor_id}:{}", item.feed_id);
+                let result = client
+                    .query(
+                        "CREATE feed_participant_edge SET \
+                         edge_id = $edge_id, \
+                         actor_id = $actor_id, \
+                         feed_id = $feed_id, \
+                         occurred_at = <datetime>$occurred_at, \
+                         scope_id = IF $scope_id = NULL THEN NONE ELSE $scope_id END, \
+                         privacy_level = IF $privacy_level = NULL THEN NONE ELSE $privacy_level END, \
+                         source_type = $source_type, \
+                         source_id = $source_id, \
+                         created_at = <datetime>$created_at, \
+                         request_id = $request_id",
+                    )
+                    .bind(("edge_id", edge_id))
+                    .bind(("actor_id", actor_id))
+                    .bind(("feed_id", item.feed_id.clone()))
+                    .bind(("occurred_at", occurred_at.clone()))
+                    .bind(("scope_id", item.scope_id.clone()))
+                    .bind(("privacy_level", item.privacy_level.clone()))
+                    .bind(("source_type", item.source_type.clone()))
+                    .bind(("source_id", item.source_id.clone()))
+                    .bind(("created_at", created_at.clone()))
+                    .bind(("request_id", item.request_id.clone()))
+                    .await
+                    .map_err(Self::map_surreal_error);
+
+                match result {
+                    Ok(_) | Err(DomainError::Conflict) => {}
+                    Err(err) => return Err(err),
+                }
+            }
+            Ok(())
         })
     }
 
@@ -4094,11 +5065,12 @@ impl FeedRepository for SurrealDiscoveryFeedRepository {
         let request_id = request_id.to_string();
         let client = self.client.clone();
         Box::pin(async move {
+            let projection = Self::feed_select_projection();
             let mut response = client
-                .query(
-                    "SELECT * FROM discovery_feed_item \
+                .query(format!(
+                    "SELECT {projection} FROM discovery_feed_item \
                      WHERE source_type = $source_type AND source_id = $source_id AND request_id = $request_id LIMIT 1",
-                )
+                ))
                 .bind(("source_type", source_type))
                 .bind(("source_id", source_id))
                 .bind(("request_id", request_id))
@@ -4112,79 +5084,121 @@ impl FeedRepository for SurrealDiscoveryFeedRepository {
         })
     }
 
+    fn get_by_feed_id(
+        &self,
+        feed_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<FeedItem>>> {
+        let feed_id = feed_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let projection = Self::feed_select_projection();
+            let mut response = client
+                .query(format!(
+                    "SELECT {projection} FROM discovery_feed_item WHERE feed_id = $feed_id LIMIT 1",
+                ))
+                .bind(("feed_id", feed_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            Ok(rows.pop())
+        })
+    }
+
+    fn get_latest_by_source(
+        &self,
+        source_type: &str,
+        source_id: &str,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Option<FeedItem>>> {
+        let source_type = source_type.to_string();
+        let source_id = source_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let projection = Self::feed_select_projection();
+            let mut response = client
+                .query(format!(
+                    "SELECT {projection} FROM discovery_feed_item \
+                     WHERE source_type = $source_type AND source_id = $source_id \
+                     ORDER BY occurred_at DESC, feed_id DESC LIMIT 1",
+                ))
+                .bind(("source_type", source_type))
+                .bind(("source_id", source_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            Ok(rows.pop())
+        })
+    }
+
+    fn merge_payload(
+        &self,
+        feed_id: &str,
+        payload_patch: Value,
+    ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<FeedItem>> {
+        let feed_id = feed_id.to_string();
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut response = client
+                .query("SELECT payload FROM discovery_feed_item WHERE feed_id = $feed_id LIMIT 1")
+                .bind(("feed_id", feed_id.clone()))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let existing_payload = rows
+                .into_iter()
+                .next()
+                .and_then(|row| row.get("payload").cloned())
+                .unwrap_or(Value::Null);
+            let mut merged_payload = match existing_payload {
+                Value::Null => Value::Object(serde_json::Map::new()),
+                other => other,
+            };
+            deep_merge_json(&mut merged_payload, payload_patch);
+
+            client
+                .query(
+                    "UPDATE discovery_feed_item SET payload = $payload \
+                     WHERE feed_id = $feed_id",
+                )
+                .bind(("feed_id", feed_id.clone()))
+                .bind(("payload", merged_payload))
+                .await
+                .map_err(Self::map_surreal_error)?;
+
+            let projection = Self::feed_select_projection();
+            let mut response = client
+                .query(format!(
+                    "SELECT {projection} FROM discovery_feed_item WHERE feed_id = $feed_id LIMIT 1",
+                ))
+                .bind(("feed_id", feed_id))
+                .await
+                .map_err(Self::map_surreal_error)?;
+            let rows: Vec<Value> = response
+                .take(0)
+                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
+            let mut rows = Self::map_rows(rows)?;
+            rows.pop().ok_or(DomainError::NotFound)
+        })
+    }
+
     fn list_feed(
         &self,
         query: &FeedRepositoryQuery,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<FeedItem>>> {
         let query = query.clone();
-        let client = self.client.clone();
+        let repository = self.clone();
         Box::pin(async move {
-            let mut clauses = Vec::new();
-            if query.scope_id.is_some() {
-                clauses.push("scope_id = $scope_id");
-            }
-            if query.privacy_level.is_some() {
-                clauses.push("privacy_level = $privacy_level");
-            }
-            if query.from_ms.is_some() {
-                clauses.push("occurred_at >= $from_occurred_at");
-            }
-            if query.to_ms.is_some() {
-                clauses.push("occurred_at <= $to_occurred_at");
-            }
-            if query.cursor_occurred_at_ms.is_some() && query.cursor_feed_id.is_some() {
-                clauses.push(
-                    "(occurred_at < $cursor_occurred_at OR (occurred_at = $cursor_occurred_at AND feed_id < $cursor_feed_id))",
-                );
-            }
-
-            let mut statement = String::from("SELECT * FROM discovery_feed_item");
-            if !clauses.is_empty() {
-                statement.push_str(" WHERE ");
-                statement.push_str(&clauses.join(" AND "));
-            }
-            statement.push_str(" ORDER BY occurred_at DESC, feed_id DESC LIMIT $limit");
-
-            let mut db_query = client.query(statement).bind(("limit", query.limit as i64));
-
-            if let Some(scope_id) = query.scope_id.as_deref() {
-                db_query = db_query.bind(("scope_id", scope_id.to_string()));
-            }
-            if let Some(privacy_level) = query.privacy_level.as_deref() {
-                db_query = db_query.bind(("privacy_level", privacy_level.to_string()));
-            }
-            if let Some(from_ms) = query.from_ms {
-                let cursor = Self::to_rfc3339(from_ms)?;
-                db_query = db_query.bind(("from_occurred_at", cursor));
-            }
-            if let Some(to_ms) = query.to_ms {
-                let cursor = Self::to_rfc3339(to_ms)?;
-                db_query = db_query.bind(("to_occurred_at", cursor));
-            }
-            if let (Some(cursor_ms), Some(cursor_feed_id)) =
-                (query.cursor_occurred_at_ms, query.cursor_feed_id.as_deref())
-            {
-                let cursor = Self::to_rfc3339(cursor_ms)?;
-                db_query = db_query
-                    .bind(("cursor_occurred_at", cursor))
-                    .bind(("cursor_feed_id", cursor_feed_id.to_string()));
-            }
-
-            let mut response = db_query.await.map_err(Self::map_surreal_error)?;
-            let rows: Vec<Value> = response
-                .take(0)
-                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            let mut items = Self::map_rows(rows)?;
             if query.involvement_only {
-                items.retain(|item| {
-                    item.actor_id == query.actor_id
-                        || item
-                            .participant_ids
-                            .iter()
-                            .any(|participant| participant == &query.actor_id)
-                });
+                return repository.list_feed_involvement_edge_first(&query).await;
             }
-            Ok(items)
+            repository.list_feed_legacy(&query).await
         })
     }
 
@@ -4193,73 +5207,12 @@ impl FeedRepository for SurrealDiscoveryFeedRepository {
         query: &FeedRepositorySearchQuery,
     ) -> gotong_domain::ports::BoxFuture<'_, DomainResult<Vec<FeedItem>>> {
         let query = query.clone();
-        let client = self.client.clone();
+        let repository = self.clone();
         Box::pin(async move {
-            let mut clauses = Vec::new();
-            if query.scope_id.is_some() {
-                clauses.push("scope_id = $scope_id");
-            }
-            if query.privacy_level.is_some() {
-                clauses.push("privacy_level = $privacy_level");
-            }
-            if query.exclude_vault {
-                clauses.push("source_type != $exclude_source_type");
-            }
-            if query.from_ms.is_some() {
-                clauses.push("occurred_at >= $from_occurred_at");
-            }
-            if query.to_ms.is_some() {
-                clauses.push("occurred_at <= $to_occurred_at");
-            }
-
-            let mut statement = String::from("SELECT * FROM discovery_feed_item");
-            if !clauses.is_empty() {
-                statement.push_str(" WHERE ");
-                statement.push_str(&clauses.join(" AND "));
-            }
-            statement.push_str(" ORDER BY occurred_at DESC, feed_id DESC LIMIT $limit");
-
-            let mut db_query = client.query(statement).bind(("limit", query.limit as i64));
-
-            if let Some(scope_id) = query.scope_id.as_deref() {
-                db_query = db_query.bind(("scope_id", scope_id.to_string()));
-            }
-            if let Some(privacy_level) = query.privacy_level.as_deref() {
-                db_query = db_query.bind(("privacy_level", privacy_level.to_string()));
-            }
-            if query.exclude_vault {
-                db_query = db_query.bind(("exclude_source_type", FEED_SOURCE_VAULT.to_string()));
-            }
-            if let Some(from_ms) = query.from_ms {
-                let from = Self::to_rfc3339(from_ms)?;
-                db_query = db_query.bind(("from_occurred_at", from));
-            }
-            if let Some(to_ms) = query.to_ms {
-                let to = Self::to_rfc3339(to_ms)?;
-                db_query = db_query.bind(("to_occurred_at", to));
-            }
-
-            let mut response = db_query.await.map_err(Self::map_surreal_error)?;
-            let rows: Vec<Value> = response
-                .take(0)
-                .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            let mut rows = Self::map_rows(rows)?;
-            rows.sort_by(|left, right| {
-                right
-                    .occurred_at_ms
-                    .cmp(&left.occurred_at_ms)
-                    .then_with(|| right.feed_id.cmp(&left.feed_id))
-            });
             if query.involvement_only {
-                rows.retain(|item| {
-                    item.actor_id == query.actor_id
-                        || item
-                            .participant_ids
-                            .iter()
-                            .any(|participant| participant == &query.actor_id)
-                });
+                return repository.search_feed_involvement_edge_first(&query).await;
             }
-            Ok(rows)
+            repository.search_feed_legacy(&query).await
         })
     }
 }
@@ -4617,8 +5570,8 @@ struct SurrealDiscoveryFeedRow {
     summary: Option<String>,
     scope_id: Option<String>,
     privacy_level: Option<String>,
-    occurred_at: String,
-    created_at: String,
+    occurred_at: Value,
+    created_at: Value,
     request_id: String,
     correlation_id: String,
     participant_ids: Vec<String>,
@@ -4642,6 +5595,11 @@ struct SurrealDiscoveryFeedCreateRow {
     correlation_id: String,
     participant_ids: Vec<String>,
     payload: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SurrealFeedParticipantEdgeCandidateRow {
+    feed_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -7644,7 +8602,14 @@ impl ChatRepositoryPort for InMemoryChatRepository {
                     .cmp(&b.created_at_ms)
                     .then_with(|| a.message_id.cmp(&b.message_id))
             });
-            messages.truncate(cursor.limit);
+            if cursor.since_created_at_ms.is_none() && cursor.since_message_id.is_none() {
+                if messages.len() > cursor.limit {
+                    let start = messages.len().saturating_sub(cursor.limit);
+                    messages = messages.split_off(start);
+                }
+            } else {
+                messages.truncate(cursor.limit);
+            }
             Ok(messages)
         })
     }
@@ -8598,7 +9563,7 @@ impl ChatRepositoryPort for SurrealChatRepository {
                         IF deleted_at IS NONE THEN NONE ELSE type::string(deleted_at) END AS deleted_at\n\
                      FROM chat_message\n\
                      WHERE thread_id = $thread_id\n\
-                     ORDER BY created_at ASC, message_id ASC\n\
+                     ORDER BY created_at DESC, message_id DESC\n\
                      LIMIT $limit",
                 )
                 .bind(("thread_id", thread_id))
@@ -8608,7 +9573,14 @@ impl ChatRepositoryPort for SurrealChatRepository {
             let rows: Vec<Value> = response
                 .take(0)
                 .map_err(|err| DomainError::Validation(format!("invalid query result: {err}")))?;
-            Self::decode_message_row(rows)
+            let mut messages = Self::decode_message_row(rows)?;
+            messages.sort_by(|a, b| {
+                a.created_at_ms
+                    .cmp(&b.created_at_ms)
+                    .then_with(|| a.message_id.cmp(&b.message_id))
+            });
+            messages.truncate(cursor.limit);
+            Ok(messages)
         })
     }
 

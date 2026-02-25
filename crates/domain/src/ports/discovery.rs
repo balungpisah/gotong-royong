@@ -41,12 +41,29 @@ pub struct NotificationRepositoryListQuery {
 pub trait FeedRepository: Send + Sync {
     fn create_feed_item(&self, item: &FeedItem) -> BoxFuture<'_, DomainResult<FeedItem>>;
 
+    fn upsert_participant_edges_for_item(&self, item: &FeedItem)
+    -> BoxFuture<'_, DomainResult<()>>;
+
     fn get_by_source_request(
         &self,
         source_type: &str,
         source_id: &str,
         request_id: &str,
     ) -> BoxFuture<'_, DomainResult<Option<FeedItem>>>;
+
+    fn get_by_feed_id(&self, feed_id: &str) -> BoxFuture<'_, DomainResult<Option<FeedItem>>>;
+
+    fn get_latest_by_source(
+        &self,
+        source_type: &str,
+        source_id: &str,
+    ) -> BoxFuture<'_, DomainResult<Option<FeedItem>>>;
+
+    fn merge_payload(
+        &self,
+        feed_id: &str,
+        payload_patch: serde_json::Value,
+    ) -> BoxFuture<'_, DomainResult<FeedItem>>;
 
     fn list_feed(&self, query: &FeedRepositoryQuery) -> BoxFuture<'_, DomainResult<Vec<FeedItem>>>;
 

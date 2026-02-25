@@ -1,6 +1,8 @@
 use crate::DomainResult;
+use crate::ontology::OntologyEdgeKind;
 use crate::ontology::{
-    NoteFeedbackCounts, OntologyConcept, OntologyNote, OntologyNoteCreate, OntologyTripleCreate,
+    NoteFeedbackCounts, OntologyActionRef, OntologyConcept, OntologyNote, OntologyNoteCreate,
+    OntologyPlaceRef, OntologyTripleCreate,
 };
 use crate::ports::BoxFuture;
 
@@ -21,8 +23,29 @@ pub trait OntologyRepository: Send + Sync {
 
     fn write_triples(&self, triples: &[OntologyTripleCreate]) -> BoxFuture<'_, DomainResult<()>>;
 
+    fn list_note_edge_targets(
+        &self,
+        note_id: &str,
+        edge: OntologyEdgeKind,
+    ) -> BoxFuture<'_, DomainResult<Vec<String>>>;
+
     fn get_concept_by_qid(&self, qid: &str)
     -> BoxFuture<'_, DomainResult<Option<OntologyConcept>>>;
+
+    fn get_concepts_by_qids(
+        &self,
+        qids: &[String],
+    ) -> BoxFuture<'_, DomainResult<Vec<OntologyConcept>>>;
+
+    fn get_actions_by_types(
+        &self,
+        action_types: &[String],
+    ) -> BoxFuture<'_, DomainResult<Vec<OntologyActionRef>>>;
+
+    fn get_places_by_ids(
+        &self,
+        place_ids: &[String],
+    ) -> BoxFuture<'_, DomainResult<Vec<OntologyPlaceRef>>>;
 
     fn list_broader_concepts(
         &self,
@@ -34,5 +57,5 @@ pub trait OntologyRepository: Send + Sync {
         note_id: &str,
     ) -> BoxFuture<'_, DomainResult<NoteFeedbackCounts>>;
 
-    fn cleanup_expired_notes(&self, cutoff_ms: i64) -> BoxFuture<'_, DomainResult<usize>>;
+    fn cleanup_expired_notes(&self, cutoff_ms: i64) -> BoxFuture<'_, DomainResult<Vec<String>>>;
 }

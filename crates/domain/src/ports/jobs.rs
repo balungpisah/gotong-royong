@@ -22,6 +22,7 @@ pub enum JobType {
     DigestSend,
     TTLCleanup,
     ConceptVerification,
+    OntologyNoteEnrich,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

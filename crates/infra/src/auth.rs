@@ -136,7 +136,9 @@ impl SurrealAuthService {
         let jti = decode_jwt_claim(access_token, "jti")
             .and_then(|value| value.as_str().map(str::to_string));
         let exp = decode_jwt_claim(access_token, "exp").and_then(|value| {
-            value.as_i64().or_else(|| value.as_u64().and_then(|v| i64::try_from(v).ok()))
+            value
+                .as_i64()
+                .or_else(|| value.as_u64().and_then(|v| i64::try_from(v).ok()))
         });
 
         if let Some(jti) = jti {
@@ -193,14 +195,11 @@ impl SurrealAuthService {
         }
 
         let mut response = session
-            .query(
-                "SELECT type::string(id) AS id, username, platform_role FROM $auth.id",
-            )
+            .query("SELECT type::string(id) AS id, username, platform_role FROM $auth.id")
             .await
             .context("select $auth identity")?;
-        let rows: Vec<serde_json::Value> = response
-            .take(0)
-            .context("decode $auth identity rows")?;
+        let rows: Vec<serde_json::Value> =
+            response.take(0).context("decode $auth identity rows")?;
         let row: WargaRow = rows
             .into_iter()
             .next()
@@ -263,9 +262,7 @@ impl SurrealAuthService {
             .bind(("jti", jti_verify))
             .await
             .context("verify revoked state")?;
-        let rows: Vec<serde_json::Value> = verify
-            .take(0)
-            .context("decode revoked verify rows")?;
+        let rows: Vec<serde_json::Value> = verify.take(0).context("decode revoked verify rows")?;
         let revoked = rows
             .first()
             .and_then(|row| row.get("revoked"))

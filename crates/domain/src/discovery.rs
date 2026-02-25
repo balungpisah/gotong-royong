@@ -20,6 +20,7 @@ pub const FEED_SOURCE_VAULT: &str = "vault";
 pub const FEED_SOURCE_SIAGA: &str = "siaga";
 pub const FEED_SOURCE_MODERATION: &str = "moderation";
 pub const FEED_SOURCE_VOUCH: &str = "vouch";
+pub const FEED_SOURCE_ONTOLOGY_NOTE: &str = "ontology_note";
 
 pub const NOTIF_TYPE_VOUCH: &str = "vouch";
 pub const NOTIF_TYPE_VAULT: &str = "vault";
@@ -206,15 +207,21 @@ impl DiscoveryService {
             payload: input.payload,
         };
 
-        match self.feed_repo.create_feed_item(&item).await {
-            Ok(item) => Ok(item),
+        let persisted_item = match self.feed_repo.create_feed_item(&item).await {
+            Ok(item) => item,
             Err(DomainError::Conflict) => self
                 .feed_repo
                 .get_by_source_request(&item.source_type, &item.source_id, &item.request_id)
                 .await?
-                .ok_or(DomainError::Conflict),
-            Err(err) => Err(err),
-        }
+                .ok_or(DomainError::Conflict)?,
+            Err(err) => return Err(err),
+        };
+
+        self.feed_repo
+            .upsert_participant_edges_for_item(&persisted_item)
+            .await?;
+
+        Ok(persisted_item)
     }
 
     pub async fn list_feed(&self, query: FeedListQuery) -> DomainResult<PagedFeed> {
@@ -433,7 +440,8 @@ impl DiscoveryService {
         items.retain(|notification| is_visible_notification(&actor_id, notification));
 
         let next_cursor = items
-            .get(limit)
+            .get(limit.saturating_sub(1))
+            .filter(|_| items.len() > limit)
             .map(|item| make_notification_cursor(item.created_at_ms, &item.notification_id));
         if items.len() > limit {
             items.truncate(limit);
@@ -720,7 +728,19 @@ fn is_open_privacy_level(level: Option<&str>) -> bool {
     OPEN_PRIVACY_LEVELS.contains(&level.as_str())
 }
 
+fn is_hidden_feed_item(item: &FeedItem) -> bool {
+    item.payload
+        .as_ref()
+        .and_then(|payload| payload.get("lifecycle"))
+        .and_then(|lifecycle| lifecycle.get("hidden"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+}
+
 fn is_visible_to_actor(actor_id: &str, item: &FeedItem) -> bool {
+    if is_hidden_feed_item(item) {
+        return false;
+    }
     is_open_privacy_level(item.privacy_level.as_deref())
         || actor_id == item.actor_id
         || item.participant_ids.iter().any(|id| id == actor_id)
@@ -735,6 +755,201 @@ fn is_visible_notification(actor_id: &str, notification: &InAppNotification) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ports::BoxFuture;
+    use crate::ports::discovery::{
+        FeedRepository, FeedRepositoryQuery, FeedRepositorySearchQuery, NotificationRepository,
+        NotificationRepositoryListQuery,
+    };
+    use std::sync::{Arc, Mutex};
+
+    struct MockFeedRepository {
+        persisted_item: Arc<Mutex<Option<FeedItem>>>,
+        create_conflict: bool,
+        participant_edge_upsert_calls: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl MockFeedRepository {
+        fn new(create_conflict: bool) -> Self {
+            Self {
+                persisted_item: Arc::new(Mutex::new(None)),
+                create_conflict,
+                participant_edge_upsert_calls: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        fn set_persisted_item(&self, item: FeedItem) {
+            self.persisted_item
+                .lock()
+                .expect("persisted_item mutex")
+                .replace(item);
+        }
+
+        fn upserted_feed_ids(&self) -> Vec<String> {
+            self.participant_edge_upsert_calls
+                .lock()
+                .expect("participant_edge_upsert_calls mutex")
+                .clone()
+        }
+    }
+
+    impl FeedRepository for MockFeedRepository {
+        fn create_feed_item(&self, item: &FeedItem) -> BoxFuture<'_, DomainResult<FeedItem>> {
+            let item = item.clone();
+            let persisted_item = self.persisted_item.clone();
+            let create_conflict = self.create_conflict;
+            Box::pin(async move {
+                if create_conflict {
+                    return Err(DomainError::Conflict);
+                }
+                persisted_item
+                    .lock()
+                    .expect("persisted_item mutex")
+                    .replace(item.clone());
+                Ok(item)
+            })
+        }
+
+        fn upsert_participant_edges_for_item(
+            &self,
+            item: &FeedItem,
+        ) -> BoxFuture<'_, DomainResult<()>> {
+            let feed_id = item.feed_id.clone();
+            let participant_edge_upsert_calls = self.participant_edge_upsert_calls.clone();
+            Box::pin(async move {
+                participant_edge_upsert_calls
+                    .lock()
+                    .expect("participant_edge_upsert_calls mutex")
+                    .push(feed_id);
+                Ok(())
+            })
+        }
+
+        fn get_by_source_request(
+            &self,
+            _source_type: &str,
+            _source_id: &str,
+            _request_id: &str,
+        ) -> BoxFuture<'_, DomainResult<Option<FeedItem>>> {
+            let persisted_item = self.persisted_item.clone();
+            Box::pin(
+                async move { Ok(persisted_item.lock().expect("persisted_item mutex").clone()) },
+            )
+        }
+
+        fn get_by_feed_id(&self, feed_id: &str) -> BoxFuture<'_, DomainResult<Option<FeedItem>>> {
+            let feed_id = feed_id.to_string();
+            let persisted_item = self.persisted_item.clone();
+            Box::pin(async move {
+                Ok(persisted_item
+                    .lock()
+                    .expect("persisted_item mutex")
+                    .as_ref()
+                    .filter(|item| item.feed_id == feed_id)
+                    .cloned())
+            })
+        }
+
+        fn get_latest_by_source(
+            &self,
+            source_type: &str,
+            source_id: &str,
+        ) -> BoxFuture<'_, DomainResult<Option<FeedItem>>> {
+            let source_type = source_type.to_string();
+            let source_id = source_id.to_string();
+            let persisted_item = self.persisted_item.clone();
+            Box::pin(async move {
+                Ok(persisted_item
+                    .lock()
+                    .expect("persisted_item mutex")
+                    .as_ref()
+                    .filter(|item| item.source_type == source_type && item.source_id == source_id)
+                    .cloned())
+            })
+        }
+
+        fn merge_payload(
+            &self,
+            feed_id: &str,
+            payload_patch: serde_json::Value,
+        ) -> BoxFuture<'_, DomainResult<FeedItem>> {
+            let feed_id = feed_id.to_string();
+            let persisted_item = self.persisted_item.clone();
+            Box::pin(async move {
+                let mut guard = persisted_item.lock().expect("persisted_item mutex");
+                let Some(item) = guard.as_mut() else {
+                    return Err(DomainError::NotFound);
+                };
+                if item.feed_id != feed_id {
+                    return Err(DomainError::NotFound);
+                }
+                item.payload = Some(payload_patch);
+                Ok(item.clone())
+            })
+        }
+
+        fn list_feed(
+            &self,
+            _query: &FeedRepositoryQuery,
+        ) -> BoxFuture<'_, DomainResult<Vec<FeedItem>>> {
+            Box::pin(async move { Ok(Vec::new()) })
+        }
+
+        fn search_feed(
+            &self,
+            _query: &FeedRepositorySearchQuery,
+        ) -> BoxFuture<'_, DomainResult<Vec<FeedItem>>> {
+            Box::pin(async move { Ok(Vec::new()) })
+        }
+    }
+
+    struct MockNotificationRepository;
+
+    impl NotificationRepository for MockNotificationRepository {
+        fn create_notification(
+            &self,
+            notification: &InAppNotification,
+        ) -> BoxFuture<'_, DomainResult<InAppNotification>> {
+            let notification = notification.clone();
+            Box::pin(async move { Ok(notification) })
+        }
+
+        fn get_by_dedupe_key(
+            &self,
+            _user_id: &str,
+            _dedupe_key: &str,
+        ) -> BoxFuture<'_, DomainResult<Option<InAppNotification>>> {
+            Box::pin(async move { Ok(None) })
+        }
+
+        fn list_notifications(
+            &self,
+            _query: &NotificationRepositoryListQuery,
+        ) -> BoxFuture<'_, DomainResult<Vec<InAppNotification>>> {
+            Box::pin(async move { Ok(Vec::new()) })
+        }
+
+        fn list_notifications_in_window(
+            &self,
+            _user_id: &str,
+            _window_start_ms: i64,
+            _window_end_ms: i64,
+        ) -> BoxFuture<'_, DomainResult<Vec<InAppNotification>>> {
+            Box::pin(async move { Ok(Vec::new()) })
+        }
+
+        fn mark_as_read(
+            &self,
+            _user_id: &str,
+            _notification_id: &str,
+            _read_at_ms: i64,
+        ) -> BoxFuture<'_, DomainResult<InAppNotification>> {
+            Box::pin(async move { Err(DomainError::NotFound) })
+        }
+
+        fn unread_count(&self, _user_id: &str) -> BoxFuture<'_, DomainResult<usize>> {
+            Box::pin(async move { Ok(0) })
+        }
+    }
 
     #[test]
     fn parse_feed_cursor_rejects_invalid_shape() {
@@ -793,6 +1008,33 @@ mod tests {
     }
 
     #[test]
+    fn filter_visibility_hidden_feed_item_is_false() {
+        let item = FeedItem {
+            feed_id: "feed-1".into(),
+            source_type: FEED_SOURCE_CONTRIBUTION.into(),
+            source_id: "source-1".into(),
+            actor_id: "author-1".into(),
+            actor_username: "author".into(),
+            title: "abc".into(),
+            summary: None,
+            scope_id: None,
+            privacy_level: Some("public".into()),
+            occurred_at_ms: 0,
+            created_at_ms: 0,
+            request_id: "r1".into(),
+            correlation_id: "c1".into(),
+            participant_ids: vec!["somebody".into()],
+            payload: Some(serde_json::json!({
+                "lifecycle": {
+                    "hidden": true,
+                    "hidden_reason": "ontology_ttl_expired"
+                }
+            })),
+        };
+        assert!(!is_visible_to_actor("somebody", &item));
+    }
+
+    #[test]
     fn search_cursor_ordering_filters() {
         let rows = vec![
             SearchResult {
@@ -838,5 +1080,89 @@ mod tests {
         ];
         assert!(search_result_older(&rows[1], 3, 100, "a"));
         assert!(!search_result_older(&rows[0], 3, 100, "a"));
+    }
+
+    #[tokio::test]
+    async fn ingest_feed_upserts_participant_edges_on_create() {
+        let feed_repo = Arc::new(MockFeedRepository::new(false));
+        let service =
+            DiscoveryService::new(feed_repo.clone(), Arc::new(MockNotificationRepository));
+
+        let result = service
+            .ingest_feed(FeedIngestInput {
+                source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+                source_id: "seed-1".to_string(),
+                actor: ActorIdentity {
+                    user_id: "actor-1".to_string(),
+                    username: "actor-1-name".to_string(),
+                },
+                title: "seed title".to_string(),
+                summary: None,
+                scope_id: Some("scope-1".to_string()),
+                privacy_level: Some("public".to_string()),
+                occurred_at_ms: Some(1_000),
+                request_id: "req-1".to_string(),
+                correlation_id: "corr-1".to_string(),
+                request_ts_ms: Some(1_000),
+                participant_ids: vec!["participant-1".to_string()],
+                payload: None,
+            })
+            .await
+            .expect("ingest feed should succeed");
+
+        let upserted = feed_repo.upserted_feed_ids();
+        assert_eq!(upserted.len(), 1);
+        assert_eq!(upserted[0], result.feed_id);
+    }
+
+    #[tokio::test]
+    async fn ingest_feed_upserts_participant_edges_on_replay_conflict() {
+        let feed_repo = Arc::new(MockFeedRepository::new(true));
+        feed_repo.set_persisted_item(FeedItem {
+            feed_id: "feed-existing".to_string(),
+            source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+            source_id: "seed-existing".to_string(),
+            actor_id: "actor-existing".to_string(),
+            actor_username: "actor-existing-name".to_string(),
+            title: "existing".to_string(),
+            summary: None,
+            scope_id: Some("scope-1".to_string()),
+            privacy_level: Some("public".to_string()),
+            occurred_at_ms: 2_000,
+            created_at_ms: 2_000,
+            request_id: "req-existing".to_string(),
+            correlation_id: "corr-existing".to_string(),
+            participant_ids: vec!["participant-existing".to_string()],
+            payload: None,
+        });
+        let service =
+            DiscoveryService::new(feed_repo.clone(), Arc::new(MockNotificationRepository));
+
+        let result = service
+            .ingest_feed(FeedIngestInput {
+                source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+                source_id: "seed-existing".to_string(),
+                actor: ActorIdentity {
+                    user_id: "actor-1".to_string(),
+                    username: "actor-1-name".to_string(),
+                },
+                title: "seed title".to_string(),
+                summary: None,
+                scope_id: Some("scope-1".to_string()),
+                privacy_level: Some("public".to_string()),
+                occurred_at_ms: Some(1_000),
+                request_id: "req-existing".to_string(),
+                correlation_id: "corr-1".to_string(),
+                request_ts_ms: Some(1_000),
+                participant_ids: vec!["participant-1".to_string()],
+                payload: None,
+            })
+            .await
+            .expect("ingest feed replay should succeed");
+
+        assert_eq!(result.feed_id, "feed-existing");
+        let upserted = feed_repo.upserted_feed_ids();
+        assert_eq!(upserted.len(), 1);
+        assert_eq!(upserted[0], "feed-existing");
     }
 }

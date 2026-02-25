@@ -20,9 +20,9 @@ use gotong_domain::ports::{
     webhook::WebhookOutboxRepository,
 };
 use gotong_domain::util::uuid_v7_without_dashes;
+use gotong_infra::auth::SurrealAuthService;
 use gotong_infra::config::AppConfig;
 use gotong_infra::db::DbConfig;
-use gotong_infra::auth::SurrealAuthService;
 use gotong_infra::idempotency::RedisIdempotencyStore;
 use gotong_infra::jobs::RedisJobQueue;
 use gotong_infra::markov_client::MarkovReadClient;
@@ -735,6 +735,9 @@ mod tests {
         let mut receiver_a = bus_a.subscribe(thread_id).await;
         let mut receiver_b = bus_b.subscribe(thread_id).await;
 
+        // Give Redis pubsub subscriptions a brief moment to attach before publishing.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
         let message = ChatMessage {
             thread_id: thread_id.to_string(),
             message_id: "msg-redis-1".to_string(),
@@ -750,11 +753,11 @@ mod tests {
 
         bus_a.publish(thread_id, message.clone()).await;
 
-        let first = tokio::time::timeout(Duration::from_secs(3), receiver_a.recv())
+        let first = tokio::time::timeout(Duration::from_secs(5), receiver_a.recv())
             .await
             .expect("message timed out")
             .expect("stream closed");
-        let second = tokio::time::timeout(Duration::from_secs(3), receiver_b.recv())
+        let second = tokio::time::timeout(Duration::from_secs(5), receiver_b.recv())
             .await
             .expect("message timed out")
             .expect("stream closed");

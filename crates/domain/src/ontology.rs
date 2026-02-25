@@ -67,6 +67,19 @@ pub struct OntologyConcept {
     pub verified: bool,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OntologyActionRef {
+    pub action_type: String,
+    pub maps_to_mode: String,
+    pub display_label: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OntologyPlaceRef {
+    pub place_id: String,
+    pub name: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct OntologyNote {
     pub note_id: String,

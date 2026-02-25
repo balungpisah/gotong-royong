@@ -19,8 +19,10 @@ surrealdb-types.workspace = true
 time.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+metrics.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 url.workspace = true
+uuid.workspace = true
 
 gotong-domain = { path = "../domain" }

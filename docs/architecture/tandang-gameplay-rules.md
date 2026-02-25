@@ -1,7 +1,7 @@
 # Gotong Gameplay Rules Mapped to Tandang Signals
 
-Status: baseline ruleset (v1)  
-Last updated: 2026-02-17
+Status: baseline ruleset (v1.1, contract-locked)  
+Last updated: 2026-02-24
 
 This document defines the deterministic gameplay behavior in Gotong that is driven by Tandang signals. It is the canonical reference for product, frontend, backend, and analytics.
 
@@ -23,7 +23,7 @@ Primary read endpoints:
 - `GET /api/v1/skills/search`
 - `GET /api/v1/por/requirements/{task_type}`
 - `GET /api/v1/por/triad-requirements/{track}/{transition}`
-- `GET /api/v1/por/status?user_id=...`
+- `GET /api/v1/por/status/{evidence_id}`
 - `GET /api/v1/reputation/leaderboard`
 - `GET /api/v1/reputation/distribution`
 
@@ -83,6 +83,8 @@ Primary read endpoints:
 - Tandang service-token reads are platform-scoped and must be treated as authoritative.
 - If Tandang read fails, Gotong should show stale marker/fallback state and avoid destructive gameplay state changes.
 - Write-side rewards are finalized only after successful webhook processing + PoR verification state.
+- Formula shape is locked by Rule ID (`GR-*`): triggers, signal families, and decision branches must not be changed by ad-hoc tuning.
+- Numeric balancing values are tunable, but only through versioned rule config (never hardcoded one-off edits).
 
 ## 6. Versioning and Change Control
 
@@ -96,3 +98,34 @@ Primary read endpoints:
   - Exact signal input
   - Deterministic condition
   - UI surface impact
+- Balancing changes must be deployed as config versions with explicit activation timestamp and rollback target.
+
+## 7. Rule Config Governance (Mandatory)
+
+Rule behavior is split into:
+- **Logic contract (locked):** condition tree + outputs per Rule ID.
+- **Parameter set (tunable):** weights, thresholds, caps, decay windows, and reward multipliers.
+
+Required config envelope for every balancing change:
+
+| Field | Requirement |
+|---|---|
+| `rule_version` | Monotonic version string; immutable after publish |
+| `effective_at_ms` | Future activation timestamp (epoch ms) |
+| `params` | Explicit key/value set used by deterministic logic |
+| `bounds` | Per-parameter min/max guardrails enforced at load time |
+| `rollback_to` | Prior `rule_version` to restore if release is unhealthy |
+| `change_reason` | Human-readable reason for audit and postmortem use |
+
+Operational rules:
+- No runtime tuning outside versioned config.
+- New parameters require default + bounds before activation.
+- Old versions stay queryable for audit/replay.
+- Rollback must be single-step and deterministic.
+
+## 8. Frontend/Backend Execution Priority
+
+Until all hot paths meet SLOs, implementation order is fixed:
+1. Chat fast path (`send`, `catch-up`, `stream`).
+2. Feed + trust surfaces (relevance, gating, profile trust widgets).
+3. Notifications polish and digest tuning.

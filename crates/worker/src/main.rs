@@ -1,20 +1,23 @@
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 use std::time::Duration;
 
+use gotong_domain::ports::discovery::{FeedRepository, FeedRepositoryQuery};
 use gotong_domain::ports::jobs::{JobQueue, JobQueueError, JobType};
 use gotong_domain::ports::ontology::OntologyRepository;
 use gotong_domain::ports::webhook::WebhookOutboxRepository;
 use gotong_domain::{
     auth::Role,
+    discovery::{FEED_SOURCE_ONTOLOGY_NOTE, FeedItem},
     identity::ActorIdentity,
     jobs::{
-        backoff_ms, new_job, now_ms, ConceptVerificationPayload, JobDefaults, TTLCleanupPayload,
-        WebhookRetryPayload,
+        ConceptVerificationPayload, JobDefaults, OntologyNoteEnrichPayload, TTLCleanupPayload,
+        WebhookRetryPayload, backoff_ms, new_job, now_ms,
     },
     moderation::{ModerationAutoReleaseCommand, ModerationService},
-    ontology::OntologyConcept,
+    ontology::{OntologyConcept, OntologyEdgeKind},
     ports::{jobs::JobEnvelope, moderation::ModerationRepository},
     webhook::{
         WebhookDeliveryLog, WebhookDeliveryResult, WebhookOutboxEvent, WebhookOutboxListQuery,
@@ -27,7 +30,8 @@ use gotong_infra::{
     jobs::{JobQueueMetricsSnapshot, RedisJobQueue},
     logging::init_tracing,
     repositories::{
-        SurrealModerationRepository, SurrealOntologyRepository, SurrealWebhookOutboxRepository,
+        SurrealDiscoveryFeedRepository, SurrealModerationRepository, SurrealOntologyRepository,
+        SurrealWebhookOutboxRepository,
     },
 };
 use hmac::{Hmac, Mac};
@@ -38,6 +42,7 @@ use uuid::Uuid;
 
 type HmacSha256 = Hmac<Sha256>;
 mod observability;
+const ONTOLOGY_TTL_HIDDEN_REASON: &str = "ontology_ttl_expired";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -54,6 +59,14 @@ async fn main() -> anyhow::Result<()> {
             }
             "webhook-replay-dlq" => {
                 run_webhook_replay_mode(&config, &args[1..]).await?;
+                return Ok(());
+            }
+            "ontology-feed-backfill-expired" => {
+                run_ontology_feed_backfill_mode(&config, &args[1..]).await?;
+                return Ok(());
+            }
+            "feed-participant-edge-backfill" => {
+                run_feed_participant_edge_backfill_mode(&config, &args[1..]).await?;
                 return Ok(());
             }
             _ => {}
@@ -86,6 +99,7 @@ async fn main() -> anyhow::Result<()> {
     let mut moderation_repo = None;
     let mut ontology_repo = None;
     let mut webhook_outbox_repo = None;
+    let mut feed_repo = None;
     let backend = config.data_backend.trim().to_ascii_lowercase();
     if matches!(backend.as_str(), "surreal" | "surrealdb" | "tikv") {
         let db_config = DbConfig::from_app_config(&config);
@@ -96,6 +110,8 @@ async fn main() -> anyhow::Result<()> {
         let webhook_repository = SurrealWebhookOutboxRepository::new(&db_config).await?;
         webhook_outbox_repo =
             Some(Arc::new(webhook_repository) as Arc<dyn WebhookOutboxRepository>);
+        let feed_repository = SurrealDiscoveryFeedRepository::new(&db_config).await?;
+        feed_repo = Some(Arc::new(feed_repository) as Arc<dyn FeedRepository>);
     }
 
     let worker = Worker::new(
@@ -104,6 +120,7 @@ async fn main() -> anyhow::Result<()> {
         moderation_repo,
         ontology_repo,
         webhook_outbox_repo,
+        feed_repo,
     );
     info!("worker starting");
     worker.run().await?;
@@ -117,6 +134,7 @@ struct Worker {
     moderation_repo: Option<Arc<dyn ModerationRepository>>,
     ontology_repo: Option<Arc<dyn OntologyRepository>>,
     webhook_outbox_repo: Option<Arc<dyn WebhookOutboxRepository>>,
+    feed_repo: Option<Arc<dyn FeedRepository>>,
 }
 
 #[derive(Debug, Clone)]
@@ -171,6 +189,69 @@ struct WebhookReplaySummary {
     processed: usize,
     replayed: usize,
     failed: usize,
+}
+
+#[derive(Debug, Clone)]
+struct OntologyFeedBackfillOptions {
+    dry_run: bool,
+    page_size: usize,
+    progress_every: usize,
+    cutoff_ms: Option<i64>,
+}
+
+impl Default for OntologyFeedBackfillOptions {
+    fn default() -> Self {
+        Self {
+            dry_run: false,
+            page_size: 500,
+            progress_every: 500,
+            cutoff_ms: None,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct OntologyFeedBackfillSummary {
+    scanned: usize,
+    ontology_items: usize,
+    already_hidden: usize,
+    missing_ttl: usize,
+    fallback_ttl_resolved: usize,
+    missing_ttl_unresolved: usize,
+    expired_candidates: usize,
+    hidden: usize,
+    failed: usize,
+}
+
+#[derive(Debug, Clone)]
+struct FeedParticipantEdgeBackfillOptions {
+    dry_run: bool,
+    page_size: usize,
+    progress_every: usize,
+    from_ms: Option<i64>,
+    to_ms: Option<i64>,
+    max_rows: Option<usize>,
+}
+
+impl Default for FeedParticipantEdgeBackfillOptions {
+    fn default() -> Self {
+        Self {
+            dry_run: false,
+            page_size: 500,
+            progress_every: 500,
+            from_ms: None,
+            to_ms: None,
+            max_rows: None,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct FeedParticipantEdgeBackfillSummary {
+    scanned: usize,
+    candidate_edges: usize,
+    upserted_items: usize,
+    failed_items: usize,
 }
 
 fn parse_webhook_backfill_options(args: &[String]) -> anyhow::Result<WebhookBackfillOptions> {
@@ -285,6 +366,523 @@ fn parse_webhook_replay_options(args: &[String]) -> anyhow::Result<WebhookReplay
         }
     }
     Ok(opts)
+}
+
+fn parse_ontology_feed_backfill_options(
+    args: &[String],
+) -> anyhow::Result<OntologyFeedBackfillOptions> {
+    let mut opts = OntologyFeedBackfillOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--dry-run" => {
+                opts.dry_run = true;
+                idx += 1;
+            }
+            "--page-size" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --page-size"))?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|err| anyhow::anyhow!("invalid --page-size value: {err}"))?;
+                if parsed == 0 {
+                    return Err(anyhow::anyhow!("--page-size must be >= 1"));
+                }
+                opts.page_size = parsed.min(10_000);
+                idx += 2;
+            }
+            "--progress-every" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --progress-every"))?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|err| anyhow::anyhow!("invalid --progress-every value: {err}"))?;
+                if parsed == 0 {
+                    return Err(anyhow::anyhow!("--progress-every must be >= 1"));
+                }
+                opts.progress_every = parsed;
+                idx += 2;
+            }
+            "--cutoff-ms" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --cutoff-ms"))?;
+                let parsed = value
+                    .parse::<i64>()
+                    .map_err(|err| anyhow::anyhow!("invalid --cutoff-ms value: {err}"))?;
+                if parsed < 0 {
+                    return Err(anyhow::anyhow!("--cutoff-ms must be >= 0"));
+                }
+                opts.cutoff_ms = Some(parsed);
+                idx += 2;
+            }
+            other => {
+                return Err(anyhow::anyhow!(
+                    "unknown argument for ontology-feed-backfill-expired: {other}"
+                ));
+            }
+        }
+    }
+    Ok(opts)
+}
+
+fn parse_feed_participant_edge_backfill_options(
+    args: &[String],
+) -> anyhow::Result<FeedParticipantEdgeBackfillOptions> {
+    let mut opts = FeedParticipantEdgeBackfillOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--dry-run" => {
+                opts.dry_run = true;
+                idx += 1;
+            }
+            "--page-size" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --page-size"))?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|err| anyhow::anyhow!("invalid --page-size value: {err}"))?;
+                if parsed == 0 {
+                    return Err(anyhow::anyhow!("--page-size must be >= 1"));
+                }
+                opts.page_size = parsed.min(10_000);
+                idx += 2;
+            }
+            "--progress-every" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --progress-every"))?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|err| anyhow::anyhow!("invalid --progress-every value: {err}"))?;
+                if parsed == 0 {
+                    return Err(anyhow::anyhow!("--progress-every must be >= 1"));
+                }
+                opts.progress_every = parsed;
+                idx += 2;
+            }
+            "--from-ms" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --from-ms"))?;
+                let parsed = value
+                    .parse::<i64>()
+                    .map_err(|err| anyhow::anyhow!("invalid --from-ms value: {err}"))?;
+                if parsed < 0 {
+                    return Err(anyhow::anyhow!("--from-ms must be >= 0"));
+                }
+                opts.from_ms = Some(parsed);
+                idx += 2;
+            }
+            "--to-ms" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --to-ms"))?;
+                let parsed = value
+                    .parse::<i64>()
+                    .map_err(|err| anyhow::anyhow!("invalid --to-ms value: {err}"))?;
+                if parsed < 0 {
+                    return Err(anyhow::anyhow!("--to-ms must be >= 0"));
+                }
+                opts.to_ms = Some(parsed);
+                idx += 2;
+            }
+            "--max-rows" => {
+                let value = args
+                    .get(idx + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --max-rows"))?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|err| anyhow::anyhow!("invalid --max-rows value: {err}"))?;
+                if parsed == 0 {
+                    return Err(anyhow::anyhow!("--max-rows must be >= 1"));
+                }
+                opts.max_rows = Some(parsed);
+                idx += 2;
+            }
+            other => {
+                return Err(anyhow::anyhow!(
+                    "unknown argument for feed-participant-edge-backfill: {other}"
+                ));
+            }
+        }
+    }
+
+    if let (Some(from_ms), Some(to_ms)) = (opts.from_ms, opts.to_ms) {
+        if from_ms > to_ms {
+            return Err(anyhow::anyhow!("--from-ms must be <= --to-ms"));
+        }
+    }
+    Ok(opts)
+}
+
+fn feed_item_lifecycle_hidden(item: &FeedItem) -> bool {
+    item.payload
+        .as_ref()
+        .and_then(|payload| payload.get("lifecycle"))
+        .and_then(|lifecycle| lifecycle.get("hidden"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn feed_item_note_ttl_expires_ms(item: &FeedItem) -> Option<i64> {
+    let value = item
+        .payload
+        .as_ref()
+        .and_then(|payload| payload.get("note"))
+        .and_then(|note| note.get("ttl_expires_ms"))?;
+    if let Some(ms) = value.as_i64() {
+        return Some(ms);
+    }
+    if let Some(ms) = value.as_u64() {
+        if ms <= i64::MAX as u64 {
+            return Some(ms as i64);
+        }
+        return None;
+    }
+    value.as_str().and_then(|ms| ms.parse::<i64>().ok())
+}
+
+fn normalize_note_source_id(raw: &str) -> String {
+    raw.trim()
+        .split_once(':')
+        .map(|(_, id)| id.trim().to_string())
+        .unwrap_or_else(|| raw.trim().to_string())
+}
+
+fn feed_item_resolved_note_ttl_expires_ms(
+    item: &FeedItem,
+    ttl_by_note_id: &HashMap<String, i64>,
+) -> Option<i64> {
+    feed_item_note_ttl_expires_ms(item).or_else(|| {
+        let note_id = normalize_note_source_id(&item.source_id);
+        ttl_by_note_id.get(&note_id).copied()
+    })
+}
+
+fn should_hide_expired_ontology_feed_item_with_ttl(
+    item: &FeedItem,
+    ttl_expires_ms: Option<i64>,
+    cutoff_ms: i64,
+) -> bool {
+    if item.source_type != FEED_SOURCE_ONTOLOGY_NOTE || feed_item_lifecycle_hidden(item) {
+        return false;
+    }
+    ttl_expires_ms.is_some_and(|ttl_expires_ms| ttl_expires_ms <= cutoff_ms)
+}
+
+fn feed_participant_actor_count(item: &FeedItem) -> usize {
+    let mut actor_ids = HashSet::new();
+    for actor_id in std::iter::once(item.actor_id.as_str())
+        .chain(item.participant_ids.iter().map(String::as_str))
+    {
+        let actor_id = actor_id.trim();
+        if actor_id.is_empty() {
+            continue;
+        }
+        actor_ids.insert(actor_id.to_string());
+    }
+    actor_ids.len()
+}
+
+async fn run_feed_participant_edge_backfill_mode(
+    config: &AppConfig,
+    args: &[String],
+) -> anyhow::Result<()> {
+    let options = parse_feed_participant_edge_backfill_options(args)?;
+    let db_config = DbConfig::from_app_config(config);
+    let feed_repo: Arc<dyn FeedRepository> =
+        Arc::new(SurrealDiscoveryFeedRepository::new(&db_config).await?);
+    let mut summary = FeedParticipantEdgeBackfillSummary::default();
+    let mut cursor_occurred_at_ms: Option<i64> = None;
+    let mut cursor_feed_id: Option<String> = None;
+
+    println!(
+        "[feed-participant-edge-backfill] start dry_run={} page_size={} progress_every={} from_ms={:?} to_ms={:?} max_rows={:?}",
+        options.dry_run,
+        options.page_size,
+        options.progress_every,
+        options.from_ms,
+        options.to_ms,
+        options.max_rows
+    );
+
+    loop {
+        if options
+            .max_rows
+            .is_some_and(|max_rows| summary.scanned >= max_rows)
+        {
+            break;
+        }
+        let page_limit = options
+            .max_rows
+            .map(|max_rows| max_rows.saturating_sub(summary.scanned))
+            .unwrap_or(options.page_size)
+            .min(options.page_size)
+            .max(1);
+
+        let rows = feed_repo
+            .list_feed(&FeedRepositoryQuery {
+                actor_id: "system".to_string(),
+                cursor_occurred_at_ms,
+                cursor_feed_id: cursor_feed_id.clone(),
+                limit: page_limit,
+                scope_id: None,
+                privacy_level: None,
+                from_ms: options.from_ms,
+                to_ms: options.to_ms,
+                involvement_only: false,
+            })
+            .await
+            .map_err(|err| anyhow::anyhow!("failed listing feed rows for edge backfill: {err}"))?;
+        if rows.is_empty() {
+            break;
+        }
+
+        for item in &rows {
+            summary.scanned = summary.scanned.saturating_add(1);
+            summary.candidate_edges = summary
+                .candidate_edges
+                .saturating_add(feed_participant_actor_count(item));
+
+            if !options.dry_run {
+                match feed_repo.upsert_participant_edges_for_item(item).await {
+                    Ok(()) => {
+                        summary.upserted_items = summary.upserted_items.saturating_add(1);
+                    }
+                    Err(err) => {
+                        summary.failed_items = summary.failed_items.saturating_add(1);
+                        warn!(
+                            feed_id = %item.feed_id,
+                            source_type = %item.source_type,
+                            source_id = %item.source_id,
+                            error = %err,
+                            "failed upserting participant edges during feed backfill"
+                        );
+                    }
+                }
+            }
+
+            if summary.scanned % options.progress_every == 0 {
+                println!(
+                    "[feed-participant-edge-backfill] progress scanned={} candidate_edges={} upserted_items={} failed_items={}",
+                    summary.scanned,
+                    summary.candidate_edges,
+                    summary.upserted_items,
+                    summary.failed_items
+                );
+            }
+
+            if options
+                .max_rows
+                .is_some_and(|max_rows| summary.scanned >= max_rows)
+            {
+                break;
+            }
+        }
+
+        let Some(last_row) = rows.last() else {
+            break;
+        };
+        if cursor_occurred_at_ms == Some(last_row.occurred_at_ms)
+            && cursor_feed_id.as_deref() == Some(last_row.feed_id.as_str())
+        {
+            break;
+        }
+        cursor_occurred_at_ms = Some(last_row.occurred_at_ms);
+        cursor_feed_id = Some(last_row.feed_id.clone());
+        if rows.len() < page_limit {
+            break;
+        }
+    }
+
+    println!(
+        "[feed-participant-edge-backfill] done scanned={} candidate_edges={} upserted_items={} failed_items={} dry_run={}",
+        summary.scanned,
+        summary.candidate_edges,
+        summary.upserted_items,
+        summary.failed_items,
+        options.dry_run
+    );
+    Ok(())
+}
+
+async fn run_ontology_feed_backfill_mode(
+    config: &AppConfig,
+    args: &[String],
+) -> anyhow::Result<()> {
+    let options = parse_ontology_feed_backfill_options(args)?;
+    let db_config = DbConfig::from_app_config(config);
+    let feed_repo: Arc<dyn FeedRepository> =
+        Arc::new(SurrealDiscoveryFeedRepository::new(&db_config).await?);
+    let ontology_repo = SurrealOntologyRepository::new(&db_config).await?;
+    let cutoff_ms = options.cutoff_ms.unwrap_or_else(now_ms);
+    let mut summary = OntologyFeedBackfillSummary::default();
+    let mut cursor_occurred_at_ms: Option<i64> = None;
+    let mut cursor_feed_id: Option<String> = None;
+
+    println!(
+        "[ontology-feed-backfill-expired] start dry_run={} page_size={} progress_every={} cutoff_ms={}",
+        options.dry_run, options.page_size, options.progress_every, cutoff_ms
+    );
+
+    loop {
+        let rows = feed_repo
+            .list_feed(&FeedRepositoryQuery {
+                actor_id: "system".to_string(),
+                cursor_occurred_at_ms,
+                cursor_feed_id: cursor_feed_id.clone(),
+                limit: options.page_size,
+                scope_id: None,
+                privacy_level: None,
+                from_ms: None,
+                to_ms: None,
+                involvement_only: false,
+            })
+            .await
+            .map_err(|err| anyhow::anyhow!("failed listing feed rows for backfill: {err}"))?;
+        if rows.is_empty() {
+            break;
+        }
+        let note_ids_missing_payload_ttl: Vec<String> = rows
+            .iter()
+            .filter(|item| {
+                item.source_type == FEED_SOURCE_ONTOLOGY_NOTE
+                    && !feed_item_lifecycle_hidden(item)
+                    && feed_item_note_ttl_expires_ms(item).is_none()
+            })
+            .map(|item| normalize_note_source_id(&item.source_id))
+            .collect();
+        let ttl_by_note_id = if note_ids_missing_payload_ttl.is_empty() {
+            HashMap::new()
+        } else {
+            match ontology_repo
+                .note_ttl_expires_ms_by_note_ids(&note_ids_missing_payload_ttl)
+                .await
+            {
+                Ok(map) => map,
+                Err(err) => {
+                    warn!(
+                        error = %err,
+                        batch_size = note_ids_missing_payload_ttl.len(),
+                        "failed resolving fallback note ttl values during ontology feed backfill"
+                    );
+                    HashMap::new()
+                }
+            }
+        };
+
+        for item in &rows {
+            summary.scanned = summary.scanned.saturating_add(1);
+            if item.source_type != FEED_SOURCE_ONTOLOGY_NOTE {
+                continue;
+            }
+            summary.ontology_items = summary.ontology_items.saturating_add(1);
+            if feed_item_lifecycle_hidden(item) {
+                summary.already_hidden = summary.already_hidden.saturating_add(1);
+                continue;
+            }
+            let payload_ttl_expires_ms = feed_item_note_ttl_expires_ms(item);
+            let resolved_ttl_expires_ms =
+                feed_item_resolved_note_ttl_expires_ms(item, &ttl_by_note_id);
+            if payload_ttl_expires_ms.is_none() {
+                summary.missing_ttl = summary.missing_ttl.saturating_add(1);
+                if resolved_ttl_expires_ms.is_some() {
+                    summary.fallback_ttl_resolved = summary.fallback_ttl_resolved.saturating_add(1);
+                } else {
+                    summary.missing_ttl_unresolved =
+                        summary.missing_ttl_unresolved.saturating_add(1);
+                }
+            }
+            if !should_hide_expired_ontology_feed_item_with_ttl(
+                item,
+                resolved_ttl_expires_ms,
+                cutoff_ms,
+            ) {
+                if summary.scanned % options.progress_every == 0 {
+                    println!(
+                        "[ontology-feed-backfill-expired] progress scanned={} ontology_items={} candidates={} hidden={} failed={} already_hidden={} missing_ttl={} fallback_resolved={} missing_ttl_unresolved={}",
+                        summary.scanned,
+                        summary.ontology_items,
+                        summary.expired_candidates,
+                        summary.hidden,
+                        summary.failed,
+                        summary.already_hidden,
+                        summary.missing_ttl,
+                        summary.fallback_ttl_resolved,
+                        summary.missing_ttl_unresolved
+                    );
+                }
+                continue;
+            }
+            summary.expired_candidates = summary.expired_candidates.saturating_add(1);
+            if !options.dry_run {
+                let payload_patch = json!({
+                    "lifecycle": {
+                        "hidden": true,
+                        "hidden_reason": ONTOLOGY_TTL_HIDDEN_REASON,
+                        "hidden_at_ms": now_ms()
+                    }
+                });
+                match feed_repo.merge_payload(&item.feed_id, payload_patch).await {
+                    Ok(_) => {
+                        summary.hidden = summary.hidden.saturating_add(1);
+                    }
+                    Err(err) => {
+                        summary.failed = summary.failed.saturating_add(1);
+                        warn!(feed_id = %item.feed_id, source_id = %item.source_id, error = %err, "failed to hide expired ontology feed item during backfill");
+                    }
+                }
+            }
+            if summary.scanned % options.progress_every == 0 {
+                println!(
+                    "[ontology-feed-backfill-expired] progress scanned={} ontology_items={} candidates={} hidden={} failed={} already_hidden={} missing_ttl={} fallback_resolved={} missing_ttl_unresolved={}",
+                    summary.scanned,
+                    summary.ontology_items,
+                    summary.expired_candidates,
+                    summary.hidden,
+                    summary.failed,
+                    summary.already_hidden,
+                    summary.missing_ttl,
+                    summary.fallback_ttl_resolved,
+                    summary.missing_ttl_unresolved
+                );
+            }
+        }
+
+        let Some(last_row) = rows.last() else {
+            break;
+        };
+        if cursor_occurred_at_ms == Some(last_row.occurred_at_ms)
+            && cursor_feed_id.as_deref() == Some(last_row.feed_id.as_str())
+        {
+            break;
+        }
+        cursor_occurred_at_ms = Some(last_row.occurred_at_ms);
+        cursor_feed_id = Some(last_row.feed_id.clone());
+        if rows.len() < options.page_size {
+            break;
+        }
+    }
+
+    println!(
+        "[ontology-feed-backfill-expired] done scanned={} ontology_items={} candidates={} hidden={} failed={} already_hidden={} missing_ttl={} fallback_resolved={} missing_ttl_unresolved={} dry_run={}",
+        summary.scanned,
+        summary.ontology_items,
+        summary.expired_candidates,
+        summary.hidden,
+        summary.failed,
+        summary.already_hidden,
+        summary.missing_ttl,
+        summary.fallback_ttl_resolved,
+        summary.missing_ttl_unresolved,
+        options.dry_run
+    );
+    Ok(())
 }
 
 async fn run_webhook_backfill_mode(config: &AppConfig, args: &[String]) -> anyhow::Result<()> {
@@ -578,6 +1176,7 @@ impl Worker {
         moderation_repo: Option<Arc<dyn ModerationRepository>>,
         ontology_repo: Option<Arc<dyn OntologyRepository>>,
         webhook_outbox_repo: Option<Arc<dyn WebhookOutboxRepository>>,
+        feed_repo: Option<Arc<dyn FeedRepository>>,
     ) -> Self {
         Self {
             queue,
@@ -585,6 +1184,7 @@ impl Worker {
             moderation_repo,
             ontology_repo,
             webhook_outbox_repo,
+            feed_repo,
         }
     }
 
@@ -647,6 +1247,7 @@ impl Worker {
                         self.moderation_repo.as_ref(),
                         self.ontology_repo.as_ref(),
                         self.webhook_outbox_repo.as_ref(),
+                        self.feed_repo.as_ref(),
                     )
                     .await
                     {
@@ -900,6 +1501,7 @@ async fn handle_job(
     moderation_repo: Option<&Arc<dyn ModerationRepository>>,
     ontology_repo: Option<&Arc<dyn OntologyRepository>>,
     webhook_outbox_repo: Option<&Arc<dyn WebhookOutboxRepository>>,
+    feed_repo: Option<&Arc<dyn FeedRepository>>,
 ) -> anyhow::Result<()> {
     match job.job_type {
         JobType::ModerationAutoRelease => {
@@ -942,10 +1544,13 @@ async fn handle_job(
             info!(job_id = %job.job_id, "handling digest send (stub)");
         }
         JobType::TTLCleanup => {
-            handle_ttl_cleanup(ontology_repo, job).await?;
+            handle_ttl_cleanup(ontology_repo, feed_repo, job).await?;
         }
         JobType::ConceptVerification => {
             handle_concept_verification(ontology_repo, job).await?;
+        }
+        JobType::OntologyNoteEnrich => {
+            handle_ontology_note_enrich(ontology_repo, feed_repo, job).await?;
         }
     }
 
@@ -959,6 +1564,7 @@ fn job_type_label(job_type: &JobType) -> &'static str {
         JobType::DigestSend => "digest_send",
         JobType::TTLCleanup => "ttl_cleanup",
         JobType::ConceptVerification => "concept_verification",
+        JobType::OntologyNoteEnrich => "ontology_note_enrich",
     }
 }
 
@@ -1041,8 +1647,178 @@ fn parse_concept_verification_payload(
     Ok(payload)
 }
 
+fn parse_ontology_note_enrich_payload(
+    job: &JobEnvelope,
+) -> anyhow::Result<OntologyNoteEnrichPayload> {
+    let payload: OntologyNoteEnrichPayload = serde_json::from_value(job.payload.clone())
+        .map_err(|err| anyhow::anyhow!("invalid ontology note enrich payload: {err}"))?;
+    if payload.requested_ms < 0 {
+        return Err(anyhow::anyhow!(
+            "invalid ontology note enrich payload: requested_ms must be non-negative"
+        ));
+    }
+    if payload.note_id.trim().is_empty() {
+        return Err(anyhow::anyhow!(
+            "invalid ontology note enrich payload: note_id is required"
+        ));
+    }
+    if let Some(feed_id) = payload.feed_id.as_deref() {
+        if feed_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "invalid ontology note enrich payload: feed_id must be non-empty when provided"
+            ));
+        }
+    }
+    Ok(payload)
+}
+
+fn concept_qid_from_target_id(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.starts_with("concept:") {
+        let qid = trimmed.strip_prefix("concept:")?.trim();
+        if qid.is_empty() {
+            None
+        } else {
+            Some(qid.to_string())
+        }
+    } else if trimmed.starts_with('Q') {
+        Some(trimmed.to_string())
+    } else {
+        None
+    }
+}
+
+fn action_type_from_target_id(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    let action_id = trimmed.strip_prefix("action:")?.trim();
+    if action_id.is_empty() {
+        return None;
+    }
+    Some(format!("schema:{action_id}"))
+}
+
+async fn handle_ontology_note_enrich(
+    ontology_repo: Option<&Arc<dyn OntologyRepository>>,
+    feed_repo: Option<&Arc<dyn FeedRepository>>,
+    job: &JobEnvelope,
+) -> anyhow::Result<()> {
+    let payload = parse_ontology_note_enrich_payload(job)?;
+    let Some(ontology_repo) = ontology_repo else {
+        warn!(
+            job_id = %job.job_id,
+            "skipping ontology note enrich job: ontology repository is unavailable"
+        );
+        return Ok(());
+    };
+    let Some(feed_repo) = feed_repo else {
+        warn!(
+            job_id = %job.job_id,
+            "skipping ontology note enrich job: feed repository is unavailable"
+        );
+        return Ok(());
+    };
+
+    let feed_item = if let Some(feed_id) = payload.feed_id.as_deref() {
+        feed_repo
+            .get_by_feed_id(feed_id)
+            .await
+            .map_err(|err| anyhow::anyhow!("failed to fetch feed item by id: {err}"))?
+    } else {
+        feed_repo
+            .get_latest_by_source(FEED_SOURCE_ONTOLOGY_NOTE, &payload.note_id)
+            .await
+            .map_err(|err| anyhow::anyhow!("failed to fetch feed item by source: {err}"))?
+    };
+    let Some(feed_item) = feed_item else {
+        info!(
+            job_id = %job.job_id,
+            note_id = %payload.note_id,
+            "ontology note enrich job skipped: feed item not found"
+        );
+        return Ok(());
+    };
+
+    let about_targets = ontology_repo
+        .list_note_edge_targets(&payload.note_id, OntologyEdgeKind::About)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to list ABOUT targets: {err}"))?;
+    let action_targets = ontology_repo
+        .list_note_edge_targets(&payload.note_id, OntologyEdgeKind::HasAction)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to list HAS_ACTION targets: {err}"))?;
+    let place_targets = ontology_repo
+        .list_note_edge_targets(&payload.note_id, OntologyEdgeKind::LocatedAt)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to list LOCATED_AT targets: {err}"))?;
+
+    let mut concept_qids = about_targets
+        .into_iter()
+        .filter_map(|target| concept_qid_from_target_id(&target))
+        .collect::<Vec<_>>();
+    concept_qids.sort();
+    concept_qids.dedup();
+
+    let mut action_types = action_targets
+        .into_iter()
+        .filter_map(|target| action_type_from_target_id(&target))
+        .collect::<Vec<_>>();
+    action_types.sort();
+    action_types.dedup();
+
+    let mut place_ids = place_targets
+        .into_iter()
+        .map(|target| target.trim().to_string())
+        .filter(|value| value.starts_with("place:"))
+        .collect::<Vec<_>>();
+    place_ids.sort();
+    place_ids.dedup();
+
+    let concepts = ontology_repo
+        .get_concepts_by_qids(&concept_qids)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to fetch concepts by qids: {err}"))?;
+    let actions = ontology_repo
+        .get_actions_by_types(&action_types)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to fetch actions by types: {err}"))?;
+    let places = ontology_repo
+        .get_places_by_ids(&place_ids)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to fetch places by ids: {err}"))?;
+
+    let payload_patch = json!({
+        "enrichment": {
+            "status": "computed",
+            "tags_enriched_at_ms": now_ms(),
+            "tags": {
+                "concept_qids": concept_qids,
+                "action_types": action_types,
+                "place_ids": place_ids,
+            },
+            "labels": {
+                "concepts": concepts,
+                "actions": actions,
+                "places": places,
+            }
+        }
+    });
+    feed_repo
+        .merge_payload(&feed_item.feed_id, payload_patch)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to merge feed payload: {err}"))?;
+
+    info!(
+        job_id = %job.job_id,
+        feed_id = %feed_item.feed_id,
+        note_id = %payload.note_id,
+        "handled ontology note enrich job"
+    );
+    Ok(())
+}
+
 async fn handle_ttl_cleanup(
     ontology_repo: Option<&Arc<dyn OntologyRepository>>,
+    feed_repo: Option<&Arc<dyn FeedRepository>>,
     job: &JobEnvelope,
 ) -> anyhow::Result<()> {
     let payload = parse_ttl_cleanup_payload(job)?;
@@ -1054,14 +1830,49 @@ async fn handle_ttl_cleanup(
         return Ok(());
     };
 
-    let removed = repo
+    let removed_note_ids = repo
         .cleanup_expired_notes(payload.cutoff_ms)
         .await
         .map_err(|err| anyhow::anyhow!("ttl cleanup ontology cleanup failed: {err}"))?;
+    let mut hidden_feed_items = 0usize;
+    if let Some(feed_repo) = feed_repo {
+        for note_id in &removed_note_ids {
+            match feed_repo
+                .get_latest_by_source(FEED_SOURCE_ONTOLOGY_NOTE, note_id)
+                .await
+            {
+                Ok(Some(feed_item)) => {
+                    let payload_patch = json!({
+                        "lifecycle": {
+                            "hidden": true,
+                            "hidden_reason": ONTOLOGY_TTL_HIDDEN_REASON,
+                            "hidden_at_ms": now_ms()
+                        }
+                    });
+                    match feed_repo
+                        .merge_payload(&feed_item.feed_id, payload_patch)
+                        .await
+                    {
+                        Ok(_) => {
+                            hidden_feed_items += 1;
+                        }
+                        Err(err) => {
+                            warn!(job_id = %job.job_id, note_id = %note_id, feed_id = %feed_item.feed_id, error = %err, "failed to hide expired ontology note feed item");
+                        }
+                    }
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    warn!(job_id = %job.job_id, note_id = %note_id, error = %err, "failed to lookup ontology note feed item during ttl cleanup");
+                }
+            }
+        }
+    }
     info!(
         job_id = %job.job_id,
         cutoff_ms = payload.cutoff_ms,
-        removed,
+        removed = removed_note_ids.len(),
+        hidden_feed_items,
         "handled ttl cleanup job"
     );
     Ok(())
@@ -1375,10 +2186,11 @@ fn hash_sha256_hex(payload: &[u8]) -> String {
 mod periodic_job_tests {
     use super::*;
 
+    use gotong_domain::discovery::FeedItem;
     use gotong_domain::ontology::{
         OntologyConcept, OntologyEdgeKind, OntologyNoteCreate, OntologyTripleCreate,
     };
-    use gotong_infra::repositories::InMemoryOntologyRepository;
+    use gotong_infra::repositories::{InMemoryDiscoveryFeedRepository, InMemoryOntologyRepository};
 
     fn moderation_auto_release_job(payload: serde_json::Value) -> JobEnvelope {
         JobEnvelope {
@@ -1412,6 +2224,20 @@ mod periodic_job_tests {
         JobEnvelope {
             job_id: "job-1".to_string(),
             job_type: JobType::ConceptVerification,
+            payload,
+            request_id: "req-1".to_string(),
+            correlation_id: "corr-1".to_string(),
+            attempt: 1,
+            max_attempts: 1,
+            run_at_ms: 1,
+            created_at_ms: 1,
+        }
+    }
+
+    fn ontology_note_enrich_job(payload: serde_json::Value) -> JobEnvelope {
+        JobEnvelope {
+            job_id: "job-1".to_string(),
+            job_type: JobType::OntologyNoteEnrich,
             payload,
             request_id: "req-1".to_string(),
             correlation_id: "corr-1".to_string(),
@@ -1542,9 +2368,197 @@ mod periodic_job_tests {
         assert!(parse_webhook_retry_payload(&job).is_err());
     }
 
+    #[test]
+    fn parse_ontology_feed_backfill_options_defaults_and_flags() {
+        let defaults = parse_ontology_feed_backfill_options(&[]).expect("default options");
+        assert!(!defaults.dry_run);
+        assert_eq!(defaults.page_size, 500);
+        assert_eq!(defaults.progress_every, 500);
+        assert_eq!(defaults.cutoff_ms, None);
+
+        let args = vec![
+            "--dry-run".to_string(),
+            "--page-size".to_string(),
+            "1000".to_string(),
+            "--progress-every".to_string(),
+            "100".to_string(),
+            "--cutoff-ms".to_string(),
+            "1234".to_string(),
+        ];
+        let parsed =
+            parse_ontology_feed_backfill_options(&args).expect("custom ontology backfill options");
+        assert!(parsed.dry_run);
+        assert_eq!(parsed.page_size, 1000);
+        assert_eq!(parsed.progress_every, 100);
+        assert_eq!(parsed.cutoff_ms, Some(1234));
+    }
+
+    #[test]
+    fn parse_feed_participant_edge_backfill_options_defaults_and_flags() {
+        let defaults =
+            parse_feed_participant_edge_backfill_options(&[]).expect("default backfill options");
+        assert!(!defaults.dry_run);
+        assert_eq!(defaults.page_size, 500);
+        assert_eq!(defaults.progress_every, 500);
+        assert_eq!(defaults.from_ms, None);
+        assert_eq!(defaults.to_ms, None);
+        assert_eq!(defaults.max_rows, None);
+
+        let args = vec![
+            "--dry-run".to_string(),
+            "--page-size".to_string(),
+            "1000".to_string(),
+            "--progress-every".to_string(),
+            "100".to_string(),
+            "--from-ms".to_string(),
+            "2000".to_string(),
+            "--to-ms".to_string(),
+            "9000".to_string(),
+            "--max-rows".to_string(),
+            "250".to_string(),
+        ];
+        let parsed = parse_feed_participant_edge_backfill_options(&args)
+            .expect("custom participant edge backfill options");
+        assert!(parsed.dry_run);
+        assert_eq!(parsed.page_size, 1000);
+        assert_eq!(parsed.progress_every, 100);
+        assert_eq!(parsed.from_ms, Some(2000));
+        assert_eq!(parsed.to_ms, Some(9000));
+        assert_eq!(parsed.max_rows, Some(250));
+    }
+
+    #[test]
+    fn parse_feed_participant_edge_backfill_options_rejects_inverted_window() {
+        let args = vec![
+            "--from-ms".to_string(),
+            "5000".to_string(),
+            "--to-ms".to_string(),
+            "1000".to_string(),
+        ];
+        let result = parse_feed_participant_edge_backfill_options(&args);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn feed_participant_actor_count_dedupes_actor_and_participants() {
+        let item = FeedItem {
+            feed_id: "feed-1".to_string(),
+            source_type: "contribution".to_string(),
+            source_id: "source-1".to_string(),
+            actor_id: "actor-1".to_string(),
+            actor_username: "actor-1".to_string(),
+            title: "title".to_string(),
+            summary: None,
+            scope_id: None,
+            privacy_level: Some("public".to_string()),
+            occurred_at_ms: 1,
+            created_at_ms: 1,
+            request_id: "req-1".to_string(),
+            correlation_id: "corr-1".to_string(),
+            participant_ids: vec![
+                "actor-1".to_string(),
+                "participant-1".to_string(),
+                "participant-1".to_string(),
+                "participant-2".to_string(),
+                " ".to_string(),
+            ],
+            payload: None,
+        };
+        assert_eq!(feed_participant_actor_count(&item), 3);
+    }
+
+    #[test]
+    fn should_hide_expired_ontology_feed_item_requires_expired_ttl_and_not_hidden() {
+        let expired = FeedItem {
+            feed_id: "feed-expired".to_string(),
+            source_type: FEED_SOURCE_ONTOLOGY_NOTE.to_string(),
+            source_id: "note-1".to_string(),
+            actor_id: "actor-1".to_string(),
+            actor_username: "actor-1".to_string(),
+            title: "expired note".to_string(),
+            summary: None,
+            scope_id: Some("rt-1".to_string()),
+            privacy_level: Some("public".to_string()),
+            occurred_at_ms: 1,
+            created_at_ms: 1,
+            request_id: "req-1".to_string(),
+            correlation_id: "corr-1".to_string(),
+            participant_ids: Vec::new(),
+            payload: Some(serde_json::json!({
+                "note": { "ttl_expires_ms": 500 }
+            })),
+        };
+        assert!(should_hide_expired_ontology_feed_item_with_ttl(
+            &expired,
+            feed_item_note_ttl_expires_ms(&expired),
+            1_000
+        ));
+
+        let future_ttl = FeedItem {
+            payload: Some(serde_json::json!({
+                "note": { "ttl_expires_ms": 5_000 }
+            })),
+            ..expired.clone()
+        };
+        assert!(!should_hide_expired_ontology_feed_item_with_ttl(
+            &future_ttl,
+            feed_item_note_ttl_expires_ms(&future_ttl),
+            1_000
+        ));
+
+        let hidden = FeedItem {
+            payload: Some(serde_json::json!({
+                "note": { "ttl_expires_ms": 500 },
+                "lifecycle": { "hidden": true }
+            })),
+            ..expired
+        };
+        assert!(!should_hide_expired_ontology_feed_item_with_ttl(
+            &hidden,
+            feed_item_note_ttl_expires_ms(&hidden),
+            1_000
+        ));
+    }
+
+    #[test]
+    fn feed_item_resolved_note_ttl_uses_lookup_when_payload_ttl_missing() {
+        let item = FeedItem {
+            feed_id: "feed-fallback".to_string(),
+            source_type: FEED_SOURCE_ONTOLOGY_NOTE.to_string(),
+            source_id: "note:note-lookup".to_string(),
+            actor_id: "actor-1".to_string(),
+            actor_username: "actor-1".to_string(),
+            title: "missing ttl payload".to_string(),
+            summary: None,
+            scope_id: Some("rt-1".to_string()),
+            privacy_level: Some("public".to_string()),
+            occurred_at_ms: 1,
+            created_at_ms: 1,
+            request_id: "req-fallback".to_string(),
+            correlation_id: "corr-fallback".to_string(),
+            participant_ids: Vec::new(),
+            payload: Some(serde_json::json!({
+                "note": { "note_id": "note-lookup" }
+            })),
+        };
+        let mut ttl_by_note_id = HashMap::new();
+        ttl_by_note_id.insert("note-lookup".to_string(), 750);
+
+        assert_eq!(
+            feed_item_resolved_note_ttl_expires_ms(&item, &ttl_by_note_id),
+            Some(750)
+        );
+        assert!(should_hide_expired_ontology_feed_item_with_ttl(
+            &item,
+            feed_item_resolved_note_ttl_expires_ms(&item, &ttl_by_note_id),
+            1_000
+        ));
+    }
+
     #[tokio::test]
     async fn handle_ttl_cleanup_removes_expired_notes_and_edges() {
         let repo: Arc<dyn OntologyRepository> = Arc::new(InMemoryOntologyRepository::new());
+        let feed_repo: Arc<dyn FeedRepository> = Arc::new(InMemoryDiscoveryFeedRepository::new());
         let now = gotong_domain::jobs::now_ms();
 
         repo.upsert_concept(&OntologyConcept {
@@ -1613,12 +2627,60 @@ mod periodic_job_tests {
         .await
         .expect("write triples");
 
+        feed_repo
+            .create_feed_item(&FeedItem {
+                feed_id: "feed-expired".to_string(),
+                source_type: FEED_SOURCE_ONTOLOGY_NOTE.to_string(),
+                source_id: expired.note_id.clone(),
+                actor_id: expired.author_id.clone(),
+                actor_username: "author-1".to_string(),
+                title: "expired note".to_string(),
+                summary: None,
+                scope_id: Some(expired.community_id.clone()),
+                privacy_level: Some("public".to_string()),
+                occurred_at_ms: expired.created_at_ms,
+                created_at_ms: expired.created_at_ms,
+                request_id: "req-feed-expired".to_string(),
+                correlation_id: "corr-feed-expired".to_string(),
+                participant_ids: Vec::new(),
+                payload: Some(serde_json::json!({
+                    "note": { "note_id": expired.note_id },
+                    "enrichment": { "status": "computed" }
+                })),
+            })
+            .await
+            .expect("create expired feed item");
+
+        feed_repo
+            .create_feed_item(&FeedItem {
+                feed_id: "feed-active".to_string(),
+                source_type: FEED_SOURCE_ONTOLOGY_NOTE.to_string(),
+                source_id: active.note_id.clone(),
+                actor_id: active.author_id.clone(),
+                actor_username: "author-2".to_string(),
+                title: "active note".to_string(),
+                summary: None,
+                scope_id: Some(active.community_id.clone()),
+                privacy_level: Some("public".to_string()),
+                occurred_at_ms: active.created_at_ms,
+                created_at_ms: active.created_at_ms,
+                request_id: "req-feed-active".to_string(),
+                correlation_id: "corr-feed-active".to_string(),
+                participant_ids: Vec::new(),
+                payload: Some(serde_json::json!({
+                    "note": { "note_id": active.note_id },
+                    "enrichment": { "status": "computed" }
+                })),
+            })
+            .await
+            .expect("create active feed item");
+
         let job = ttl_cleanup_job(serde_json::json!({
             "scheduled_ms": now,
             "cutoff_ms": now,
         }));
 
-        handle_ttl_cleanup(Some(&repo), &job)
+        handle_ttl_cleanup(Some(&repo), Some(&feed_repo), &job)
             .await
             .expect("handle ttl cleanup");
 
@@ -1634,6 +2696,36 @@ mod periodic_job_tests {
             .await
             .expect("active feedback counts");
         assert_eq!(active_feedback.challenge_count, 1);
+
+        let expired_feed = feed_repo
+            .get_by_feed_id("feed-expired")
+            .await
+            .expect("expired feed fetch")
+            .expect("expired feed item exists");
+        assert_eq!(
+            expired_feed
+                .payload
+                .as_ref()
+                .and_then(|payload| payload.get("lifecycle"))
+                .and_then(|lifecycle| lifecycle.get("hidden"))
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
+
+        let active_feed = feed_repo
+            .get_by_feed_id("feed-active")
+            .await
+            .expect("active feed fetch")
+            .expect("active feed item exists");
+        assert_ne!(
+            active_feed
+                .payload
+                .as_ref()
+                .and_then(|payload| payload.get("lifecycle"))
+                .and_then(|lifecycle| lifecycle.get("hidden"))
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
     }
 
     #[tokio::test]
@@ -1642,7 +2734,158 @@ mod periodic_job_tests {
             "scheduled_ms": 1_000,
             "cutoff_ms": 1_000,
         }));
-        assert!(handle_ttl_cleanup(None, &job).await.is_ok());
+        assert!(handle_ttl_cleanup(None, None, &job).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn handle_ontology_note_enrich_preserves_feedback_and_updates_tags() {
+        let ontology_repo: Arc<dyn OntologyRepository> =
+            Arc::new(InMemoryOntologyRepository::new());
+        let feed_repo: Arc<dyn FeedRepository> = Arc::new(InMemoryDiscoveryFeedRepository::new());
+
+        ontology_repo
+            .upsert_concept(&OntologyConcept {
+                concept_id: "Q2095".to_string(),
+                qid: "Q2095".to_string(),
+                label_id: Some("Makanan".to_string()),
+                label_en: Some("Food".to_string()),
+                verified: true,
+            })
+            .await
+            .expect("upsert concept");
+
+        let note = ontology_repo
+            .create_note(&OntologyNoteCreate {
+                note_id: Some("note-enrich".to_string()),
+                content: "harga naik".to_string(),
+                author_id: "author-1".to_string(),
+                community_id: "rt-1".to_string(),
+                temporal_class: "persistent".to_string(),
+                ttl_expires_ms: None,
+                ai_readable: true,
+                rahasia_level: 0,
+                confidence: 0.9,
+            })
+            .await
+            .expect("create note");
+
+        ontology_repo
+            .write_triples(&[
+                OntologyTripleCreate {
+                    edge: OntologyEdgeKind::About,
+                    from_id: format!("note:{}", note.note_id),
+                    to_id: "concept:Q2095".to_string(),
+                    predicate: Some("schema:about".to_string()),
+                    metadata: None,
+                },
+                OntologyTripleCreate {
+                    edge: OntologyEdgeKind::HasAction,
+                    from_id: format!("note:{}", note.note_id),
+                    to_id: "action:InformAction".to_string(),
+                    predicate: Some("schema:InformAction".to_string()),
+                    metadata: None,
+                },
+                OntologyTripleCreate {
+                    edge: OntologyEdgeKind::LocatedAt,
+                    from_id: format!("note:{}", note.note_id),
+                    to_id: "place:rt05".to_string(),
+                    predicate: None,
+                    metadata: None,
+                },
+            ])
+            .await
+            .expect("write triples");
+
+        let feedback_enriched_at_ms = now_ms() - 10_000;
+        let feed_id = "feed-enrich-1".to_string();
+        feed_repo
+            .create_feed_item(&FeedItem {
+                feed_id: feed_id.clone(),
+                source_type: FEED_SOURCE_ONTOLOGY_NOTE.to_string(),
+                source_id: note.note_id.clone(),
+                actor_id: note.author_id.clone(),
+                actor_username: "author-1".to_string(),
+                title: "Harga naik".to_string(),
+                summary: None,
+                scope_id: Some(note.community_id.clone()),
+                privacy_level: Some("public".to_string()),
+                occurred_at_ms: note.created_at_ms,
+                created_at_ms: note.created_at_ms,
+                request_id: "req-feed-1".to_string(),
+                correlation_id: "corr-feed-1".to_string(),
+                participant_ids: Vec::new(),
+                payload: Some(serde_json::json!({
+                    "enrichment": {
+                        "status": "computed",
+                        "feedback_enriched_at_ms": feedback_enriched_at_ms,
+                        "feedback": {
+                            "vouch_count": 2,
+                            "challenge_count": 1,
+                            "score": 0.42
+                        }
+                    }
+                })),
+            })
+            .await
+            .expect("create feed item");
+
+        let job = ontology_note_enrich_job(serde_json::json!({
+            "note_id": note.note_id,
+            "feed_id": feed_id,
+            "requested_ms": now_ms()
+        }));
+        handle_ontology_note_enrich(Some(&ontology_repo), Some(&feed_repo), &job)
+            .await
+            .expect("handle enrichment");
+
+        let updated = feed_repo
+            .get_by_feed_id("feed-enrich-1")
+            .await
+            .expect("get feed item")
+            .expect("feed item exists");
+        let payload = updated.payload.expect("payload");
+        let enrichment = payload.get("enrichment").expect("enrichment");
+
+        assert_eq!(
+            enrichment
+                .get("feedback_enriched_at_ms")
+                .and_then(serde_json::Value::as_i64),
+            Some(feedback_enriched_at_ms)
+        );
+        assert_eq!(
+            enrichment
+                .get("feedback")
+                .and_then(|feedback| feedback.get("vouch_count"))
+                .and_then(serde_json::Value::as_i64),
+            Some(2)
+        );
+        assert_eq!(
+            enrichment
+                .get("feedback")
+                .and_then(|feedback| feedback.get("challenge_count"))
+                .and_then(serde_json::Value::as_i64),
+            Some(1)
+        );
+        assert!(
+            enrichment
+                .get("tags_enriched_at_ms")
+                .and_then(serde_json::Value::as_i64)
+                .is_some()
+        );
+        assert!(
+            enrichment
+                .get("tags")
+                .and_then(|tags| tags.get("concept_qids"))
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|items| items.iter().any(|value| value == "Q2095"))
+        );
+        assert!(
+            enrichment
+                .get("tags")
+                .and_then(|tags| tags.get("action_types"))
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|items| items.iter().any(|value| value == "schema:InformAction"))
+        );
     }
 
     #[tokio::test]

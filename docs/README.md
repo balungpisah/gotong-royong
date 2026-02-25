@@ -22,6 +22,7 @@ Canonical decision:
 - [Tandang Signal Mapping](architecture/tandang-signal-mapping.md) - GR event → Tandang signal mapping table
 - [Full Gotong ↔ Tandang Integration](architecture/tandang-full-integration.md) - Complete integration spec
 - [Tandang Read Cache Policy](architecture/tandang-read-cache-policy.md) - Caching strategy for Tandang reputation reads
+- [Hot-Path API Shapes](architecture/hot-path-api-shapes.md) - Frozen chat/feed/notification contracts + SLO gates
 
 ### API Specifications
 - [Webhook Specification](api/webhook-spec.md) - Webhook endpoint requirements
@@ -42,6 +43,10 @@ Canonical decision:
 ### Database
 - [Schema Requirements](database/schema-requirements.md) - Required tables and relationships
 - [Migrations](database/migrations.md) - Schema versioning strategy
+- [Hot-Path Query + SLO Matrix](database/hot-path-query-shape-slo-matrix.md) - Canonical endpoint→query/index/latency map
+- [Hot-Path Read-Model Design](database/hot-path-read-model-design-v1.md) - Proposed index packs and migration order
+- [Hot-Path Pack C Design](database/hot-path-pack-c-feed-participant-edge-design-v1.md) - Active involvement-only edge lane with fallback/stabilization plan
+- [SurrealDB v3 Feature Audit + Bench Matrix](database/surrealdb-v3-feature-audit-benchmark-matrix.md) - Research findings and benchmark notes
 
 ### Proof of Reality (PoR) Evidence
 - [Evidence Format](por-evidence/evidence-format.md) - Evidence types and metadata
@@ -54,6 +59,8 @@ Canonical decision:
 - [Monitoring](deployment/monitoring.md) - Metrics and alerting
 - [Tandang Integration Config](deployment/tandang-integration-config.md) - Required env vars, toggles, and safe defaults
 - [Webhook Backfill + Replay](deployment/webhook-backfill-replay.md) - Historical backfill and DLQ replay tooling
+- [Ontology Feed Expiry Backfill](deployment/ontology-feed-expiry-backfill.md) - One-time hide pass for already-expired ontology feed items
+- [Feed Participant-Edge Backfill](deployment/feed-participant-edge-backfill.md) - Historical backfill for Pack C participant edge read-model
 - [Tandang Observability SLOs](deployment/tandang-observability-slos.md) - Integration dashboards, SLOs, and alert rules
 
 ### Development

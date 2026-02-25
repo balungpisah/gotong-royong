@@ -1,6 +1,6 @@
 # SurrealDB v3 (Stable) — Feature Audit + Benchmark Matrix
 
-Status: research + simulation design (no implementation changes)
+Status: research + live benchmark evidence on v3.0.0 stable
 
 Primary goal: make **chat** and **feed** predictably fast under worst-credible load, while keeping the data model robust (idempotent, auditable, permission-safe).
 
@@ -342,3 +342,29 @@ These are sanity checks, not performance tests:
 - Transactions: reliable when issued as a single batched query (RPC/SDK); do not rely on SQL shell behavior alone.
 - `EXPIRE <duration>` syntax: rejected (plan for manual TTL cleanup).
 
+Reference outputs:
+- Release-gate probe (isolated ephemeral DB): `docs/research/surrealdb-go-no-go-latest.md`
+- Live Docker dev DB probe (`compose.dev.yaml` on `ws://127.0.0.1:8000`): `docs/research/surrealdb-live-db-probe-latest.md`
+  - Re-run: `bash scripts/surrealdb-live-db-probe.sh`
+- Feed source lookup benchmark: `docs/research/surrealdb-feed-index-bench-latest.md`
+  - Re-run: `just feed-index-bench-surreal`
+- Feed involvement benchmark (`involvement_only` shape): `docs/research/surrealdb-feed-involvement-bench-latest.md`
+  - Re-run: `just feed-involvement-bench-surreal`
+
+---
+
+## Appendix B — live Docker probe takeaways (v3.0.0 on `compose.dev.yaml`)
+
+These are the “what we learned for product architecture” notes from the live probe:
+
+- **Realtime is WS-only**: `LIVE SELECT` works over `ws://...` but fails over `http://...` in this environment. Backend must own fanout over our WS layer; don’t plan on HTTP streaming.
+- **Chat/feed hot-path queries are index-backed, but still TopK-sort**: `EXPLAIN` shows `IndexScan` + `SortTopKByKey` for ordered timeline reads. Keep limits small and always benchmark “hot thread” skew.
+- **Permission-filtered live streams work**: record access + table `PERMISSIONS` can prevent row leakage even on live subscriptions; treat permission expressions as part of the p95 budget.
+- **DIFF stream payloads are viable**: `LIVE SELECT DIFF` emits compact patch-style updates (good fit for “message edited” / “status changed”).
+- **Graph traversal works, but shouldn’t serve hot lists**: 1-hop relations return nested objects; use relations for correctness/audit/background computations, not for assembling feed pages.
+- **FTS + vector KNN are available on v3.0.0**:
+  - FULLTEXT queries via `@1@` + `search::score(1)` work.
+  - HNSW + KNN queries can produce `KnnScan` in `EXPLAIN FULL` and return `vector::distance::knn()` distances.
+  - Still treat both as “benchmark-required” before committing to indexing high-write tables (e.g., do **not** fulltext-index chat messages).
+- **`involvement_only` was the scaling trigger**: actor-only feed lookups stay index-backed, while `participant_ids` membership predicates are filter-heavy; Pack C (`feed_participant_edge` materialization) is now active with legacy fallback while C5 stabilization completes (backfill command + lane/shadow counters shipped, fallback removal pending).
+  - Pack C design reference: `docs/database/hot-path-pack-c-feed-participant-edge-design-v1.md`

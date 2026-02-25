@@ -6,6 +6,7 @@ use reqwest::StatusCode;
 use serde_json::Value;
 use tokio::sync::{Mutex, Notify, RwLock};
 use tokio::time::sleep;
+use uuid::Uuid;
 
 use crate::config::AppConfig;
 
@@ -212,6 +213,17 @@ impl MarkovReadClient {
         format!("{PLATFORM_ID_PREFIX}{user_id}")
     }
 
+    fn normalize_user_selector(platform_user_id: &str) -> String {
+        let trimmed = platform_user_id.trim();
+        if trimmed.contains(':') {
+            return trimmed.to_string();
+        }
+        if Uuid::parse_str(trimmed).is_ok() {
+            return trimmed.to_string();
+        }
+        Self::platform_identity(trimmed)
+    }
+
     pub async fn get_user_reputation(
         &self,
         gotong_user_id: &str,
@@ -262,9 +274,20 @@ impl MarkovReadClient {
             .await
     }
 
-    pub async fn get_cv_hidup_qr(&self) -> Result<CachedJson, MarkovClientError> {
+    pub async fn get_cv_hidup_qr(
+        &self,
+        platform_user_id: &str,
+    ) -> Result<CachedJson, MarkovClientError> {
+        let platform_user_id = platform_user_id.trim();
+        if platform_user_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "platform_user_id must not be empty".to_string(),
+            ));
+        }
+        let identity = Self::normalize_user_selector(platform_user_id);
+        let path = format!("cv-hidup/{identity}/qr");
         self.fetch_cached_json(
-            "cv-hidup/qr".to_string(),
+            path,
             Vec::new(),
             CacheClass::Gameplay,
             TokenPolicy::Required,
@@ -274,10 +297,19 @@ impl MarkovReadClient {
 
     pub async fn post_cv_hidup_export(
         &self,
+        platform_user_id: &str,
         payload: Value,
     ) -> Result<CachedJson, MarkovClientError> {
+        let platform_user_id = platform_user_id.trim();
+        if platform_user_id.is_empty() {
+            return Err(MarkovClientError::BadRequest(
+                "platform_user_id must not be empty".to_string(),
+            ));
+        }
+        let identity = Self::normalize_user_selector(platform_user_id);
+        let path = format!("cv-hidup/{identity}/export");
         let value = self
-            .post_from_origin("cv-hidup/export", payload, TokenPolicy::Required)
+            .post_from_origin(&path, payload, TokenPolicy::Required)
             .await?;
         Ok(uncached_json(value))
     }
@@ -293,8 +325,13 @@ impl MarkovReadClient {
             ));
         }
         let path = format!("cv-hidup/verify/{export_id}");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn search_skills(
@@ -334,8 +371,13 @@ impl MarkovReadClient {
             ));
         }
         let path = format!("skills/nodes/{node_id}");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn get_skill_node_labels(
@@ -349,8 +391,13 @@ impl MarkovReadClient {
             ));
         }
         let path = format!("skills/nodes/{node_id}/labels");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn get_skill_node_relations(
@@ -364,14 +411,16 @@ impl MarkovReadClient {
             ));
         }
         let path = format!("skills/nodes/{node_id}/relations");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
-    pub async fn get_skill_parent(
-        &self,
-        skill_id: &str,
-    ) -> Result<CachedJson, MarkovClientError> {
+    pub async fn get_skill_parent(&self, skill_id: &str) -> Result<CachedJson, MarkovClientError> {
         let skill_id = skill_id.trim();
         if skill_id.is_empty() {
             return Err(MarkovClientError::BadRequest(
@@ -379,8 +428,13 @@ impl MarkovReadClient {
             ));
         }
         let path = format!("skills/{skill_id}/parent");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn get_por_requirements(
@@ -403,10 +457,7 @@ impl MarkovReadClient {
         .await
     }
 
-    pub async fn get_por_status(
-        &self,
-        evidence_id: &str,
-    ) -> Result<CachedJson, MarkovClientError> {
+    pub async fn get_por_status(&self, evidence_id: &str) -> Result<CachedJson, MarkovClientError> {
         let evidence_id = evidence_id.trim();
         if evidence_id.is_empty() {
             return Err(MarkovClientError::BadRequest(
@@ -503,24 +554,33 @@ impl MarkovReadClient {
                 "user_id must not be empty".to_string(),
             ));
         }
-        let path = format!("users/{user_id}/vouch-budget");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
-            .await
+        let identity = Self::normalize_user_selector(user_id);
+        let path = format!("users/{identity}/vouch-budget");
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
-    pub async fn get_decay_warnings(
-        &self,
-        user_id: &str,
-    ) -> Result<CachedJson, MarkovClientError> {
+    pub async fn get_decay_warnings(&self, user_id: &str) -> Result<CachedJson, MarkovClientError> {
         let user_id = user_id.trim();
         if user_id.is_empty() {
             return Err(MarkovClientError::BadRequest(
                 "user_id must not be empty".to_string(),
             ));
         }
-        let path = format!("decay/warnings/{user_id}");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
-            .await
+        let identity = Self::normalize_user_selector(user_id);
+        let path = format!("users/{identity}/decay/warnings");
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn get_community_pulse(&self) -> Result<CachedJson, MarkovClientError> {
@@ -571,8 +631,13 @@ impl MarkovReadClient {
             ));
         }
         let path = format!("hero/{user_id}");
-        self.fetch_cached_json(path, Vec::new(), CacheClass::Gameplay, TokenPolicy::Required)
-            .await
+        self.fetch_cached_json(
+            path,
+            Vec::new(),
+            CacheClass::Gameplay,
+            TokenPolicy::Required,
+        )
+        .await
     }
 
     pub async fn get_hero_leaderboard(

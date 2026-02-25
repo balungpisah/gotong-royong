@@ -53,6 +53,11 @@ CHECKS=(
   "0019_record_permissions_check.surql"
   "0021_chat_optional_datetimes_check.surql"
   "0022_auth_token_permissions_fix_check.surql"
+  "0023_enrichment_indexes_check.surql"
+  "0024_discovery_payload_flexible_check.surql"
+  "0025_hot_path_pack_a_indexes_check.surql"
+  "0026_hot_path_pack_b_indexes_check.surql"
+  "0027_hot_path_pack_c_feed_participant_edge_check.surql"
 )
 
 run_check() {

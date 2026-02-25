@@ -1533,6 +1533,7 @@ dependencies = [
  "config",
  "dotenvy",
  "gotong-domain",
+ "metrics",
  "redis",
  "reqwest 0.12.28",
  "serde",
@@ -1545,6 +1546,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]

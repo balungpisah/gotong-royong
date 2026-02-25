@@ -35,6 +35,13 @@ pub struct ConceptVerificationPayload {
     pub scheduled_ms: i64,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct OntologyNoteEnrichPayload {
+    pub note_id: String,
+    pub feed_id: Option<String>,
+    pub requested_ms: i64,
+}
+
 #[derive(Clone, Debug)]
 pub struct JobDefaults {
     pub max_attempts: u32,

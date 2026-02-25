@@ -329,13 +329,9 @@ mod tests {
                 .and_then(|value| value.as_str())
                 .map(str::to_string)
                 .unwrap_or_else(|| panic!("fixture {fixture_name} missing request_id"));
-            let event = WebhookOutboxEvent::new(
-                payload,
-                request_id,
-                format!("corr-{fixture_name}"),
-                3,
-            )
-            .unwrap_or_else(|err| panic!("fixture {fixture_name} failed contract: {err}"));
+            let event =
+                WebhookOutboxEvent::new(payload, request_id, format!("corr-{fixture_name}"), 3)
+                    .unwrap_or_else(|err| panic!("fixture {fixture_name} failed contract: {err}"));
             assert!(!event.event_id.trim().is_empty());
         }
     }

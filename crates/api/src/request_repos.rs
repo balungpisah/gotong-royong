@@ -13,9 +13,10 @@ use gotong_domain::ports::vouches::VouchRepository;
 use gotong_domain::ports::webhook::WebhookOutboxRepository;
 use gotong_infra::repositories::{
     SurrealAdaptivePathRepository, SurrealChatRepository, SurrealContributionRepository,
-    SurrealDiscoveryFeedRepository, SurrealDiscoveryNotificationRepository, SurrealEvidenceRepository,
-    SurrealModerationRepository, SurrealOntologyRepository, SurrealSiagaRepository,
-    SurrealVaultRepository, SurrealVouchRepository, SurrealWebhookOutboxRepository,
+    SurrealDiscoveryFeedRepository, SurrealDiscoveryNotificationRepository,
+    SurrealEvidenceRepository, SurrealModerationRepository, SurrealOntologyRepository,
+    SurrealSiagaRepository, SurrealVaultRepository, SurrealVouchRepository,
+    SurrealWebhookOutboxRepository,
 };
 
 use crate::middleware::AuthContext;
@@ -87,14 +88,18 @@ pub fn siaga_repo(state: &AppState, auth: &AuthContext) -> Arc<dyn SiagaReposito
 
 pub fn feed_repo(state: &AppState, auth: &AuthContext) -> Arc<dyn FeedRepository> {
     match &auth.surreal_db_session {
-        Some(session) => Arc::new(SurrealDiscoveryFeedRepository::with_client(session.client())),
+        Some(session) => Arc::new(SurrealDiscoveryFeedRepository::with_client(
+            session.client(),
+        )),
         None => state.feed_repo.clone(),
     }
 }
 
 pub fn notification_repo(state: &AppState, auth: &AuthContext) -> Arc<dyn NotificationRepository> {
     match &auth.surreal_db_session {
-        Some(session) => Arc::new(SurrealDiscoveryNotificationRepository::with_client(session.client())),
+        Some(session) => Arc::new(SurrealDiscoveryNotificationRepository::with_client(
+            session.client(),
+        )),
         None => state.notification_repo.clone(),
     }
 }
@@ -105,7 +110,9 @@ pub fn webhook_outbox_repo(
     auth: &AuthContext,
 ) -> Arc<dyn WebhookOutboxRepository> {
     match &auth.surreal_db_session {
-        Some(session) => Arc::new(SurrealWebhookOutboxRepository::with_client(session.client())),
+        Some(session) => Arc::new(SurrealWebhookOutboxRepository::with_client(
+            session.client(),
+        )),
         None => state.webhook_outbox_repo.clone(),
     }
 }

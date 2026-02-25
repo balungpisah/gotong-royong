@@ -98,6 +98,11 @@ for migration_file in \
   "0019_record_permissions.surql" \
   "0020_auth_access_overwrite.surql" \
   "0021_chat_optional_datetimes.surql" \
-  "0022_auth_token_permissions_fix.surql"; do
+  "0022_auth_token_permissions_fix.surql" \
+  "0023_enrichment_indexes.surql" \
+  "0024_discovery_payload_flexible.surql" \
+  "0025_hot_path_pack_a_indexes.surql" \
+  "0026_hot_path_pack_b_indexes.surql" \
+  "0027_hot_path_pack_c_feed_participant_edge.surql"; do
   run_migration "$migration_file"
 done

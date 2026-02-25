@@ -67,6 +67,9 @@ graph TB
 
 **Locked** — see [ADR-001](adr/ADR-001-rust-axum-surrealdb-stack-lock.md) for the full decision record.
 
+Hot-path reference (API shapes + DB read-model mapping):
+- `docs/architecture/hot-path-api-shapes.md`
+
 | Layer | Technology |
 |-------|-----------|
 | **Language** | Rust 2024 edition, MSRV 1.88.0 |
@@ -185,19 +188,20 @@ Gotong Royong → Webhook Event → Markov Engine API → Reputation Update
 
 **Endpoints consumed**:
 - `POST /api/v1/platforms/gotong_royong/webhook` — Markov receives events
-- `GET /api/v1/users/{user_id}/reputation` — Gotong queries reputation
-- `GET /api/v1/users/{user_id}/tier`
+- `GET /api/v1/users/{id}/reputation` — Gotong queries reputation (supports `gotong_royong:{user_id}`)
+- `GET /api/v1/users/{id}/tier`
 - `GET /api/v1/cv-hidup/{user_id}`
 - `GET /api/v1/reputation/leaderboard`
 - `GET /api/v1/skills/search` — optional UX enrichment
-- `GET /api/v1/por/requirements` — PoR UX guidance
+- `GET /api/v1/por/requirements/{task_type}` — PoR UX guidance
+- `GET /api/v1/por/triad-requirements/{track}/{transition}` — phase gating
 
 **Authentication**: HMAC-SHA256 webhook signatures + platform service token for read APIs
 
 **Tandang Signals** (planned — not yet implemented):
 - Pattern Observed, Collective Vouch, J-Score, Genesis Decay, Consistency Multiplier
 
-**Reference**: [Integration Architecture](integration-architecture.md), [Full Integration Spec](tandang-full-integration.md)
+**Reference**: [Integration Architecture](integration-architecture.md), [Full Integration Spec](tandang-full-integration.md), [Endpoint Map](tandang-endpoint-map.md)
 
 ## Data Flow
 

@@ -9,7 +9,7 @@ use crate::DomainResult;
 #[allow(clippy::needless_pass_by_value)]
 pub trait WebhookOutboxRepository: Send + Sync {
     fn create(&self, event: &WebhookOutboxEvent)
-        -> BoxFuture<'_, DomainResult<WebhookOutboxEvent>>;
+    -> BoxFuture<'_, DomainResult<WebhookOutboxEvent>>;
 
     fn get(&self, event_id: &str) -> BoxFuture<'_, DomainResult<Option<WebhookOutboxEvent>>>;
 

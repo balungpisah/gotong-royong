@@ -9,11 +9,12 @@ use axum::http::{Request, StatusCode};
 use axum::routing::get;
 use axum::{Router, extract::Path};
 use gotong_domain::discovery::{
-    DiscoveryService, FEED_SOURCE_CONTRIBUTION, FeedIngestInput, FeedListQuery, NOTIF_TYPE_SYSTEM,
-    NotificationIngestInput, SearchListQuery,
+    DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_ONTOLOGY_NOTE, FeedIngestInput,
+    FeedListQuery, NOTIF_TYPE_SYSTEM, NotificationIngestInput, SearchListQuery,
 };
 use gotong_domain::idempotency::InMemoryIdempotencyStore;
 use gotong_domain::identity::ActorIdentity;
+use gotong_domain::ontology::OntologyEdgeKind;
 use gotong_domain::ranking::wilson_score;
 use gotong_domain::webhook::WebhookOutboxListQuery;
 use jsonwebtoken::{EncodingKey, Header, encode};
@@ -802,6 +803,374 @@ async fn ontology_feed_accepts_valid_schema_action_predicate() {
         .expect("request");
     let response = app.oneshot(request).await.expect("response");
     assert_eq!(response.status(), StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn ontology_feed_public_note_is_visible_in_discovery_feed() {
+    let (_state, app) = test_app_state_router();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "content": "Public note should appear in discovery feed",
+        "community_id": "rt05",
+        "temporal_class": "persistent"
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "ontology-discovery-1")
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let created: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let note_id = created
+        .get("note")
+        .and_then(|note| note.get("note_id"))
+        .and_then(|value| value.as_str())
+        .expect("note_id");
+    let feed_id = created
+        .get("feed_id")
+        .and_then(|value| value.as_str())
+        .expect("feed_id");
+
+    let feed_request = Request::builder()
+        .method("GET")
+        .uri("/v1/feed?scope_id=rt05&limit=10")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(feed_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let feed: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let items = feed
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items");
+    let found = items.iter().find(|row| {
+        row.get("feed_id").and_then(|value| value.as_str()) == Some(feed_id)
+            && row.get("source_type").and_then(|value| value.as_str())
+                == Some(FEED_SOURCE_ONTOLOGY_NOTE)
+            && row.get("source_id").and_then(|value| value.as_str()) == Some(note_id)
+    });
+    let found = found.expect("ontology note feed item present");
+    assert_eq!(
+        found
+            .get("payload")
+            .and_then(|payload| payload.get("note"))
+            .and_then(|note| note.get("note_id"))
+            .and_then(|value| value.as_str()),
+        Some(note_id)
+    );
+    assert!(
+        found
+            .get("payload")
+            .and_then(|payload| payload.get("enrichment"))
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn ontology_feed_normalizes_has_action_to_action_record_id() {
+    let (state, app) = test_app_state_router();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "content": "Action normalization check",
+        "community_id": "rt05",
+        "temporal_class": "persistent",
+        "triples": [
+            {
+                "edge": "HasAction",
+                "to_id": "concept:Q2048",
+                "predicate": "schema:DonateAction"
+            }
+        ]
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "ontology-action-normalize-1")
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let created: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    let note_id = created
+        .get("note")
+        .and_then(|note| note.get("note_id"))
+        .and_then(|value| value.as_str())
+        .expect("note_id");
+
+    let targets = state
+        .ontology_repo
+        .list_note_edge_targets(note_id, OntologyEdgeKind::HasAction)
+        .await
+        .expect("list targets");
+    assert!(targets.iter().any(|value| value == "action:DonateAction"));
+}
+
+#[tokio::test]
+async fn ontology_note_vouch_is_idempotent_and_patches_feed_payload() {
+    let (_state, app) = test_app_state_router();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "content": "Idempotent vouch note",
+        "community_id": "rt05",
+        "temporal_class": "persistent"
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "ontology-vouch-idem-1")
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let created: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    let note_id = created
+        .get("note")
+        .and_then(|note| note.get("note_id"))
+        .and_then(|value| value.as_str())
+        .expect("note_id")
+        .to_string();
+
+    for _ in 0..2 {
+        let vouch_request = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/ontology/notes/{note_id}/vouches"))
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token}"))
+            .body(Body::from(r#"{"metadata":{"reason":"valid"}}"#))
+            .expect("request");
+        let response = app.clone().oneshot(vouch_request).await.expect("response");
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    let feedback_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/ontology/notes/{note_id}/feedback"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app
+        .clone()
+        .oneshot(feedback_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let feedback: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    assert_eq!(feedback.get("vouch_count"), Some(&json!(1)));
+
+    let feed_request = Request::builder()
+        .method("GET")
+        .uri("/v1/feed?scope_id=rt05&limit=10")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(feed_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let feed: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    let items = feed
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items");
+    let found = items.iter().find(|row| {
+        row.get("source_type").and_then(|value| value.as_str()) == Some(FEED_SOURCE_ONTOLOGY_NOTE)
+            && row.get("source_id").and_then(|value| value.as_str()) == Some(note_id.as_str())
+    });
+    let found = found.expect("feed item present");
+    assert_eq!(
+        found
+            .get("payload")
+            .and_then(|payload| payload.get("enrichment"))
+            .and_then(|enrichment| enrichment.get("feedback"))
+            .and_then(|feedback| feedback.get("vouch_count"))
+            .and_then(|value| value.as_i64()),
+        Some(1)
+    );
+    assert!(
+        found
+            .get("payload")
+            .and_then(|payload| payload.get("enrichment"))
+            .and_then(|enrichment| enrichment.get("feedback_enriched_at_ms"))
+            .and_then(|value| value.as_i64())
+            .is_some()
+    );
+    assert!(
+        found
+            .get("payload")
+            .and_then(|payload| payload.get("enrichment"))
+            .and_then(|enrichment| enrichment.get("tags_enriched_at_ms"))
+            .and_then(|value| value.as_i64())
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn ontology_note_challenge_is_idempotent_and_patches_feed_payload() {
+    let (_state, app) = test_app_state_router();
+    let token = test_token("test-secret");
+
+    let payload = json!({
+        "content": "Idempotent challenge note",
+        "community_id": "rt05",
+        "temporal_class": "persistent",
+        "triples": [{
+            "edge": "HasAction",
+            "predicate": "schema:InformAction",
+            "to_id": "action:InformAction"
+        }]
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/ontology/feed")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "ontology-challenge-idem-1")
+        .body(Body::from(payload.to_string()))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let created: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    let note_id = created
+        .get("note")
+        .and_then(|note| note.get("note_id"))
+        .and_then(|value| value.as_str())
+        .expect("note_id")
+        .to_string();
+
+    for _ in 0..2 {
+        let challenge_request = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/ontology/notes/{note_id}/challenges"))
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token}"))
+            .body(Body::from(r#"{"metadata":{"reason":"unsure"}}"#))
+            .expect("request");
+        let response = app
+            .clone()
+            .oneshot(challenge_request)
+            .await
+            .expect("response");
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    let feedback_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/ontology/notes/{note_id}/feedback"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app
+        .clone()
+        .oneshot(feedback_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let feedback: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    assert_eq!(feedback.get("challenge_count"), Some(&json!(1)));
+
+    let feed_request = Request::builder()
+        .method("GET")
+        .uri("/v1/feed?scope_id=rt05&limit=10")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let response = app.clone().oneshot(feed_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let feed: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    let items = feed
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items");
+    let found = items.iter().find(|row| {
+        row.get("source_type").and_then(|value| value.as_str()) == Some(FEED_SOURCE_ONTOLOGY_NOTE)
+            && row.get("source_id").and_then(|value| value.as_str()) == Some(note_id.as_str())
+    });
+    let found = found.expect("feed item present");
+    assert_eq!(
+        found
+            .get("payload")
+            .and_then(|payload| payload.get("enrichment"))
+            .and_then(|enrichment| enrichment.get("feedback"))
+            .and_then(|feedback| feedback.get("challenge_count"))
+            .and_then(|value| value.as_i64()),
+        Some(1)
+    );
+    assert_eq!(
+        found
+            .get("payload")
+            .and_then(|payload| payload.get("enrichment"))
+            .and_then(|enrichment| enrichment.get("feedback"))
+            .and_then(|feedback| feedback.get("vouch_count"))
+            .and_then(|value| value.as_i64()),
+        Some(0)
+    );
+    assert!(
+        found
+            .get("payload")
+            .and_then(|payload| payload.get("enrichment"))
+            .and_then(|enrichment| enrichment.get("feedback_enriched_at_ms"))
+            .and_then(|value| value.as_i64())
+            .is_some()
+    );
+    assert!(
+        found
+            .get("payload")
+            .and_then(|payload| payload.get("enrichment"))
+            .and_then(|enrichment| enrichment.get("tags_enriched_at_ms"))
+            .and_then(|value| value.as_i64())
+            .is_some()
+    );
 }
 
 #[tokio::test]
@@ -1932,6 +2301,93 @@ async fn chat_thread_and_message_flow() {
 }
 
 #[tokio::test]
+async fn chat_list_messages_defaults_to_latest_limit() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let thread_request = json!({
+        "scope_id": "scope-chat-latest",
+        "privacy_level": "public",
+    });
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/threads")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "chat-latest-1")
+        .body(Body::from(thread_request.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(create_request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let thread: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    let thread_id = thread
+        .get("thread_id")
+        .and_then(|value| value.as_str())
+        .expect("thread_id")
+        .to_string();
+
+    let mut sent_ids = Vec::new();
+    for idx in 0..3 {
+        let message_request = json!({
+            "body": format!("msg-{idx}"),
+            "attachments": [],
+        });
+        let send_request = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/chat/threads/{thread_id}/messages/send"))
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token}"))
+            .header("x-request-id", format!("chat-latest-msg-{idx}"))
+            .body(Body::from(message_request.to_string()))
+            .unwrap();
+        let response = app.clone().oneshot(send_request).await.expect("response");
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body");
+        let message: serde_json::Value = serde_json::from_slice(&body).expect("json");
+        sent_ids.push(
+            message
+                .get("message_id")
+                .and_then(|value| value.as_str())
+                .expect("message_id")
+                .to_string(),
+        );
+    }
+
+    let list_messages_request = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/chat/threads/{thread_id}/messages?limit=2"))
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(list_messages_request)
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let messages: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
+    assert_eq!(messages.len(), 2);
+    let listed_ids: Vec<String> = messages
+        .iter()
+        .map(|item| {
+            item.get("message_id")
+                .and_then(|value| value.as_str())
+                .expect("message_id")
+                .to_string()
+        })
+        .collect();
+    assert_eq!(listed_ids, vec![sent_ids[1].clone(), sent_ids[2].clone()]);
+}
+
+#[tokio::test]
 async fn chat_read_cursor_is_member_only() {
     let app = test_app();
     let owner_token = test_token("test-secret");
@@ -2587,6 +3043,64 @@ async fn discovery_notifications_endpoints() {
 }
 
 #[tokio::test]
+async fn discovery_notifications_pagination_cursor_does_not_skip_items() {
+    let (state, _app) = test_app_state_router();
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+
+    let actor = actor_identity_for_tests("user-notif-page");
+
+    for (idx, ts) in [(0, 3_000_i64), (1, 2_000_i64), (2, 1_000_i64)] {
+        service
+            .ingest_notification(NotificationIngestInput {
+                recipient_id: actor.user_id.clone(),
+                actor: actor.clone(),
+                notification_type: NOTIF_TYPE_SYSTEM.to_string(),
+                source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+                source_id: format!("seed-notif-page-{idx}"),
+                title: format!("Notif {idx}"),
+                body: "pagination check".into(),
+                payload: None,
+                privacy_level: Some("public".into()),
+                request_id: format!("notif-page-req-{idx}"),
+                correlation_id: format!("notif-page-corr-{idx}"),
+                request_ts_ms: Some(ts),
+                dedupe_key: Some(format!("notif-page-dedupe-{idx}")),
+            })
+            .await
+            .expect("seed notification");
+    }
+
+    let first_page = service
+        .list_notifications(gotong_domain::discovery::NotificationListQuery {
+            actor_id: actor.user_id.clone(),
+            cursor: None,
+            limit: Some(2),
+            include_read: Some(true),
+        })
+        .await
+        .expect("first page");
+
+    assert_eq!(first_page.items.len(), 2);
+    let first_ts: Vec<i64> = first_page.items.iter().map(|n| n.created_at_ms).collect();
+    assert_eq!(first_ts, vec![3_000, 2_000]);
+    let cursor = first_page.next_cursor.expect("cursor present");
+
+    let second_page = service
+        .list_notifications(gotong_domain::discovery::NotificationListQuery {
+            actor_id: actor.user_id.clone(),
+            cursor: Some(cursor),
+            limit: Some(2),
+            include_read: Some(true),
+        })
+        .await
+        .expect("second page");
+
+    assert_eq!(second_page.items.len(), 1);
+    assert_eq!(second_page.items[0].created_at_ms, 1_000);
+    assert!(second_page.next_cursor.is_none());
+}
+
+#[tokio::test]
 async fn edgepod_ep03_duplicate_detection_success() {
     let app = test_app();
     let token = test_token("test-secret");
@@ -3191,7 +3705,11 @@ async fn tandang_routes_match_read_contract_shapes() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .expect("profile request");
-    let profile_response = app.clone().oneshot(profile_request).await.expect("profile response");
+    let profile_response = app
+        .clone()
+        .oneshot(profile_request)
+        .await
+        .expect("profile response");
     assert_eq!(profile_response.status(), StatusCode::OK);
     let profile_body = to_bytes(profile_response.into_body(), usize::MAX)
         .await
@@ -3229,7 +3747,11 @@ async fn tandang_routes_match_read_contract_shapes() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .expect("skills request");
-    let skills_response = app.clone().oneshot(skills_request).await.expect("skills response");
+    let skills_response = app
+        .clone()
+        .oneshot(skills_request)
+        .await
+        .expect("skills response");
     assert_eq!(skills_response.status(), StatusCode::OK);
     let skills_body = to_bytes(skills_response.into_body(), usize::MAX)
         .await
@@ -3249,7 +3771,11 @@ async fn tandang_routes_match_read_contract_shapes() {
         .header("authorization", format!("Bearer {token}"))
         .body(Body::empty())
         .expect("por request");
-    let por_response = app.clone().oneshot(por_request).await.expect("por response");
+    let por_response = app
+        .clone()
+        .oneshot(por_request)
+        .await
+        .expect("por response");
     assert_eq!(por_response.status(), StatusCode::OK);
     let por_body = to_bytes(por_response.into_body(), usize::MAX)
         .await
@@ -3346,7 +3872,14 @@ async fn tandang_routes_match_read_contract_shapes() {
     let distribution_json: serde_json::Value =
         serde_json::from_slice(&distribution_body).expect("distribution");
     let distribution_data = distribution_json.get("data").expect("distribution data");
-    for field in ["keystone", "pillar", "contributor", "novice", "shadow", "total"] {
+    for field in [
+        "keystone",
+        "pillar",
+        "contributor",
+        "novice",
+        "shadow",
+        "total",
+    ] {
         assert!(
             distribution_data.get(field).is_some(),
             "missing field {field} in distribution response"

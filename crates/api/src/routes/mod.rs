@@ -32,21 +32,25 @@ use gotong_domain::{
     },
     contributions::{Contribution, ContributionCreate, ContributionService, ContributionType},
     discovery::{
-        DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_VOUCH, FeedIngestInput,
-        FeedListQuery, InAppNotification, NotificationListQuery, PagedFeed, PagedNotifications,
-        SearchListQuery, SearchPage, WeeklyDigest,
+        DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_ONTOLOGY_NOTE, FEED_SOURCE_VOUCH,
+        FeedIngestInput, FeedListQuery, InAppNotification, NotificationListQuery, PagedFeed,
+        PagedNotifications, SearchListQuery, SearchPage, WeeklyDigest,
     },
     error::DomainError,
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
     idempotency::BeginOutcome,
     identity::ActorIdentity,
-    jobs::{JobDefaults, ModerationAutoReleasePayload, WebhookRetryPayload, new_job},
+    jobs::{
+        JobDefaults, ModerationAutoReleasePayload, OntologyNoteEnrichPayload, WebhookRetryPayload,
+        new_job,
+    },
     mode::Mode,
     moderation::{
         ContentModeration, ModerationApplyCommand, ModerationDecision, ModerationService,
     },
     ontology::{
-        ActionType, OntologyConcept, OntologyEdgeKind, OntologyNoteCreate, OntologyTripleCreate,
+        ActionType, NoteFeedbackCounts, OntologyConcept, OntologyEdgeKind, OntologyNoteCreate,
+        OntologyTripleCreate,
     },
     ports::idempotency::{IdempotencyKey, IdempotencyResponse},
     ports::jobs::JobType,
@@ -217,7 +221,10 @@ pub fn router(state: AppState) -> Router {
             get(get_tandang_cv_hidup_verify),
         )
         .route("/v1/tandang/skills/search", get(search_tandang_skills))
-        .route("/v1/tandang/skills/nodes/:node_id", get(get_tandang_skill_node))
+        .route(
+            "/v1/tandang/skills/nodes/:node_id",
+            get(get_tandang_skill_node),
+        )
         .route(
             "/v1/tandang/skills/nodes/:node_id/labels",
             get(get_tandang_skill_node_labels),
@@ -234,7 +241,10 @@ pub fn router(state: AppState) -> Router {
             "/v1/tandang/por/requirements/:task_type",
             get(get_tandang_por_requirements),
         )
-        .route("/v1/tandang/por/status/:evidence_id", get(get_tandang_por_status))
+        .route(
+            "/v1/tandang/por/status/:evidence_id",
+            get(get_tandang_por_status),
+        )
         .route(
             "/v1/tandang/por/triad-requirements/:track/:transition",
             get(get_tandang_por_triad_requirements),
@@ -730,6 +740,174 @@ fn validate_ontology_action_predicate(
     Ok(())
 }
 
+fn truncate_with_ellipsis(input: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    let trimmed = input.trim();
+    let mut out = trimmed.chars().take(max_chars).collect::<String>();
+    if trimmed.chars().count() > max_chars {
+        out.push('…');
+    }
+    out
+}
+
+fn ontology_note_title(content: &str) -> String {
+    truncate_with_ellipsis(content, 96)
+}
+
+async fn build_ontology_note_enrichment(
+    state: &AppState,
+    auth: &AuthContext,
+    triples: &[OntologyTripleCreate],
+    feedback: &NoteFeedbackCounts,
+) -> Result<Value, ApiError> {
+    let mut concept_qids = HashSet::new();
+    let mut action_types = HashSet::new();
+    let mut place_ids = HashSet::new();
+
+    for triple in triples {
+        if triple.to_id.starts_with("concept:") {
+            if let Some(qid) = triple.to_id.strip_prefix("concept:") {
+                let qid = qid.trim();
+                if !qid.is_empty() {
+                    concept_qids.insert(qid.to_string());
+                }
+            }
+        }
+        if triple.edge == OntologyEdgeKind::HasAction {
+            if let Some(predicate) = triple.predicate.as_deref().map(str::trim) {
+                if !predicate.is_empty() {
+                    action_types.insert(predicate.to_string());
+                }
+            }
+        }
+        if triple.edge == OntologyEdgeKind::LocatedAt {
+            let place_id = triple.to_id.trim();
+            if place_id.starts_with("place:") {
+                place_ids.insert(place_id.to_string());
+            }
+        }
+    }
+
+    let repo = request_repos::ontology_repo(state, auth);
+    let mut concept_qids = concept_qids.into_iter().collect::<Vec<_>>();
+    concept_qids.sort();
+    let mut action_types = action_types.into_iter().collect::<Vec<_>>();
+    action_types.sort();
+    let mut place_ids = place_ids.into_iter().collect::<Vec<_>>();
+    place_ids.sort();
+
+    let concepts = repo
+        .get_concepts_by_qids(&concept_qids)
+        .await
+        .map_err(map_domain_error)?;
+    let actions = repo
+        .get_actions_by_types(&action_types)
+        .await
+        .map_err(map_domain_error)?;
+    let places = repo
+        .get_places_by_ids(&place_ids)
+        .await
+        .map_err(map_domain_error)?;
+
+    let total_feedback = feedback.vouch_count + feedback.challenge_count;
+    let score = wilson_score(feedback.vouch_count as u64, total_feedback as u64);
+
+    let enriched_at_ms = gotong_domain::jobs::now_ms();
+    Ok(json!({
+        "status": "computed",
+        "enriched_at_ms": enriched_at_ms,
+        "tags_enriched_at_ms": enriched_at_ms,
+        "feedback_enriched_at_ms": enriched_at_ms,
+        "tags": {
+            "concept_qids": concept_qids,
+            "action_types": action_types,
+            "place_ids": place_ids,
+        },
+        "labels": {
+            "concepts": concepts,
+            "actions": actions,
+            "places": places,
+        },
+        "feedback": {
+            "vouch_count": feedback.vouch_count,
+            "challenge_count": feedback.challenge_count,
+            "score": score,
+        }
+    }))
+}
+
+fn build_pending_ontology_note_enrichment(feedback: &NoteFeedbackCounts) -> Value {
+    let feedback_enriched_at_ms = gotong_domain::jobs::now_ms();
+    let total_feedback = feedback.vouch_count + feedback.challenge_count;
+    let score = wilson_score(feedback.vouch_count as u64, total_feedback as u64);
+    json!({
+        "status": "pending",
+        "enriched_at_ms": feedback_enriched_at_ms,
+        "feedback_enriched_at_ms": feedback_enriched_at_ms,
+        "tags": {
+            "concept_qids": [],
+            "action_types": [],
+            "place_ids": [],
+        },
+        "labels": {
+            "concepts": [],
+            "actions": [],
+            "places": [],
+        },
+        "feedback": {
+            "vouch_count": feedback.vouch_count,
+            "challenge_count": feedback.challenge_count,
+            "score": score,
+        }
+    })
+}
+
+fn build_feedback_patch(feedback: &NoteFeedbackCounts) -> Value {
+    let total_feedback = feedback.vouch_count + feedback.challenge_count;
+    let score = wilson_score(feedback.vouch_count as u64, total_feedback as u64);
+    json!({
+        "enrichment": {
+            "status": "computed",
+            "feedback_enriched_at_ms": gotong_domain::jobs::now_ms(),
+            "feedback": {
+                "vouch_count": feedback.vouch_count,
+                "challenge_count": feedback.challenge_count,
+                "score": score,
+            }
+        }
+    })
+}
+
+async fn patch_ontology_note_feedback_in_feed(
+    state: &AppState,
+    note_id: &str,
+    feedback: &NoteFeedbackCounts,
+    action: &str,
+) {
+    match state
+        .feed_repo
+        .get_latest_by_source(FEED_SOURCE_ONTOLOGY_NOTE, note_id)
+        .await
+    {
+        Ok(Some(item)) => {
+            let payload_patch = build_feedback_patch(feedback);
+            if let Err(err) = state
+                .feed_repo
+                .merge_payload(&item.feed_id, payload_patch)
+                .await
+            {
+                tracing::warn!(error = %err, feed_id = %item.feed_id, note_id = %note_id, action = action, "failed to patch discovery feed payload after ontology feedback write");
+            }
+        }
+        Ok(None) => {}
+        Err(err) => {
+            tracing::warn!(error = %err, note_id = %note_id, action = action, "failed to fetch latest ontology feed item for feedback patch");
+        }
+    }
+}
+
 fn validate_ontology_feed(payload: &CreateOntologyFeedRequest) -> Result<String, ApiError> {
     let temporal_class = normalize_ontology_temporal_class(&payload.temporal_class)?;
     if temporal_class == "ephemeral" && payload.ttl_expires_ms.is_none() {
@@ -819,66 +997,205 @@ async fn list_ontology_hierarchy(
 
 async fn create_ontology_feed(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Extension(auth): Extension<AuthContext>,
     Json(payload): Json<CreateOntologyFeedRequest>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+) -> Result<Response, ApiError> {
     validation::validate(&payload)?;
-    let temporal_class = validate_ontology_feed(&payload)?;
     let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+    let temporal_class = validate_ontology_feed(&payload)?;
 
-    let created_note = request_repos::ontology_repo(&state, &auth)
-        .create_note(&OntologyNoteCreate {
-            note_id: payload.note_id,
-            content: payload.content,
-            author_id: actor.user_id,
-            community_id: payload.community_id,
-            temporal_class,
-            ttl_expires_ms: payload.ttl_expires_ms,
-            ai_readable: payload.ai_readable.unwrap_or(true),
-            rahasia_level: payload.rahasia_level.unwrap_or(0),
-            confidence: payload.confidence.unwrap_or(0.5),
-        })
-        .await
-        .map_err(map_domain_error)?;
+    let key = IdempotencyKey::new(
+        "ontology_note_create",
+        format!("{}:{}", actor.user_id, payload.community_id),
+        request_id.clone(),
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
 
-    let triples = payload
-        .triples
-        .unwrap_or_default()
-        .into_iter()
-        .map(|triple| {
-            validate_ontology_action_predicate(&triple.edge, triple.predicate.as_deref())?;
-            Ok(OntologyTripleCreate {
-                edge: triple.edge,
-                from_id: triple
-                    .from_id
-                    .unwrap_or_else(|| format!("note:{}", created_note.note_id)),
-                to_id: triple.to_id,
-                predicate: triple.predicate,
-                metadata: triple.metadata,
-            })
-        })
-        .collect::<Result<Vec<_>, ApiError>>()?;
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let created_note = request_repos::ontology_repo(&state, &auth)
+                .create_note(&OntologyNoteCreate {
+                    note_id: payload.note_id,
+                    content: payload.content,
+                    author_id: actor.user_id.clone(),
+                    community_id: payload.community_id,
+                    temporal_class,
+                    ttl_expires_ms: payload.ttl_expires_ms,
+                    ai_readable: payload.ai_readable.unwrap_or(true),
+                    rahasia_level: payload.rahasia_level.unwrap_or(0),
+                    confidence: payload.confidence.unwrap_or(0.5),
+                })
+                .await
+                .map_err(map_domain_error)?;
 
-    if !triples.is_empty() {
-        request_repos::ontology_repo(&state, &auth)
-            .write_triples(&triples)
-            .await
-            .map_err(map_domain_error)?;
+            let triples = payload
+                .triples
+                .unwrap_or_default()
+                .into_iter()
+                .map(|triple| {
+                    validate_ontology_action_predicate(&triple.edge, triple.predicate.as_deref())?;
+                    let predicate = triple.predicate;
+                    let to_id = if triple.edge == OntologyEdgeKind::HasAction {
+                        let predicate = predicate
+                            .as_deref()
+                            .unwrap_or_default()
+                            .trim()
+                            .strip_prefix("schema:")
+                            .unwrap_or_default()
+                            .to_string();
+                        format!("action:{predicate}")
+                    } else {
+                        triple.to_id
+                    };
+                    Ok(OntologyTripleCreate {
+                        edge: triple.edge,
+                        from_id: triple
+                            .from_id
+                            .unwrap_or_else(|| format!("note:{}", created_note.note_id)),
+                        to_id,
+                        predicate,
+                        metadata: triple.metadata,
+                    })
+                })
+                .collect::<Result<Vec<_>, ApiError>>()?;
+
+            if !triples.is_empty() {
+                request_repos::ontology_repo(&state, &auth)
+                    .write_triples(&triples)
+                    .await
+                    .map_err(map_domain_error)?;
+            }
+
+            let feedback = request_repos::ontology_repo(&state, &auth)
+                .note_feedback_counts(&created_note.note_id)
+                .await
+                .map_err(map_domain_error)?;
+
+            let mut response_body = json!({
+                "note": created_note,
+                "triple_count": triples.len(),
+                "feedback": feedback,
+            });
+
+            if response_body
+                .get("note")
+                .and_then(|note| note.get("rahasia_level"))
+                .and_then(|value| value.as_i64())
+                .unwrap_or(0)
+                == 0
+            {
+                let note_id = response_body
+                    .get("note")
+                    .and_then(|note| note.get("note_id"))
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let community_id = response_body
+                    .get("note")
+                    .and_then(|note| note.get("community_id"))
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let content = response_body
+                    .get("note")
+                    .and_then(|note| note.get("content"))
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let created_at_ms = response_body
+                    .get("note")
+                    .and_then(|note| note.get("created_at_ms"))
+                    .and_then(|value| value.as_i64())
+                    .unwrap_or_else(gotong_domain::jobs::now_ms);
+
+                let (enrichment, enqueue_async_enrichment) = match build_ontology_note_enrichment(
+                    &state, &auth, &triples, &feedback,
+                )
+                .await
+                {
+                    Ok(enrichment) => (enrichment, false),
+                    Err(err) => {
+                        tracing::warn!(error = %err, note_id = %note_id, "failed to build ontology note enrichment");
+                        (build_pending_ontology_note_enrichment(&feedback), true)
+                    }
+                };
+
+                let service =
+                    DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+                let input = FeedIngestInput {
+                    source_type: FEED_SOURCE_ONTOLOGY_NOTE.to_string(),
+                    source_id: note_id.clone(),
+                    actor: actor.clone(),
+                    title: ontology_note_title(&content),
+                    summary: None,
+                    scope_id: Some(community_id),
+                    privacy_level: Some("public".to_string()),
+                    occurred_at_ms: Some(created_at_ms),
+                    request_id: request_id.clone(),
+                    correlation_id: correlation_id.clone(),
+                    request_ts_ms: Some(created_at_ms),
+                    participant_ids: vec![],
+                    payload: Some(json!({
+                        "note": response_body.get("note").cloned().unwrap_or(Value::Null),
+                        "enrichment": enrichment,
+                    })),
+                };
+
+                match service.ingest_feed(input).await {
+                    Ok(item) => {
+                        response_body["feed_id"] = json!(item.feed_id);
+                        if enqueue_async_enrichment {
+                            if let Some(queue) = state.job_queue.as_ref() {
+                                let payload = serde_json::to_value(OntologyNoteEnrichPayload {
+                                    note_id: note_id.clone(),
+                                    feed_id: Some(item.feed_id.clone()),
+                                    requested_ms: gotong_domain::jobs::now_ms(),
+                                })
+                                .map_err(|_| ApiError::Internal)?;
+                                let defaults = JobDefaults { max_attempts: 3 };
+                                let job = new_job(
+                                    format!("ontology_note_enrich:{note_id}:{}", item.feed_id),
+                                    JobType::OntologyNoteEnrich,
+                                    payload,
+                                    request_id.clone(),
+                                    correlation_id.clone(),
+                                    defaults,
+                                );
+                                if let Err(err) = queue.enqueue(&job).await {
+                                    tracing::warn!(error = %err, feed_id = %item.feed_id, note_id = %note_id, "failed to enqueue ontology note enrich job");
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        tracing::warn!(error = %err, note_id = %note_id, "failed to ingest ontology note into discovery feed");
+                    }
+                }
+            }
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: response_body,
+            };
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
     }
-
-    let feedback = request_repos::ontology_repo(&state, &auth)
-        .note_feedback_counts(&created_note.note_id)
-        .await
-        .map_err(map_domain_error)?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(json!({
-            "note": created_note,
-            "triple_count": triples.len(),
-            "feedback": feedback,
-        })),
-    ))
 }
 
 async fn vouch_ontology_note(
@@ -888,7 +1205,7 @@ async fn vouch_ontology_note(
     Json(payload): Json<OntologyFeedbackRequest>,
 ) -> Result<(StatusCode, Json<OntologyFeedbackResponse>), ApiError> {
     let actor = actor_identity(&auth)?;
-    request_repos::ontology_repo(&state, &auth)
+    let write_result = request_repos::ontology_repo(&state, &auth)
         .write_triples(&[OntologyTripleCreate {
             edge: OntologyEdgeKind::Vouches,
             from_id: format!("warga:{}", actor.user_id),
@@ -896,13 +1213,18 @@ async fn vouch_ontology_note(
             predicate: None,
             metadata: payload.metadata,
         }])
-        .await
-        .map_err(map_domain_error)?;
+        .await;
+    match write_result {
+        Ok(()) => {}
+        Err(DomainError::Conflict) => {}
+        Err(err) => return Err(map_domain_error(err)),
+    }
 
     let counts = request_repos::ontology_repo(&state, &auth)
         .note_feedback_counts(&note_id)
         .await
         .map_err(map_domain_error)?;
+    patch_ontology_note_feedback_in_feed(&state, &note_id, &counts, "vouch").await;
     Ok((
         StatusCode::CREATED,
         Json(OntologyFeedbackResponse {
@@ -920,7 +1242,7 @@ async fn challenge_ontology_note(
     Json(payload): Json<OntologyFeedbackRequest>,
 ) -> Result<(StatusCode, Json<OntologyFeedbackResponse>), ApiError> {
     let actor = actor_identity(&auth)?;
-    request_repos::ontology_repo(&state, &auth)
+    let write_result = request_repos::ontology_repo(&state, &auth)
         .write_triples(&[OntologyTripleCreate {
             edge: OntologyEdgeKind::Challenges,
             from_id: format!("warga:{}", actor.user_id),
@@ -928,13 +1250,18 @@ async fn challenge_ontology_note(
             predicate: None,
             metadata: payload.metadata,
         }])
-        .await
-        .map_err(map_domain_error)?;
+        .await;
+    match write_result {
+        Ok(()) => {}
+        Err(DomainError::Conflict) => {}
+        Err(err) => return Err(map_domain_error(err)),
+    }
 
     let counts = request_repos::ontology_repo(&state, &auth)
         .note_feedback_counts(&note_id)
         .await
         .map_err(map_domain_error)?;
+    patch_ontology_note_feedback_in_feed(&state, &note_id, &counts, "challenge").await;
     Ok((
         StatusCode::CREATED,
         Json(OntologyFeedbackResponse {
@@ -2028,7 +2355,8 @@ async fn create_adaptive_path_plan(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
+            let service =
+                AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = CreateAdaptivePathInput {
                 entity_id,
                 payload: into_adaptive_path_payload_draft(payload.payload),
@@ -2110,7 +2438,8 @@ async fn update_adaptive_path_plan(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
+            let service =
+                AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = UpdateAdaptivePathInput {
                 plan_id,
                 expected_version: payload.expected_version,
@@ -2168,7 +2497,8 @@ async fn propose_adaptive_path_suggestion(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
+            let service =
+                AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = SuggestAdaptivePathInput {
                 plan_id,
                 base_version: payload.base_version,
@@ -2229,7 +2559,8 @@ async fn accept_adaptive_path_suggestion(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
+            let service =
+                AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = SuggestionReviewInput {
                 suggestion_id,
                 editor_roles,
@@ -2285,7 +2616,8 @@ async fn reject_adaptive_path_suggestion(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let service = AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
+            let service =
+                AdaptivePathService::new(request_repos::adaptive_path_repo(&state, &auth));
             let input = SuggestionReviewInput {
                 suggestion_id,
                 editor_roles,
@@ -3263,7 +3595,9 @@ async fn fetch_replay_messages(
     let replay_query = ChatMessagesQuery {
         since_created_at_ms: Some(since_created_at_ms),
         since_message_id: Some(since_message_id),
-        limit: None,
+        // When the realtime receiver lags, we should replay as much as possible in one shot.
+        // `build_message_catchup` clamps this to the domain max (currently 200).
+        limit: Some(200),
     };
     list_chat_messages_by_query(chat_repo, actor, thread_id, replay_query).await
 }
@@ -3818,10 +4152,14 @@ async fn get_tandang_profile_snapshot(
     })))
 }
 
-async fn get_tandang_cv_hidup_qr(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+async fn get_tandang_cv_hidup_qr(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Json<Value>, ApiError> {
+    let user_id = auth.user_id.as_deref().ok_or(ApiError::Unauthorized)?;
     let result = state
         .markov_client
-        .get_cv_hidup_qr()
+        .get_cv_hidup_qr(user_id)
         .await
         .map_err(map_markov_error)?;
     Ok(Json(cached_json_value(result)))
@@ -3829,11 +4167,13 @@ async fn get_tandang_cv_hidup_qr(State(state): State<AppState>) -> Result<Json<V
 
 async fn post_tandang_cv_hidup_export(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Json(payload): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
+    let user_id = auth.user_id.as_deref().ok_or(ApiError::Unauthorized)?;
     let result = state
         .markov_client
-        .post_cv_hidup_export(payload)
+        .post_cv_hidup_export(user_id, payload)
         .await
         .map_err(map_markov_error)?;
     Ok(Json(cached_json_value(result)))
@@ -3994,11 +4334,7 @@ fn require_self_or_admin(auth: &AuthContext, user_id: &str) -> Result<(), ApiErr
     if requested.is_empty() {
         return Err(ApiError::Validation("user_id is required".into()));
     }
-    let actor_id = auth
-        .user_id
-        .as_deref()
-        .map(str::trim)
-        .unwrap_or_default();
+    let actor_id = auth.user_id.as_deref().map(str::trim).unwrap_or_default();
     if actor_id == requested {
         return Ok(());
     }

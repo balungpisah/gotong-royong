@@ -56,6 +56,12 @@ api:
 worker:
 	cargo run -p gotong-worker
 
+ontology-feed-backfill-expired *args:
+	cargo run -p gotong-worker -- ontology-feed-backfill-expired {{args}}
+
+feed-participant-edge-backfill *args:
+	cargo run -p gotong-worker -- feed-participant-edge-backfill {{args}}
+
 db-migrate:
 	scripts/db/migrate.sh
 
@@ -82,3 +88,18 @@ release-gates-surreal:
 	SURREAL_BIN=scripts/tools/surreal-docker.sh \
 	LOCKED_TARGET_VERSION=3.0.0 \
 	scripts/surrealdb-go-no-go.sh docs/research/surrealdb-go-no-go-latest.md
+
+feed-index-bench-surreal:
+	scripts/surrealdb-feed-index-bench.sh docs/research/surrealdb-feed-index-bench-latest.md
+
+feed-involvement-bench-surreal:
+	scripts/surrealdb-feed-involvement-bench.sh docs/research/surrealdb-feed-involvement-bench-latest.md
+
+smoke-ontology-enrichment-live:
+	scripts/smoke/ontology_enrichment_live.sh
+
+ontology-enrichment-check:
+	scripts/docs/check_ontology_enrichment_guardrails.sh
+
+ontology-enrichment-check-full:
+	scripts/docs/check_ontology_enrichment_guardrails.sh --with-tests
