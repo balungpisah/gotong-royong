@@ -57,6 +57,8 @@ fn test_config() -> AppConfig {
         s3_region: "us-east-1".to_string(),
         s3_access_key: "test-access-key".to_string(),
         s3_secret_key: "test-secret-key".to_string(),
+        chat_attachment_storage_backend: "local".to_string(),
+        chat_attachment_s3_prefix: "chat-attachments".to_string(),
         chat_realtime_transport: "local".to_string(),
         chat_realtime_channel_prefix: "gotong:chat:realtime:test".to_string(),
         worker_queue_prefix: "gotong:jobs".to_string(),
@@ -162,6 +164,29 @@ fn test_app_with_markov_base_and_scope(
     let store = InMemoryIdempotencyStore::new("test");
     let state = AppState::with_idempotency_store(config, Arc::new(store));
     routes::router(state)
+}
+
+async fn assert_error_envelope(
+    response: axum::response::Response,
+    expected_status: StatusCode,
+    expected_code: &str,
+) {
+    assert_eq!(response.status(), expected_status);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("error body");
+    let payload: serde_json::Value = serde_json::from_slice(&body).expect("error json");
+    assert_eq!(
+        payload.get("error").and_then(|value| value.get("code")),
+        Some(&json!(expected_code))
+    );
+    assert!(
+        payload
+            .get("error")
+            .and_then(|value| value.get("message"))
+            .and_then(|value| value.as_str())
+            .is_some()
+    );
 }
 
 async fn spawn_markov_stub_base_url() -> String {
@@ -2249,6 +2274,72 @@ async fn protected_route_rejects_invalid_token() {
 }
 
 #[tokio::test]
+async fn auth_me_requires_auth_and_matches_contract_shape() {
+    let app = test_app();
+    let token = test_token_with_identity("test-secret", "moderator", "user-777");
+
+    let unauth_request = Request::builder()
+        .method("GET")
+        .uri("/v1/auth/me")
+        .body(Body::empty())
+        .expect("unauth request");
+    let unauth_response = app.clone().oneshot(unauth_request).await.expect("response");
+    assert_error_envelope(unauth_response, StatusCode::UNAUTHORIZED, "unauthorized").await;
+
+    let auth_request = Request::builder()
+        .method("GET")
+        .uri("/v1/auth/me")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("auth request");
+    let auth_response = app.clone().oneshot(auth_request).await.expect("response");
+    assert_eq!(auth_response.status(), StatusCode::OK);
+    let body = to_bytes(auth_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let payload: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(payload.get("user_id"), Some(&json!("user-777")));
+    assert_eq!(payload.get("username"), Some(&json!("user-777")));
+    assert_eq!(payload.get("role"), Some(&json!("moderator")));
+    assert_eq!(payload.get("refresh_token"), Some(&serde_json::Value::Null));
+    assert_eq!(payload.get("access_token"), Some(&json!(token)));
+}
+
+#[tokio::test]
+async fn hot_path_routes_require_auth_with_standard_error_envelope() {
+    let app = test_app();
+
+    let unauth_get_endpoints = [
+        "/v1/feed?limit=1",
+        "/v1/notifications?limit=1",
+        "/v1/chat/threads",
+        "/v1/witnesses/witness-1/signals/counts",
+        "/v1/groups?limit=1",
+        "/v1/tandang/me/profile",
+        "/v1/tandang/users/user-123/profile",
+    ];
+
+    for endpoint in unauth_get_endpoints {
+        let request = Request::builder()
+            .method("GET")
+            .uri(endpoint)
+            .body(Body::empty())
+            .expect("request");
+        let response = app.clone().oneshot(request).await.expect("response");
+        assert_error_envelope(response, StatusCode::UNAUTHORIZED, "unauthorized").await;
+    }
+
+    let triage_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/sessions")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"content":"cek triage"}"#))
+        .expect("triage request");
+    let triage_response = app.clone().oneshot(triage_request).await.expect("response");
+    assert_error_envelope(triage_response, StatusCode::UNAUTHORIZED, "unauthorized").await;
+}
+
+#[tokio::test]
 async fn chat_thread_and_message_flow() {
     let app = test_app();
     let token = test_token("test-secret");
@@ -2342,6 +2433,13 @@ async fn chat_thread_and_message_flow() {
         .and_then(|value| value.as_str())
         .expect("message_id")
         .to_string();
+    assert_eq!(
+        message
+            .get("author")
+            .and_then(|value| value.get("name"))
+            .and_then(|value| value.as_str()),
+        Some("user-123")
+    );
 
     let list_messages_request = Request::builder()
         .method("GET")
@@ -2598,6 +2696,78 @@ async fn chat_poll_messages_endpoint() {
     let messages: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].get("body"), Some(&json!("poll me")));
+    assert_eq!(
+        messages[0]
+            .get("author")
+            .and_then(|value| value.get("name"))
+            .and_then(|value| value.as_str()),
+        Some("user-123")
+    );
+}
+
+#[tokio::test]
+async fn chat_attachment_upload_and_signed_download_flow() {
+    let app = test_app();
+    let token = test_token("test-secret");
+    let boundary = "----gotong-chat-upload-test";
+    let multipart_body = format!(
+        "--{boundary}\r\n\
+Content-Disposition: form-data; name=\"file\"; filename=\"foto.png\"\r\n\
+Content-Type: image/png\r\n\
+\r\n\
+PNGDATA\r\n\
+--{boundary}--\r\n"
+    );
+
+    let upload_request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/attachments/upload")
+        .header(
+            CONTENT_TYPE,
+            format!("multipart/form-data; boundary={boundary}"),
+        )
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(multipart_body))
+        .expect("upload request");
+    let upload_response = app
+        .clone()
+        .oneshot(upload_request)
+        .await
+        .expect("upload response");
+    assert_eq!(upload_response.status(), StatusCode::OK);
+    let upload_body = to_bytes(upload_response.into_body(), usize::MAX)
+        .await
+        .expect("upload body");
+    let uploaded: serde_json::Value = serde_json::from_slice(&upload_body).expect("upload json");
+    let download_url = uploaded
+        .get("url")
+        .and_then(|value| value.as_str())
+        .expect("download url");
+    assert_eq!(uploaded.get("media_type"), Some(&json!("image")));
+    assert_eq!(uploaded.get("mime_type"), Some(&json!("image/png")));
+
+    let download_request = Request::builder()
+        .method("GET")
+        .uri(download_url)
+        .body(Body::empty())
+        .expect("download request");
+    let download_response = app
+        .clone()
+        .oneshot(download_request)
+        .await
+        .expect("download response");
+    assert_eq!(download_response.status(), StatusCode::OK);
+    assert_eq!(
+        download_response
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok()),
+        Some("image/png")
+    );
+    let download_body = to_bytes(download_response.into_body(), usize::MAX)
+        .await
+        .expect("download body");
+    assert_eq!(download_body.as_ref(), b"PNGDATA");
 }
 
 #[tokio::test]
@@ -2653,7 +2823,7 @@ async fn chat_messages_query_rejects_since_message_without_created_at() {
         .body(Body::empty())
         .unwrap();
     let response = app.clone().oneshot(poll_request).await.expect("response");
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_envelope(response, StatusCode::BAD_REQUEST, "validation_error").await;
 }
 
 #[tokio::test]
@@ -2823,6 +2993,149 @@ async fn discovery_feed_and_search_endpoints() {
     assert_eq!(private_feed_ids.len(), 2);
     assert!(private_feed_ids.contains(&feed_a.feed_id.as_str()));
     assert!(private_feed_ids.contains(&feed_c.feed_id.as_str()));
+}
+
+#[tokio::test]
+async fn discovery_feed_suggestions_endpoint_returns_aggregated_entities() {
+    let (state, app) = test_app_state_router();
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let actor = actor_identity_for_tests("user-123");
+    let hidden_actor = actor_identity_for_tests("hidden-user");
+
+    service
+        .ingest_feed(FeedIngestInput {
+            source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+            source_id: "seed-suggestion-1".into(),
+            actor: actor.clone(),
+            title: "Entity suggestion 1".into(),
+            summary: Some("summary".into()),
+            scope_id: Some("scope-rw-01".into()),
+            privacy_level: Some("public".into()),
+            occurred_at_ms: Some(1_000),
+            request_id: "feed-suggestion-1".into(),
+            correlation_id: "corr-feed-suggestion-1".into(),
+            request_ts_ms: Some(1_000),
+            participant_ids: vec![],
+            payload: Some(json!({
+                "enrichment": {
+                    "entity_tags": [
+                        {
+                            "entity_id": "ent-rt05",
+                            "entity_type": "lingkungan",
+                            "label": "RT 05 Menteng",
+                            "follower_count": 44
+                        },
+                        {
+                            "entity_type": "topik",
+                            "label": "Infrastruktur"
+                        }
+                    ]
+                }
+            })),
+        })
+        .await
+        .expect("seed suggestion row one");
+
+    service
+        .ingest_feed(FeedIngestInput {
+            source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+            source_id: "seed-suggestion-2".into(),
+            actor,
+            title: "Entity suggestion 2".into(),
+            summary: Some("summary".into()),
+            scope_id: Some("scope-rw-01".into()),
+            privacy_level: Some("public".into()),
+            occurred_at_ms: Some(2_000),
+            request_id: "feed-suggestion-2".into(),
+            correlation_id: "corr-feed-suggestion-2".into(),
+            request_ts_ms: Some(2_000),
+            participant_ids: vec![],
+            payload: Some(json!({
+                "enrichment": {
+                    "entity_tags": [
+                        {
+                            "entity_id": "ent-rt05",
+                            "entity_type": "lingkungan",
+                            "label": "RT 05 Menteng"
+                        },
+                        {
+                            "entity_id": "ent-air",
+                            "entity_type": "topik",
+                            "label": "Saluran Air",
+                            "followed": true
+                        }
+                    ]
+                }
+            })),
+        })
+        .await
+        .expect("seed suggestion row two");
+
+    service
+        .ingest_feed(FeedIngestInput {
+            source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+            source_id: "seed-suggestion-hidden".into(),
+            actor: hidden_actor,
+            title: "Entity hidden".into(),
+            summary: Some("summary".into()),
+            scope_id: Some("scope-rw-01".into()),
+            privacy_level: Some("private".into()),
+            occurred_at_ms: Some(3_000),
+            request_id: "feed-suggestion-hidden".into(),
+            correlation_id: "corr-feed-suggestion-hidden".into(),
+            request_ts_ms: Some(3_000),
+            participant_ids: vec![],
+            payload: Some(json!({
+                "enrichment": {
+                    "entity_tags": [
+                        {
+                            "entity_id": "ent-hidden",
+                            "entity_type": "topik",
+                            "label": "Hidden Topic"
+                        }
+                    ]
+                }
+            })),
+        })
+        .await
+        .expect("seed suggestion hidden row");
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/v1/feed/suggestions?scope_id=scope-rw-01&limit=5")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let suggestions: Vec<serde_json::Value> = serde_json::from_slice(&body).expect("json");
+
+    assert_eq!(suggestions.len(), 2);
+    assert_eq!(suggestions[0].get("entity_id"), Some(&json!("ent-rt05")));
+    assert_eq!(suggestions[0].get("witness_count"), Some(&json!(2)));
+    assert_eq!(suggestions[0].get("follower_count"), Some(&json!(44)));
+    assert_eq!(suggestions[1].get("label"), Some(&json!("Infrastruktur")));
+    assert!(
+        suggestions
+            .iter()
+            .all(|item| item.get("followed") == Some(&json!(false)))
+    );
+    assert!(
+        suggestions
+            .iter()
+            .all(|item| item.get("entity_id") != Some(&json!("ent-air")))
+    );
+    assert!(
+        suggestions
+            .iter()
+            .all(|item| item.get("entity_id") != Some(&json!("ent-hidden")))
+    );
 }
 
 #[tokio::test]
@@ -3211,6 +3524,760 @@ async fn discovery_notifications_pagination_cursor_does_not_skip_items() {
     assert_eq!(second_page.items.len(), 1);
     assert_eq!(second_page.items[0].created_at_ms, 1_000);
     assert!(second_page.next_cursor.is_none());
+}
+
+#[tokio::test]
+async fn triage_sessions_start_and_continue_flow() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let start_payload = json!({
+        "content": "Jalan di depan rumah rusak parah",
+        "attachments": [
+            {
+                "name": "foto-jalan.jpg",
+                "mime_type": "image/jpeg",
+                "size_bytes": 128_000
+            }
+        ]
+    });
+    let start_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/sessions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "triage-start-1")
+        .header("x-correlation-id", "corr-triage-start-1")
+        .body(Body::from(start_payload.to_string()))
+        .expect("start request");
+    let start_response = app.clone().oneshot(start_request).await.expect("response");
+    assert_eq!(start_response.status(), StatusCode::OK);
+    let start_body = to_bytes(start_response.into_body(), usize::MAX)
+        .await
+        .expect("start body");
+    let start_json: serde_json::Value = serde_json::from_slice(&start_body).expect("start json");
+    let session_id = start_json
+        .get("session_id")
+        .and_then(|value| value.as_str())
+        .expect("session id");
+    assert_eq!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("bar_state")),
+        Some(&json!("probing"))
+    );
+    assert_eq!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("route")),
+        Some(&json!("komunitas"))
+    );
+
+    let continue_payload = json!({
+        "answer": "Saya siap lanjutkan detailnya",
+        "attachments": [
+            {
+                "name": "lanjutan.jpg",
+                "mime_type": "image/jpeg",
+                "size_bytes": 42_000
+            }
+        ]
+    });
+    let continue_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/triage/sessions/{session_id}/messages"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "triage-continue-1")
+        .header("x-correlation-id", "corr-triage-continue-1")
+        .body(Body::from(continue_payload.to_string()))
+        .expect("continue request");
+    let continue_response = app
+        .clone()
+        .oneshot(continue_request)
+        .await
+        .expect("continue response");
+    assert_eq!(continue_response.status(), StatusCode::OK);
+    let continue_body = to_bytes(continue_response.into_body(), usize::MAX)
+        .await
+        .expect("continue body");
+    let continue_json: serde_json::Value =
+        serde_json::from_slice(&continue_body).expect("continue json");
+    assert_eq!(
+        continue_json
+            .get("result")
+            .and_then(|value| value.get("bar_state")),
+        Some(&json!("leaning"))
+    );
+
+    let continue_request_2 = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/triage/sessions/{session_id}/messages"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "triage-continue-2")
+        .header("x-correlation-id", "corr-triage-continue-2")
+        .body(Body::from(
+            json!({
+                "answer": "lanjut sampai selesai"
+            })
+            .to_string(),
+        ))
+        .expect("continue request 2");
+    let continue_response_2 = app
+        .clone()
+        .oneshot(continue_request_2)
+        .await
+        .expect("continue response 2");
+    assert_eq!(continue_response_2.status(), StatusCode::OK);
+    let continue_body_2 = to_bytes(continue_response_2.into_body(), usize::MAX)
+        .await
+        .expect("continue body 2");
+    let continue_json_2: serde_json::Value =
+        serde_json::from_slice(&continue_body_2).expect("continue json 2");
+    assert_eq!(
+        continue_json_2
+            .get("result")
+            .and_then(|value| value.get("bar_state")),
+        Some(&json!("ready"))
+    );
+}
+
+#[tokio::test]
+async fn triage_session_continue_forbids_cross_user_access() {
+    let app = test_app();
+    let owner_token = test_token_with_identity("test-secret", "user", "user-123");
+    let other_token = test_token_with_identity("test-secret", "user", "user-999");
+
+    let start_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/sessions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {owner_token}"))
+        .header("x-request-id", "triage-forbid-start-1")
+        .header("x-correlation-id", "corr-triage-forbid-start-1")
+        .body(Body::from(
+            json!({
+                "content": "Saya ingin buat kelompok ronda malam"
+            })
+            .to_string(),
+        ))
+        .expect("start request");
+    let start_response = app.clone().oneshot(start_request).await.expect("response");
+    assert_eq!(start_response.status(), StatusCode::OK);
+    let start_body = to_bytes(start_response.into_body(), usize::MAX)
+        .await
+        .expect("start body");
+    let start_json: serde_json::Value = serde_json::from_slice(&start_body).expect("start json");
+    let session_id = start_json
+        .get("session_id")
+        .and_then(|value| value.as_str())
+        .expect("session id");
+
+    let continue_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/triage/sessions/{session_id}/messages"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {other_token}"))
+        .header("x-request-id", "triage-forbid-continue-1")
+        .header("x-correlation-id", "corr-triage-forbid-continue-1")
+        .body(Body::from(
+            json!({
+                "answer": "saya coba akses sesi orang lain"
+            })
+            .to_string(),
+        ))
+        .expect("continue request");
+    let continue_response = app.oneshot(continue_request).await.expect("response");
+    assert_error_envelope(continue_response, StatusCode::FORBIDDEN, "forbidden").await;
+}
+
+#[tokio::test]
+async fn witness_signals_endpoints_roundtrip_and_counts() {
+    let app = test_app();
+    let token_user_1 = test_token_with_identity("test-secret", "user", "user-123");
+    let token_user_2 = test_token_with_identity("test-secret", "user", "user-456");
+
+    let send_signal_payload = json!({ "signal_type": "saksi" });
+    let send_request = Request::builder()
+        .method("POST")
+        .uri("/v1/witnesses/witness-1/signals")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .header("x-request-id", "signal-send-1")
+        .header("x-correlation-id", "corr-signal-send-1")
+        .body(Body::from(send_signal_payload.to_string()))
+        .expect("send request");
+    let send_response = app.clone().oneshot(send_request).await.expect("response");
+    assert_eq!(send_response.status(), StatusCode::CREATED);
+    let send_body = to_bytes(send_response.into_body(), usize::MAX)
+        .await
+        .expect("send body");
+    let send_json: serde_json::Value = serde_json::from_slice(&send_body).expect("send json");
+    assert_eq!(send_json.get("witness_id"), Some(&json!("witness-1")));
+    assert_eq!(send_json.get("signal_type"), Some(&json!("saksi")));
+    assert_eq!(send_json.get("outcome"), Some(&json!("pending")));
+
+    let replay_request = Request::builder()
+        .method("POST")
+        .uri("/v1/witnesses/witness-1/signals")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .header("x-request-id", "signal-send-1")
+        .header("x-correlation-id", "corr-signal-send-1-replay")
+        .body(Body::from(send_signal_payload.to_string()))
+        .expect("replay request");
+    let replay_response = app.clone().oneshot(replay_request).await.expect("response");
+    assert_eq!(replay_response.status(), StatusCode::CREATED);
+    let replay_body = to_bytes(replay_response.into_body(), usize::MAX)
+        .await
+        .expect("replay body");
+    let replay_json: serde_json::Value = serde_json::from_slice(&replay_body).expect("replay json");
+    assert_eq!(send_json, replay_json);
+
+    let relation_request = Request::builder()
+        .method("GET")
+        .uri("/v1/witnesses/witness-1/signals/my-relation")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .body(Body::empty())
+        .expect("relation request");
+    let relation_response = app
+        .clone()
+        .oneshot(relation_request)
+        .await
+        .expect("response");
+    assert_eq!(relation_response.status(), StatusCode::OK);
+    let relation_body = to_bytes(relation_response.into_body(), usize::MAX)
+        .await
+        .expect("relation body");
+    let relation_json: serde_json::Value =
+        serde_json::from_slice(&relation_body).expect("relation json");
+    assert_eq!(relation_json.get("witnessed"), Some(&json!(true)));
+    assert_eq!(relation_json.get("flagged"), Some(&json!(false)));
+
+    let counts_request = Request::builder()
+        .method("GET")
+        .uri("/v1/witnesses/witness-1/signals/counts")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .body(Body::empty())
+        .expect("counts request");
+    let counts_response = app.clone().oneshot(counts_request).await.expect("response");
+    assert_eq!(counts_response.status(), StatusCode::OK);
+    let counts_body = to_bytes(counts_response.into_body(), usize::MAX)
+        .await
+        .expect("counts body");
+    let counts_json: serde_json::Value = serde_json::from_slice(&counts_body).expect("counts json");
+    assert_eq!(counts_json.get("witness_count"), Some(&json!(1)));
+    assert_eq!(counts_json.get("flags"), Some(&json!(0)));
+
+    let send_flag_payload = json!({ "signal_type": "perlu_dicek" });
+    let send_flag_request = Request::builder()
+        .method("POST")
+        .uri("/v1/witnesses/witness-1/signals")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token_user_2}"))
+        .header("x-request-id", "signal-send-2")
+        .header("x-correlation-id", "corr-signal-send-2")
+        .body(Body::from(send_flag_payload.to_string()))
+        .expect("send flag request");
+    let send_flag_response = app
+        .clone()
+        .oneshot(send_flag_request)
+        .await
+        .expect("response");
+    assert_eq!(send_flag_response.status(), StatusCode::CREATED);
+
+    let counts_after_flag_request = Request::builder()
+        .method("GET")
+        .uri("/v1/witnesses/witness-1/signals/counts")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .body(Body::empty())
+        .expect("counts request");
+    let counts_after_flag_response = app
+        .clone()
+        .oneshot(counts_after_flag_request)
+        .await
+        .expect("response");
+    let counts_after_flag_body = to_bytes(counts_after_flag_response.into_body(), usize::MAX)
+        .await
+        .expect("counts body");
+    let counts_after_flag_json: serde_json::Value =
+        serde_json::from_slice(&counts_after_flag_body).expect("counts json");
+    assert_eq!(counts_after_flag_json.get("witness_count"), Some(&json!(1)));
+    assert_eq!(counts_after_flag_json.get("flags"), Some(&json!(1)));
+
+    let remove_request = Request::builder()
+        .method("DELETE")
+        .uri("/v1/witnesses/witness-1/signals/saksi")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .header("x-request-id", "signal-remove-1")
+        .header("x-correlation-id", "corr-signal-remove-1")
+        .body(Body::empty())
+        .expect("remove request");
+    let remove_response = app.clone().oneshot(remove_request).await.expect("response");
+    assert_eq!(remove_response.status(), StatusCode::OK);
+
+    let relation_after_remove_request = Request::builder()
+        .method("GET")
+        .uri("/v1/witnesses/witness-1/signals/my-relation")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .body(Body::empty())
+        .expect("relation request");
+    let relation_after_remove_response = app
+        .clone()
+        .oneshot(relation_after_remove_request)
+        .await
+        .expect("response");
+    let relation_after_remove_body =
+        to_bytes(relation_after_remove_response.into_body(), usize::MAX)
+            .await
+            .expect("relation body");
+    let relation_after_remove_json: serde_json::Value =
+        serde_json::from_slice(&relation_after_remove_body).expect("relation json");
+    assert_eq!(
+        relation_after_remove_json.get("witnessed"),
+        Some(&json!(false))
+    );
+    assert_eq!(
+        relation_after_remove_json.get("flagged"),
+        Some(&json!(false))
+    );
+
+    let counts_after_remove_request = Request::builder()
+        .method("GET")
+        .uri("/v1/witnesses/witness-1/signals/counts")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .body(Body::empty())
+        .expect("counts request");
+    let counts_after_remove_response = app
+        .clone()
+        .oneshot(counts_after_remove_request)
+        .await
+        .expect("response");
+    let counts_after_remove_body = to_bytes(counts_after_remove_response.into_body(), usize::MAX)
+        .await
+        .expect("counts body");
+    let counts_after_remove_json: serde_json::Value =
+        serde_json::from_slice(&counts_after_remove_body).expect("counts json");
+    assert_eq!(
+        counts_after_remove_json.get("witness_count"),
+        Some(&json!(0))
+    );
+    assert_eq!(counts_after_remove_json.get("flags"), Some(&json!(1)));
+
+    let resolutions_request = Request::builder()
+        .method("GET")
+        .uri("/v1/witnesses/witness-1/signals/resolutions")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .body(Body::empty())
+        .expect("resolutions request");
+    let resolutions_response = app
+        .clone()
+        .oneshot(resolutions_request)
+        .await
+        .expect("response");
+    assert_eq!(resolutions_response.status(), StatusCode::OK);
+    let resolutions_body = to_bytes(resolutions_response.into_body(), usize::MAX)
+        .await
+        .expect("resolutions body");
+    let resolutions_json: serde_json::Value =
+        serde_json::from_slice(&resolutions_body).expect("resolutions json");
+    assert_eq!(resolutions_json.as_array().expect("array").len(), 0);
+}
+
+#[tokio::test]
+async fn group_endpoints_lifecycle_roundtrip() {
+    let app = test_app();
+    let admin_token = test_token_with_identity("test-secret", "user", "user-123");
+    let member_token = test_token_with_identity("test-secret", "user", "user-456");
+    let invitee_token = test_token_with_identity("test-secret", "user", "user-789");
+
+    let make_request = |method: &str,
+                        uri: String,
+                        token: &str,
+                        request_id: Option<&str>,
+                        correlation_id: Option<&str>,
+                        body: Option<serde_json::Value>| {
+        let mut builder = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("authorization", format!("Bearer {token}"));
+        if let Some(request_id) = request_id {
+            builder = builder.header("x-request-id", request_id);
+        }
+        if let Some(correlation_id) = correlation_id {
+            builder = builder.header("x-correlation-id", correlation_id);
+        }
+        if let Some(body) = body {
+            builder
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .expect("request")
+        } else {
+            builder.body(Body::empty()).expect("request")
+        }
+    };
+
+    let create_payload = json!({
+        "name": "Karang Taruna RT 07",
+        "description": "Wadah pemuda untuk kerja bakti dan ronda.",
+        "entity_type": "kelompok",
+        "join_policy": "persetujuan"
+    });
+    let create_request = make_request(
+        "POST",
+        "/v1/groups".to_string(),
+        &admin_token,
+        Some("group-create-1"),
+        Some("corr-group-create-1"),
+        Some(create_payload.clone()),
+    );
+    let create_response = app.clone().oneshot(create_request).await.expect("response");
+    assert_eq!(create_response.status(), StatusCode::CREATED);
+    let create_body = to_bytes(create_response.into_body(), usize::MAX)
+        .await
+        .expect("create body");
+    let create_json: serde_json::Value = serde_json::from_slice(&create_body).expect("create json");
+    let group_id = create_json
+        .get("group_id")
+        .and_then(|value| value.as_str())
+        .expect("group_id")
+        .to_string();
+    assert_eq!(create_json.get("my_role"), Some(&json!("admin")));
+
+    let create_replay_request = make_request(
+        "POST",
+        "/v1/groups".to_string(),
+        &admin_token,
+        Some("group-create-1"),
+        Some("corr-group-create-1-replay"),
+        Some(create_payload),
+    );
+    let create_replay_response = app
+        .clone()
+        .oneshot(create_replay_request)
+        .await
+        .expect("response");
+    assert_eq!(create_replay_response.status(), StatusCode::CREATED);
+    let create_replay_body = to_bytes(create_replay_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let create_replay_json: serde_json::Value =
+        serde_json::from_slice(&create_replay_body).expect("json");
+    assert_eq!(create_replay_json, create_json);
+
+    let list_request = make_request(
+        "GET",
+        "/v1/groups?limit=20".to_string(),
+        &admin_token,
+        None,
+        None,
+        None,
+    );
+    let list_response = app.clone().oneshot(list_request).await.expect("response");
+    assert_eq!(list_response.status(), StatusCode::OK);
+    let list_body = to_bytes(list_response.into_body(), usize::MAX)
+        .await
+        .expect("list body");
+    let list_json: serde_json::Value = serde_json::from_slice(&list_body).expect("list json");
+    let list_items = list_json
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("items");
+    assert!(
+        list_items
+            .iter()
+            .any(|item| item.get("group_id") == Some(&json!(group_id)))
+    );
+
+    let my_groups_request = make_request(
+        "GET",
+        "/v1/groups/me".to_string(),
+        &admin_token,
+        None,
+        None,
+        None,
+    );
+    let my_groups_response = app
+        .clone()
+        .oneshot(my_groups_request)
+        .await
+        .expect("response");
+    assert_eq!(my_groups_response.status(), StatusCode::OK);
+    let my_groups_body = to_bytes(my_groups_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let my_groups_json: serde_json::Value = serde_json::from_slice(&my_groups_body).expect("json");
+    let my_groups_items = my_groups_json.as_array().expect("array");
+    assert!(
+        my_groups_items
+            .iter()
+            .any(|item| item.get("group_id") == Some(&json!(group_id)))
+    );
+
+    let get_request = make_request(
+        "GET",
+        format!("/v1/groups/{group_id}"),
+        &admin_token,
+        None,
+        None,
+        None,
+    );
+    let get_response = app.clone().oneshot(get_request).await.expect("response");
+    assert_eq!(get_response.status(), StatusCode::OK);
+    let get_body = to_bytes(get_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let get_json: serde_json::Value = serde_json::from_slice(&get_body).expect("json");
+    assert_eq!(
+        get_json.get("my_membership_status"),
+        Some(&json!("approved"))
+    );
+
+    let patch_request = make_request(
+        "PATCH",
+        format!("/v1/groups/{group_id}"),
+        &admin_token,
+        Some("group-update-1"),
+        Some("corr-group-update-1"),
+        Some(json!({
+            "name": "Karang Taruna RT 07 (Aktif)",
+            "description": "Forum aktif untuk kerja bakti, ronda, dan kesiapsiagaan."
+        })),
+    );
+    let patch_response = app.clone().oneshot(patch_request).await.expect("response");
+    assert_eq!(patch_response.status(), StatusCode::OK);
+    let patch_body = to_bytes(patch_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let patch_json: serde_json::Value = serde_json::from_slice(&patch_body).expect("json");
+    assert_eq!(
+        patch_json.get("name"),
+        Some(&json!("Karang Taruna RT 07 (Aktif)"))
+    );
+
+    let request_join_request = make_request(
+        "POST",
+        format!("/v1/groups/{group_id}/requests"),
+        &member_token,
+        Some("group-request-join-1"),
+        Some("corr-group-request-join-1"),
+        Some(json!({
+            "message": "Saya siap bantu ronda malam."
+        })),
+    );
+    let request_join_response = app
+        .clone()
+        .oneshot(request_join_request)
+        .await
+        .expect("response");
+    assert_eq!(request_join_response.status(), StatusCode::CREATED);
+    let request_join_body = to_bytes(request_join_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let request_join_json: serde_json::Value =
+        serde_json::from_slice(&request_join_body).expect("json");
+    let join_request_id = request_join_json
+        .get("request_id")
+        .and_then(|value| value.as_str())
+        .expect("request_id")
+        .to_string();
+
+    let approve_request = make_request(
+        "POST",
+        format!("/v1/groups/{group_id}/requests/{join_request_id}/approve"),
+        &admin_token,
+        Some("group-approve-1"),
+        Some("corr-group-approve-1"),
+        None,
+    );
+    let approve_response = app
+        .clone()
+        .oneshot(approve_request)
+        .await
+        .expect("response");
+    assert_eq!(approve_response.status(), StatusCode::OK);
+    let approve_body = to_bytes(approve_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let approve_json: serde_json::Value = serde_json::from_slice(&approve_body).expect("json");
+    assert_eq!(approve_json.get("user_id"), Some(&json!("user-456")));
+
+    let update_role_request = make_request(
+        "POST",
+        format!("/v1/groups/{group_id}/members/user-456/role"),
+        &admin_token,
+        Some("group-role-1"),
+        Some("corr-group-role-1"),
+        Some(json!({ "role": "moderator" })),
+    );
+    let update_role_response = app
+        .clone()
+        .oneshot(update_role_request)
+        .await
+        .expect("response");
+    assert_eq!(update_role_response.status(), StatusCode::OK);
+
+    let invite_request = make_request(
+        "POST",
+        format!("/v1/groups/{group_id}/invite"),
+        &admin_token,
+        Some("group-invite-1"),
+        Some("corr-group-invite-1"),
+        Some(json!({ "user_id": "user-789" })),
+    );
+    let invite_response = app.clone().oneshot(invite_request).await.expect("response");
+    assert_eq!(invite_response.status(), StatusCode::OK);
+    let invite_body = to_bytes(invite_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let invite_json: serde_json::Value = serde_json::from_slice(&invite_body).expect("json");
+    assert_eq!(invite_json.get("added"), Some(&json!(true)));
+
+    let remove_invited_request = make_request(
+        "POST",
+        format!("/v1/groups/{group_id}/members/user-789/remove"),
+        &admin_token,
+        Some("group-remove-1"),
+        Some("corr-group-remove-1"),
+        None,
+    );
+    let remove_invited_response = app
+        .clone()
+        .oneshot(remove_invited_request)
+        .await
+        .expect("response");
+    assert_eq!(remove_invited_response.status(), StatusCode::OK);
+
+    let leave_request = make_request(
+        "POST",
+        format!("/v1/groups/{group_id}/leave"),
+        &member_token,
+        Some("group-leave-1"),
+        Some("corr-group-leave-1"),
+        None,
+    );
+    let leave_response = app.clone().oneshot(leave_request).await.expect("response");
+    assert_eq!(leave_response.status(), StatusCode::OK);
+
+    let request_join_again_request = make_request(
+        "POST",
+        format!("/v1/groups/{group_id}/requests"),
+        &invitee_token,
+        Some("group-request-join-2"),
+        Some("corr-group-request-join-2"),
+        Some(json!({
+            "message": "Ingin bergabung."
+        })),
+    );
+    let request_join_again_response = app
+        .clone()
+        .oneshot(request_join_again_request)
+        .await
+        .expect("response");
+    assert_eq!(request_join_again_response.status(), StatusCode::CREATED);
+    let request_join_again_body = to_bytes(request_join_again_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let request_join_again_json: serde_json::Value =
+        serde_json::from_slice(&request_join_again_body).expect("json");
+    let join_request_id_2 = request_join_again_json
+        .get("request_id")
+        .and_then(|value| value.as_str())
+        .expect("request_id")
+        .to_string();
+
+    let reject_request = make_request(
+        "POST",
+        format!("/v1/groups/{group_id}/requests/{join_request_id_2}/reject"),
+        &admin_token,
+        Some("group-reject-1"),
+        Some("corr-group-reject-1"),
+        None,
+    );
+    let reject_response = app.clone().oneshot(reject_request).await.expect("response");
+    assert_eq!(reject_response.status(), StatusCode::OK);
+    let reject_body = to_bytes(reject_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let reject_json: serde_json::Value = serde_json::from_slice(&reject_body).expect("json");
+    assert_eq!(reject_json.get("rejected"), Some(&json!(true)));
+
+    let create_open_group_request = make_request(
+        "POST",
+        "/v1/groups".to_string(),
+        &admin_token,
+        Some("group-create-open-1"),
+        Some("corr-group-create-open-1"),
+        Some(json!({
+            "name": "Lembaga Lingkungan",
+            "description": "Koordinasi lembaga lingkungan tingkat RW.",
+            "entity_type": "lembaga",
+            "join_policy": "terbuka"
+        })),
+    );
+    let create_open_group_response = app
+        .clone()
+        .oneshot(create_open_group_request)
+        .await
+        .expect("response");
+    assert_eq!(create_open_group_response.status(), StatusCode::CREATED);
+    let create_open_group_body = to_bytes(create_open_group_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let create_open_group_json: serde_json::Value =
+        serde_json::from_slice(&create_open_group_body).expect("json");
+    let open_group_id = create_open_group_json
+        .get("group_id")
+        .and_then(|value| value.as_str())
+        .expect("group id");
+
+    let join_open_request = make_request(
+        "POST",
+        format!("/v1/groups/{open_group_id}/join"),
+        &member_token,
+        Some("group-join-open-1"),
+        Some("corr-group-join-open-1"),
+        None,
+    );
+    let join_open_response = app
+        .clone()
+        .oneshot(join_open_request)
+        .await
+        .expect("response");
+    assert_eq!(join_open_response.status(), StatusCode::OK);
+    let join_open_body = to_bytes(join_open_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let join_open_json: serde_json::Value = serde_json::from_slice(&join_open_body).expect("json");
+    assert_eq!(join_open_json.get("user_id"), Some(&json!("user-456")));
+    assert_eq!(join_open_json.get("role"), Some(&json!("anggota")));
+
+    let member_groups_request = make_request(
+        "GET",
+        "/v1/groups/me".to_string(),
+        &member_token,
+        None,
+        None,
+        None,
+    );
+    let member_groups_response = app
+        .clone()
+        .oneshot(member_groups_request)
+        .await
+        .expect("response");
+    assert_eq!(member_groups_response.status(), StatusCode::OK);
+    let member_groups_body = to_bytes(member_groups_response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let member_groups_json: serde_json::Value =
+        serde_json::from_slice(&member_groups_body).expect("json");
+    let member_groups_items = member_groups_json.as_array().expect("array");
+    assert!(
+        member_groups_items
+            .iter()
+            .any(|item| item.get("group_id") == Some(&json!(open_group_id)))
+    );
 }
 
 #[tokio::test]
@@ -3773,6 +4840,39 @@ async fn tandang_routes_surface_cache_metadata_and_data() {
         Some(&json!("hit"))
     );
 
+    let user_profile_request = Request::builder()
+        .method("GET")
+        .uri("/v1/tandang/users/user-999/profile")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .expect("user profile request");
+    let user_profile_response = app
+        .clone()
+        .oneshot(user_profile_request)
+        .await
+        .expect("user profile response");
+    assert_eq!(user_profile_response.status(), StatusCode::OK);
+    let user_profile_json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(user_profile_response.into_body(), usize::MAX)
+            .await
+            .expect("user profile body"),
+    )
+    .expect("user profile json");
+    assert_eq!(
+        user_profile_json
+            .get("data")
+            .and_then(|data| data.get("platform_user_id"))
+            .and_then(|value| value.as_str()),
+        Some("user-999")
+    );
+    assert_eq!(
+        user_profile_json
+            .get("data")
+            .and_then(|data| data.get("identity"))
+            .and_then(|value| value.as_str()),
+        Some("gotong_royong:user-999")
+    );
+
     for endpoint in [
         "/v1/tandang/skills/search?q=cleanup",
         "/v1/tandang/por/requirements/delivery",
@@ -3852,6 +4952,12 @@ async fn tandang_routes_match_read_contract_shapes() {
             .get("cv_hidup")
             .and_then(|value| value.get("user_id"))
             .is_some()
+    );
+    assert_eq!(
+        profile_data
+            .get("platform_user_id")
+            .and_then(|value| value.as_str()),
+        Some("user-123")
     );
 
     let skills_request = Request::builder()
@@ -4122,7 +5228,7 @@ async fn tandang_user_keyed_routes_require_self_or_admin() {
             .oneshot(forbidden_request)
             .await
             .expect("forbidden response");
-        assert_eq!(forbidden_response.status(), StatusCode::FORBIDDEN);
+        assert_error_envelope(forbidden_response, StatusCode::FORBIDDEN, "forbidden").await;
 
         let admin_request = Request::builder()
             .method("GET")
