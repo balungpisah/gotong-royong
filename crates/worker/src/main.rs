@@ -1511,18 +1511,22 @@ impl Worker {
             job.attempt,
             self.config.worker_backoff_max_ms,
         );
+        let current_job_id = job.job_id.clone();
         job.attempt = job.attempt.saturating_add(1);
         job.run_at_ms = now_ms() + delay as i64;
+        job.job_id = next_retry_job_id(&current_job_id, job.attempt);
         if let Err(enqueue_err) = self.queue.enqueue(&job).await {
             warn!(
-                job_id = %job.job_id,
+                job_id = %current_job_id,
+                retry_job_id = %job.job_id,
                 attempt = %job.attempt,
                 error = %enqueue_err,
                 "failed to enqueue retry job; attempting to move processing job back to ready queue"
             );
+            job.job_id = current_job_id.clone();
             if let Err(requeue_err) = self.queue.restore_processing_with_retry_delay(&job).await {
                 warn!(
-                    job_id = %job.job_id,
+                    job_id = %current_job_id,
                     error = %requeue_err,
                     "failed to restore processing job for retry"
                 );
@@ -1530,10 +1534,11 @@ impl Worker {
             return Err(enqueue_err);
         }
 
-        self.queue.ack(&job.job_id).await?;
+        self.queue.ack(&current_job_id).await?;
 
         error!(
-            job_id = %job.job_id,
+            job_id = %current_job_id,
+            retry_job_id = %job.job_id,
             attempt = job.attempt,
             next_run_at_ms = job.run_at_ms,
             error = %err,
@@ -1541,6 +1546,14 @@ impl Worker {
         );
         Ok(())
     }
+}
+
+fn next_retry_job_id(current_job_id: &str, next_attempt: u32) -> String {
+    let root_job_id = current_job_id
+        .split_once(":retry:")
+        .map(|(root, _)| root)
+        .unwrap_or(current_job_id);
+    format!("{root_job_id}:retry:{next_attempt}:{}", Uuid::now_v7())
 }
 
 async fn handle_job(
@@ -2304,6 +2317,22 @@ mod periodic_job_tests {
     #[test]
     fn periodic_slot_start_ms_zero_interval_passthrough() {
         assert_eq!(periodic_slot_start_ms(12_345, 0), 12_345);
+    }
+
+    #[test]
+    fn next_retry_job_id_keeps_root_job_id() {
+        let retry_job_id = next_retry_job_id("evt_123", 2);
+        assert!(retry_job_id.starts_with("evt_123:retry:2:"));
+
+        let nested_retry_job_id = next_retry_job_id("evt_123:retry:2:old", 3);
+        assert!(nested_retry_job_id.starts_with("evt_123:retry:3:"));
+    }
+
+    #[test]
+    fn next_retry_job_id_uses_unique_suffix() {
+        let first = next_retry_job_id("evt_123", 2);
+        let second = next_retry_job_id("evt_123", 2);
+        assert_ne!(first, second);
     }
 
     #[test]
