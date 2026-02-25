@@ -134,5 +134,14 @@ pack-c-slice-gate namespace="monitoring":
 pack-c-cutover-readiness namespace="monitoring":
 	scripts/deploy/pack_c_cutover_readiness.sh --namespace {{namespace}}
 
+pack-c-stage-kickoff stage="stage-a" namespace="monitoring":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage {{stage}} --namespace {{namespace}}
+
 pack-c-stage-a-kickoff namespace="monitoring":
-	scripts/deploy/pack_c_stage_a_kickoff.sh --namespace {{namespace}}
+	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-a --namespace {{namespace}}
+
+pack-c-stage-b-kickoff namespace="monitoring":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-b --namespace {{namespace}}
+
+pack-c-stage-c-kickoff namespace="monitoring":
+	scripts/deploy/pack_c_stage_kickoff.sh --stage stage-c --namespace {{namespace}}

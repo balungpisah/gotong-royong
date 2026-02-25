@@ -64,12 +64,18 @@ Use staged rollout for API pods/instances.
 
 ### Stage B — Canary (fallback OFF on a subset)
 
+- Optional kickoff automation (recommended):
+  - `just pack-c-stage-b-kickoff`
+
 - Set `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=false` on 5–10% of replicas.
 - Replace alert rules with Stage B profile:
   - `just pack-c-alerts-stage-b`
 - Run for 2–4h minimum, then increase to 25%, then 50% if stable.
 
 ### Stage C — Full cutover
+
+- Optional kickoff automation (recommended):
+  - `just pack-c-stage-c-kickoff`
 
 - Set `DISCOVERY_FEED_INVOLVEMENT_FALLBACK_ENABLED=false` on all replicas.
 - Replace alert rules with Stage C profile:
