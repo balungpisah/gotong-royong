@@ -200,26 +200,23 @@ start_ts = end_ts - window_seconds
 
 queries = {
     "edge_error_ratio": """(
-  sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m]))
+  (sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_error"}[5m])) or vector(0))
   /
-  clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+  clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
 )""",
     "edge_partial_ratio": """(
-  sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m]))
+  (sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search",lane="edge_partial"}[5m])) or vector(0))
   /
-  clamp_min(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])), 1)
+  clamp_min((sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) or vector(0)), 1)
 )""",
-    "shadow_mismatch_growth_30m": "increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])",
-    "feed_p95_latency_seconds": """histogram_quantile(
-  0.95,
-  sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le)
-)""",
+    "shadow_mismatch_growth_30m": "(sum(increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])) or vector(0))",
+    "feed_p95_latency_seconds": "max(gotong_api_http_request_duration_seconds{route=\"/v1/feed\",method=\"GET\",quantile=\"0.95\"})",
     "feed_5xx_ratio": """(
-  sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m]))
+  (sum(rate(gotong_api_http_errors_total{route="/v1/feed",method="GET"}[5m])) or vector(0))
   /
-  clamp_min(sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])), 1)
+  clamp_min((sum(rate(gotong_api_http_requests_total{route="/v1/feed",method="GET"}[5m])) or vector(0)), 1)
 )""",
-    "fallback_legacy_lane_rps": "sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\",lane=~\"fallback|legacy\"}[5m]))",
+    "fallback_legacy_lane_rps": "(sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~\"feed|search\",lane=~\"fallback|legacy\"}[5m])) or vector(0))",
 }
 
 stage_profiles = {

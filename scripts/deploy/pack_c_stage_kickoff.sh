@@ -270,9 +270,9 @@ ${stage_checklist}
 - Watch lane distribution:
   - \`sum(rate(gotong_api_feed_involvement_lane_requests_total{endpoint=~"feed|search"}[5m])) by (lane)\`
 - Watch shadow mismatch:
-  - \`increase(gotong_api_feed_involvement_shadow_mismatch_total[30m])\`
+  - \`sum(increase(gotong_api_feed_involvement_shadow_mismatch_total[30m]))\`
 - Watch feed SLO:
-  - \`histogram_quantile(0.95, sum(rate(gotong_api_http_request_duration_seconds_bucket{route="/v1/feed",method="GET"}[5m])) by (le))\`
+  - \`max(gotong_api_http_request_duration_seconds{route="/v1/feed",method="GET",quantile="0.95"})\`
 
 References:
 - \`docs/deployment/feed-involvement-fallback-removal-runbook.md\`

@@ -8,27 +8,30 @@ set -euo pipefail
 #   SURREAL_DOCKER_IMAGE=surrealdb/surrealdb:v3.0.0
 #
 # Notes:
-# - On macOS, a CLI running inside a container cannot reach host services on 127.0.0.1.
-#   We rewrite --endpoint values to use host.docker.internal so scripts can keep using
-#   ws://127.0.0.1:PORT and http://127.0.0.1:PORT.
+# - A CLI running inside a container cannot reach host services on 127.0.0.1 directly.
+#   We rewrite localhost/127.0.0.1 endpoints to host.docker.internal so scripts can keep
+#   using ws://127.0.0.1:PORT and http://127.0.0.1:PORT from the host side.
+# - On Linux, host.docker.internal is injected with --add-host host-gateway.
 # - For `start ... --bind 127.0.0.1:PORT`, we rewrite bind to 0.0.0.0:PORT and publish
 #   the port back to 127.0.0.1:PORT on the host.
 
 IMAGE="${SURREAL_DOCKER_IMAGE:-surrealdb/surrealdb:v3.0.0}"
 OS_NAME="$(uname -s || true)"
+HOST_ALIAS="${SURREAL_DOCKER_HOST_ALIAS:-host.docker.internal}"
+needs_host_alias="false"
 
 rewrite_endpoint_if_needed() {
   local endpoint="$1"
-  if [[ "${OS_NAME}" != "Darwin" ]]; then
-    printf "%s" "${endpoint}"
-    return 0
+  local rewritten="${endpoint}"
+  rewritten="${rewritten//ws:\/\/127.0.0.1/ws://${HOST_ALIAS}}"
+  rewritten="${rewritten//http:\/\/127.0.0.1/http://${HOST_ALIAS}}"
+  rewritten="${rewritten//ws:\/\/localhost/ws://${HOST_ALIAS}}"
+  rewritten="${rewritten//http:\/\/localhost/http://${HOST_ALIAS}}"
+  if [[ "${rewritten}" == *"${HOST_ALIAS}"* ]]; then
+    needs_host_alias="true"
   fi
 
-  endpoint="${endpoint//ws:\\/\\/127.0.0.1/ws:\\/\\/host.docker.internal}"
-  endpoint="${endpoint//http:\\/\\/127.0.0.1/http:\\/\\/host.docker.internal}"
-  endpoint="${endpoint//ws:\\/\\/localhost/ws:\\/\\/host.docker.internal}"
-  endpoint="${endpoint//http:\\/\\/localhost/http:\\/\\/host.docker.internal}"
-  printf "%s" "${endpoint}"
+  printf "%s" "${rewritten}"
 }
 
 rewrite_bind_if_needed() {
@@ -120,6 +123,9 @@ for ((i=0; i<${#args[@]}; i++)); do
 done
 
 docker_args=(run --rm)
+if [[ "${OS_NAME}" == "Linux" && "${needs_host_alias}" == "true" ]]; then
+  docker_args+=(--add-host "${HOST_ALIAS}:host-gateway")
+fi
 target_port="${bind_port:-${endpoint_port}}"
 container_name="${SURREAL_DOCKER_CONTAINER:-}"
 if [[ -z "${container_name}" && -n "${target_port}" ]]; then
