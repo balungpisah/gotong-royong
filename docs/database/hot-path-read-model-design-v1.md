@@ -98,6 +98,7 @@ Detailed Pack C design reference:
 
 Current benchmark artifacts:
 - `docs/research/surrealdb-live-db-probe-latest.md`
+- `docs/research/surrealdb-chat-bench-latest.md`
 - `docs/research/surrealdb-feed-index-bench-latest.md`
 - `docs/research/surrealdb-feed-involvement-bench-latest.md`
 - `docs/research/surrealdb-notification-bench-latest.md`
@@ -107,6 +108,7 @@ Current benchmark artifacts:
 - Contract source: `docs/database/hot-path-query-shape-slo-matrix.md`
 - Live DB baseline: `just dev-db-up`
 - Release checks: `just release-gates-surreal`
+- Chat benchmark: `just chat-bench-surreal`
 - Feed source benchmark: `just feed-index-bench-surreal`
 - Feed involvement benchmark: `just feed-involvement-bench-surreal`
 - Notification benchmark: `just notification-bench-surreal`

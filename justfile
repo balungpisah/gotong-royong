@@ -89,6 +89,9 @@ release-gates-surreal:
 	LOCKED_TARGET_VERSION=3.0.0 \
 	scripts/surrealdb-go-no-go.sh docs/research/surrealdb-go-no-go-latest.md
 
+chat-bench-surreal:
+	scripts/surrealdb-chat-bench.sh docs/research/surrealdb-chat-bench-latest.md
+
 feed-index-bench-surreal:
 	scripts/surrealdb-feed-index-bench.sh docs/research/surrealdb-feed-index-bench-latest.md
 

@@ -346,6 +346,8 @@ Reference outputs:
 - Release-gate probe (isolated ephemeral DB): `docs/research/surrealdb-go-no-go-latest.md`
 - Live Docker dev DB probe (`compose.dev.yaml` on `ws://127.0.0.1:8000`): `docs/research/surrealdb-live-db-probe-latest.md`
   - Re-run: `bash scripts/surrealdb-live-db-probe.sh`
+- Chat hot-path benchmark (catch-up/idempotent/member/read-cursor): `docs/research/surrealdb-chat-bench-latest.md`
+  - Re-run: `just chat-bench-surreal`
 - Feed source lookup benchmark: `docs/research/surrealdb-feed-index-bench-latest.md`
   - Re-run: `just feed-index-bench-surreal`
 - Feed involvement benchmark (`involvement_only` legacy OR vs materialized edge lane): `docs/research/surrealdb-feed-involvement-bench-latest.md`
