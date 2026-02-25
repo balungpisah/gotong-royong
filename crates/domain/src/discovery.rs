@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,10 @@ use crate::{DomainResult, error::DomainError, identity::ActorIdentity};
 const DEFAULT_LIMIT: usize = 20;
 const MAX_LIMIT: usize = 50;
 const MAX_SEARCH_FETCH_LIMIT: usize = 1_024;
+const DEFAULT_SUGGESTION_LIMIT: usize = 6;
+const MAX_SUGGESTION_LIMIT: usize = 20;
+const SUGGESTION_FETCH_MULTIPLIER: usize = 8;
+const SUGGESTION_FETCH_CAP: usize = 200;
 const ONE_WEEK_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
 pub const FEED_SOURCE_CONTRIBUTION: &str = "contribution";
@@ -112,6 +116,27 @@ pub struct FeedListQuery {
     pub from_ms: Option<i64>,
     pub to_ms: Option<i64>,
     pub involvement_only: bool,
+}
+
+#[derive(Clone)]
+pub struct FeedSuggestionsQuery {
+    pub actor_id: String,
+    pub limit: Option<usize>,
+    pub scope_id: Option<String>,
+    pub privacy_level: Option<String>,
+    pub from_ms: Option<i64>,
+    pub to_ms: Option<i64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FeedSuggestion {
+    pub entity_id: String,
+    pub entity_type: String,
+    pub label: String,
+    pub followed: bool,
+    pub description: Option<String>,
+    pub witness_count: usize,
+    pub follower_count: usize,
 }
 
 #[derive(Clone)]
@@ -276,6 +301,103 @@ impl DiscoveryService {
             items.truncate(limit);
         }
         Ok(PagedFeed { items, next_cursor })
+    }
+
+    pub async fn list_feed_suggestions(
+        &self,
+        query: FeedSuggestionsQuery,
+    ) -> DomainResult<Vec<FeedSuggestion>> {
+        validate_actor_id(&query.actor_id)?;
+        let limit = normalize_suggestion_limit(query.limit)?;
+        let fetch_limit = limit
+            .saturating_mul(SUGGESTION_FETCH_MULTIPLIER)
+            .min(SUGGESTION_FETCH_CAP)
+            .max(limit);
+        let repo_query = FeedRepositoryQuery {
+            actor_id: query.actor_id.clone(),
+            cursor_occurred_at_ms: None,
+            cursor_feed_id: None,
+            limit: fetch_limit,
+            scope_id: query.scope_id,
+            privacy_level: query.privacy_level,
+            from_ms: query.from_ms,
+            to_ms: query.to_ms,
+            involvement_only: false,
+        };
+        let rows = self.feed_repo.list_feed(&repo_query).await?;
+        let mut grouped: HashMap<String, SuggestionAggregate> = HashMap::new();
+
+        for item in rows {
+            if !is_visible_to_actor(&query.actor_id, &item) {
+                continue;
+            }
+            for candidate in extract_suggestion_candidates(item.payload.as_ref()) {
+                if !is_suggestable_entity_type(&candidate.entity_type) {
+                    continue;
+                }
+                let entity_id = normalized_entity_id(
+                    candidate.entity_id.as_deref(),
+                    &candidate.entity_type,
+                    &candidate.label,
+                );
+                if entity_id.is_empty() {
+                    continue;
+                }
+
+                let aggregate =
+                    grouped
+                        .entry(entity_id.clone())
+                        .or_insert_with(|| SuggestionAggregate {
+                            suggestion: FeedSuggestion {
+                                entity_id: entity_id.clone(),
+                                entity_type: candidate.entity_type.clone(),
+                                label: candidate.label.clone(),
+                                followed: false,
+                                description: candidate.description.clone(),
+                                witness_count: 0,
+                                follower_count: candidate.follower_count.unwrap_or(0),
+                            },
+                            seen_sources: HashSet::new(),
+                        });
+
+                if aggregate.suggestion.description.is_none() && candidate.description.is_some() {
+                    aggregate.suggestion.description = candidate.description.clone();
+                }
+                aggregate.suggestion.follower_count = aggregate
+                    .suggestion
+                    .follower_count
+                    .max(candidate.follower_count.unwrap_or(0));
+                if candidate.followed {
+                    aggregate.suggestion.followed = true;
+                }
+                if aggregate.seen_sources.insert(item.source_id.clone()) {
+                    aggregate.suggestion.witness_count += 1;
+                }
+            }
+        }
+
+        let mut suggestions: Vec<FeedSuggestion> = grouped
+            .into_values()
+            .map(|aggregate| aggregate.suggestion)
+            .filter(|suggestion| !suggestion.followed)
+            .map(|mut suggestion| {
+                suggestion.followed = false;
+                if suggestion.follower_count == 0 {
+                    suggestion.follower_count = suggestion.witness_count;
+                }
+                suggestion
+            })
+            .collect();
+
+        suggestions.sort_by(|left, right| {
+            right
+                .witness_count
+                .cmp(&left.witness_count)
+                .then_with(|| right.follower_count.cmp(&left.follower_count))
+                .then_with(|| left.label.cmp(&right.label))
+        });
+        suggestions.truncate(limit);
+        Ok(suggestions)
     }
 
     pub async fn search(&self, query: SearchListQuery) -> DomainResult<SearchPage> {
@@ -540,6 +662,17 @@ fn normalize_limit(limit: Option<usize>) -> DomainResult<usize> {
     }
 }
 
+fn normalize_suggestion_limit(limit: Option<usize>) -> DomainResult<usize> {
+    let limit = limit.unwrap_or(DEFAULT_SUGGESTION_LIMIT);
+    if !(1..=MAX_SUGGESTION_LIMIT).contains(&limit) {
+        Err(DomainError::Validation(format!(
+            "suggestion limit must be between 1 and {MAX_SUGGESTION_LIMIT}"
+        )))
+    } else {
+        Ok(limit)
+    }
+}
+
 fn validate_feed_input(input: &FeedIngestInput) -> DomainResult<()> {
     if input.source_type.trim().is_empty() {
         return Err(DomainError::Validation("source_type is required".into()));
@@ -752,6 +885,144 @@ fn is_visible_notification(actor_id: &str, notification: &InAppNotification) -> 
         || actor_id == notification.actor_id
 }
 
+#[derive(Clone, Debug)]
+struct SuggestionCandidate {
+    entity_id: Option<String>,
+    entity_type: String,
+    label: String,
+    followed: bool,
+    description: Option<String>,
+    follower_count: Option<usize>,
+}
+
+#[derive(Clone, Debug)]
+struct SuggestionAggregate {
+    suggestion: FeedSuggestion,
+    seen_sources: HashSet<String>,
+}
+
+fn extract_suggestion_candidates(payload: Option<&serde_json::Value>) -> Vec<SuggestionCandidate> {
+    let Some(payload) = payload else {
+        return Vec::new();
+    };
+    let raw_tags = payload
+        .get("enrichment")
+        .and_then(|value| value.get("entity_tags"))
+        .or_else(|| payload.get("entity_tags"))
+        .and_then(serde_json::Value::as_array);
+    let Some(raw_tags) = raw_tags else {
+        return Vec::new();
+    };
+
+    raw_tags
+        .iter()
+        .filter_map(|raw_tag| {
+            if let Some(label) = raw_tag
+                .as_str()
+                .map(str::trim)
+                .filter(|label| !label.is_empty())
+            {
+                return Some(SuggestionCandidate {
+                    entity_id: None,
+                    entity_type: "topik".to_string(),
+                    label: label.to_string(),
+                    followed: false,
+                    description: None,
+                    follower_count: None,
+                });
+            }
+
+            let tag = raw_tag.as_object()?;
+            let label = tag
+                .get("label")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|label| !label.is_empty())?
+                .to_string();
+            let entity_type = normalize_entity_type(
+                tag.get("entity_type")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("topik"),
+            );
+            let entity_id = tag
+                .get("entity_id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|entity_id| !entity_id.is_empty())
+                .map(str::to_string);
+            let followed = tag
+                .get("followed")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false);
+            let description = tag
+                .get("description")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|description| !description.is_empty())
+                .map(str::to_string);
+            let follower_count = tag.get("follower_count").and_then(to_usize);
+
+            Some(SuggestionCandidate {
+                entity_id,
+                entity_type,
+                label,
+                followed,
+                description,
+                follower_count,
+            })
+        })
+        .collect()
+}
+
+fn to_usize(value: &serde_json::Value) -> Option<usize> {
+    if let Some(number) = value.as_u64() {
+        return usize::try_from(number).ok();
+    }
+    value
+        .as_str()
+        .and_then(|raw| raw.trim().parse::<usize>().ok())
+}
+
+fn normalize_entity_type(value: &str) -> String {
+    let normalized = value.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "lingkungan" | "topik" | "kelompok" | "lembaga" | "warga" => normalized,
+        _ => "topik".to_string(),
+    }
+}
+
+fn is_suggestable_entity_type(entity_type: &str) -> bool {
+    matches!(entity_type, "lingkungan" | "topik")
+}
+
+fn normalized_entity_id(entity_id: Option<&str>, entity_type: &str, label: &str) -> String {
+    if let Some(entity_id) = entity_id
+        .map(str::trim)
+        .filter(|entity_id| !entity_id.is_empty())
+    {
+        return entity_id.to_string();
+    }
+    let slug = label
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    if slug.is_empty() {
+        String::new()
+    } else {
+        format!("{entity_type}:{slug}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -764,6 +1035,7 @@ mod tests {
 
     struct MockFeedRepository {
         persisted_item: Arc<Mutex<Option<FeedItem>>>,
+        feed_rows: Arc<Mutex<Vec<FeedItem>>>,
         create_conflict: bool,
         participant_edge_upsert_calls: Arc<Mutex<Vec<String>>>,
     }
@@ -772,6 +1044,7 @@ mod tests {
         fn new(create_conflict: bool) -> Self {
             Self {
                 persisted_item: Arc::new(Mutex::new(None)),
+                feed_rows: Arc::new(Mutex::new(Vec::new())),
                 create_conflict,
                 participant_edge_upsert_calls: Arc::new(Mutex::new(Vec::new())),
             }
@@ -789,6 +1062,13 @@ mod tests {
                 .lock()
                 .expect("participant_edge_upsert_calls mutex")
                 .clone()
+        }
+
+        fn set_feed_rows(&self, rows: Vec<FeedItem>) {
+            self.feed_rows
+                .lock()
+                .expect("feed_rows mutex")
+                .clone_from(&rows);
         }
     }
 
@@ -891,7 +1171,8 @@ mod tests {
             &self,
             _query: &FeedRepositoryQuery,
         ) -> BoxFuture<'_, DomainResult<Vec<FeedItem>>> {
-            Box::pin(async move { Ok(Vec::new()) })
+            let rows = self.feed_rows.clone();
+            Box::pin(async move { Ok(rows.lock().expect("feed_rows mutex").clone()) })
         }
 
         fn search_feed(
@@ -1164,5 +1445,132 @@ mod tests {
         let upserted = feed_repo.upserted_feed_ids();
         assert_eq!(upserted.len(), 1);
         assert_eq!(upserted[0], "feed-existing");
+    }
+
+    #[tokio::test]
+    async fn list_feed_suggestions_aggregates_entity_tags() {
+        let feed_repo = Arc::new(MockFeedRepository::new(false));
+        feed_repo.set_feed_rows(vec![
+            FeedItem {
+                feed_id: "feed-public-1".to_string(),
+                source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+                source_id: "src-1".to_string(),
+                actor_id: "author-1".to_string(),
+                actor_username: "author-1".to_string(),
+                title: "public one".to_string(),
+                summary: None,
+                scope_id: Some("scope-1".to_string()),
+                privacy_level: Some("public".to_string()),
+                occurred_at_ms: 1_000,
+                created_at_ms: 1_000,
+                request_id: "req-1".to_string(),
+                correlation_id: "corr-1".to_string(),
+                participant_ids: vec![],
+                payload: Some(serde_json::json!({
+                    "enrichment": {
+                        "entity_tags": [
+                            {
+                                "entity_id": "ent-rt05",
+                                "entity_type": "lingkungan",
+                                "label": "RT 05 Menteng",
+                                "follower_count": 40
+                            },
+                            {
+                                "entity_type": "topik",
+                                "label": "Infrastruktur"
+                            }
+                        ]
+                    }
+                })),
+            },
+            FeedItem {
+                feed_id: "feed-public-2".to_string(),
+                source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+                source_id: "src-2".to_string(),
+                actor_id: "author-2".to_string(),
+                actor_username: "author-2".to_string(),
+                title: "public two".to_string(),
+                summary: None,
+                scope_id: Some("scope-1".to_string()),
+                privacy_level: Some("public".to_string()),
+                occurred_at_ms: 900,
+                created_at_ms: 900,
+                request_id: "req-2".to_string(),
+                correlation_id: "corr-2".to_string(),
+                participant_ids: vec![],
+                payload: Some(serde_json::json!({
+                    "enrichment": {
+                        "entity_tags": [
+                            {
+                                "entity_id": "ent-rt05",
+                                "entity_type": "lingkungan",
+                                "label": "RT 05 Menteng"
+                            },
+                            {
+                                "entity_id": "ent-air",
+                                "entity_type": "topik",
+                                "label": "Saluran Air",
+                                "followed": true
+                            }
+                        ]
+                    }
+                })),
+            },
+            FeedItem {
+                feed_id: "feed-private".to_string(),
+                source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+                source_id: "src-3".to_string(),
+                actor_id: "hidden-author".to_string(),
+                actor_username: "hidden-author".to_string(),
+                title: "private".to_string(),
+                summary: None,
+                scope_id: Some("scope-1".to_string()),
+                privacy_level: Some("private".to_string()),
+                occurred_at_ms: 800,
+                created_at_ms: 800,
+                request_id: "req-3".to_string(),
+                correlation_id: "corr-3".to_string(),
+                participant_ids: vec![],
+                payload: Some(serde_json::json!({
+                    "enrichment": {
+                        "entity_tags": [
+                            {
+                                "entity_id": "ent-hidden",
+                                "entity_type": "topik",
+                                "label": "Hidden Topic"
+                            }
+                        ]
+                    }
+                })),
+            },
+        ]);
+        let service = DiscoveryService::new(feed_repo, Arc::new(MockNotificationRepository));
+        let suggestions = service
+            .list_feed_suggestions(FeedSuggestionsQuery {
+                actor_id: "reader-1".to_string(),
+                limit: Some(6),
+                scope_id: Some("scope-1".to_string()),
+                privacy_level: None,
+                from_ms: None,
+                to_ms: None,
+            })
+            .await
+            .expect("list suggestions should succeed");
+
+        assert_eq!(suggestions.len(), 2);
+        assert_eq!(suggestions[0].entity_id, "ent-rt05");
+        assert_eq!(suggestions[0].entity_type, "lingkungan");
+        assert_eq!(suggestions[0].witness_count, 2);
+        assert_eq!(suggestions[0].follower_count, 40);
+        assert_eq!(suggestions[1].entity_type, "topik");
+        assert_eq!(suggestions[1].label, "Infrastruktur");
+        assert_eq!(suggestions[1].witness_count, 1);
+        assert!(suggestions.iter().all(|item| !item.followed));
+        assert!(suggestions.iter().all(|item| item.entity_id != "ent-air"));
+        assert!(
+            suggestions
+                .iter()
+                .all(|item| item.entity_id != "ent-hidden")
+        );
     }
 }
