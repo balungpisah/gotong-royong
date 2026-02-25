@@ -163,8 +163,9 @@ Add metrics:
 - `feed_participant_edge_backfill_progress_ratio` (optional derived metric from backfill runs)
 
 Add verification scripts:
-- Extend benchmark suite with edge-table variant once implemented.
-- Keep current `just feed-involvement-bench-surreal` as pre-Pack-C baseline.
+- ✅ `just feed-involvement-bench-surreal` now benchmarks both legacy OR lane and materialized edge lane in one run.
+- Default benchmark profile includes `NOISE_ROWS=80000` to stress worst-case global-table scans; override as needed for lighter local checks.
+- Keep historical pre-cutover baseline notes in `docs/research/surrealdb-feed-involvement-bench-latest.md` history for before/after comparison.
 
 ## 8) Risks and mitigations
 

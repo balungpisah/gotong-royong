@@ -74,6 +74,7 @@ Current state:
 - C5 stabilization is in progress:
   - backfill command available (`feed-participant-edge-backfill`),
   - explicit lane/shadow counters are emitted from involvement read paths,
+  - live benchmark now compares legacy OR lane vs edge lane (`just feed-involvement-bench-surreal`),
   - fallback removal remains pending final verification window.
 
 Reference design:

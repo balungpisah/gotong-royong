@@ -92,6 +92,7 @@ Detailed Pack C design reference:
 7. 🔄 Pack C Phase C5 in progress:
    - ✅ backfill command added (`feed-participant-edge-backfill`),
    - ✅ explicit lane/shadow counters added for involvement reads,
+   - ✅ live benchmark script compares legacy OR lane vs materialized edge lane (`just feed-involvement-bench-surreal`),
    - ⏳ remove fallback after sustained correctness/SLO verification.
 
 Current benchmark artifacts:

@@ -348,7 +348,7 @@ Reference outputs:
   - Re-run: `bash scripts/surrealdb-live-db-probe.sh`
 - Feed source lookup benchmark: `docs/research/surrealdb-feed-index-bench-latest.md`
   - Re-run: `just feed-index-bench-surreal`
-- Feed involvement benchmark (`involvement_only` shape): `docs/research/surrealdb-feed-involvement-bench-latest.md`
+- Feed involvement benchmark (`involvement_only` legacy OR vs materialized edge lane): `docs/research/surrealdb-feed-involvement-bench-latest.md`
   - Re-run: `just feed-involvement-bench-surreal`
 
 ---
