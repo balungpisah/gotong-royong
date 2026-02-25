@@ -1,6 +1,6 @@
 # Pack C Stage B Kickoff Report
 
-Date: 2026-02-25T09:52:21Z
+Date: 2026-02-25T10:15:16Z
 Namespace: `monitoring`
 Observation window target: 4h
 Stage summary: Canary rollout with fallback OFF on a subset of replicas.
@@ -13,8 +13,8 @@ Stage summary: Canary rollout with fallback OFF on a subset of replicas.
 | Kubernetes cluster status | unreachable |
 | Stage rule action mode | dry-run |
 | Stage rule action result | dry_run_only |
-| Go/no-go gate | pass |
-| Go/no-go mode | dry-run |
+| Go/no-go gate | fail |
+| Go/no-go mode | live |
 | Go/no-go window | 4h |
 | Go/no-go report | docs/research/pack-c-stage-b-go-no-go-latest.md |
 
@@ -22,7 +22,7 @@ Stage summary: Canary rollout with fallback OFF on a subset of replicas.
 
 1. `not run`
 2. `scripts/deploy/pack_c_prometheus_rules.sh --stage stage-b --namespace monitoring --dry-run`
-3. `scripts/deploy/pack_c_stage_go_no_go.sh --stage stage-b --prom-url http://127.0.0.1:9090 --window 4h --step 60s --output docs/research/pack-c-stage-b-go-no-go-latest.md --dry-run`
+3. `scripts/deploy/pack_c_stage_go_no_go.sh --stage stage-b --prom-url http://127.0.0.1:9090 --window 4h --step 60s --output docs/research/pack-c-stage-b-go-no-go-latest.md`
 
 ## Stage Checklist (4h)
 

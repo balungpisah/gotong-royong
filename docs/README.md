@@ -70,6 +70,7 @@ Canonical decision:
 - [Pack C Stage A Go/No-Go Report](research/pack-c-stage-a-go-no-go-latest.md) - Latest baseline-stage decision report from Prometheus thresholds
 - [Pack C Stage B Go/No-Go Report](research/pack-c-stage-b-go-no-go-latest.md) - Latest automated stage decision report from Prometheus thresholds
 - [Pack C Stage C Go/No-Go Report](research/pack-c-stage-c-go-no-go-latest.md) - Latest full-cutover decision report from Prometheus thresholds
+- [Pack C Live Gate Follow-up](research/pack-c-live-gate-followup-latest.md) - Current blocker and rerun steps for live Prometheus-backed stage gating
 - [Pack C Prometheus Rules](../deploy/monitoring/README.md) - Deployable stage A/B/C PrometheusRule manifests for fallback cutover
 - [Pack C Grafana Dashboard](../deploy/monitoring/grafana-pack-c-cutover-dashboard.json) - Importable cutover dashboard for lane/error/latency watch
 - [Tandang Observability SLOs](deployment/tandang-observability-slos.md) - Integration dashboards, SLOs, and alert rules
