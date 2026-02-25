@@ -1,5 +1,12 @@
 <script lang="ts">
-	import type { FeedItem, UrgencyBadge, ContentSignalType, SignalResolutionOutcome } from '$lib/types';
+	import type {
+		FeedItem,
+		UrgencyBadge,
+		ContentSignalType,
+		SignalResolutionOutcome,
+		MyRelation,
+		SignalCounts
+	} from '$lib/types';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import { m } from '$lib/paraglide/messages';
 	import EntityPill from './entity-pill.svelte';
@@ -30,6 +37,42 @@
 	const signalStore = getSignalStore();
 	const feedStore = getFeedStore();
 
+	const signalRelation = $derived(signalStore.getRelation(item.witness_id));
+	const signalCounts = $derived(signalStore.getCounts(item.witness_id));
+
+	const effectiveRelation = $derived.by<MyRelation | undefined>(() => {
+		if (!item.my_relation && !signalRelation) return undefined;
+		const base: MyRelation = item.my_relation ?? {
+			vouched: false,
+			witnessed: false,
+			flagged: false,
+			supported: false
+		};
+		if (!signalRelation) return base;
+		return {
+			...base,
+			witnessed: signalRelation.witnessed,
+			flagged: signalRelation.flagged
+		};
+	});
+
+	const effectiveSignalCounts = $derived.by<SignalCounts | undefined>(() => {
+		if (!item.signal_counts && !signalCounts) return undefined;
+		const base: SignalCounts = item.signal_counts ?? {
+			vouch_positive: 0,
+			vouch_skeptical: 0,
+			witness_count: 0,
+			dukung_count: 0,
+			flags: 0
+		};
+		if (!signalCounts) return base;
+		return {
+			...base,
+			witness_count: signalCounts.witness_count,
+			flags: signalCounts.flags
+		};
+	});
+
 	// ── Dukung (support) state — non-Tandang social action ──────────
 	const isSupported = $derived(item.my_relation?.supported ?? false);
 	const dukungCount = $derived(item.signal_counts?.dukung_count ?? 0);
@@ -38,6 +81,14 @@
 	const isTerminalWitness = $derived(item.status === 'resolved' || item.status === 'closed');
 	const resolutions = $derived(signalStore.getResolutionsForWitness(item.witness_id));
 	const resolutionCount = $derived(resolutions.length);
+
+	function handleSignalChipClick(chip: ContentSignalType, value: boolean) {
+		if (chip === 'saksi') {
+			feedStore.autoMonitorOnAction(item.witness_id, { witnessed: value });
+		} else if (chip === 'perlu_dicek') {
+			feedStore.autoMonitorOnAction(item.witness_id, { flagged: value });
+		}
+	}
 
 	/** Build outcome map for signal-chip-bar from resolved signals. */
 	const signalOutcomes = $derived.by(() => {
@@ -343,15 +394,16 @@
 		{/if}
 
 		<!-- ── Row 2: Signal chips (icon-only, full-row expandable) ── -->
-		{#if item.signal_counts || item.my_relation}
+		{#if effectiveSignalCounts || effectiveRelation}
 			<div class="mt-2">
 				<SignalChipBar
 					witnessId={item.witness_id}
 					signalLabels={item.signal_labels}
-					myRelation={item.my_relation}
-					signalCounts={item.signal_counts}
+					myRelation={effectiveRelation}
+					signalCounts={effectiveSignalCounts}
 					{signalOutcomes}
 					{moodColor}
+					onchipclick={handleSignalChipClick}
 				/>
 			</div>
 		{/if}
@@ -370,11 +422,21 @@
 			{#if item.members_preview.length > 0}
 				<div class="flex -space-x-1.5">
 					{#each item.members_preview.slice(0, 4) as member (member.user_id)}
-						<TandangAvatar
-							person={{ user_id: member.user_id, name: member.name, avatar_url: member.avatar_url }}
-							size="xs"
-							class="border-[1.5px] border-card"
-						/>
+							<a
+								href="/profil/{member.user_id}"
+								aria-label="Profil {member.name}"
+								class="inline-flex rounded-full"
+								data-profile-link
+								data-profile-user-id={member.user_id}
+								onclick={(e) => e.stopPropagation()}
+							>
+							<TandangAvatar
+								person={{ user_id: member.user_id, name: member.name, avatar_url: member.avatar_url }}
+								size="xs"
+								interactive={false}
+								class="border-[1.5px] border-card"
+							/>
+						</a>
 					{/each}
 				</div>
 			{/if}

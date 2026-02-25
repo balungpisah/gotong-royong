@@ -64,6 +64,8 @@
 		attachments?: { type: 'image' | 'video' | 'audio'; preview_url: string }[];
 	}
 	let messages = $state<TriageChatMessage[]>([]);
+	let submitError = $state<string | null>(null);
+	const triageSubmitError = $derived(submitError);
 
 	/** Pending file attachments for current message */
 	let pendingAttachments = $state<TriageAttachment[]>([]);
@@ -94,7 +96,10 @@
 	}
 
 	const canSend = $derived(
-		(content.trim().length > 0 || pendingAttachments.length > 0) && !triageStore.loading
+		(content.trim().length > 0 || pendingAttachments.length > 0) &&
+			!triageStore.loading &&
+			!triageStore.isReady &&
+			!isOnCooldown
 	);
 	const hasSession = $derived(triageStore.sessionId !== null);
 
@@ -139,6 +144,7 @@
 
 	function collapse() {
 		expanded = false;
+		submitError = null;
 	}
 
 	function handleBackdropClick() {
@@ -172,9 +178,7 @@
 	async function handleSubmit(injectedText?: string) {
 		const text = (injectedText ?? content).trim();
 		if ((!text && pendingAttachments.length === 0) || triageStore.loading || isOnCooldown) return;
-
-		content = '';
-		if (textareaEl) textareaEl.style.height = 'auto';
+		submitError = null;
 
 		// Capture attachment previews for the message bubble
 		const msgAttachments = pendingAttachments.length > 0
@@ -186,18 +190,30 @@
 			? pendingAttachments.map(a => a.file)
 			: undefined;
 
-		messages.push({ role: 'user', text: text || '(lampiran)', attachments: msgAttachments });
-
-		// Clear pending (don't revoke URLs — they're referenced by message bubbles now)
-		pendingAttachments = [];
-
 		if (!hasSession) {
 			await triageStore.startTriage(text, files);
 		} else {
 			await triageStore.updateTriage(text, files);
 		}
 
+		if (triageStore.error) {
+			submitError = triageStore.error;
+			if (injectedText && content.trim().length === 0) {
+				content = injectedText;
+				autoResize();
+			}
+			requestAnimationFrame(() => textareaEl?.focus());
+			return;
+		}
+
+		content = '';
+		if (textareaEl) textareaEl.style.height = 'auto';
+
+		messages.push({ role: 'user', text: text || '(lampiran)', attachments: msgAttachments });
 		messages.push({ role: 'ai', text: aiResponseText() });
+
+		// Clear pending (don't revoke URLs — they're referenced by message bubbles now)
+		pendingAttachments = [];
 
 		// Re-focus textarea for next message
 		requestAnimationFrame(() => textareaEl?.focus());
@@ -215,8 +231,13 @@
 
 	function handleReset() {
 		triageStore.reset();
+		submitError = null;
 		messages = [];
 		content = '';
+		for (const attachment of pendingAttachments) {
+			URL.revokeObjectURL(attachment.preview_url);
+		}
+		pendingAttachments = [];
 		startCooldown();
 		collapse();
 	}
@@ -293,6 +314,7 @@
 
 		// Reset triage + cooldown to prevent rapid re-submission
 		triageStore.reset();
+		submitError = null;
 		messages = [];
 		content = '';
 		startCooldown();
@@ -311,6 +333,7 @@
 
 		// Reset triage + cooldown, then navigate to new group
 		triageStore.reset();
+		submitError = null;
 		messages = [];
 		content = '';
 		startCooldown();
@@ -647,6 +670,24 @@
 				</div>
 			{/if}
 		</div>
+
+		{#if triageSubmitError}
+			<div
+				class="mx-3 mb-2 flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2"
+				role="status"
+				aria-live="polite"
+			>
+				<p class="text-xs text-destructive">{triageSubmitError}</p>
+				<button
+					type="button"
+					onclick={() => handleSubmit()}
+					disabled={!canSend}
+					class="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+				>
+					Coba lagi
+				</button>
+			</div>
+		{/if}
 
 		<!-- Attachment preview row -->
 		{#if pendingAttachments.length > 0}

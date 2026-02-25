@@ -48,16 +48,28 @@
 
 <div class={cn('flex gap-2', message.is_self ? 'flex-row-reverse' : 'flex-row')} data-slot="chat-bubble">
 	{#if !message.is_self}
-		<TandangAvatar
-			person={avatarPerson}
-			size="sm"
-			showTierDot
-		/>
+		<a
+			href="/profil/{message.author.user_id}"
+			aria-label="Profil {message.author.name}"
+			class="inline-flex rounded-full"
+		>
+			<TandangAvatar
+				person={avatarPerson}
+				size="sm"
+				showTierDot
+				interactive={false}
+			/>
+		</a>
 	{/if}
 	<div class={cn('max-w-[75%] flex flex-col gap-1', message.is_self ? 'items-end' : 'items-start')}>
 		{#if !message.is_self}
 			<div class="flex items-center gap-1.5">
-				<span class="text-xs font-medium text-muted-foreground">{message.author.name}</span>
+				<a
+					href="/profil/{message.author.user_id}"
+					class="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+				>
+					{message.author.name}
+				</a>
 				<!-- CD5: Role badge -->
 				{#if message.author.role}
 					<span class="rounded px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider {roleColors[message.author.role] ?? 'bg-muted text-muted-foreground'}">

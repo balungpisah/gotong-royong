@@ -261,8 +261,16 @@
 						<div class="flex items-center gap-1.5 mt-auto pt-1">
 							<StatusIndicator status={statusMap[detail.status] ?? 'active'} />
 							{#if initiator}
-								<TandangAvatar person={initiator} size="xs" showTierDot={false} />
-								<span class="text-[13px] text-muted-foreground/60 truncate max-w-[160px]" style="font-family: 'Caveat', cursive;">— {initiator.name}</span>
+								<a
+									href="/profil/{initiator.user_id}"
+									class="inline-flex items-center gap-1.5 rounded-md hover:bg-muted/30 px-1 -mx-1 transition-colors"
+									aria-label="Profil {initiator.name}"
+									data-initiator-profile-link
+									data-profile-user-id={initiator.user_id}
+								>
+									<TandangAvatar person={initiator} size="xs" showTierDot={false} interactive={false} />
+									<span class="text-[13px] text-muted-foreground/60 truncate max-w-[160px]" style="font-family: 'Caveat', cursive;">— {initiator.name}</span>
+								</a>
 							{/if}
 							{#if rahasiaDisplay.show}
 								<Badge variant={rahasiaDisplay.variant} class="text-caption">

@@ -44,7 +44,7 @@
 		signalOutcomes?: Map<ContentSignalType, SignalResolutionOutcome>;
 		/** Mood color CSS variable for active chip tinting. */
 		moodColor?: string;
-		onchipclick?: (chip: string, value: boolean) => void;
+		onchipclick?: (chip: ContentSignalType, value: boolean) => void;
 	}
 
 	let {
@@ -58,6 +58,8 @@
 	}: Props = $props();
 
 	const signalStore = getSignalStore();
+	let lastFailedAction = $state<{ chipId: ContentSignalType; currentState: boolean } | null>(null);
+	const signalError = $derived(signalStore.getError(witnessId));
 
 	// ── Expand/collapse state ──────────────────────────────────────
 	let expanded = $state(false);
@@ -111,8 +113,13 @@
 	// ── Handlers ────────────────────────────────────────────────────
 	async function handleChip(e: MouseEvent, chipId: ContentSignalType, currentState: boolean) {
 		e.stopPropagation();
-		await signalStore.toggleSignal(witnessId, chipId);
-		onchipclick?.(chipId, !currentState);
+		try {
+			await signalStore.toggleSignal(witnessId, chipId);
+			lastFailedAction = null;
+			onchipclick?.(chipId, !currentState);
+		} catch {
+			lastFailedAction = { chipId, currentState };
+		}
 	}
 
 	function handleRowClick(e: MouseEvent) {
@@ -120,6 +127,28 @@
 		const target = e.target as HTMLElement;
 		if (!target.closest('.signal-chip')) {
 			expanded = !expanded;
+		}
+	}
+
+	async function handleRetry(e: MouseEvent) {
+		e.stopPropagation();
+		if (signalStore.sending) return;
+
+		if (lastFailedAction) {
+			try {
+				await signalStore.toggleSignal(witnessId, lastFailedAction.chipId);
+				onchipclick?.(lastFailedAction.chipId, !lastFailedAction.currentState);
+				lastFailedAction = null;
+				return;
+			} catch {
+				return;
+			}
+		}
+
+		try {
+			await signalStore.refreshWitness(witnessId);
+		} catch {
+			// keep store error state for retry feedback
 		}
 	}
 </script>
@@ -218,6 +247,20 @@
 				{/if}
 			</button>
 		{/each}
+	</div>
+{/if}
+
+{#if signalError}
+	<div class="signal-error" role="status" aria-live="polite">
+		<span class="signal-error-text">{signalError}</span>
+		<button
+			type="button"
+			class="signal-error-retry"
+			onclick={handleRetry}
+			disabled={signalStore.sending}
+		>
+			Coba lagi
+		</button>
 	</div>
 {/if}
 
@@ -352,6 +395,43 @@
 		border-radius: 0.5rem;
 		background: color-mix(in srgb, var(--v-wash) 40%, transparent);
 		border: 1px solid color-mix(in srgb, var(--v-light) 20%, transparent);
+	}
+
+	.signal-error {
+		margin-top: 0.3rem;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		border-radius: 0.5rem;
+		border: 1px solid oklch(from var(--c-bahaya) l c h / 0.25);
+		background: oklch(from var(--c-bahaya) l c h / 0.06);
+		padding: 0.3rem 0.45rem;
+	}
+
+	.signal-error-text {
+		font-size: 10px;
+		line-height: 1.2;
+		color: oklch(from var(--c-bahaya) l c h / 0.92);
+	}
+
+	.signal-error-retry {
+		border-radius: 999px;
+		border: 1px solid oklch(from var(--c-batu) l c h / 0.25);
+		padding: 0.15rem 0.45rem;
+		font-size: 10px;
+		font-weight: 600;
+		color: var(--v-deep);
+		transition: background-color 120ms ease;
+	}
+
+	.signal-error-retry:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--v-wash) 80%, transparent);
+	}
+
+	.signal-error-retry:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	/* ── Expanded row ─────────────────────────────────────────────── */
