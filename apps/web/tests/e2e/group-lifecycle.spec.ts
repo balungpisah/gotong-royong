@@ -85,13 +85,17 @@ test.describe('Group lifecycle (Kelompok)', () => {
 		await createBtn.click();
 
 		// Create form should appear — wait for the name input placeholder
-		await expect(page.getByPlaceholder('Contoh: Karang Taruna RT 05')).toBeVisible({ timeout: 5000 });
+		await expect(page.getByPlaceholder('Contoh: Karang Taruna RT 05')).toBeVisible({
+			timeout: 5000
+		});
 
 		// Fill in the form
 		const nameInput = page.getByPlaceholder('Contoh: Karang Taruna RT 05');
 		await nameInput.fill('Kelompok Test E2E');
 
-		const descInput = page.getByPlaceholder('Tulis tujuan, kegiatan, dan siapa yang cocok bergabung...');
+		const descInput = page.getByPlaceholder(
+			'Tulis tujuan, kegiatan, dan siapa yang cocok bergabung...'
+		);
 		await descInput.fill('Kelompok untuk pengujian end-to-end otomatis.');
 
 		// Entity type defaults to 'kelompok', join policy to 'terbuka' - keep defaults
@@ -102,7 +106,9 @@ test.describe('Group lifecycle (Kelompok)', () => {
 		await submitBtn.click();
 
 		// After creation, form should close and new group appears in "Kelompok Saya"
-		await expect(page.getByPlaceholder('Contoh: Karang Taruna RT 05')).not.toBeVisible({ timeout: 5000 });
+		await expect(page.getByPlaceholder('Contoh: Karang Taruna RT 05')).not.toBeVisible({
+			timeout: 5000
+		});
 		await expect(page.getByText('Kelompok Test E2E').first()).toBeVisible();
 	});
 
@@ -153,8 +159,6 @@ test.describe('Group lifecycle (Kelompok)', () => {
 		// Settings form should appear
 		await expect(page.getByText('Pengaturan Kelompok')).toBeVisible();
 
-		// Name input should be pre-filled
-		const nameInput = page.locator('input').filter({ hasText: '' }).nth(0);
 		await expect(page.getByText('Nama')).toBeVisible();
 
 		// Save button
@@ -193,7 +197,9 @@ test.describe('Group lifecycle (Kelompok)', () => {
 		await joinBtn.click();
 
 		// After joining, should see "Keluar" button instead
-		await expect(page.getByRole('button', { name: 'Keluar', exact: true })).toBeVisible({ timeout: 5000 });
+		await expect(page.getByRole('button', { name: 'Keluar', exact: true })).toBeVisible({
+			timeout: 5000
+		});
 	});
 
 	test('pending request status shows for persetujuan group', async ({ page }) => {

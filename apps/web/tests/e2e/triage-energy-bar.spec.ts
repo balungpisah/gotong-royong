@@ -67,10 +67,7 @@ test.describe('Triage Energy Bar', () => {
 		await expect(freeTextCard).toBeVisible();
 	});
 
-	test('clicking trajectory chip starts triage and shows energy bar', async ({
-		context,
-		page
-	}) => {
+	test('clicking trajectory chip starts triage and shows energy bar', async ({ context, page }) => {
 		await authenticateAndNavigate(context, page);
 
 		// Expand triage panel

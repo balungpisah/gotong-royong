@@ -233,6 +233,8 @@ test.describe('live API proxy smoke', () => {
 		await triageTextarea.press('Enter');
 		const triageStartResponse = await triageStartResponsePromise;
 		expect(triageStartResponse.ok()).toBeTruthy();
+		const triageStartBody = (await triageStartResponse.json()) as { session_id?: string };
+		const triageSessionId = triageStartBody.session_id;
 
 		const createWitnessButton = page
 			.locator('.triage-panel')
@@ -287,10 +289,8 @@ test.describe('live API proxy smoke', () => {
 					'x-correlation-id': witnessFallbackKey
 				},
 				data: {
-					title: `Live Witness ${Date.now().toString().slice(-6)}`,
-					summary: 'Fallback witness create for live API E2E permalink verification.',
-					route: 'komunitas',
-					rahasia_level: 'L0'
+					schema_version: 'triage.v1',
+					triage_session_id: triageSessionId
 				}
 			});
 			if (fallbackWitnessResponse.status() === 201) {
@@ -353,9 +353,9 @@ test.describe('live API proxy smoke', () => {
 					const feedCandidate = feedProbeBody.items?.find((item) =>
 						'kind' in item ? item.kind === 'witness' : true
 					);
-					const feedData = (feedCandidate && 'kind' in feedCandidate
-						? feedCandidate.data
-						: feedCandidate) as { source_id?: string; payload?: { witness_id?: string } } | undefined;
+					const feedData = (
+						feedCandidate && 'kind' in feedCandidate ? feedCandidate.data : feedCandidate
+					) as { source_id?: string; payload?: { witness_id?: string } } | undefined;
 					witnessId = feedData?.payload?.witness_id ?? feedData?.source_id;
 				}
 			}
