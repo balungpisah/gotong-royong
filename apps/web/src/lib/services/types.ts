@@ -15,7 +15,6 @@ import type {
 	DiffResponse,
 	UserProfile,
 	AppNotification,
-	FeedItem,
 	FeedStreamItem,
 	FollowableEntity,
 	TriageResult,

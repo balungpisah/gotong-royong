@@ -1,5 +1,12 @@
 import type { TriageService } from '../types';
-import type { TriageResult, ContextBarState, CardEnrichment, TriageBudget, TrajectoryType, KelolaPayload } from '$lib/types';
+import type {
+	TriageResult,
+	ContextBarState,
+	CardEnrichment,
+	TriageBudget,
+	TrajectoryType,
+	KelolaPayload
+} from '$lib/types';
 import { mockPathPlan } from '$lib/fixtures';
 
 const delay = (ms: number = 200) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -18,39 +25,89 @@ function detectTrajectory(primer: string): DetectedTrajectory {
 	const p = primer.toLowerCase();
 
 	// Kelola — group management (no trajectory)
-	if (p.includes('kelola') || p.includes('kelompok') || p.includes('mengatur kelompok') || p.includes('manage a group'))
+	if (
+		p.includes('kelola') ||
+		p.includes('kelompok') ||
+		p.includes('mengatur kelompok') ||
+		p.includes('manage a group')
+	)
 		return { trajectory: null, route: 'kelola' };
 
 	// Siaga — emergency alert
-	if (p.includes('siaga') || p.includes('darurat') || p.includes('bahaya') || p.includes('peringatan') || p.includes('emergency'))
+	if (
+		p.includes('siaga') ||
+		p.includes('darurat') ||
+		p.includes('bahaya') ||
+		p.includes('peringatan') ||
+		p.includes('emergency')
+	)
 		return { trajectory: 'siaga', route: 'siaga' };
 
 	// Catat — data/documentation
-	if (p.includes('catat') || p.includes('data') || p.includes('dokumentasi') || p.includes('fakta') || p.includes('bukti') || p.includes('document'))
+	if (
+		p.includes('catat') ||
+		p.includes('data') ||
+		p.includes('dokumentasi') ||
+		p.includes('fakta') ||
+		p.includes('bukti') ||
+		p.includes('document')
+	)
 		return { trajectory: 'data', route: 'catatan_komunitas' };
 
 	// Musyawarah — deliberation
-	if (p.includes('musyawarah') || p.includes('diskusi') || p.includes('keputusan') || p.includes('usul') || p.includes('discussion'))
+	if (
+		p.includes('musyawarah') ||
+		p.includes('diskusi') ||
+		p.includes('keputusan') ||
+		p.includes('usul') ||
+		p.includes('discussion')
+	)
 		return { trajectory: 'mufakat', route: 'komunitas' };
 
 	// Pantau — monitoring
-	if (p.includes('pantau') || p.includes('awasi') || p.includes('mengawasi') || p.includes('monitor'))
+	if (
+		p.includes('pantau') ||
+		p.includes('awasi') ||
+		p.includes('mengawasi') ||
+		p.includes('monitor')
+	)
 		return { trajectory: 'pantau', route: 'komunitas' };
 
 	// Bantuan — help request
-	if (p.includes('bantuan') || p.includes('butuh') || p.includes('pertolongan') || p.includes('need help'))
+	if (
+		p.includes('bantuan') ||
+		p.includes('butuh') ||
+		p.includes('pertolongan') ||
+		p.includes('need help')
+	)
 		return { trajectory: 'bantuan', route: 'komunitas' };
 
 	// Rayakan — celebration
-	if (p.includes('rayakan') || p.includes('kabar baik') || p.includes('capai') || p.includes('celebrate') || p.includes('good news'))
+	if (
+		p.includes('rayakan') ||
+		p.includes('kabar baik') ||
+		p.includes('capai') ||
+		p.includes('celebrate') ||
+		p.includes('good news')
+	)
 		return { trajectory: 'pencapaian', route: 'komunitas' };
 
 	// Program — recurring activity
-	if (p.includes('program') || p.includes('jadwal') || p.includes('kegiatan rutin') || p.includes('organize'))
+	if (
+		p.includes('program') ||
+		p.includes('jadwal') ||
+		p.includes('kegiatan rutin') ||
+		p.includes('organize')
+	)
 		return { trajectory: 'program', route: 'komunitas' };
 
 	// Masalah — problem/action (default for content trajectories)
-	if (p.includes('masalah') || p.includes('rusak') || p.includes('keluhan') || p.includes('problem'))
+	if (
+		p.includes('masalah') ||
+		p.includes('rusak') ||
+		p.includes('keluhan') ||
+		p.includes('problem')
+	)
 		return { trajectory: 'aksi', route: 'komunitas' };
 
 	// Fallback
@@ -88,9 +145,7 @@ const TRAJECTORY_ENRICHMENTS: Record<TrajectoryType, CardEnrichment> = {
 		body: 'Komunitas Kampung Melayu mendesak pemerintah daerah untuk menyediakan akses air bersih yang layak.',
 		sentiment: 'hopeful',
 		intensity: 4,
-		entity_tags: [
-			{ label: 'Kampung Melayu', entity_type: 'lingkungan', confidence: 0.92 }
-		]
+		entity_tags: [{ label: 'Kampung Melayu', entity_type: 'lingkungan', confidence: 0.92 }]
 	},
 	mufakat: {
 		icon: 'users',
@@ -114,9 +169,7 @@ const TRAJECTORY_ENRICHMENTS: Record<TrajectoryType, CardEnrichment> = {
 		body: 'Perlu mediasi untuk menyelesaikan sengketa batas tanah antara warga di RT 07.',
 		sentiment: 'curious',
 		intensity: 3,
-		entity_tags: [
-			{ label: 'RT 07', entity_type: 'lingkungan', confidence: 0.87 }
-		]
+		entity_tags: [{ label: 'RT 07', entity_type: 'lingkungan', confidence: 0.87 }]
 	},
 	pantau: {
 		icon: 'eye',
@@ -218,8 +271,22 @@ const TRAJECTORY_ENRICHMENTS: Record<TrajectoryType, CardEnrichment> = {
 
 /** Trajectories that produce lifecycle witnesses (with proposed_plan). */
 const WITNESS_TRAJECTORIES: TrajectoryType[] = [
-	'aksi', 'advokasi', 'pantau', 'mufakat', 'mediasi', 'program'
+	'aksi',
+	'advokasi',
+	'pantau',
+	'mufakat',
+	'mediasi',
+	'program'
 ];
+
+function triageKind(
+	route: TriageResult['route'],
+	trajectory: TrajectoryType | null
+): 'witness' | 'data' {
+	if (route === 'kelola' || route === 'catatan_komunitas') return 'data';
+	if (!trajectory) return 'data';
+	return WITNESS_TRAJECTORIES.includes(trajectory) ? 'witness' : 'data';
+}
 
 /** Terminal bar_state per route. */
 function terminalBarState(route: TriageResult['route']): ContextBarState {
@@ -274,10 +341,14 @@ export class MockTriageService implements TriageService {
 		await delay(500);
 		this.currentStep = 1;
 		this.detected = detectTrajectory(content);
+		const kind = triageKind(this.detected.route, this.detected.trajectory);
 
 		// Kelola path — ask group name on first step
 		if (this.detected.route === 'kelola') {
 			return {
+				schema_version: 'triage.v1',
+				status: 'draft',
+				kind,
 				bar_state: 'probing',
 				route: 'kelola',
 				confidence: { score: 0.5, label: 'Kelola Kelompok...' },
@@ -286,6 +357,9 @@ export class MockTriageService implements TriageService {
 		}
 
 		return {
+			schema_version: 'triage.v1',
+			status: 'draft',
+			kind,
 			bar_state: 'probing',
 			route: this.detected.route,
 			trajectory_type: this.detected.trajectory ?? undefined,
@@ -294,17 +368,25 @@ export class MockTriageService implements TriageService {
 		};
 	}
 
-	async updateTriage(sessionId: string, answer: string, _attachments?: File[]): Promise<TriageResult> {
+	async updateTriage(
+		_sessionId: string,
+		_answer: string,
+		_attachments?: File[]
+	): Promise<TriageResult> {
 		await delay(400);
 		this.currentStep = Math.min(this.currentStep + 1, 3);
 
 		const { trajectory, route } = this.detected;
+		const kind = triageKind(route, trajectory);
 
 		// ── Kelola path ─────────────────────────────────────────────
 		if (route === 'kelola') {
 			if (this.currentStep === 2) {
 				// Step 2 — leaning, ask description + policy
 				return {
+					schema_version: 'triage.v1',
+					status: 'draft',
+					kind,
 					bar_state: 'leaning',
 					route: 'kelola',
 					confidence: { score: 0.7, label: 'Kelola Kelompok · 70%' },
@@ -313,6 +395,9 @@ export class MockTriageService implements TriageService {
 			}
 			// Step 3+ — ready with kelola result
 			return {
+				schema_version: 'triage.v1',
+				status: 'final',
+				kind,
 				bar_state: 'ready',
 				route: 'kelola',
 				confidence: { score: 0.95, label: 'Kelola Kelompok · 95%' },
@@ -325,7 +410,9 @@ export class MockTriageService implements TriageService {
 		if (this.currentStep >= 3) {
 			// Terminal state
 			const barState = terminalBarState(route);
-			const enrichment = trajectory ? TRAJECTORY_ENRICHMENTS[trajectory] : TRAJECTORY_ENRICHMENTS.aksi;
+			const enrichment = trajectory
+				? TRAJECTORY_ENRICHMENTS[trajectory]
+				: TRAJECTORY_ENRICHMENTS.aksi;
 			const isWitness = trajectory && WITNESS_TRAJECTORIES.includes(trajectory);
 
 			const confidenceLabel = trajectory
@@ -333,6 +420,9 @@ export class MockTriageService implements TriageService {
 				: 'Aksi Bersama · 92%';
 
 			return {
+				schema_version: 'triage.v1',
+				status: 'final',
+				kind,
 				bar_state: barState,
 				route,
 				track_hint: 'tuntaskan',
@@ -347,6 +437,9 @@ export class MockTriageService implements TriageService {
 
 		// Intermediate state — leaning
 		return {
+			schema_version: 'triage.v1',
+			status: 'draft',
+			kind,
 			bar_state: 'leaning',
 			route,
 			track_hint: 'tuntaskan',

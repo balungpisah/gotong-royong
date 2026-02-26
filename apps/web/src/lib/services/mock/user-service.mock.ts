@@ -1,6 +1,11 @@
 import type { UserService } from '../types';
 import type { UserProfile, TandangProfile } from '$lib/types';
-import { mockUsers, mockCurrentUser, mockTandangProfiles, mockCurrentTandangProfile } from '$lib/fixtures';
+import {
+	mockUsers,
+	mockCurrentUser,
+	mockTandangProfiles,
+	mockCurrentTandangProfile
+} from '$lib/fixtures';
 
 const delay = (ms: number = 200) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 

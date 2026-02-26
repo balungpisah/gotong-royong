@@ -26,11 +26,16 @@ function isMember(group: GroupDetail, userId: string): boolean {
 	return group.members.some((m) => m.user_id === userId);
 }
 
-function computeMy(group: GroupDetail, userId: string): Pick<GroupDetail, 'my_role' | 'my_membership_status'> {
+function computeMy(
+	group: GroupDetail,
+	userId: string
+): Pick<GroupDetail, 'my_role' | 'my_membership_status'> {
 	const member = group.members.find((m) => m.user_id === userId);
 	if (member) return { my_role: member.role, my_membership_status: 'approved' };
 
-	const pending = group.pending_requests.some((r) => r.user_id === userId && r.status === 'pending');
+	const pending = group.pending_requests.some(
+		(r) => r.user_id === userId && r.status === 'pending'
+	);
 	if (pending) return { my_role: null, my_membership_status: 'pending' };
 
 	return { my_role: null, my_membership_status: 'none' };
@@ -70,7 +75,12 @@ export class MockGroupService implements GroupService {
 		const group = this.groups.find((g) => g.group_id === groupId);
 		if (!group) throw new Error('Kelompok tidak ditemukan');
 		const my = computeMy(group, currentUser.user_id);
-		return { ...group, ...my, members: [...group.members], pending_requests: [...group.pending_requests] };
+		return {
+			...group,
+			...my,
+			members: [...group.members],
+			pending_requests: [...group.pending_requests]
+		};
 	}
 
 	// ---------------------------------------------------------------------------
@@ -159,7 +169,9 @@ export class MockGroupService implements GroupService {
 
 		group.members = [...group.members, newMember];
 		group.member_count = group.members.length;
-		group.pending_requests = group.pending_requests.filter((r) => r.user_id !== currentUser.user_id);
+		group.pending_requests = group.pending_requests.filter(
+			(r) => r.user_id !== currentUser.user_id
+		);
 
 		console.log('[MockGroupService] join:', { groupId });
 		return newMember;
@@ -284,4 +296,3 @@ export class MockGroupService implements GroupService {
 		console.log('[MockGroupService] updateMemberRole:', { groupId, userId, role });
 	}
 }
-

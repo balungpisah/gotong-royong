@@ -119,7 +119,8 @@ export class MockSignalService implements SignalService {
 
 		// Remove the pending signal
 		this.signals = this.signals.filter(
-			(s) => !(s.witness_id === witnessId && s.signal_type === signalType && s.outcome === 'pending')
+			(s) =>
+				!(s.witness_id === witnessId && s.signal_type === signalType && s.outcome === 'pending')
 		);
 	}
 
@@ -135,9 +136,7 @@ export class MockSignalService implements SignalService {
 
 	async getResolutions(witnessId: string): Promise<ContentSignal[]> {
 		await delay(100);
-		return this.signals.filter(
-			(s) => s.witness_id === witnessId && s.outcome !== 'pending'
-		);
+		return this.signals.filter((s) => s.witness_id === witnessId && s.outcome !== 'pending');
 	}
 
 	/**
@@ -156,7 +155,8 @@ export class MockSignalService implements SignalService {
 		for (const signal of this.signals) {
 			if (signal.witness_id === witnessId && signal.outcome === 'pending') {
 				const outcome = resolveOutcome(signal.signal_type, closeReason);
-				const sign = outcome === 'resolved_positive' ? 1 : outcome === 'resolved_negative' ? -0.5 : 0;
+				const sign =
+					outcome === 'resolved_positive' ? 1 : outcome === 'resolved_negative' ? -0.5 : 0;
 
 				signal.outcome = outcome;
 				signal.resolved_at = now;
