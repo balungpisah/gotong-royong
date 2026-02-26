@@ -111,7 +111,9 @@ export function iconNameForTrajectory(trajectoryType: TrajectoryType): string {
  * Resolve an icon for a trajectory type to a Lucide Svelte component.
  * Falls back to the Tag icon if the trajectory type is unknown.
  */
-export function resolveTrajectoryIcon(trajectoryType: TrajectoryType): Component<{ class?: string }> {
+export function resolveTrajectoryIcon(
+	trajectoryType: TrajectoryType
+): Component<{ class?: string }> {
 	const name = TRAJECTORY_ICON_MAP[trajectoryType];
 	return name ? (ICON_REGISTRY[name] ?? Tag) : Tag;
 }

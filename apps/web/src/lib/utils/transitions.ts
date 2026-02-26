@@ -15,7 +15,12 @@ import {
 	type SlideParams,
 	type TransitionConfig
 } from 'svelte/transition';
-import { safeFly as fly, safeFade as fade, safeScale as scale, safeSlide as slide } from './safe-slide';
+import {
+	safeFly as fly,
+	safeFade as fade,
+	safeScale as scale,
+	safeSlide as slide
+} from './safe-slide';
 import { cubicOut, quintOut, backOut } from 'svelte/easing';
 
 // ─── Duration presets (match CSS custom properties) ──────────────────────────
@@ -45,10 +50,7 @@ export function staggerDelay(index: number, gap = 50): number {
 
 // ─── Composite transitions ──────────────────────────────────────────────────
 
-type TransitionFn<T> = (
-	node: Element,
-	params?: T
-) => TransitionConfig;
+type TransitionFn<T> = (node: Element, params?: T) => TransitionConfig;
 
 /** Fade in while sliding up 12px — great for cards & list items */
 export const fadeUp: TransitionFn<Partial<FlyParams>> = (node, params = {}) =>
@@ -163,11 +165,7 @@ interface RevealOptions {
  *        <div use:reveal={{ class: 'animate-slide-up', threshold: 0.2 }}>...</div>
  */
 export function reveal(node: HTMLElement, options: RevealOptions = {}) {
-	const {
-		class: revealClass = 'animate-fade-in',
-		threshold = 0.1,
-		once = true
-	} = options;
+	const { class: revealClass = 'animate-fade-in', threshold = 0.1, once = true } = options;
 
 	// Start invisible
 	node.style.opacity = '0';
