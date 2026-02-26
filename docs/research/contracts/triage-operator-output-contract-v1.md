@@ -9,6 +9,8 @@ Scope:
 - operator -> orchestrator consultation outputs (draft and final)
 - operator taxonomy mapping to `kind` (`witness | data | kelola`)
 - operator-specific `payload` final shape requirements
+- backend triage handoff field: optional `operator_output` in
+  `POST /v1/triage/sessions` and `POST /v1/triage/sessions/:session_id/messages`
 
 Related runtime contract:
 - `docs/research/contracts/triage-witness-feed-contract-v1.md`

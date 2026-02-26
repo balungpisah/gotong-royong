@@ -3845,6 +3845,263 @@ async fn triage_sessions_start_and_continue_flow() {
 }
 
 #[tokio::test]
+async fn triage_start_accepts_operator_output_final_contract() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let start_payload = json!({
+        "content": "Ada masalah jalan rusak yang perlu dituntaskan",
+        "operator_output": {
+            "schema_version": "operator.v1",
+            "operator": "masalah",
+            "triage_stage": "triage_final",
+            "output_kind": "witness",
+            "confidence": 0.96,
+            "checklist": [
+                {
+                    "field": "problem_scope",
+                    "filled": true,
+                    "required_for_final": true
+                }
+            ],
+            "questions": [],
+            "missing_fields": [],
+            "routing": {
+                "route": "komunitas",
+                "trajectory_type": "aksi",
+                "track_hint": "tuntaskan",
+                "seed_hint": "Keresahan",
+                "program_refs": []
+            },
+            "payload": {
+                "trajectory": "A",
+                "path_plan": {
+                    "plan_id": "plan-op-start-1"
+                }
+            }
+        }
+    });
+
+    let start_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/sessions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "triage-op-start-1")
+        .header("x-correlation-id", "corr-triage-op-start-1")
+        .body(Body::from(start_payload.to_string()))
+        .expect("start request");
+    let start_response = app.clone().oneshot(start_request).await.expect("response");
+    assert_eq!(start_response.status(), StatusCode::OK);
+    let start_body = to_bytes(start_response.into_body(), usize::MAX)
+        .await
+        .expect("start body");
+    let start_json: serde_json::Value = serde_json::from_slice(&start_body).expect("start json");
+    let session_id = start_json
+        .get("session_id")
+        .and_then(|value| value.as_str())
+        .expect("session id")
+        .to_string();
+    assert_eq!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("status"))
+            .and_then(|value| value.as_str()),
+        Some("final")
+    );
+    assert_eq!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("kind"))
+            .and_then(|value| value.as_str()),
+        Some("witness")
+    );
+    assert_eq!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("bar_state"))
+            .and_then(|value| value.as_str()),
+        Some("ready")
+    );
+    assert_eq!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("proposed_plan"))
+            .and_then(|value| value.get("plan_id"))
+            .and_then(|value| value.as_str()),
+        Some("plan-op-start-1")
+    );
+
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/witnesses")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "triage-op-create-1")
+        .header("x-correlation-id", "corr-triage-op-create-1")
+        .body(Body::from(
+            json!({
+                "schema_version": "triage.v1",
+                "triage_session_id": session_id,
+            })
+            .to_string(),
+        ))
+        .expect("create request");
+    let create_response = app.oneshot(create_request).await.expect("response");
+    assert_eq!(create_response.status(), StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn triage_continue_accepts_operator_output_and_updates_session_route() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let start_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/sessions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "triage-op-route-start-1")
+        .header("x-correlation-id", "corr-triage-op-route-start-1")
+        .body(Body::from(
+            json!({
+                "content": "Saya mau bahas isu kampung"
+            })
+            .to_string(),
+        ))
+        .expect("start request");
+    let start_response = app.clone().oneshot(start_request).await.expect("response");
+    assert_eq!(start_response.status(), StatusCode::OK);
+    let start_body = to_bytes(start_response.into_body(), usize::MAX)
+        .await
+        .expect("start body");
+    let start_json: serde_json::Value = serde_json::from_slice(&start_body).expect("start json");
+    let session_id = start_json
+        .get("session_id")
+        .and_then(|value| value.as_str())
+        .expect("session id")
+        .to_string();
+
+    let continue_payload = json!({
+        "answer": "Saya kirim hasil operator data",
+        "operator_output": {
+            "schema_version": "operator.v1",
+            "operator": "catat",
+            "triage_stage": "triage_final",
+            "output_kind": "data",
+            "confidence": 0.91,
+            "checklist": [
+                {
+                    "field": "claim",
+                    "filled": true,
+                    "required_for_final": true
+                }
+            ],
+            "questions": [],
+            "missing_fields": [],
+            "routing": {
+                "route": "catatan_komunitas",
+                "trajectory_type": "data",
+                "track_hint": "catat",
+                "seed_hint": "Kejadian",
+                "taxonomy": {
+                    "category_code": "commodity_price",
+                    "category_label": "Harga Komoditas",
+                    "quality": "community_observation"
+                }
+            },
+            "payload": {
+                "record_type": "data",
+                "claim": "Harga telur Rp32.000/kg",
+                "observed_at": "2026-02-26T06:00:00Z",
+                "category": "harga_pangan"
+            }
+        }
+    });
+
+    let continue_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/triage/sessions/{session_id}/messages"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "triage-op-route-continue-1")
+        .header("x-correlation-id", "corr-triage-op-route-continue-1")
+        .body(Body::from(continue_payload.to_string()))
+        .expect("continue request");
+    let continue_response = app
+        .clone()
+        .oneshot(continue_request)
+        .await
+        .expect("continue response");
+    assert_eq!(continue_response.status(), StatusCode::OK);
+    let continue_body = to_bytes(continue_response.into_body(), usize::MAX)
+        .await
+        .expect("continue body");
+    let continue_json: serde_json::Value =
+        serde_json::from_slice(&continue_body).expect("continue json");
+    assert_eq!(
+        continue_json
+            .get("result")
+            .and_then(|value| value.get("route"))
+            .and_then(|value| value.as_str()),
+        Some("catatan_komunitas")
+    );
+    assert_eq!(
+        continue_json
+            .get("result")
+            .and_then(|value| value.get("kind"))
+            .and_then(|value| value.as_str()),
+        Some("data")
+    );
+    assert_eq!(
+        continue_json
+            .get("result")
+            .and_then(|value| value.get("status"))
+            .and_then(|value| value.as_str()),
+        Some("final")
+    );
+
+    let continue_request_2 = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/triage/sessions/{session_id}/messages"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "triage-op-route-continue-2")
+        .header("x-correlation-id", "corr-triage-op-route-continue-2")
+        .body(Body::from(
+            json!({
+                "answer": "lanjut default"
+            })
+            .to_string(),
+        ))
+        .expect("continue request 2");
+    let continue_response_2 = app
+        .oneshot(continue_request_2)
+        .await
+        .expect("continue response 2");
+    assert_eq!(continue_response_2.status(), StatusCode::OK);
+    let continue_body_2 = to_bytes(continue_response_2.into_body(), usize::MAX)
+        .await
+        .expect("continue body 2");
+    let continue_json_2: serde_json::Value =
+        serde_json::from_slice(&continue_body_2).expect("continue json 2");
+    assert_eq!(
+        continue_json_2
+            .get("result")
+            .and_then(|value| value.get("route"))
+            .and_then(|value| value.as_str()),
+        Some("catatan_komunitas")
+    );
+    assert_eq!(
+        continue_json_2
+            .get("result")
+            .and_then(|value| value.get("kind"))
+            .and_then(|value| value.as_str()),
+        Some("data")
+    );
+}
+
+#[tokio::test]
 async fn triage_session_continue_forbids_cross_user_access() {
     let app = test_app();
     let owner_token = test_token_with_identity("test-secret", "user", "user-123");
@@ -3891,6 +4148,439 @@ async fn triage_session_continue_forbids_cross_user_access() {
         .expect("continue request");
     let continue_response = app.oneshot(continue_request).await.expect("response");
     assert_error_envelope(continue_response, StatusCode::FORBIDDEN, "forbidden").await;
+}
+
+#[tokio::test]
+async fn witness_create_rejects_draft_triage_with_missing_fields() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let start_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/sessions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "witness-draft-start-1")
+        .header("x-correlation-id", "corr-witness-draft-start-1")
+        .body(Body::from(
+            json!({
+                "content": "Ada masalah drainase di RT 05"
+            })
+            .to_string(),
+        ))
+        .expect("start request");
+    let start_response = app.clone().oneshot(start_request).await.expect("response");
+    assert_eq!(start_response.status(), StatusCode::OK);
+    let start_body = to_bytes(start_response.into_body(), usize::MAX)
+        .await
+        .expect("start body");
+    let start_json: serde_json::Value = serde_json::from_slice(&start_body).expect("start json");
+    let session_id = start_json
+        .get("session_id")
+        .and_then(|value| value.as_str())
+        .expect("session id");
+
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/witnesses")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "witness-draft-create-1")
+        .header("x-correlation-id", "corr-witness-draft-create-1")
+        .body(Body::from(
+            json!({
+                "schema_version": "triage.v1",
+                "triage_session_id": session_id,
+            })
+            .to_string(),
+        ))
+        .expect("create request");
+    let create_response = app.clone().oneshot(create_request).await.expect("response");
+    assert_eq!(create_response.status(), StatusCode::CONFLICT);
+    let create_body = to_bytes(create_response.into_body(), usize::MAX)
+        .await
+        .expect("create body");
+    let create_json: serde_json::Value = serde_json::from_slice(&create_body).expect("create json");
+    assert_eq!(
+        create_json
+            .get("error")
+            .and_then(|value| value.get("code"))
+            .and_then(|value| value.as_str()),
+        Some("triage_incomplete")
+    );
+    assert!(
+        create_json
+            .get("missing_fields")
+            .and_then(|value| value.as_array())
+            .is_some_and(|items| !items.is_empty())
+    );
+}
+
+#[tokio::test]
+async fn witness_create_uses_final_triage_session_and_returns_stream_item() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let start_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/sessions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "witness-final-start-1")
+        .header("x-correlation-id", "corr-witness-final-start-1")
+        .body(Body::from(
+            json!({
+                "content": "Jalan rusak berat di RT 02"
+            })
+            .to_string(),
+        ))
+        .expect("start request");
+    let start_response = app.clone().oneshot(start_request).await.expect("response");
+    assert_eq!(start_response.status(), StatusCode::OK);
+    let start_body = to_bytes(start_response.into_body(), usize::MAX)
+        .await
+        .expect("start body");
+    let start_json: serde_json::Value = serde_json::from_slice(&start_body).expect("start json");
+    let session_id = start_json
+        .get("session_id")
+        .and_then(|value| value.as_str())
+        .expect("session id")
+        .to_string();
+
+    for (idx, answer) in ["butuh perbaikan cepat", "warga siap gotong royong"]
+        .iter()
+        .enumerate()
+    {
+        let continue_request = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/triage/sessions/{session_id}/messages"))
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token}"))
+            .header(
+                "x-request-id",
+                format!("witness-final-continue-{}", idx + 1),
+            )
+            .header(
+                "x-correlation-id",
+                format!("corr-witness-final-continue-{}", idx + 1),
+            )
+            .body(Body::from(
+                json!({
+                    "answer": answer
+                })
+                .to_string(),
+            ))
+            .expect("continue request");
+        let continue_response = app
+            .clone()
+            .oneshot(continue_request)
+            .await
+            .expect("response");
+        assert_eq!(continue_response.status(), StatusCode::OK);
+    }
+
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/witnesses")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "witness-final-create-1")
+        .header("x-correlation-id", "corr-witness-final-create-1")
+        .body(Body::from(
+            json!({
+                "schema_version": "triage.v1",
+                "triage_session_id": session_id,
+            })
+            .to_string(),
+        ))
+        .expect("create request");
+    let create_response = app.clone().oneshot(create_request).await.expect("response");
+    assert_eq!(create_response.status(), StatusCode::CREATED);
+    let create_body = to_bytes(create_response.into_body(), usize::MAX)
+        .await
+        .expect("create body");
+    let create_json: serde_json::Value = serde_json::from_slice(&create_body).expect("create json");
+    let witness_id = create_json
+        .get("witness_id")
+        .and_then(|value| value.as_str())
+        .expect("witness_id");
+    assert!(!witness_id.is_empty());
+    assert_eq!(
+        create_json
+            .get("stream_item")
+            .and_then(|value| value.get("kind"))
+            .and_then(|value| value.as_str()),
+        Some("witness")
+    );
+    assert_eq!(
+        create_json
+            .get("stream_item")
+            .and_then(|value| value.get("data"))
+            .and_then(|value| value.get("source_id"))
+            .and_then(|value| value.as_str()),
+        Some(witness_id)
+    );
+    assert!(
+        create_json
+            .get("taxonomy")
+            .and_then(|value| value.get("category_code"))
+            .and_then(|value| value.as_str())
+            .is_some()
+    );
+    assert!(
+        create_json
+            .get("program_refs")
+            .and_then(|value| value.as_array())
+            .is_some()
+    );
+    assert_eq!(
+        create_json
+            .get("impact_verification")
+            .and_then(|value| value.get("status"))
+            .and_then(|value| value.as_str()),
+        Some("not_open")
+    );
+}
+
+#[tokio::test]
+async fn triage_session_mufakat_includes_stempel_template_and_taxonomy() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let start_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/sessions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .header("x-request-id", "triage-mufakat-start-1")
+        .header("x-correlation-id", "corr-triage-mufakat-start-1")
+        .body(Body::from(
+            json!({
+                "content": "Saya mau musyawarah mufakat soal perbaikan pos ronda"
+            })
+            .to_string(),
+        ))
+        .expect("start request");
+    let start_response = app.oneshot(start_request).await.expect("response");
+    assert_eq!(start_response.status(), StatusCode::OK);
+    let start_body = to_bytes(start_response.into_body(), usize::MAX)
+        .await
+        .expect("start body");
+    let start_json: serde_json::Value = serde_json::from_slice(&start_body).expect("start json");
+
+    assert_eq!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("stempel_state"))
+            .and_then(|value| value.get("state"))
+            .and_then(|value| value.as_str()),
+        Some("draft")
+    );
+    assert_eq!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("taxonomy"))
+            .and_then(|value| value.get("category_code"))
+            .and_then(|value| value.as_str()),
+        Some("infrastructure")
+    );
+    assert!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("program_refs"))
+            .and_then(|value| value.as_array())
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn witness_stempel_propose_and_finalize_locks_and_opens_impact_verification() {
+    let app = test_app();
+    let token_user_1 = test_token_with_identity("test-secret", "user", "user-111");
+    let token_user_2 = test_token_with_identity("test-secret", "user", "user-222");
+    let token_user_3 = test_token_with_identity("test-secret", "user", "user-333");
+
+    let start_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/sessions")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .header("x-request-id", "witness-stempel-start-1")
+        .header("x-correlation-id", "corr-witness-stempel-start-1")
+        .body(Body::from(
+            json!({
+                "content": "Jalan lingkungan rusak dan perlu ditangani"
+            })
+            .to_string(),
+        ))
+        .expect("start request");
+    let start_response = app.clone().oneshot(start_request).await.expect("response");
+    assert_eq!(start_response.status(), StatusCode::OK);
+    let start_body = to_bytes(start_response.into_body(), usize::MAX)
+        .await
+        .expect("start body");
+    let start_json: serde_json::Value = serde_json::from_slice(&start_body).expect("start json");
+    let session_id = start_json
+        .get("session_id")
+        .and_then(|value| value.as_str())
+        .expect("session id")
+        .to_string();
+
+    for (idx, answer) in ["lokasi di RT 07", "warga minta perbaikan minggu ini"]
+        .iter()
+        .enumerate()
+    {
+        let continue_request = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/triage/sessions/{session_id}/messages"))
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token_user_1}"))
+            .header(
+                "x-request-id",
+                format!("witness-stempel-continue-{}", idx + 1),
+            )
+            .header(
+                "x-correlation-id",
+                format!("corr-witness-stempel-continue-{}", idx + 1),
+            )
+            .body(Body::from(
+                json!({
+                    "answer": answer
+                })
+                .to_string(),
+            ))
+            .expect("continue request");
+        let continue_response = app
+            .clone()
+            .oneshot(continue_request)
+            .await
+            .expect("response");
+        assert_eq!(continue_response.status(), StatusCode::OK);
+    }
+
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/v1/witnesses")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .header("x-request-id", "witness-stempel-create-1")
+        .header("x-correlation-id", "corr-witness-stempel-create-1")
+        .body(Body::from(
+            json!({
+                "schema_version": "triage.v1",
+                "triage_session_id": session_id,
+            })
+            .to_string(),
+        ))
+        .expect("create request");
+    let create_response = app.clone().oneshot(create_request).await.expect("response");
+    assert_eq!(create_response.status(), StatusCode::CREATED);
+    let create_body = to_bytes(create_response.into_body(), usize::MAX)
+        .await
+        .expect("create body");
+    let create_json: serde_json::Value = serde_json::from_slice(&create_body).expect("create json");
+    let witness_id = create_json
+        .get("witness_id")
+        .and_then(|value| value.as_str())
+        .expect("witness_id")
+        .to_string();
+
+    for (idx, token) in [&token_user_1, &token_user_2, &token_user_3]
+        .iter()
+        .enumerate()
+    {
+        let signal_request = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/witnesses/{witness_id}/signals"))
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token}"))
+            .header(
+                "x-request-id",
+                format!("witness-stempel-signal-{}", idx + 1),
+            )
+            .header(
+                "x-correlation-id",
+                format!("corr-witness-stempel-signal-{}", idx + 1),
+            )
+            .body(Body::from(
+                json!({
+                    "signal_type": "saksi"
+                })
+                .to_string(),
+            ))
+            .expect("signal request");
+        let signal_response = app.clone().oneshot(signal_request).await.expect("response");
+        assert_eq!(signal_response.status(), StatusCode::CREATED);
+    }
+
+    let propose_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/witnesses/{witness_id}/stempel/propose"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .header("x-request-id", "witness-stempel-propose-1")
+        .header("x-correlation-id", "corr-witness-stempel-propose-1")
+        .body(Body::from(
+            json!({
+                "summary": "Kesimpulan musyawarah siap ditutup",
+                "rationale": "Tidak ada poin terbuka tersisa",
+                "objection_window_seconds": 0
+            })
+            .to_string(),
+        ))
+        .expect("propose request");
+    let propose_response = app
+        .clone()
+        .oneshot(propose_request)
+        .await
+        .expect("response");
+    assert_eq!(propose_response.status(), StatusCode::OK);
+    let propose_body = to_bytes(propose_response.into_body(), usize::MAX)
+        .await
+        .expect("propose body");
+    let propose_json: serde_json::Value =
+        serde_json::from_slice(&propose_body).expect("propose json");
+    assert_eq!(
+        propose_json
+            .get("stempel_state")
+            .and_then(|value| value.get("state"))
+            .and_then(|value| value.as_str()),
+        Some("objection_window")
+    );
+
+    let finalize_request = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/witnesses/{witness_id}/stempel/finalize"))
+        .header("authorization", format!("Bearer {token_user_1}"))
+        .header("x-request-id", "witness-stempel-finalize-1")
+        .header("x-correlation-id", "corr-witness-stempel-finalize-1")
+        .body(Body::empty())
+        .expect("finalize request");
+    let finalize_response = app
+        .clone()
+        .oneshot(finalize_request)
+        .await
+        .expect("response");
+    assert_eq!(finalize_response.status(), StatusCode::OK);
+    let finalize_body = to_bytes(finalize_response.into_body(), usize::MAX)
+        .await
+        .expect("finalize body");
+    let finalize_json: serde_json::Value =
+        serde_json::from_slice(&finalize_body).expect("finalize json");
+    assert_eq!(
+        finalize_json
+            .get("stempel_state")
+            .and_then(|value| value.get("state"))
+            .and_then(|value| value.as_str()),
+        Some("locked")
+    );
+    assert_eq!(
+        finalize_json
+            .get("impact_verification")
+            .and_then(|value| value.get("status"))
+            .and_then(|value| value.as_str()),
+        Some("open")
+    );
 }
 
 #[tokio::test]

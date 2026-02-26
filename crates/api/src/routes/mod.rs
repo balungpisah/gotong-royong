@@ -764,6 +764,7 @@ struct StartTriageSessionRequest {
     content: String,
     #[validate(length(max = 10), nested)]
     attachments: Option<Vec<TriageAttachmentInput>>,
+    operator_output: Option<Value>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -772,6 +773,7 @@ struct ContinueTriageSessionRequest {
     answer: String,
     #[validate(length(max = 10), nested)]
     attachments: Option<Vec<TriageAttachmentInput>>,
+    operator_output: Option<Value>,
 }
 
 #[derive(Clone, Copy)]
@@ -1855,6 +1857,11 @@ fn triage_result_from_operator_contract(contract: &TriageOperatorOutput, step: u
     } else {
         "draft"
     };
+    let bar_state = if status == "final" {
+        triage_terminal_bar_state(route)
+    } else {
+        triage_bar_state(route, step)
+    };
     let score = contract
         .confidence
         .unwrap_or_else(|| triage_confidence_score(step));
@@ -1878,7 +1885,7 @@ fn triage_result_from_operator_contract(contract: &TriageOperatorOutput, step: u
         "missing_fields": contract.missing_fields.clone().unwrap_or_default(),
         "taxonomy": taxonomy,
         "program_refs": program_refs,
-        "bar_state": triage_bar_state(route, step),
+        "bar_state": bar_state,
         "route": route,
         "track_hint": contract.routing.track_hint.clone().unwrap_or_else(|| "tuntaskan".to_string()),
         "seed_hint": contract.routing.seed_hint.clone().unwrap_or_else(|| {
@@ -1940,6 +1947,21 @@ fn triage_result_from_operator_output(operator_output: Value, step: u8) -> Resul
     Ok(triage_result_from_operator_contract(&contract, step))
 }
 
+fn triage_route_from_result(result: &Value) -> String {
+    result
+        .get("route")
+        .and_then(Value::as_str)
+        .unwrap_or("komunitas")
+        .to_string()
+}
+
+fn triage_trajectory_type_from_result(result: &Value) -> Option<String> {
+    result
+        .get("trajectory_type")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
 fn triage_card_payload(route: &str, trajectory_type: Option<&str>, kind: &str) -> Value {
     let trajectory = trajectory_type.unwrap_or(if kind == "witness" { "aksi" } else { "data" });
     let icon = match trajectory {
@@ -1989,8 +2011,10 @@ fn triage_result_payload(
     route: &str,
     trajectory_type: Option<&str>,
     step: u8,
+    operator_output: Option<Value>,
 ) -> Result<Value, ApiError> {
-    let operator_output = triage_operator_output_payload(route, trajectory_type, step);
+    let operator_output = operator_output
+        .unwrap_or_else(|| triage_operator_output_payload(route, trajectory_type, step));
     triage_result_from_operator_output(operator_output, step)
 }
 
@@ -2135,7 +2159,14 @@ async fn start_triage_session(
             let detected = detect_triage_route(&payload.content);
             let now_ms = gotong_domain::jobs::now_ms();
             let session_id = format!("triage-sess-{request_id}");
-            let result = triage_result_payload(detected.route, detected.trajectory_type, 1)?;
+            let result = triage_result_payload(
+                detected.route,
+                detected.trajectory_type,
+                1,
+                payload.operator_output.clone(),
+            )?;
+            let result_route = triage_route_from_result(&result);
+            let result_trajectory_type = triage_trajectory_type_from_result(&result);
             let ai_message = triage_ai_message(&result);
 
             {
@@ -2145,8 +2176,8 @@ async fn start_triage_session(
                     session_id.clone(),
                     TriageSessionState {
                         owner_user_id: actor.user_id.clone(),
-                        route: detected.route.to_string(),
-                        trajectory_type: detected.trajectory_type.map(str::to_string),
+                        route: result_route,
+                        trajectory_type: result_trajectory_type,
                         step: 1,
                         latest_result: result.clone(),
                         messages: vec![
@@ -2247,7 +2278,10 @@ async fn continue_triage_session(
                     &session.route,
                     session.trajectory_type.as_deref(),
                     session.step,
+                    payload.operator_output.clone(),
                 )?;
+                session.route = triage_route_from_result(&result);
+                session.trajectory_type = triage_trajectory_type_from_result(&result);
                 session.latest_result = result.clone();
                 let ai_message = triage_ai_message(&result);
                 session.messages.push(TriageSessionMessageState {

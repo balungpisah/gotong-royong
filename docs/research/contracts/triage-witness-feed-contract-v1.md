@@ -81,6 +81,28 @@ Every triage response includes:
 - `witness`: lifecycle card candidate; valid input for `POST /v1/witnesses`.
 - `data`: one-off data card candidate; not valid for `POST /v1/witnesses`.
 
+### 2.0 Optional Operator Handoff Input (`operator.v1`)
+
+`POST /v1/triage/sessions` and `POST /v1/triage/sessions/:session_id/messages` may include
+optional `operator_output` payload:
+
+```json
+{
+  "content": "....",
+  "operator_output": {
+    "schema_version": "operator.v1",
+    "...": "triage operator envelope"
+  }
+}
+```
+
+Rules:
+- when `operator_output` is present, backend validates it against `operator.v1` constraints
+  before mapping to runtime `triage.v1`.
+- invalid `operator_output` is rejected with standard `500 internal_error` envelope in current
+  runtime behavior (hard gate, no silent coercion).
+- when `operator_output` is omitted, backend uses internal fallback operator synthesis.
+
 ### 2.1 Data taxonomy (controlled-hybrid)
 
 `result.taxonomy.category_code` must use a controlled vocabulary:
