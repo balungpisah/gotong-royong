@@ -2,6 +2,13 @@
 
 Track AI features, contracts, versioning, and fallback behavior before backend integration.
 
+Canonical endpoint registry:
+- `docs/research/contracts/ai-endpoint-map-v1.md`
+
+Notes:
+- use `ai-endpoint-map-v1.md` as system-of-record for endpoint-level runtime contracts and gate behavior.
+- keep this file as feature-level AI touchpoint traceability and planning log.
+
 ## AI contract table
 
 | Feature ID | AI touchpoint | Inputs expected | Output contract fields | Version/Prompt source | Fallback strategy | Status |

@@ -33,6 +33,7 @@ The canonical stack decision (ADR-001) has been promoted to `docs/architecture/a
 | File | Status | Description |
 |------|--------|-------------|
 | `triage-witness-feed-contract-v1.md` | [ACTIVE REF] | Canonical runtime contract for triage sessions and session-authoritative witness materialization |
+| `ai-endpoint-map-v1.md` | [ACTIVE REF] | Canonical registry of runtime AI endpoints: prompt/version, contract links, fallback, validation gate, observability |
 | `triage-operator-output-contract-v1.md` | [ACTIVE REF] | Canonical operator->orchestrator contract (`triage_draft/triage_final`) with payload semantics per operator |
 | `triage-operator-output-contract-v1.schema.json` | [ACTIVE REF] | Strict JSON Schema for validating operator outputs (`schema_version=operator.v1`) |
 | `trajectory-tandang-signal-crosswalk-v1.md` | [ACTIVE REF] | Cross-reference matrix between trajectory taxonomy and Tandang signal patterns, including gap-detection contract |
