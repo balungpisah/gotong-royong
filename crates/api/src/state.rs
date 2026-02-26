@@ -44,6 +44,7 @@ use redis::Client;
 use reqwest::Client as HttpClient;
 use rusty_s3::{Bucket as S3Bucket, Credentials as S3Credentials, S3Action, UrlStyle};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::sync::{RwLock, broadcast};
 use tracing::warn;
 
@@ -91,7 +92,16 @@ pub struct AppState {
     pub chat_attachment_storage: ChatAttachmentStorage,
     pub triage_sessions: Arc<RwLock<HashMap<String, TriageSessionState>>>,
     pub witness_signals: Arc<RwLock<HashMap<String, WitnessSignalState>>>,
+    pub witness_stempel: Arc<RwLock<HashMap<String, WitnessStempelState>>>,
+    pub witness_impact_verifications: Arc<RwLock<HashMap<String, WitnessImpactVerificationState>>>,
     pub job_queue: SharedJobQueue,
+}
+
+#[derive(Clone, Debug)]
+pub struct TriageSessionMessageState {
+    pub role: String,
+    pub text: String,
+    pub created_at_ms: i64,
 }
 
 #[derive(Clone, Debug)]
@@ -100,6 +110,8 @@ pub struct TriageSessionState {
     pub route: String,
     pub trajectory_type: Option<String>,
     pub step: u8,
+    pub latest_result: Value,
+    pub messages: Vec<TriageSessionMessageState>,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
 }
@@ -121,6 +133,61 @@ pub struct WitnessSignalState {
     pub updated_at_ms: i64,
     pub active_signals: HashMap<String, WitnessSignalEntry>,
     pub resolved_signals: Vec<WitnessSignalEntry>,
+}
+
+#[derive(Clone, Debug)]
+pub struct WitnessStempelObjection {
+    pub user_id: String,
+    pub reason: String,
+    pub created_at_ms: i64,
+}
+
+#[derive(Clone, Debug)]
+pub struct WitnessStempelState {
+    pub state: String,
+    pub proposed_at_ms: Option<i64>,
+    pub objection_deadline_ms: Option<i64>,
+    pub locked_at_ms: Option<i64>,
+    pub min_participants: usize,
+    pub participant_count: usize,
+    pub objections: Vec<WitnessStempelObjection>,
+}
+
+impl Default for WitnessStempelState {
+    fn default() -> Self {
+        Self {
+            state: "draft".to_string(),
+            proposed_at_ms: None,
+            objection_deadline_ms: None,
+            locked_at_ms: None,
+            min_participants: 3,
+            participant_count: 0,
+            objections: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct WitnessImpactVerificationState {
+    pub status: String,
+    pub opened_at_ms: Option<i64>,
+    pub closes_at_ms: Option<i64>,
+    pub yes_count: usize,
+    pub no_count: usize,
+    pub min_vouches: usize,
+}
+
+impl Default for WitnessImpactVerificationState {
+    fn default() -> Self {
+        Self {
+            status: "not_open".to_string(),
+            opened_at_ms: None,
+            closes_at_ms: None,
+            yes_count: 0,
+            no_count: 0,
+            min_vouches: 3,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -484,6 +551,8 @@ impl AppState {
         let markov_client = Arc::new(MarkovReadClient::from_config(&config));
         let triage_sessions = Arc::new(RwLock::new(HashMap::new()));
         let witness_signals = Arc::new(RwLock::new(HashMap::new()));
+        let witness_stempel = Arc::new(RwLock::new(HashMap::new()));
+        let witness_impact_verifications = Arc::new(RwLock::new(HashMap::new()));
         let feed_monitor_preferences = Arc::new(RwLock::new(HashMap::new()));
         let feed_follow_preferences = Arc::new(RwLock::new(HashMap::new()));
         Ok(Self {
@@ -510,6 +579,8 @@ impl AppState {
             chat_attachment_storage,
             triage_sessions,
             witness_signals,
+            witness_stempel,
+            witness_impact_verifications,
             job_queue,
         })
     }
@@ -536,6 +607,8 @@ impl AppState {
         let markov_client = Arc::new(MarkovReadClient::from_config(&config));
         let triage_sessions = Arc::new(RwLock::new(HashMap::new()));
         let witness_signals = Arc::new(RwLock::new(HashMap::new()));
+        let witness_stempel = Arc::new(RwLock::new(HashMap::new()));
+        let witness_impact_verifications = Arc::new(RwLock::new(HashMap::new()));
         let feed_monitor_preferences = Arc::new(RwLock::new(HashMap::new()));
         let feed_follow_preferences = Arc::new(RwLock::new(HashMap::new()));
         Self {
@@ -562,6 +635,8 @@ impl AppState {
             chat_attachment_storage,
             triage_sessions,
             witness_signals,
+            witness_stempel,
+            witness_impact_verifications,
             job_queue: None,
         }
     }
@@ -591,6 +666,8 @@ impl AppState {
         let markov_client = Arc::new(MarkovReadClient::from_config(&config));
         let triage_sessions = Arc::new(RwLock::new(HashMap::new()));
         let witness_signals = Arc::new(RwLock::new(HashMap::new()));
+        let witness_stempel = Arc::new(RwLock::new(HashMap::new()));
+        let witness_impact_verifications = Arc::new(RwLock::new(HashMap::new()));
         let feed_monitor_preferences = Arc::new(RwLock::new(HashMap::new()));
         let feed_follow_preferences = Arc::new(RwLock::new(HashMap::new()));
         Self {
@@ -617,6 +694,8 @@ impl AppState {
             chat_attachment_storage,
             triage_sessions,
             witness_signals,
+            witness_stempel,
+            witness_impact_verifications,
             job_queue: None,
         }
     }
