@@ -35,8 +35,7 @@ use gotong_domain::{
     discovery::{
         DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_ONTOLOGY_NOTE, FEED_SOURCE_VOUCH,
         FeedIngestInput, FeedListQuery, FeedSuggestion, FeedSuggestionsQuery, InAppNotification,
-        NotificationListQuery, PagedNotifications, SearchListQuery, SearchPage,
-        WeeklyDigest,
+        NotificationListQuery, PagedNotifications, SearchListQuery, SearchPage, WeeklyDigest,
     },
     error::DomainError,
     evidence::{Evidence, EvidenceCreate, EvidenceService, EvidenceType},
@@ -89,7 +88,9 @@ use crate::{
     error::ApiError,
     middleware as app_middleware, observability,
     state::{
-        AppState, ChatAttachmentStorage, TriageSessionState, WitnessSignalEntry, WitnessSignalState,
+        AppState, ChatAttachmentStorage, TriageSessionMessageState, TriageSessionState,
+        WitnessImpactVerificationState, WitnessSignalEntry, WitnessSignalState,
+        WitnessStempelObjection, WitnessStempelState,
     },
     validation,
 };
@@ -256,6 +257,18 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/v1/witnesses/:witness_id/signals/resolutions",
             get(list_witness_signal_resolutions),
+        )
+        .route(
+            "/v1/witnesses/:witness_id/stempel/propose",
+            post(propose_witness_stempel),
+        )
+        .route(
+            "/v1/witnesses/:witness_id/stempel/objections",
+            post(submit_witness_stempel_objection),
+        )
+        .route(
+            "/v1/witnesses/:witness_id/stempel/finalize",
+            post(finalize_witness_stempel),
         )
         .route("/v1/witnesses", post(create_witness))
         .route("/v1/groups", post(create_group).get(list_groups))
@@ -900,6 +913,136 @@ fn triage_label(route: &str) -> &'static str {
     }
 }
 
+const TRIAGE_SCHEMA_VERSION: &str = "triage.v1";
+const OPERATOR_SCHEMA_VERSION: &str = "operator.v1";
+const STEMPEL_MIN_PARTICIPANTS: usize = 3;
+const STEMPEL_DEFAULT_WINDOW_MS: i64 = 24 * 60 * 60 * 1_000;
+const STEMPEL_MAX_WINDOW_MS: i64 = 7 * 24 * 60 * 60 * 1_000;
+const IMPACT_VOUCH_DEFAULT_WINDOW_MS: i64 = 7 * 24 * 60 * 60 * 1_000;
+const IMPACT_VOUCH_MIN_VOUCHES: usize = 3;
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct TriageOperatorChecklistItem {
+    field: String,
+    filled: bool,
+    value: Option<String>,
+    required_for_final: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct TriageOperatorTaxonomy {
+    category_code: String,
+    category_label: String,
+    custom_label: Option<String>,
+    quality: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct TriageOperatorProgramRef {
+    program_id: String,
+    label: String,
+    source: String,
+    confidence: f64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct TriageOperatorStempelState {
+    state: String,
+    proposed_at_ms: Option<i64>,
+    objection_deadline_ms: Option<i64>,
+    locked_at_ms: Option<i64>,
+    min_participants: usize,
+    participant_count: usize,
+    objection_count: usize,
+    latest_objection_at_ms: Option<i64>,
+    latest_objection_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct TriageOperatorRouting {
+    route: String,
+    trajectory_type: Option<String>,
+    track_hint: Option<String>,
+    seed_hint: Option<String>,
+    taxonomy: Option<TriageOperatorTaxonomy>,
+    program_refs: Option<Vec<TriageOperatorProgramRef>>,
+    stempel_state: Option<TriageOperatorStempelState>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct TriageOperatorOutput {
+    schema_version: String,
+    operator: String,
+    triage_stage: String,
+    output_kind: String,
+    confidence: Option<f64>,
+    checklist: Vec<TriageOperatorChecklistItem>,
+    questions: Option<Vec<String>>,
+    missing_fields: Option<Vec<String>>,
+    routing: TriageOperatorRouting,
+    payload: Value,
+}
+
+fn triage_taxonomy_payload(route: &str, trajectory_type: Option<&str>, kind: &str) -> Value {
+    let trajectory = trajectory_type.unwrap_or(if kind == "witness" { "aksi" } else { "data" });
+    let (category_code, category_label, quality) = match trajectory {
+        "siaga" => (
+            "safety_alert",
+            "Peringatan Keamanan",
+            "community_observation",
+        ),
+        "bantuan" => ("public_service", "Layanan Publik", "community_observation"),
+        "program" => ("community_event", "Program Komunitas", "official_source"),
+        "pencapaian" => (
+            "community_event",
+            "Pencapaian Komunitas",
+            "community_observation",
+        ),
+        "vault" => ("other_custom", "Catatan Privat", "unverified_claim"),
+        "data" if route == "catatan_komunitas" => {
+            ("public_service", "Data Komunitas", "community_observation")
+        }
+        _ if kind == "data" => ("public_service", "Data Komunitas", "community_observation"),
+        _ => ("infrastructure", "Laporan Warga", "community_observation"),
+    };
+
+    json!({
+        "category_code": category_code,
+        "category_label": category_label,
+        "quality": quality
+    })
+}
+
+fn triage_program_refs_payload(trajectory_type: Option<&str>) -> Value {
+    if trajectory_type == Some("program") {
+        return json!([{
+            "program_id": "program:community-initiative",
+            "label": "Program Komunitas",
+            "source": "llm_inferred",
+            "confidence": 0.55
+        }]);
+    }
+    json!([])
+}
+
+fn triage_initial_stempel_payload(trajectory_type: Option<&str>) -> Option<Value> {
+    if trajectory_type != Some("mufakat") {
+        return None;
+    }
+    Some(json!({
+        "state": "draft",
+        "min_participants": STEMPEL_MIN_PARTICIPANTS,
+        "participant_count": 0,
+        "objection_count": 0
+    }))
+}
+
 fn triage_terminal_bar_state(route: &str) -> &'static str {
     match route {
         "siaga" => "siaga-ready",
@@ -923,24 +1066,830 @@ fn triage_budget(turn: u8) -> Value {
     })
 }
 
-fn triage_result_payload(route: &str, trajectory_type: Option<&str>, step: u8) -> Value {
-    let bar_state = if step >= 3 {
-        triage_terminal_bar_state(route)
-    } else if step == 2 {
-        "leaning"
-    } else {
-        "probing"
-    };
-    let score: f64 = if step >= 3 {
+fn triage_kind(route: &str, trajectory_type: Option<&str>) -> &'static str {
+    if route == "catatan_komunitas" || route == "kelola" {
+        return "data";
+    }
+
+    match trajectory_type {
+        Some("data" | "vault" | "bantuan" | "pencapaian" | "siaga") => "data",
+        _ => "witness",
+    }
+}
+
+fn triage_missing_fields(kind: &str, step: u8) -> Vec<&'static str> {
+    if step >= 3 {
+        return Vec::new();
+    }
+
+    if kind == "witness" {
+        if step == 1 {
+            return vec!["location_hint", "impact_summary", "desired_outcome"];
+        }
+        return vec!["impact_summary"];
+    }
+
+    if step == 1 {
+        return vec!["record_category", "time_reference"];
+    }
+
+    vec!["claim_statement"]
+}
+
+fn triage_missing_field_prompt(field: &str) -> &'static str {
+    match field {
+        "location_hint" => "Mohon sebutkan lokasi singkat supaya konteksnya jelas.",
+        "impact_summary" => "Siapa terdampak dan dampaknya apa?",
+        "desired_outcome" => "Hasil apa yang paling diharapkan dari laporan ini?",
+        "record_category" => "Ini termasuk catatan jenis apa menurut Anda?",
+        "time_reference" => "Kapan peristiwa ini terjadi atau diamati?",
+        "claim_statement" => "Tolong ringkas klaim utama yang ingin dicatat.",
+        _ => "Mohon tambah detail singkat agar saya bisa melanjutkan.",
+    }
+}
+
+fn triage_confidence_score(step: u8) -> f64 {
+    if step >= 3 {
         0.95
     } else if step == 2 {
         0.70
     } else {
         0.40
+    }
+}
+
+fn triage_bar_state(route: &str, step: u8) -> &'static str {
+    if step >= 3 {
+        triage_terminal_bar_state(route)
+    } else if step == 2 {
+        "leaning"
+    } else {
+        "probing"
+    }
+}
+
+fn triage_operator_name(route: &str, trajectory_type: Option<&str>) -> &'static str {
+    if route == "kelola" {
+        return "kelola";
+    }
+
+    match trajectory_type {
+        Some("mufakat" | "mediasi") => "musyawarah",
+        Some("pantau") => "pantau",
+        Some("data" | "vault") => "catat",
+        Some("bantuan") => "bantuan",
+        Some("pencapaian") => "rayakan",
+        Some("siaga") => "siaga",
+        Some("program") => "program",
+        _ => "masalah",
+    }
+}
+
+fn triage_operator_output_kind(route: &str, trajectory_type: Option<&str>) -> &'static str {
+    if route == "kelola" {
+        return "kelola";
+    }
+    triage_kind(route, trajectory_type)
+}
+
+fn triage_operator_stage(step: u8) -> &'static str {
+    if step >= 3 {
+        "triage_final"
+    } else {
+        "triage_draft"
+    }
+}
+
+fn triage_operator_default_path_plan(route: &str, trajectory_type: Option<&str>) -> Value {
+    let title = match trajectory_type {
+        Some("advokasi") => "Rencana Advokasi Komunitas",
+        Some("pantau") => "Rencana Pantau Komunitas",
+        Some("program") => "Rencana Program Komunitas",
+        _ if route == "siaga" => "Rencana Tanggap Siaga",
+        _ => "Rencana Aksi Warga",
     };
-    let mut payload = json!({
-        "bar_state": bar_state,
+
+    json!({
+        "plan_id": "plan-auto-triage",
+        "version": 1,
+        "title": title,
+        "summary": "Rencana awal yang disusun dari konteks triase.",
+        "branches": [
+            {
+                "branch_id": "main",
+                "label": "Utama",
+                "parent_checkpoint_id": Value::Null,
+                "phases": [
+                    {
+                        "phase_id": "phase-1",
+                        "title": "Validasi Konteks",
+                        "objective": "Pastikan lingkup dan prioritas masalah disepakati.",
+                        "status": "planned",
+                        "source": "ai",
+                        "locked_fields": [],
+                        "checkpoints": [
+                            {
+                                "checkpoint_id": "cp-1",
+                                "title": "Konteks inti terkonfirmasi",
+                                "status": "open",
+                                "source": "ai",
+                                "locked_fields": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    })
+}
+
+fn triage_operator_payload(
+    operator: &str,
+    route: &str,
+    trajectory_type: Option<&str>,
+    step: u8,
+) -> Value {
+    let is_final = step >= 3;
+    match operator {
+        "masalah" => {
+            let trajectory = if trajectory_type == Some("advokasi") {
+                "B"
+            } else {
+                "A"
+            };
+            if is_final {
+                json!({
+                    "trajectory": trajectory,
+                    "path_plan": triage_operator_default_path_plan(route, trajectory_type)
+                })
+            } else {
+                json!({
+                    "trajectory": trajectory
+                })
+            }
+        }
+        "musyawarah" => {
+            let context = if trajectory_type == Some("mediasi") {
+                "dispute"
+            } else {
+                "proposal"
+            };
+            if is_final {
+                json!({
+                    "context": context,
+                    "decision_steps": [
+                        {
+                            "question": "Apakah usulan ini disepakati untuk dijalankan?",
+                            "options": ["Setuju", "Tidak Setuju", "Perlu Revisi"],
+                            "rationale": "Perlu keputusan awal sebelum lanjut ke eksekusi.",
+                            "order": 1
+                        }
+                    ],
+                    "stempel_candidate": {
+                        "summary": "Kesepakatan awal telah dirumuskan.",
+                        "rationale": "Poin utama sudah dibahas dengan pihak terkait.",
+                        "objection_window_seconds": 86400
+                    }
+                })
+            } else {
+                json!({
+                    "context": context
+                })
+            }
+        }
+        "pantau" => {
+            if is_final {
+                json!({
+                    "case_type": "komunitas",
+                    "timeline_seed": [
+                        {
+                            "event": "Laporan awal diterima",
+                            "date": "2026-02-26T00:00:00Z",
+                            "source": "user"
+                        }
+                    ],
+                    "tracking_points": [
+                        "Perkembangan tindak lanjut warga",
+                        "Respons pihak terkait"
+                    ]
+                })
+            } else {
+                json!({
+                    "case_type": "komunitas"
+                })
+            }
+        }
+        "catat" => {
+            let record_type = if trajectory_type == Some("vault") {
+                "vault"
+            } else {
+                "data"
+            };
+            if is_final {
+                json!({
+                    "record_type": record_type,
+                    "claim": "Catatan komunitas terstruktur dari hasil triase.",
+                    "location": "Lingkungan setempat",
+                    "observed_at": "2026-02-26T00:00:00Z",
+                    "category": "catatan_komunitas"
+                })
+            } else {
+                json!({
+                    "record_type": record_type,
+                    "claim": "Catatan awal"
+                })
+            }
+        }
+        "bantuan" => {
+            if is_final {
+                json!({
+                    "help_type": "dukungan_komunitas",
+                    "description": "Warga memerlukan bantuan tindak lanjut.",
+                    "urgency": "sedang",
+                    "matched_resources": [
+                        {
+                            "resource_id": "resource-1",
+                            "name": "Relawan Lingkungan",
+                            "relevance": 0.74,
+                            "match_reason": "Dekat lokasi dan relevan dengan kebutuhan."
+                        }
+                    ]
+                })
+            } else {
+                json!({
+                    "help_type": "dukungan_komunitas"
+                })
+            }
+        }
+        "rayakan" => {
+            if is_final {
+                json!({
+                    "achievement": "Pencapaian komunitas teridentifikasi.",
+                    "contributors": ["warga-utama"],
+                    "impact_summary": "Pencapaian ini berdampak positif untuk lingkungan."
+                })
+            } else {
+                json!({
+                    "achievement": "Pencapaian awal"
+                })
+            }
+        }
+        "siaga" => {
+            if is_final {
+                json!({
+                    "threat_type": "peringatan_warga",
+                    "severity": "siaga",
+                    "location": "Area komunitas",
+                    "description": "Potensi risiko perlu perhatian cepat.",
+                    "source": "laporan_warga",
+                    "expires_at": "2026-02-27T00:00:00Z"
+                })
+            } else {
+                json!({
+                    "threat_type": "peringatan_warga",
+                    "severity": "waspada"
+                })
+            }
+        }
+        "program" => {
+            if is_final {
+                json!({
+                    "activity_name": "Program Rutin Komunitas",
+                    "frequency": "mingguan",
+                    "rotation": [
+                        {
+                            "participant": "warga-utama",
+                            "slot": "Minggu ke-1"
+                        }
+                    ],
+                    "next_occurrence": "2026-03-01T00:00:00Z"
+                })
+            } else {
+                json!({
+                    "activity_name": "Program Rutin Komunitas",
+                    "frequency": "mingguan"
+                })
+            }
+        }
+        "kelola" => {
+            if is_final {
+                json!({
+                    "action": "create",
+                    "group_detail": {
+                        "name": "Karang Taruna RT 05",
+                        "description": "Kelompok pemuda untuk kegiatan sosial dan pembangunan di lingkungan RT 05.",
+                        "join_policy": "terbuka",
+                        "entity_type": "kelompok"
+                    }
+                })
+            } else {
+                json!({
+                    "action": "create"
+                })
+            }
+        }
+        _ => json!({}),
+    }
+}
+
+fn triage_operator_output_payload(route: &str, trajectory_type: Option<&str>, step: u8) -> Value {
+    let operator = triage_operator_name(route, trajectory_type);
+    let output_kind = triage_operator_output_kind(route, trajectory_type);
+    let stage = triage_operator_stage(step);
+    let kind_for_missing = if output_kind == "witness" {
+        "witness"
+    } else {
+        "data"
+    };
+    let missing_fields = triage_missing_fields(kind_for_missing, step);
+
+    let checklist = if stage == "triage_final" {
+        vec![json!({
+            "field": "core_context",
+            "filled": true,
+            "required_for_final": true
+        })]
+    } else if missing_fields.is_empty() {
+        vec![json!({
+            "field": "core_context",
+            "filled": false,
+            "required_for_final": true
+        })]
+    } else {
+        missing_fields
+            .iter()
+            .map(|field| {
+                json!({
+                    "field": field,
+                    "filled": false,
+                    "required_for_final": true
+                })
+            })
+            .collect()
+    };
+
+    let questions = if stage == "triage_draft" {
+        missing_fields
+            .iter()
+            .map(|field| triage_missing_field_prompt(field).to_string())
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+
+    let mut routing = json!({
         "route": route,
+        "track_hint": "tuntaskan",
+        "seed_hint": if output_kind == "witness" { "Keresahan" } else { "Kejadian" }
+    });
+    if let Some(trajectory_type) = trajectory_type {
+        routing["trajectory_type"] = json!(trajectory_type);
+    }
+    if output_kind == "data" {
+        routing["taxonomy"] = triage_taxonomy_payload(route, trajectory_type, "data");
+    }
+    if output_kind == "witness" {
+        routing["program_refs"] = triage_program_refs_payload(trajectory_type);
+    }
+    if let Some(stempel_state) = triage_initial_stempel_payload(trajectory_type) {
+        routing["stempel_state"] = stempel_state;
+    }
+
+    json!({
+        "schema_version": OPERATOR_SCHEMA_VERSION,
+        "operator": operator,
+        "triage_stage": stage,
+        "output_kind": output_kind,
+        "confidence": triage_confidence_score(step),
+        "checklist": checklist,
+        "questions": questions,
+        "missing_fields": if stage == "triage_draft" {
+            json!(missing_fields)
+        } else {
+            json!([])
+        },
+        "routing": routing,
+        "payload": triage_operator_payload(operator, route, trajectory_type, step)
+    })
+}
+
+fn triage_non_empty_string(value: Option<&Value>) -> bool {
+    value
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty())
+}
+
+fn triage_payload_has_non_empty_string(payload: &Value, key: &str) -> bool {
+    payload
+        .as_object()
+        .and_then(|object| object.get(key))
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty())
+}
+
+fn triage_payload_has_array_with_min(payload: &Value, key: &str, min: usize) -> bool {
+    payload
+        .as_object()
+        .and_then(|object| object.get(key))
+        .and_then(Value::as_array)
+        .is_some_and(|items| items.len() >= min)
+}
+
+fn triage_validate_operator_final_payload(contract: &TriageOperatorOutput) -> Result<(), String> {
+    let payload = &contract.payload;
+    if !payload.is_object() {
+        return Err("payload must be an object".to_string());
+    }
+
+    match contract.operator.as_str() {
+        "masalah" => {
+            let trajectory = payload
+                .get("trajectory")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "masalah payload requires trajectory".to_string())?;
+            if !matches!(trajectory, "A" | "B") {
+                return Err("masalah payload trajectory must be A|B".to_string());
+            }
+            if !payload
+                .as_object()
+                .and_then(|object| object.get("path_plan"))
+                .is_some_and(Value::is_object)
+            {
+                return Err("masalah payload requires path_plan object".to_string());
+            }
+        }
+        "musyawarah" => {
+            let context = payload
+                .get("context")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "musyawarah payload requires context".to_string())?;
+            if !matches!(context, "proposal" | "dispute") {
+                return Err("musyawarah payload context must be proposal|dispute".to_string());
+            }
+            if !triage_payload_has_array_with_min(payload, "decision_steps", 1) {
+                return Err("musyawarah payload requires decision_steps[]".to_string());
+            }
+        }
+        "pantau" => {
+            if !triage_payload_has_non_empty_string(payload, "case_type")
+                || !triage_payload_has_array_with_min(payload, "timeline_seed", 1)
+                || !triage_payload_has_array_with_min(payload, "tracking_points", 1)
+            {
+                return Err("pantau payload missing required fields".to_string());
+            }
+        }
+        "catat" => {
+            let record_type = payload
+                .get("record_type")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "catat payload requires record_type".to_string())?;
+            if !matches!(record_type, "data" | "vault") {
+                return Err("catat payload record_type must be data|vault".to_string());
+            }
+            if !triage_payload_has_non_empty_string(payload, "claim")
+                || !triage_payload_has_non_empty_string(payload, "observed_at")
+                || !triage_payload_has_non_empty_string(payload, "category")
+            {
+                return Err("catat payload missing required fields".to_string());
+            }
+        }
+        "bantuan" => {
+            let urgency = payload
+                .get("urgency")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "bantuan payload requires urgency".to_string())?;
+            if !matches!(urgency, "rendah" | "sedang" | "tinggi") {
+                return Err("bantuan payload urgency must be rendah|sedang|tinggi".to_string());
+            }
+            if !triage_payload_has_non_empty_string(payload, "help_type")
+                || !triage_payload_has_non_empty_string(payload, "description")
+                || payload
+                    .as_object()
+                    .and_then(|object| object.get("matched_resources"))
+                    .and_then(Value::as_array)
+                    .is_none()
+            {
+                return Err("bantuan payload missing required fields".to_string());
+            }
+        }
+        "rayakan" => {
+            if !triage_payload_has_non_empty_string(payload, "achievement")
+                || !triage_payload_has_array_with_min(payload, "contributors", 1)
+                || !triage_payload_has_non_empty_string(payload, "impact_summary")
+            {
+                return Err("rayakan payload missing required fields".to_string());
+            }
+        }
+        "siaga" => {
+            let severity = payload
+                .get("severity")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "siaga payload requires severity".to_string())?;
+            if !matches!(severity, "waspada" | "siaga" | "darurat") {
+                return Err("siaga payload severity must be waspada|siaga|darurat".to_string());
+            }
+            if !triage_payload_has_non_empty_string(payload, "threat_type")
+                || !triage_payload_has_non_empty_string(payload, "location")
+                || !triage_payload_has_non_empty_string(payload, "description")
+                || !triage_payload_has_non_empty_string(payload, "source")
+                || !triage_payload_has_non_empty_string(payload, "expires_at")
+            {
+                return Err("siaga payload missing required fields".to_string());
+            }
+        }
+        "program" => {
+            let frequency = payload
+                .get("frequency")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "program payload requires frequency".to_string())?;
+            if !matches!(frequency, "harian" | "mingguan" | "bulanan" | "custom") {
+                return Err(
+                    "program payload frequency must be harian|mingguan|bulanan|custom".to_string(),
+                );
+            }
+            if !triage_payload_has_non_empty_string(payload, "activity_name")
+                || !triage_payload_has_array_with_min(payload, "rotation", 1)
+            {
+                return Err("program payload missing required fields".to_string());
+            }
+        }
+        "kelola" => {
+            let action = payload
+                .get("action")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "kelola payload requires action".to_string())?;
+            if !matches!(action, "create" | "edit" | "invite" | "join" | "leave") {
+                return Err(
+                    "kelola payload action must be create|edit|invite|join|leave".to_string(),
+                );
+            }
+            if matches!(action, "create" | "edit")
+                && !payload
+                    .as_object()
+                    .and_then(|object| object.get("group_detail"))
+                    .is_some_and(Value::is_object)
+            {
+                return Err("kelola payload requires group_detail for create|edit".to_string());
+            }
+            if matches!(action, "edit" | "invite" | "join" | "leave")
+                && !triage_payload_has_non_empty_string(payload, "group_id")
+            {
+                return Err(
+                    "kelola payload requires group_id for edit|invite|join|leave".to_string(),
+                );
+            }
+            if action == "invite"
+                && !triage_payload_has_array_with_min(payload, "invited_user_ids", 1)
+            {
+                return Err("kelola payload requires invited_user_ids for invite".to_string());
+            }
+        }
+        _ => {
+            return Err("unsupported operator".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+fn triage_validate_operator_output(contract: &TriageOperatorOutput) -> Result<(), String> {
+    if contract.schema_version != OPERATOR_SCHEMA_VERSION {
+        return Err(format!(
+            "operator schema_version must be '{OPERATOR_SCHEMA_VERSION}'"
+        ));
+    }
+
+    if !matches!(
+        contract.triage_stage.as_str(),
+        "triage_draft" | "triage_final"
+    ) {
+        return Err("triage_stage must be triage_draft|triage_final".to_string());
+    }
+
+    if !matches!(contract.output_kind.as_str(), "witness" | "data" | "kelola") {
+        return Err("output_kind must be witness|data|kelola".to_string());
+    }
+
+    if let Some(confidence) = contract.confidence
+        && !(0.0..=1.0).contains(&confidence)
+    {
+        return Err("confidence must be between 0 and 1".to_string());
+    }
+
+    if contract.checklist.is_empty() {
+        return Err("checklist must contain at least one item".to_string());
+    }
+    for item in &contract.checklist {
+        if item.field.trim().is_empty() {
+            return Err("checklist field cannot be empty".to_string());
+        }
+    }
+
+    let expected_kind = match contract.operator.as_str() {
+        "masalah" | "musyawarah" | "pantau" | "program" => "witness",
+        "catat" | "bantuan" | "rayakan" | "siaga" => "data",
+        "kelola" => "kelola",
+        _ => return Err("operator is not recognized".to_string()),
+    };
+    if contract.output_kind != expected_kind {
+        return Err("operator/output_kind combination is invalid".to_string());
+    }
+
+    if !matches!(
+        contract.routing.route.as_str(),
+        "komunitas" | "vault" | "siaga" | "catatan_komunitas" | "kelola"
+    ) {
+        return Err("routing.route is invalid".to_string());
+    }
+
+    if let Some(seed_hint) = contract.routing.seed_hint.as_deref()
+        && !matches!(
+            seed_hint,
+            "Keresahan" | "Aspirasi" | "Kejadian" | "Rencana" | "Pertanyaan"
+        )
+    {
+        return Err("routing.seed_hint is invalid".to_string());
+    }
+
+    if let Some(taxonomy) = &contract.routing.taxonomy {
+        if taxonomy.category_label.trim().is_empty() {
+            return Err("routing.taxonomy.category_label cannot be empty".to_string());
+        }
+        if !matches!(
+            taxonomy.category_code.as_str(),
+            "commodity_price"
+                | "public_service"
+                | "training"
+                | "employment"
+                | "health"
+                | "education"
+                | "infrastructure"
+                | "safety_alert"
+                | "environment"
+                | "community_event"
+                | "other_custom"
+        ) {
+            return Err("routing.taxonomy.category_code is invalid".to_string());
+        }
+        if !matches!(
+            taxonomy.quality.as_str(),
+            "official_source" | "community_observation" | "unverified_claim"
+        ) {
+            return Err("routing.taxonomy.quality is invalid".to_string());
+        }
+    }
+
+    if let Some(program_refs) = &contract.routing.program_refs {
+        for item in program_refs {
+            if item.program_id.trim().is_empty()
+                || item.label.trim().is_empty()
+                || item.source.trim().is_empty()
+            {
+                return Err("routing.program_refs contains empty required fields".to_string());
+            }
+            if !(0.0..=1.0).contains(&item.confidence) {
+                return Err("routing.program_refs confidence must be between 0 and 1".to_string());
+            }
+        }
+    }
+
+    if let Some(stempel_state) = &contract.routing.stempel_state
+        && !matches!(
+            stempel_state.state.as_str(),
+            "draft" | "proposed" | "objection_window" | "locked"
+        )
+    {
+        return Err("routing.stempel_state.state is invalid".to_string());
+    }
+
+    if contract.triage_stage == "triage_draft" {
+        if contract
+            .questions
+            .as_ref()
+            .is_none_or(|items| items.is_empty())
+        {
+            return Err("triage_draft requires questions[]".to_string());
+        }
+        if contract
+            .missing_fields
+            .as_ref()
+            .is_none_or(|items| items.is_empty())
+        {
+            return Err("triage_draft requires missing_fields[]".to_string());
+        }
+    } else {
+        if contract
+            .questions
+            .as_ref()
+            .is_some_and(|items| !items.is_empty())
+        {
+            return Err("triage_final requires empty questions[]".to_string());
+        }
+        if contract
+            .missing_fields
+            .as_ref()
+            .is_some_and(|items| !items.is_empty())
+        {
+            return Err("triage_final requires empty missing_fields[]".to_string());
+        }
+        if contract
+            .checklist
+            .iter()
+            .any(|item| item.required_for_final && !item.filled)
+        {
+            return Err("triage_final checklist has unfilled required fields".to_string());
+        }
+        triage_validate_operator_final_payload(contract)?;
+    }
+
+    match contract.output_kind.as_str() {
+        "witness" => {
+            let trajectory_type = contract
+                .routing
+                .trajectory_type
+                .as_deref()
+                .ok_or_else(|| "witness output requires routing.trajectory_type".to_string())?;
+            if !matches!(
+                trajectory_type,
+                "aksi" | "advokasi" | "pantau" | "mufakat" | "mediasi" | "program"
+            ) {
+                return Err("witness output uses invalid trajectory_type".to_string());
+            }
+        }
+        "data" => {
+            let trajectory_type = contract
+                .routing
+                .trajectory_type
+                .as_deref()
+                .ok_or_else(|| "data output requires routing.trajectory_type".to_string())?;
+            if !matches!(
+                trajectory_type,
+                "data" | "vault" | "bantuan" | "pencapaian" | "siaga"
+            ) {
+                return Err("data output uses invalid trajectory_type".to_string());
+            }
+            if contract.routing.taxonomy.is_none() {
+                return Err("data output requires routing.taxonomy".to_string());
+            }
+        }
+        "kelola" => {
+            if contract.routing.route != "kelola" {
+                return Err("kelola output requires routing.route=kelola".to_string());
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn triage_result_from_operator_contract(contract: &TriageOperatorOutput, step: u8) -> Value {
+    let route = contract.routing.route.as_str();
+    let trajectory_type = contract.routing.trajectory_type.as_deref();
+    let kind = match contract.output_kind.as_str() {
+        "witness" => "witness",
+        _ => "data",
+    };
+    let status = if contract.triage_stage == "triage_final" {
+        "final"
+    } else {
+        "draft"
+    };
+    let score = contract
+        .confidence
+        .unwrap_or_else(|| triage_confidence_score(step));
+    let taxonomy = contract
+        .routing
+        .taxonomy
+        .as_ref()
+        .and_then(|value| serde_json::to_value(value).ok())
+        .unwrap_or_else(|| triage_taxonomy_payload(route, trajectory_type, kind));
+    let program_refs = contract
+        .routing
+        .program_refs
+        .as_ref()
+        .and_then(|value| serde_json::to_value(value).ok())
+        .unwrap_or_else(|| triage_program_refs_payload(trajectory_type));
+
+    let mut payload = json!({
+        "schema_version": TRIAGE_SCHEMA_VERSION,
+        "status": status,
+        "kind": kind,
+        "missing_fields": contract.missing_fields.clone().unwrap_or_default(),
+        "taxonomy": taxonomy,
+        "program_refs": program_refs,
+        "bar_state": triage_bar_state(route, step),
+        "route": route,
+        "track_hint": contract.routing.track_hint.clone().unwrap_or_else(|| "tuntaskan".to_string()),
+        "seed_hint": contract.routing.seed_hint.clone().unwrap_or_else(|| {
+            if kind == "witness" {
+                "Keresahan".to_string()
+            } else {
+                "Kejadian".to_string()
+            }
+        }),
+        "summary_text": triage_summary_text(route, kind),
+        "card": triage_card_payload(route, trajectory_type, kind),
         "confidence": {
             "score": score,
             "label": format!("{} · {}%", triage_label(route), (score * 100.0).round() as i64)
@@ -950,18 +1899,193 @@ fn triage_result_payload(route: &str, trajectory_type: Option<&str>, step: u8) -
     if let Some(trajectory_type) = trajectory_type {
         payload["trajectory_type"] = json!(trajectory_type);
     }
-    if route == "kelola" && step >= 3 {
-        payload["kelola_result"] = json!({
-            "action": "create",
-            "group_detail": {
-                "name": "Karang Taruna RT 05",
-                "description": "Kelompok pemuda untuk kegiatan sosial dan pembangunan di lingkungan RT 05.",
-                "join_policy": "terbuka",
-                "entity_type": "kelompok"
+
+    let stempel_state = contract
+        .routing
+        .stempel_state
+        .as_ref()
+        .and_then(|value| serde_json::to_value(value).ok())
+        .or_else(|| triage_initial_stempel_payload(trajectory_type));
+    if let Some(stempel_state) = stempel_state {
+        payload["stempel_state"] = stempel_state;
+    }
+
+    if route == "kelola" && status == "final" {
+        payload["kelola_result"] = contract.payload.clone();
+    }
+    if status == "final"
+        && contract.operator == "masalah"
+        && triage_non_empty_string(contract.payload.get("trajectory"))
+        && contract
+            .payload
+            .get("path_plan")
+            .is_some_and(Value::is_object)
+    {
+        payload["proposed_plan"] = contract.payload["path_plan"].clone();
+    }
+
+    payload
+}
+
+fn triage_result_from_operator_output(operator_output: Value, step: u8) -> Result<Value, ApiError> {
+    let contract: TriageOperatorOutput =
+        serde_json::from_value(operator_output).map_err(|error| {
+            tracing::error!(error = %error, "failed to parse operator.v1 output");
+            ApiError::Internal
+        })?;
+    triage_validate_operator_output(&contract).map_err(|error| {
+        tracing::error!(error = %error, "operator.v1 output failed validation");
+        ApiError::Internal
+    })?;
+    Ok(triage_result_from_operator_contract(&contract, step))
+}
+
+fn triage_card_payload(route: &str, trajectory_type: Option<&str>, kind: &str) -> Value {
+    let trajectory = trajectory_type.unwrap_or(if kind == "witness" { "aksi" } else { "data" });
+    let icon = match trajectory {
+        "aksi" => "construction",
+        "pantau" => "eye",
+        "mufakat" => "users",
+        "program" => "calendar",
+        "siaga" => "siren",
+        "vault" => "lock",
+        "pencapaian" => "trophy",
+        "bantuan" => "heart",
+        "data" => "file-text",
+        _ => "sparkles",
+    };
+    let title = match route {
+        "vault" => "Catatan Rahasia Warga",
+        "siaga" => "Peringatan Siaga Komunitas",
+        "catatan_komunitas" => "Catatan Fakta Komunitas",
+        _ if kind == "witness" => "Laporan Saksi Komunitas",
+        _ => "Data Komunitas",
+    };
+    let hook_line = if kind == "witness" {
+        "Konteks awal terkumpul, siap diproses jadi saksi komunitas."
+    } else {
+        "Catatan siap dipublikasikan sebagai data satu kali."
+    };
+
+    json!({
+        "icon": icon,
+        "trajectory_type": trajectory,
+        "title": title,
+        "hook_line": hook_line,
+        "body": format!("{title}. {hook_line}"),
+        "sentiment": if route == "siaga" { "urgent" } else { "curious" },
+        "intensity": if route == "siaga" { 5 } else { 2 },
+    })
+}
+
+fn triage_summary_text(route: &str, kind: &str) -> String {
+    if kind == "witness" {
+        return format!("{} siap dibuat sebagai saksi.", triage_label(route));
+    }
+    format!("{} siap dicatat sebagai data.", triage_label(route))
+}
+
+fn triage_result_payload(
+    route: &str,
+    trajectory_type: Option<&str>,
+    step: u8,
+) -> Result<Value, ApiError> {
+    let operator_output = triage_operator_output_payload(route, trajectory_type, step);
+    triage_result_from_operator_output(operator_output, step)
+}
+
+fn triage_ai_message(result: &Value) -> String {
+    let status = result
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("draft");
+    if status == "final" {
+        return "Siap, detail sudah cukup untuk diproses.".to_string();
+    }
+
+    let first_missing = result
+        .get("missing_fields")
+        .and_then(Value::as_array)
+        .and_then(|items| items.first())
+        .and_then(Value::as_str);
+    match first_missing {
+        Some(field) => triage_missing_field_prompt(field).to_string(),
+        None => "Boleh tambah satu detail penting lagi agar saya bisa menutup triase.".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod triage_operator_contract_tests {
+    use super::*;
+
+    #[test]
+    fn operator_output_maps_to_runtime_triage_payload() {
+        let operator_output = triage_operator_output_payload("komunitas", Some("aksi"), 3);
+        let result = triage_result_from_operator_output(operator_output, 3).expect("triage result");
+
+        assert_eq!(result.get("schema_version"), Some(&json!("triage.v1")));
+        assert_eq!(result.get("status"), Some(&json!("final")));
+        assert_eq!(result.get("kind"), Some(&json!("witness")));
+        assert_eq!(result.get("bar_state"), Some(&json!("ready")));
+        assert_eq!(result.get("route"), Some(&json!("komunitas")));
+        assert!(result.get("proposed_plan").is_some_and(Value::is_object));
+    }
+
+    #[test]
+    fn operator_contract_rejects_invalid_final_payload_shape() {
+        let invalid = json!({
+            "schema_version": "operator.v1",
+            "operator": "musyawarah",
+            "triage_stage": "triage_final",
+            "output_kind": "witness",
+            "confidence": 0.92,
+            "checklist": [
+                { "field": "stakeholders", "filled": true, "required_for_final": true }
+            ],
+            "questions": [],
+            "missing_fields": [],
+            "routing": {
+                "route": "komunitas",
+                "trajectory_type": "mufakat"
+            },
+            "payload": {
+                "context": "proposal",
+                "decision_steps": []
             }
         });
+
+        let result = triage_result_from_operator_output(invalid, 3);
+        assert!(matches!(result, Err(ApiError::Internal)));
     }
-    payload
+
+    #[test]
+    fn operator_contract_rejects_data_output_without_taxonomy() {
+        let invalid = json!({
+            "schema_version": "operator.v1",
+            "operator": "catat",
+            "triage_stage": "triage_final",
+            "output_kind": "data",
+            "confidence": 0.85,
+            "checklist": [
+                { "field": "claim", "filled": true, "required_for_final": true }
+            ],
+            "questions": [],
+            "missing_fields": [],
+            "routing": {
+                "route": "catatan_komunitas",
+                "trajectory_type": "data"
+            },
+            "payload": {
+                "record_type": "data",
+                "claim": "Harga komoditas naik",
+                "observed_at": "2026-02-26T00:00:00Z",
+                "category": "harga_pangan"
+            }
+        });
+
+        let result = triage_result_from_operator_output(invalid, 3);
+        assert!(matches!(result, Err(ApiError::Internal)));
+    }
 }
 
 fn compact_triage_sessions(sessions: &mut HashMap<String, TriageSessionState>, now_ms: i64) {
@@ -1011,6 +2135,8 @@ async fn start_triage_session(
             let detected = detect_triage_route(&payload.content);
             let now_ms = gotong_domain::jobs::now_ms();
             let session_id = format!("triage-sess-{request_id}");
+            let result = triage_result_payload(detected.route, detected.trajectory_type, 1)?;
+            let ai_message = triage_ai_message(&result);
 
             {
                 let mut sessions = state.triage_sessions.write().await;
@@ -1022,6 +2148,19 @@ async fn start_triage_session(
                         route: detected.route.to_string(),
                         trajectory_type: detected.trajectory_type.map(str::to_string),
                         step: 1,
+                        latest_result: result.clone(),
+                        messages: vec![
+                            TriageSessionMessageState {
+                                role: "user".to_string(),
+                                text: payload.content.clone(),
+                                created_at_ms: now_ms,
+                            },
+                            TriageSessionMessageState {
+                                role: "ai".to_string(),
+                                text: ai_message.clone(),
+                                created_at_ms: now_ms,
+                            },
+                        ],
                         created_at_ms: now_ms,
                         updated_at_ms: now_ms,
                     },
@@ -1032,7 +2171,8 @@ async fn start_triage_session(
                 status_code: StatusCode::OK.as_u16(),
                 body: json!({
                     "session_id": session_id,
-                    "result": triage_result_payload(detected.route, detected.trajectory_type, 1)
+                    "result": result,
+                    "ai_message": ai_message
                 }),
             };
             state
@@ -1075,7 +2215,7 @@ async fn continue_triage_session(
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
             let now_ms = gotong_domain::jobs::now_ms();
-            let (route, trajectory_type, step) = {
+            let (result, ai_message) = {
                 let mut sessions = state.triage_sessions.write().await;
                 compact_triage_sessions(&mut sessions, now_ms);
                 let session = sessions.get_mut(&session_id).ok_or(ApiError::NotFound)?;
@@ -1098,17 +2238,31 @@ async fn continue_triage_session(
                     });
                 session.step = session.step.saturating_add(1).min(3);
                 session.updated_at_ms = now_ms;
-                (
-                    session.route.clone(),
-                    session.trajectory_type.clone(),
+                session.messages.push(TriageSessionMessageState {
+                    role: "user".to_string(),
+                    text: payload.answer.clone(),
+                    created_at_ms: now_ms,
+                });
+                let result = triage_result_payload(
+                    &session.route,
+                    session.trajectory_type.as_deref(),
                     session.step,
-                )
+                )?;
+                session.latest_result = result.clone();
+                let ai_message = triage_ai_message(&result);
+                session.messages.push(TriageSessionMessageState {
+                    role: "ai".to_string(),
+                    text: ai_message.clone(),
+                    created_at_ms: now_ms,
+                });
+                (result, ai_message)
             };
 
             let response = IdempotencyResponse {
                 status_code: StatusCode::OK.as_u16(),
                 body: json!({
-                    "result": triage_result_payload(&route, trajectory_type.as_deref(), step)
+                    "result": result,
+                    "ai_message": ai_message
                 }),
             };
             state
@@ -1131,6 +2285,21 @@ const SIGNAL_REGISTRY_MAX_ITEMS: usize = 50_000;
 struct CreateWitnessSignalRequest {
     #[validate(length(min = 1, max = 32))]
     signal_type: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct ProposeWitnessStempelRequest {
+    #[validate(length(max = 512))]
+    summary: Option<String>,
+    #[validate(length(max = 2_000))]
+    rationale: Option<String>,
+    objection_window_seconds: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct SubmitWitnessStempelObjectionRequest {
+    #[validate(length(min = 1, max = 1_000))]
+    reason: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -1166,6 +2335,39 @@ struct WitnessSignalCountsDto {
     witness_count: usize,
     dukung_count: usize,
     flags: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct WitnessStempelStateDto {
+    state: String,
+    proposed_at_ms: Option<i64>,
+    objection_deadline_ms: Option<i64>,
+    locked_at_ms: Option<i64>,
+    min_participants: usize,
+    participant_count: usize,
+    objection_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest_objection_at_ms: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest_objection_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct WitnessImpactVerificationDto {
+    status: String,
+    opened_at_ms: Option<i64>,
+    closes_at_ms: Option<i64>,
+    yes_count: usize,
+    no_count: usize,
+    min_vouches: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct WitnessStempelEnvelopeDto {
+    witness_id: String,
+    stempel_state: WitnessStempelStateDto,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    impact_verification: Option<WitnessImpactVerificationDto>,
 }
 
 fn normalize_content_signal_type(value: &str) -> Option<&'static str> {
@@ -1213,6 +2415,89 @@ fn to_signal_dto(signal: &WitnessSignalEntry) -> WitnessSignalDto {
         resolved_at: signal.resolved_at_ms,
         credit_delta: signal.credit_delta,
     }
+}
+
+fn to_stempel_state_dto(state: &WitnessStempelState) -> WitnessStempelStateDto {
+    let latest_objection = state.objections.last();
+    WitnessStempelStateDto {
+        state: state.state.clone(),
+        proposed_at_ms: state.proposed_at_ms,
+        objection_deadline_ms: state.objection_deadline_ms,
+        locked_at_ms: state.locked_at_ms,
+        min_participants: state.min_participants,
+        participant_count: state.participant_count,
+        objection_count: state.objections.len(),
+        latest_objection_at_ms: latest_objection.map(|item| item.created_at_ms),
+        latest_objection_reason: latest_objection.map(|item| item.reason.clone()),
+    }
+}
+
+fn to_impact_verification_dto(
+    state: &WitnessImpactVerificationState,
+) -> WitnessImpactVerificationDto {
+    WitnessImpactVerificationDto {
+        status: state.status.clone(),
+        opened_at_ms: state.opened_at_ms,
+        closes_at_ms: state.closes_at_ms,
+        yes_count: state.yes_count,
+        no_count: state.no_count,
+        min_vouches: state.min_vouches,
+    }
+}
+
+fn impact_verification_not_open_json() -> Value {
+    json!({
+        "status": "not_open",
+        "opened_at_ms": Value::Null,
+        "closes_at_ms": Value::Null,
+        "yes_count": 0,
+        "no_count": 0,
+        "min_vouches": IMPACT_VOUCH_MIN_VOUCHES
+    })
+}
+
+fn stempel_state_from_value(raw: &Value) -> Option<WitnessStempelState> {
+    let obj = raw.as_object()?;
+    let state = obj
+        .get("state")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("draft");
+    let min_participants = obj
+        .get("min_participants")
+        .and_then(Value::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+        .unwrap_or(STEMPEL_MIN_PARTICIPANTS);
+    let participant_count = obj
+        .get("participant_count")
+        .and_then(Value::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+        .unwrap_or(0);
+    Some(WitnessStempelState {
+        state: state.to_string(),
+        proposed_at_ms: obj.get("proposed_at_ms").and_then(Value::as_i64),
+        objection_deadline_ms: obj.get("objection_deadline_ms").and_then(Value::as_i64),
+        locked_at_ms: obj.get("locked_at_ms").and_then(Value::as_i64),
+        min_participants,
+        participant_count,
+        objections: Vec::new(),
+    })
+}
+
+async fn witness_participant_count(state: &AppState, witness_id: &str) -> usize {
+    let registry = state.witness_signals.read().await;
+    let Some(signal_state) = registry.get(witness_id) else {
+        return 1;
+    };
+    let mut participants = HashSet::new();
+    for signal in signal_state.active_signals.values() {
+        participants.insert(signal.user_id.clone());
+    }
+    for signal in &signal_state.resolved_signals {
+        participants.insert(signal.user_id.clone());
+    }
+    participants.len().max(1)
 }
 
 async fn create_witness_signal(
@@ -1420,6 +2705,326 @@ async fn list_witness_signal_resolutions(
         })
         .unwrap_or_default();
     Ok(Json(items))
+}
+
+async fn propose_witness_stempel(
+    State(state): State<AppState>,
+    Path(witness_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<ProposeWitnessStempelRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+    let _summary = payload.summary.as_deref().unwrap_or_default();
+    let _rationale = payload.rationale.as_deref().unwrap_or_default();
+
+    let key = IdempotencyKey::new(
+        "witness_stempel_propose",
+        format!("{}:{witness_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let window_seconds = payload
+                .objection_window_seconds
+                .unwrap_or((STEMPEL_DEFAULT_WINDOW_MS / 1_000) as u64);
+            let window_ms = i64::try_from(window_seconds)
+                .unwrap_or(STEMPEL_DEFAULT_WINDOW_MS / 1_000)
+                .saturating_mul(1_000)
+                .clamp(0, STEMPEL_MAX_WINDOW_MS);
+            let participant_count = witness_participant_count(&state, &witness_id).await;
+
+            let stempel_state = {
+                let mut registry = state.witness_stempel.write().await;
+                let state_entry = registry.entry(witness_id.clone()).or_default();
+                if state_entry.state == "locked" {
+                    None
+                } else {
+                    state_entry.state = "objection_window".to_string();
+                    state_entry.proposed_at_ms = Some(now_ms);
+                    state_entry.objection_deadline_ms = Some(now_ms.saturating_add(window_ms));
+                    state_entry.locked_at_ms = None;
+                    state_entry.min_participants = STEMPEL_MIN_PARTICIPANTS;
+                    state_entry.participant_count = participant_count;
+                    state_entry.objections.clear();
+                    Some(state_entry.clone())
+                }
+            };
+
+            let response = if let Some(stempel_state) = stempel_state {
+                IdempotencyResponse {
+                    status_code: StatusCode::OK.as_u16(),
+                    body: serde_json::to_value(WitnessStempelEnvelopeDto {
+                        witness_id,
+                        stempel_state: to_stempel_state_dto(&stempel_state),
+                        impact_verification: None,
+                    })
+                    .map_err(|_| ApiError::Internal)?,
+                }
+            } else {
+                IdempotencyResponse {
+                    status_code: StatusCode::CONFLICT.as_u16(),
+                    body: json!({
+                        "error": {
+                            "code": "stempel_already_locked",
+                            "message": "stempel is already locked for this witness",
+                        }
+                    }),
+                }
+            };
+
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn submit_witness_stempel_objection(
+    State(state): State<AppState>,
+    Path(witness_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<SubmitWitnessStempelObjectionRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new(
+        "witness_stempel_objection",
+        format!("{}:{witness_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let participant_count = witness_participant_count(&state, &witness_id).await;
+            let response = {
+                let mut registry = state.witness_stempel.write().await;
+                let state_entry = registry.entry(witness_id.clone()).or_default();
+                state_entry.participant_count = participant_count;
+
+                if state_entry.state != "objection_window" {
+                    IdempotencyResponse {
+                        status_code: StatusCode::CONFLICT.as_u16(),
+                        body: json!({
+                            "error": {
+                                "code": "stempel_not_open",
+                                "message": "stempel objection window is not open",
+                            }
+                        }),
+                    }
+                } else if state_entry
+                    .objection_deadline_ms
+                    .is_some_and(|deadline| now_ms > deadline)
+                {
+                    IdempotencyResponse {
+                        status_code: StatusCode::CONFLICT.as_u16(),
+                        body: json!({
+                            "error": {
+                                "code": "stempel_window_closed",
+                                "message": "objection window has already closed",
+                            }
+                        }),
+                    }
+                } else {
+                    if !state_entry
+                        .objections
+                        .iter()
+                        .any(|item| item.user_id == actor.user_id)
+                    {
+                        state_entry.objections.push(WitnessStempelObjection {
+                            user_id: actor.user_id.clone(),
+                            reason: payload.reason.clone(),
+                            created_at_ms: now_ms,
+                        });
+                    }
+                    IdempotencyResponse {
+                        status_code: StatusCode::CREATED.as_u16(),
+                        body: serde_json::to_value(WitnessStempelEnvelopeDto {
+                            witness_id,
+                            stempel_state: to_stempel_state_dto(state_entry),
+                            impact_verification: None,
+                        })
+                        .map_err(|_| ApiError::Internal)?,
+                    }
+                }
+            };
+
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn finalize_witness_stempel(
+    State(state): State<AppState>,
+    Path(witness_id): Path<String>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<Response, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let _correlation_id = correlation_id_from_headers(&headers)?;
+    let key = IdempotencyKey::new(
+        "witness_stempel_finalize",
+        format!("{}:{witness_id}", actor.user_id),
+        request_id,
+    );
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let now_ms = gotong_domain::jobs::now_ms();
+            let participant_count = witness_participant_count(&state, &witness_id).await;
+
+            let maybe_stempel_state = {
+                let mut registry = state.witness_stempel.write().await;
+                let state_entry = registry.entry(witness_id.clone()).or_default();
+                state_entry.participant_count = participant_count;
+
+                if state_entry.state == "locked" {
+                    Some(state_entry.clone())
+                } else if state_entry.state != "objection_window" {
+                    None
+                } else if state_entry
+                    .objection_deadline_ms
+                    .is_some_and(|deadline| now_ms < deadline)
+                {
+                    None
+                } else if !state_entry.objections.is_empty() {
+                    state_entry.state = "proposed".to_string();
+                    None
+                } else if state_entry.participant_count < state_entry.min_participants {
+                    None
+                } else {
+                    state_entry.state = "locked".to_string();
+                    state_entry.locked_at_ms = Some(now_ms);
+                    Some(state_entry.clone())
+                }
+            };
+
+            let response = if let Some(stempel_state) = maybe_stempel_state {
+                let impact_state = {
+                    let mut impact_registry = state.witness_impact_verifications.write().await;
+                    let entry = impact_registry.entry(witness_id.clone()).or_default();
+                    if entry.status != "open" {
+                        entry.status = "open".to_string();
+                        entry.opened_at_ms = Some(now_ms);
+                        entry.closes_at_ms =
+                            Some(now_ms.saturating_add(IMPACT_VOUCH_DEFAULT_WINDOW_MS));
+                        entry.yes_count = 0;
+                        entry.no_count = 0;
+                        entry.min_vouches = IMPACT_VOUCH_MIN_VOUCHES;
+                    }
+                    entry.clone()
+                };
+
+                IdempotencyResponse {
+                    status_code: StatusCode::OK.as_u16(),
+                    body: serde_json::to_value(WitnessStempelEnvelopeDto {
+                        witness_id,
+                        stempel_state: to_stempel_state_dto(&stempel_state),
+                        impact_verification: Some(to_impact_verification_dto(&impact_state)),
+                    })
+                    .map_err(|_| ApiError::Internal)?,
+                }
+            } else {
+                let current_stempel = {
+                    let registry = state.witness_stempel.read().await;
+                    registry.get(&witness_id).cloned().unwrap_or_default()
+                };
+                let deadline_open = current_stempel
+                    .objection_deadline_ms
+                    .is_some_and(|deadline| now_ms < deadline);
+                let has_objection = !current_stempel.objections.is_empty();
+                let participant_shortfall =
+                    current_stempel.participant_count < current_stempel.min_participants;
+                let (code, message) = if current_stempel.state != "objection_window" {
+                    (
+                        "stempel_not_open",
+                        "stempel finalize requires objection_window state",
+                    )
+                } else if deadline_open {
+                    (
+                        "stempel_objection_window_open",
+                        "objection window is still active",
+                    )
+                } else if has_objection {
+                    (
+                        "stempel_has_objection",
+                        "cannot lock stempel while objections exist",
+                    )
+                } else if participant_shortfall {
+                    (
+                        "stempel_min_participants_not_met",
+                        "minimum participant threshold not met",
+                    )
+                } else {
+                    ("stempel_finalize_failed", "unable to finalize stempel")
+                };
+
+                IdempotencyResponse {
+                    status_code: StatusCode::CONFLICT.as_u16(),
+                    body: json!({
+                        "error": {
+                            "code": code,
+                            "message": message,
+                        },
+                        "stempel_state": to_stempel_state_dto(&current_stempel)
+                    }),
+                }
+            };
+
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+            Ok(to_response(response))
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -3257,57 +4862,28 @@ struct CreateContributionRequest {
     pub metadata: Option<HashMap<String, Value>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum WitnessCreateRoute {
-    Komunitas,
-    Vault,
-    Siaga,
-    CatatanKomunitas,
-    Kelola,
-}
-
-impl WitnessCreateRoute {
-    fn to_mode(&self) -> Mode {
-        match self {
-            Self::Komunitas | Self::Kelola => Mode::Komunitas,
-            Self::Vault => Mode::CatatanSaksi,
-            Self::Siaga => Mode::Siaga,
-            Self::CatatanKomunitas => Mode::CatatanKomunitas,
-        }
-    }
-
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::Komunitas => "komunitas",
-            Self::Vault => "vault",
-            Self::Siaga => "siaga",
-            Self::CatatanKomunitas => "catatan_komunitas",
-            Self::Kelola => "kelola",
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Validate)]
 struct CreateWitnessRequest {
-    #[validate(length(min = 1, max = 200))]
-    pub title: String,
-    pub summary: Option<String>,
-    pub route: WitnessCreateRoute,
-    pub track_hint: Option<String>,
-    pub seed_hint: Option<String>,
-    pub rahasia_level: Option<String>,
-    pub triage_result: Option<Value>,
-    pub triage_messages: Option<Vec<Value>>,
+    #[validate(length(min = 1, max = 32))]
+    pub schema_version: String,
+    #[validate(length(min = 1, max = 128))]
+    pub triage_session_id: String,
 }
 
-fn normalize_rahasia_level(value: Option<&str>) -> String {
-    match value.map(str::trim) {
-        Some("L1") => "L1".to_string(),
-        Some("L2") => "L2".to_string(),
-        Some("L3") => "L3".to_string(),
-        _ => "L0".to_string(),
+fn mode_from_triage_route(route: &str) -> Mode {
+    match route {
+        "vault" => Mode::CatatanSaksi,
+        "siaga" => Mode::Siaga,
+        "catatan_komunitas" => Mode::CatatanKomunitas,
+        _ => Mode::Komunitas,
     }
+}
+
+fn rahasia_level_from_triage_route(route: &str) -> String {
+    if route == "vault" {
+        return "L2".to_string();
+    }
+    "L0".to_string()
 }
 
 fn privacy_level_from_rahasia_level(value: &str) -> String {
@@ -3317,6 +4893,29 @@ fn privacy_level_from_rahasia_level(value: &str) -> String {
         "L3" => "l3".to_string(),
         _ => "public".to_string(),
     }
+}
+
+fn triage_missing_fields_from_result(result: &Value) -> Vec<String> {
+    result
+        .get("missing_fields")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn triage_result_string(result: &Value, key: &str) -> Option<String> {
+    result
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 #[derive(Debug, Deserialize)]
@@ -3386,7 +4985,7 @@ async fn create_contribution(
                     );
                 }
             }
-            ingest_discovery_contribution_feed(
+            let _feed_item = ingest_discovery_contribution_feed(
                 &state,
                 &actor,
                 request_id.to_string(),
@@ -3423,6 +5022,11 @@ async fn create_witness(
     Json(payload): Json<CreateWitnessRequest>,
 ) -> Result<Response, ApiError> {
     validation::validate(&payload)?;
+    if payload.schema_version.trim() != TRIAGE_SCHEMA_VERSION {
+        return Err(ApiError::Validation(format!(
+            "schema_version must be '{TRIAGE_SCHEMA_VERSION}'"
+        )));
+    }
     let actor = actor_identity(&auth)?;
     let request_id = request_id_from_headers(&headers)?;
     let correlation_id = correlation_id_from_headers(&headers)?;
@@ -3437,36 +5041,195 @@ async fn create_witness(
         BeginOutcome::Replay(response) => Ok(to_response(response)),
         BeginOutcome::InProgress => Err(ApiError::Conflict),
         BeginOutcome::Started => {
-            let summary = payload
-                .summary
-                .clone()
-                .map(|text| text.trim().to_string())
-                .filter(|text| !text.is_empty());
-            let rahasia_level = normalize_rahasia_level(payload.rahasia_level.as_deref());
+            let now_ms = gotong_domain::jobs::now_ms();
+            let triage_session_id = payload.triage_session_id.trim().to_string();
+            let (route, triage_result, triage_messages) = {
+                let mut sessions = state.triage_sessions.write().await;
+                compact_triage_sessions(&mut sessions, now_ms);
+                let session = sessions
+                    .get(&triage_session_id)
+                    .ok_or(ApiError::Validation("triage_session_id not found".into()))?;
+                if session.owner_user_id != actor.user_id {
+                    return Err(ApiError::Forbidden);
+                }
+                let messages = session
+                    .messages
+                    .iter()
+                    .map(|message| {
+                        json!({
+                            "role": message.role,
+                            "text": message.text,
+                            "created_at_ms": message.created_at_ms,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                (
+                    session.route.clone(),
+                    session.latest_result.clone(),
+                    messages,
+                )
+            };
+
+            let result_schema_version = triage_result_string(&triage_result, "schema_version")
+                .unwrap_or_else(|| "unknown".to_string());
+            if result_schema_version != TRIAGE_SCHEMA_VERSION {
+                let response = IdempotencyResponse {
+                    status_code: StatusCode::BAD_REQUEST.as_u16(),
+                    body: json!({
+                        "error": {
+                            "code": "validation_error",
+                            "message": format!("triage result schema_version must be '{TRIAGE_SCHEMA_VERSION}'"),
+                            "details": {
+                                "triage_session_id": triage_session_id,
+                                "schema_version": result_schema_version,
+                            }
+                        }
+                    }),
+                };
+                state
+                    .idempotency
+                    .complete(&key, response.clone())
+                    .await
+                    .map_err(|err| {
+                        tracing::error!(error = %err, "idempotency complete failed");
+                        ApiError::Internal
+                    })?;
+                return Ok(to_response(response));
+            }
+
+            let triage_status =
+                triage_result_string(&triage_result, "status").unwrap_or_else(|| "draft".into());
+            if triage_status != "final" {
+                let missing_fields = triage_missing_fields_from_result(&triage_result);
+                let response = IdempotencyResponse {
+                    status_code: StatusCode::CONFLICT.as_u16(),
+                    body: json!({
+                        "error": {
+                            "code": "triage_incomplete",
+                            "message": "triage session is still draft",
+                            "details": {
+                                "triage_session_id": triage_session_id,
+                                "status": triage_status,
+                            }
+                        },
+                        "missing_fields": missing_fields
+                    }),
+                };
+                state
+                    .idempotency
+                    .complete(&key, response.clone())
+                    .await
+                    .map_err(|err| {
+                        tracing::error!(error = %err, "idempotency complete failed");
+                        ApiError::Internal
+                    })?;
+                return Ok(to_response(response));
+            }
+
+            let triage_kind =
+                triage_result_string(&triage_result, "kind").unwrap_or_else(|| "witness".into());
+            if triage_kind != "witness" {
+                let response = IdempotencyResponse {
+                    status_code: StatusCode::BAD_REQUEST.as_u16(),
+                    body: json!({
+                        "error": {
+                            "code": "validation_error",
+                            "message": "triage final kind must be 'witness' for /v1/witnesses",
+                            "details": {
+                                "triage_session_id": triage_session_id,
+                                "kind": triage_kind,
+                            }
+                        }
+                    }),
+                };
+                state
+                    .idempotency
+                    .complete(&key, response.clone())
+                    .await
+                    .map_err(|err| {
+                        tracing::error!(error = %err, "idempotency complete failed");
+                        ApiError::Internal
+                    })?;
+                return Ok(to_response(response));
+            }
+
+            let track_hint = triage_result_string(&triage_result, "track_hint");
+            let seed_hint = triage_result_string(&triage_result, "seed_hint");
+            let card = triage_result
+                .get("card")
+                .and_then(Value::as_object)
+                .cloned();
+            let title = card
+                .as_ref()
+                .and_then(|item| item.get("title"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("{} Baru", triage_label(&route)));
+            let summary = card
+                .as_ref()
+                .and_then(|item| item.get("body"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .or_else(|| triage_result_string(&triage_result, "summary_text"));
+            let rahasia_level = rahasia_level_from_triage_route(&route);
+            let trajectory_type = triage_result_string(&triage_result, "trajectory_type");
+            let taxonomy = triage_result.get("taxonomy").cloned().unwrap_or_else(|| {
+                triage_taxonomy_payload(&route, trajectory_type.as_deref(), "witness")
+            });
+            let program_refs = triage_result
+                .get("program_refs")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+            let stempel_state_value = triage_result.get("stempel_state").cloned();
+            let impact_verification_value = impact_verification_not_open_json();
 
             let mut metadata = HashMap::new();
-            metadata.insert(
-                "route".to_string(),
-                Value::String(payload.route.as_str().to_string()),
-            );
+            metadata.insert("route".to_string(), Value::String(route.clone()));
             metadata.insert(
                 "rahasia_level".to_string(),
                 Value::String(rahasia_level.clone()),
             );
+            metadata.insert(
+                "schema_version".to_string(),
+                Value::String(TRIAGE_SCHEMA_VERSION.to_string()),
+            );
+            metadata.insert(
+                "triage_session_id".to_string(),
+                Value::String(triage_session_id.clone()),
+            );
+            metadata.insert("kind".to_string(), Value::String(triage_kind));
             metadata.insert("status".to_string(), Value::String("open".to_string()));
             metadata.insert("message_count".to_string(), Value::from(0));
             metadata.insert("unread_count".to_string(), Value::from(0));
-            if let Some(track_hint) = payload.track_hint.clone() {
+            if let Some(track_hint) = track_hint.clone() {
                 metadata.insert("track_hint".to_string(), Value::String(track_hint));
             }
-            if let Some(seed_hint) = payload.seed_hint.clone() {
+            if let Some(seed_hint) = seed_hint.clone() {
                 metadata.insert("seed_hint".to_string(), Value::String(seed_hint));
             }
-            if let Some(triage_result) = payload.triage_result.clone() {
-                metadata.insert("triage_result".to_string(), triage_result);
+            if let Some(trajectory_type) = trajectory_type.clone() {
+                metadata.insert(
+                    "trajectory_type".to_string(),
+                    Value::String(trajectory_type),
+                );
             }
-            if let Some(triage_messages) = payload.triage_messages.clone() {
-                metadata.insert("triage_messages".to_string(), Value::Array(triage_messages));
+            metadata.insert("taxonomy".to_string(), taxonomy.clone());
+            metadata.insert("program_refs".to_string(), program_refs.clone());
+            metadata.insert("triage_result".to_string(), triage_result.clone());
+            metadata.insert("triage_messages".to_string(), Value::Array(triage_messages));
+            if let Some(stempel_state) = stempel_state_value.clone() {
+                metadata.insert("stempel_state".to_string(), stempel_state);
+            }
+            metadata.insert(
+                "impact_verification".to_string(),
+                impact_verification_value.clone(),
+            );
+            if let Some(card) = card {
+                metadata.insert("enrichment".to_string(), Value::Object(card));
             }
 
             let service = ContributionService::new(request_repos::contribution_repo(&state, &auth));
@@ -3476,9 +5239,9 @@ async fn create_witness(
                     request_id.clone(),
                     correlation_id.clone(),
                     ContributionCreate {
-                        mode: payload.route.to_mode(),
+                        mode: mode_from_triage_route(&route),
                         contribution_type: ContributionType::Custom,
-                        title: payload.title.clone(),
+                        title: title.clone(),
                         description: summary.clone(),
                         evidence_url: None,
                         skill_ids: vec![],
@@ -3487,6 +5250,21 @@ async fn create_witness(
                 )
                 .await
                 .map_err(map_domain_error)?;
+
+            if let Some(stempel_state) = stempel_state_value
+                .as_ref()
+                .and_then(stempel_state_from_value)
+            {
+                let mut registry = state.witness_stempel.write().await;
+                registry.insert(contribution.contribution_id.clone(), stempel_state);
+            }
+            {
+                let mut impact_registry = state.witness_impact_verifications.write().await;
+                impact_registry.insert(
+                    contribution.contribution_id.clone(),
+                    WitnessImpactVerificationState::default(),
+                );
+            }
 
             if state.config.webhook_enabled {
                 if let Err(err) = enqueue_webhook_outbox_event(
@@ -3514,7 +5292,7 @@ async fn create_witness(
                 Value::String(contribution.contribution_id.clone()),
             );
 
-            ingest_discovery_contribution_feed(
+            let feed_item = ingest_discovery_contribution_feed(
                 &state,
                 &actor,
                 request_id.to_string(),
@@ -3524,6 +5302,7 @@ async fn create_witness(
                 Some(Value::Object(feed_payload)),
             )
             .await?;
+            let stream_item = to_feed_witness_stream_item(feed_item.clone());
 
             let response = IdempotencyResponse {
                 status_code: StatusCode::CREATED.as_u16(),
@@ -3531,11 +5310,16 @@ async fn create_witness(
                     "witness_id": contribution.contribution_id,
                     "title": contribution.title,
                     "summary": contribution.description,
-                    "track_hint": payload.track_hint,
-                    "seed_hint": payload.seed_hint,
+                    "track_hint": track_hint,
+                    "seed_hint": seed_hint,
                     "rahasia_level": rahasia_level,
                     "author_id": actor.user_id,
                     "created_at_ms": contribution.created_at_ms,
+                    "taxonomy": taxonomy,
+                    "program_refs": program_refs,
+                    "stempel_state": stempel_state_value,
+                    "impact_verification": impact_verification_value,
+                    "stream_item": stream_item,
                 }),
             };
 
@@ -3800,6 +5584,14 @@ fn sort_timestamp_ms(item: &gotong_domain::discovery::FeedItem) -> i64 {
 
 fn to_sort_timestamp_iso(epoch_ms: i64) -> String {
     gotong_domain::util::format_ms_rfc3339(epoch_ms)
+}
+
+fn to_feed_witness_stream_item(item: gotong_domain::discovery::FeedItem) -> FeedStreamItemDto {
+    FeedStreamItemDto::Witness {
+        stream_id: format!("w-{}", item.feed_id),
+        sort_timestamp: to_sort_timestamp_iso(sort_timestamp_ms(&item)),
+        data: item,
+    }
 }
 
 fn to_feed_suggestion_entity_dto(item: &FeedSuggestion) -> FeedSuggestionEntityDto {
@@ -6014,7 +7806,7 @@ async fn ingest_discovery_contribution_feed(
     contribution: &Contribution,
     privacy_level: Option<String>,
     payload: Option<Value>,
-) -> Result<(), ApiError> {
+) -> Result<gotong_domain::discovery::FeedItem, ApiError> {
     let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
     let metadata_payload = payload.or_else(|| {
         contribution.metadata.as_ref().map(|metadata| {
@@ -6040,8 +7832,7 @@ async fn ingest_discovery_contribution_feed(
         participant_ids: vec![],
         payload: metadata_payload,
     };
-    service.ingest_feed(input).await.map_err(map_domain_error)?;
-    Ok(())
+    service.ingest_feed(input).await.map_err(map_domain_error)
 }
 
 async fn ingest_discovery_vouch_feed(
