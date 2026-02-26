@@ -35,8 +35,7 @@ export const hasAnyRole = (role: AuthRole | null | undefined, roles: ReadonlyArr
 	Boolean(role && roles.includes(role));
 
 export const isProtectedPath = (pathname: string) =>
-	pathname === '/' ||
-	PROTECTED_PATH_PREFIXES.some((prefix) => matchesPathPrefix(pathname, prefix));
+	pathname === '/' || PROTECTED_PATH_PREFIXES.some((prefix) => matchesPathPrefix(pathname, prefix));
 
 export const requiredRolesForPath = (pathname: string) =>
 	ROLE_GUARD_RULES.find((rule) => matchesPathPrefix(pathname, rule.prefix))?.roles ?? null;

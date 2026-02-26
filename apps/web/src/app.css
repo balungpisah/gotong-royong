@@ -702,8 +702,12 @@
 }
 
 @keyframes peek-scroll-up {
-	from { transform: translateY(0); }
-	to   { transform: translateY(-50%); }
+	from {
+		transform: translateY(0);
+	}
+	to {
+		transform: translateY(-50%);
+	}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -753,7 +757,7 @@
 	 * the grid feels warm and natural.
 	 * ────────────────────────────────────────────────────────── */
 	.quadrille-bg {
-		--grid-color: rgba(62, 39, 35, 0.10);
+		--grid-color: rgba(62, 39, 35, 0.1);
 		background-image:
 			linear-gradient(var(--grid-color) 1px, transparent 1px),
 			linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
@@ -762,6 +766,6 @@
 
 	/* Dark mode: use vault-light (#b0bec5) tinted grid */
 	:is(.dark) .quadrille-bg {
-		--grid-color: rgba(176, 190, 197, 0.10);
+		--grid-color: rgba(176, 190, 197, 0.1);
 	}
 }
