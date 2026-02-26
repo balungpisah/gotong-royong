@@ -16,7 +16,7 @@
 	import TrajectoryGrid from '$lib/components/triage/trajectory-grid.svelte';
 	import TriageAttachmentPicker from '$lib/components/triage/triage-attachment-picker.svelte';
 	import TriageAttachmentPreview from '$lib/components/triage/triage-attachment-preview.svelte';
-	import type { WitnessCreateInput, FeedItem, TriageBudget, TriageAttachment } from '$lib/types';
+	import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/types';
 	import Zap from '@lucide/svelte/icons/zap';
 	import Video from '@lucide/svelte/icons/video';
 	import Mic from '@lucide/svelte/icons/mic';
@@ -76,9 +76,11 @@
 		const toAdd = Array.from(files).slice(0, remaining);
 
 		for (const file of toAdd) {
-			const type = file.type.startsWith('image/') ? 'image'
-				: file.type.startsWith('video/') ? 'video'
-				: 'audio' as const;
+			const type = file.type.startsWith('image/')
+				? 'image'
+				: file.type.startsWith('video/')
+					? 'video'
+					: ('audio' as const);
 			pendingAttachments.push({
 				id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
 				file,
@@ -89,7 +91,7 @@
 	}
 
 	function handleRemoveAttachment(id: string) {
-		const idx = pendingAttachments.findIndex(a => a.id === id);
+		const idx = pendingAttachments.findIndex((a) => a.id === id);
 		if (idx >= 0) {
 			URL.revokeObjectURL(pendingAttachments[idx].preview_url);
 			pendingAttachments.splice(idx, 1);
@@ -125,9 +127,7 @@
 	}
 
 	/** Phase summary from proposed plan */
-	const planPhaseCount = $derived(
-		triageStore.proposedPlan?.branches?.[0]?.phases?.length ?? 0
-	);
+	const planPhaseCount = $derived(triageStore.proposedPlan?.branches?.[0]?.phases?.length ?? 0);
 	const firstPhaseTitle = $derived(
 		triageStore.proposedPlan?.branches?.[0]?.phases?.[0]?.title ?? null
 	);
@@ -182,14 +182,13 @@
 		submitError = null;
 
 		// Capture attachment previews for the message bubble
-		const msgAttachments = pendingAttachments.length > 0
-			? pendingAttachments.map(a => ({ type: a.type, preview_url: a.preview_url }))
-			: undefined;
+		const msgAttachments =
+			pendingAttachments.length > 0
+				? pendingAttachments.map((a) => ({ type: a.type, preview_url: a.preview_url }))
+				: undefined;
 
 		// Extract files for the service call
-		const files = pendingAttachments.length > 0
-			? pendingAttachments.map(a => a.file)
-			: undefined;
+		const files = pendingAttachments.length > 0 ? pendingAttachments.map((a) => a.file) : undefined;
 
 		if (!hasSession) {
 			await triageStore.startTriage(text, files);
@@ -249,68 +248,16 @@
 	}
 
 	async function handleCreateWitness() {
-		if (witnessStore.creating || !triageStore.result) return;
-
-		const result = triageStore.result;
-		const firstUserMsg = messages.find((m) => m.role === 'user')?.text ?? 'Laporan baru';
-		const lastAiMsg = messages.findLast((m) => m.role === 'ai')?.text ?? '';
-
+		if (witnessStore.creating || !triageStore.result || !triageStore.sessionId) return;
+		const schemaVersion = triageStore.result.schema_version ?? 'triage.v1';
 		const input: WitnessCreateInput = {
-			title: firstUserMsg.slice(0, 80),
-			summary: lastAiMsg,
-			route: result.route,
-			track_hint: result.track_hint,
-			seed_hint: result.seed_hint,
-			confidence: result.confidence,
-			rahasia_level: result.route === 'vault' ? 'L2' : 'L0',
-			proposed_plan: result.proposed_plan,
-			triage_result: result,
-			triage_messages: [...messages]
+			schema_version: schemaVersion,
+			triage_session_id: triageStore.sessionId
 		};
 
 		const witnessId = await witnessStore.createWitness(input);
 		if (!witnessId) return;
-
-		// Use first image attachment as cover_url for the feed item
-		const firstImage = messages
-			.flatMap(msg => msg.attachments ?? [])
-			.find(a => a.type === 'image');
-
-		// Build feed item and prepend
-		const now = new Date().toISOString();
-		const feedItem: FeedItem = {
-			witness_id: witnessId,
-			title: input.title,
-			track_hint: input.track_hint,
-			status: 'open',
-			rahasia_level: input.rahasia_level,
-			cover_url: firstImage?.preview_url,
-			latest_event: {
-				event_id: `evt-${Date.now()}`,
-				event_type: 'created',
-				actor_name: 'Ahmad Hidayat',
-				timestamp: now,
-				verb: 'membuat saksi baru'
-			},
-			collapsed_count: 0,
-			member_count: 1,
-			members_preview: [
-				{
-					user_id: 'u-001',
-					name: 'Ahmad Hidayat',
-					role: 'pelapor'
-				}
-			],
-			entity_tags: [],
-			urgency: 'baru',
-			source: 'terlibat',
-			sentiment: 'curious',
-			hook_line: input.summary.slice(0, 100),
-			body: input.summary,
-			monitored: true
-		};
-
-		feedStore.prependWitnessItem(feedItem);
+		await feedStore.loadFeed();
 		onWitnessCreated?.(witnessId);
 
 		// Reset triage + cooldown to prevent rapid re-submission
@@ -359,7 +306,6 @@
 	{/if}
 
 	<!-- Compact card — always in document flow to hold space -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="triage-card cursor-pointer rounded-2xl border-2 border-primary/40 p-3.5 transition-all hover:border-primary/60 hover:shadow-lg"
 		class:invisible={expanded}
@@ -370,7 +316,9 @@
 	>
 		<!-- "Mulai di sini" badge -->
 		<div class="mb-2.5">
-			<span class="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-small font-bold tracking-wide text-primary-foreground uppercase">
+			<span
+				class="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-small font-bold tracking-wide text-primary-foreground uppercase"
+			>
 				<Sparkles class="size-2.5" />
 				{m.triage_start_here()}
 			</span>
@@ -381,7 +329,9 @@
 				<Sparkles class="size-4 text-primary" />
 			</div>
 			<div class="flex-1 min-w-0">
-				<p class="text-[13px] font-semibold text-foreground leading-tight">{m.triage_tell_story()}</p>
+				<p class="text-[13px] font-semibold text-foreground leading-tight">
+					{m.triage_tell_story()}
+				</p>
 				<p class="mt-0.5 text-small text-muted-foreground truncate">
 					{m.triage_tap_to_start()}
 				</p>
@@ -412,15 +362,22 @@
 				<Sparkles class="size-3.5 text-primary" />
 				<span class="font-medium">{m.triage_ai_label()}</span>
 				{#if triageStore.confidence}
-					<span
-						class="rounded-full bg-primary/10 px-2 py-0.5 text-small font-medium text-primary"
-					>
+					<span class="rounded-full bg-primary/10 px-2 py-0.5 text-small font-medium text-primary">
 						{triageStore.confidence.label}
 					</span>
 				{/if}
 				{#if budget && hasSession}
-					<div class="ml-1 flex items-center gap-1.5" title={m.triage_energy_remaining({ pct: String(Math.round((1 - budgetPct) * 100)) })}>
-						<Zap class="size-3 {budgetPct > 0.7 ? 'text-bahaya' : budgetPct > 0.4 ? 'text-waspada' : 'text-berhasil'}" />
+					<div
+						class="ml-1 flex items-center gap-1.5"
+						title={m.triage_energy_remaining({ pct: String(Math.round((1 - budgetPct) * 100)) })}
+					>
+						<Zap
+							class="size-3 {budgetPct > 0.7
+								? 'text-bahaya'
+								: budgetPct > 0.4
+									? 'text-waspada'
+									: 'text-berhasil'}"
+						/>
 						<div class="h-1.5 w-14 overflow-hidden rounded-full bg-muted">
 							<div
 								class="h-full rounded-full transition-all duration-500 ease-out {budgetColor}"
@@ -487,13 +444,21 @@
 										<div class="mt-1.5 flex gap-1.5 flex-wrap">
 											{#each msg.attachments as att}
 												{#if att.type === 'image'}
-													<img src={att.preview_url} alt="" class="size-16 rounded-lg object-cover ring-1 ring-white/20" />
+													<img
+														src={att.preview_url}
+														alt=""
+														class="size-16 rounded-lg object-cover ring-1 ring-white/20"
+													/>
 												{:else if att.type === 'video'}
-													<div class="flex size-16 items-center justify-center rounded-lg bg-black/20 ring-1 ring-white/20">
+													<div
+														class="flex size-16 items-center justify-center rounded-lg bg-black/20 ring-1 ring-white/20"
+													>
 														<Video class="size-6 text-primary-foreground/70" />
 													</div>
 												{:else}
-													<div class="flex size-16 items-center justify-center rounded-lg bg-black/20 ring-1 ring-white/20">
+													<div
+														class="flex size-16 items-center justify-center rounded-lg bg-black/20 ring-1 ring-white/20"
+													>
 														<Mic class="size-6 text-primary-foreground/70" />
 													</div>
 												{/if}
@@ -546,126 +511,132 @@
 
 					{#if triageStore.isReady}
 						{#if triageStore.route === 'kelola'}
-						<!-- Kelola result card -->
-						<div class="mt-2 overflow-hidden rounded-xl border border-blue-600/30 bg-card shadow-sm">
-							<div class="flex items-center gap-2 border-b border-border/30 px-3 py-2">
-								<Badge variant="secondary">
-									<Settings class="mr-1 size-3" />
-									{m.triage_intent_kelola_name()}
-								</Badge>
-								{#if triageStore.confidence}
-									<span class="ml-auto flex items-center gap-1 text-small text-muted-foreground">
-										<Gauge class="size-3" />
-										{triageStore.confidence.label}
-									</span>
-								{/if}
-							</div>
-							{#if triageStore.result?.kelola_result?.group_detail}
-								{@const detail = triageStore.result.kelola_result.group_detail}
-								<div class="px-3 py-2.5">
-									<p class="text-body font-semibold text-foreground leading-tight">
-										{detail.name}
-									</p>
-									<p class="mt-1 text-small text-muted-foreground line-clamp-2">
-										{detail.description}
-									</p>
-								</div>
-							{/if}
-							<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
-								<Button
-									variant="default"
-									onclick={handleCreateGroup}
-									disabled={groupStore.creating}
-									class="flex-1 bg-blue-600 hover:bg-blue-700"
-								>
-									{#if groupStore.creating}
-										<div class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
-										{m.group_create_creating()}
-									{:else}
-										<Plus class="size-4" />
-										{m.triage_create_group()}
-									{/if}
-								</Button>
-								<Button
-									variant="outline"
-									disabled
-									title={m.common_coming_soon()}
-								>
-									{m.triage_modify()}
-								</Button>
-							</div>
-						</div>
-						{:else}
-						<!-- Path plan preview card -->
-						<div class="mt-2 overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
-							<!-- Track + seed header -->
-							<div class="flex items-center gap-2 border-b border-border/30 px-3 py-2">
-								{#if triageStore.trackHint}
-									<Badge variant={trackBadgeVariant(triageStore.trackHint)}>
-										{triageStore.trackHint}
+							<!-- Kelola result card -->
+							<div
+								class="mt-2 overflow-hidden rounded-xl border border-blue-600/30 bg-card shadow-sm"
+							>
+								<div class="flex items-center gap-2 border-b border-border/30 px-3 py-2">
+									<Badge variant="secondary">
+										<Settings class="mr-1 size-3" />
+										{m.triage_intent_kelola_name()}
 									</Badge>
-								{/if}
-								{#if triageStore.seedHint}
-									<span class="flex items-center gap-1 text-small text-muted-foreground">
-										<Sprout class="size-3" />
-										{triageStore.seedHint}
-									</span>
-								{/if}
-								{#if triageStore.confidence}
-									<span class="ml-auto flex items-center gap-1 text-small text-muted-foreground">
-										<Gauge class="size-3" />
-										{triageStore.confidence.label}
-									</span>
-								{/if}
-							</div>
-
-							<!-- Plan summary -->
-							{#if triageStore.proposedPlan}
-								<div class="px-3 py-2.5">
-									<p class="text-body font-semibold text-foreground leading-tight">
-										{triageStore.proposedPlan.title}
-									</p>
-									{#if triageStore.proposedPlan.summary}
-										<p class="mt-1 text-small text-muted-foreground line-clamp-2">
-											{triageStore.proposedPlan.summary}
-										</p>
+									{#if triageStore.confidence}
+										<span class="ml-auto flex items-center gap-1 text-small text-muted-foreground">
+											<Gauge class="size-3" />
+											{triageStore.confidence.label}
+										</span>
 									{/if}
-									<div class="mt-2 flex items-center gap-1.5 text-small text-muted-foreground">
-										<Layers class="size-3" />
-										<span>{m.triage_phases({ count: String(planPhaseCount) })}</span>
-										{#if firstPhaseTitle}
-											<span class="text-muted-foreground/50">·</span>
-											<span class="truncate">{firstPhaseTitle}</span>
-										{/if}
-									</div>
 								</div>
-							{/if}
-
-							<!-- Action buttons -->
-							<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
-								<Button
-									variant="default"
-									onclick={handleCreateWitness}
-									disabled={witnessStore.creating}
-									class="flex-1"
-								>
-									{#if witnessStore.creating}
-										<div class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
-										{m.triage_creating()}
-									{:else}
-										<Plus class="size-4" />
-										{m.triage_create_witness()}
-									{/if}
-								</Button>
-								<Button
-									variant="outline"
-									disabled
-									title={m.common_coming_soon()}
-								>
-									{m.triage_modify()}
-								</Button>
+								{#if triageStore.result?.kelola_result?.group_detail}
+									{@const detail = triageStore.result.kelola_result.group_detail}
+									<div class="px-3 py-2.5">
+										<p class="text-body font-semibold text-foreground leading-tight">
+											{detail.name}
+										</p>
+										<p class="mt-1 text-small text-muted-foreground line-clamp-2">
+											{detail.description}
+										</p>
+									</div>
+								{/if}
+								<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
+									<Button
+										variant="default"
+										onclick={handleCreateGroup}
+										disabled={groupStore.creating}
+										class="flex-1 bg-blue-600 hover:bg-blue-700"
+									>
+										{#if groupStore.creating}
+											<div
+												class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+											></div>
+											{m.group_create_creating()}
+										{:else}
+											<Plus class="size-4" />
+											{m.triage_create_group()}
+										{/if}
+									</Button>
+									<Button variant="outline" disabled title={m.common_coming_soon()}>
+										{m.triage_modify()}
+									</Button>
+								</div>
 							</div>
-						</div>
+						{:else}
+							<!-- Path plan preview card -->
+							<div
+								class="mt-2 overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm"
+							>
+								<!-- Track + seed header -->
+								<div class="flex items-center gap-2 border-b border-border/30 px-3 py-2">
+									{#if triageStore.trackHint}
+										<Badge variant={trackBadgeVariant(triageStore.trackHint)}>
+											{triageStore.trackHint}
+										</Badge>
+									{/if}
+									{#if triageStore.seedHint}
+										<span class="flex items-center gap-1 text-small text-muted-foreground">
+											<Sprout class="size-3" />
+											{triageStore.seedHint}
+										</span>
+									{/if}
+									{#if triageStore.confidence}
+										<span class="ml-auto flex items-center gap-1 text-small text-muted-foreground">
+											<Gauge class="size-3" />
+											{triageStore.confidence.label}
+										</span>
+									{/if}
+								</div>
+
+								<!-- Plan summary -->
+								{#if triageStore.proposedPlan}
+									<div class="px-3 py-2.5">
+										<p class="text-body font-semibold text-foreground leading-tight">
+											{triageStore.proposedPlan.title}
+										</p>
+										{#if triageStore.proposedPlan.summary}
+											<p class="mt-1 text-small text-muted-foreground line-clamp-2">
+												{triageStore.proposedPlan.summary}
+											</p>
+										{/if}
+										<div class="mt-2 flex items-center gap-1.5 text-small text-muted-foreground">
+											<Layers class="size-3" />
+											<span>{m.triage_phases({ count: String(planPhaseCount) })}</span>
+											{#if firstPhaseTitle}
+												<span class="text-muted-foreground/50">·</span>
+												<span class="truncate">{firstPhaseTitle}</span>
+											{/if}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Action buttons -->
+								<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
+									{#if triageStore.kind === 'witness'}
+										<Button
+											variant="default"
+											onclick={handleCreateWitness}
+											disabled={witnessStore.creating}
+											class="flex-1"
+										>
+											{#if witnessStore.creating}
+												<div
+													class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+												></div>
+												{m.triage_creating()}
+											{:else}
+												<Plus class="size-4" />
+												{m.triage_create_witness()}
+											{/if}
+										</Button>
+									{:else}
+										<Button variant="outline" disabled class="flex-1">
+											Data siap dipublikasikan
+										</Button>
+									{/if}
+									<Button variant="outline" disabled title={m.common_coming_soon()}>
+										{m.triage_modify()}
+									</Button>
+								</div>
+							</div>
 						{/if}
 					{/if}
 				</div>
@@ -679,12 +650,7 @@
 				aria-live="polite"
 			>
 				<p class="text-small text-destructive">{triageSubmitError}</p>
-				<Button
-					variant="outline"
-					size="sm"
-					onclick={() => handleSubmit()}
-					disabled={!canSend}
-				>
+				<Button variant="outline" size="sm" onclick={() => handleSubmit()} disabled={!canSend}>
 					Coba lagi
 				</Button>
 			</div>
@@ -693,7 +659,10 @@
 		<!-- Attachment preview row -->
 		{#if pendingAttachments.length > 0}
 			<div class="border-t border-border/40 pt-2">
-				<TriageAttachmentPreview attachments={pendingAttachments} onRemove={handleRemoveAttachment} />
+				<TriageAttachmentPreview
+					attachments={pendingAttachments}
+					onRemove={handleRemoveAttachment}
+				/>
 			</div>
 		{/if}
 
@@ -702,7 +671,10 @@
 			<div class="flex items-end gap-2">
 				<TriageAttachmentPicker
 					onFilesSelected={handleFilesSelected}
-					disabled={triageStore.loading || triageStore.isReady || isOnCooldown || pendingAttachments.length >= 5}
+					disabled={triageStore.loading ||
+						triageStore.isReady ||
+						isOnCooldown ||
+						pendingAttachments.length >= 5}
 				/>
 				<div class="relative flex-1">
 					<textarea
@@ -710,7 +682,11 @@
 						bind:value={content}
 						oninput={autoResize}
 						onkeydown={handleKeydown}
-						placeholder={isOnCooldown ? m.triage_wait() : triageStore.isReady ? m.triage_complete() : m.shell_chat_placeholder()}
+						placeholder={isOnCooldown
+							? m.triage_wait()
+							: triageStore.isReady
+								? m.triage_complete()
+								: m.shell_chat_placeholder()}
 						disabled={triageStore.loading || triageStore.isReady || isOnCooldown}
 						rows={1}
 						tabindex={expanded ? 0 : -1}
@@ -754,7 +730,8 @@
 	}
 
 	@keyframes triage-glow {
-		0%, 100% {
+		0%,
+		100% {
 			box-shadow: 0 0 0 0 oklch(from var(--color-primary) l c h / 0);
 		}
 		50% {
@@ -801,7 +778,12 @@
 	}
 
 	@keyframes arrow-nudge {
-		0%, 100% { transform: translateY(-50%) translateX(0); }
-		50% { transform: translateY(-50%) translateX(0.5rem); }
+		0%,
+		100% {
+			transform: translateY(-50%) translateX(0);
+		}
+		50% {
+			transform: translateY(-50%) translateX(0.5rem);
+		}
 	}
 </style>

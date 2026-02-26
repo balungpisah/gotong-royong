@@ -26,10 +26,7 @@
 	>
 		<!-- Brand + Detak Komunitas -->
 		<div class="flex items-center gap-2.5">
-			<a
-				href="{base}/"
-				class="text-body font-extrabold tracking-wide text-foreground uppercase"
-			>
+			<a href="{base}/" class="text-body font-extrabold tracking-wide text-foreground uppercase">
 				{m.shell_brand_name()}
 			</a>
 			<div class="flex items-center gap-1.5 text-primary/70">
@@ -68,13 +65,13 @@
 
 			<!-- User avatar -->
 			<Tip text={m.shell_nav_profil()}>
-			<a
-				href="{base}/profil"
-				class="rounded-full ring-2 ring-transparent transition hover:ring-primary/30"
-				aria-label={m.shell_nav_profil()}
-			>
-				<TandangAvatar person={headerPerson} size="sm" isSelf />
-			</a>
+				<a
+					href="{base}/profil"
+					class="rounded-full ring-2 ring-transparent transition hover:ring-primary/30"
+					aria-label={m.shell_nav_profil()}
+				>
+					<TandangAvatar person={headerPerson} size="sm" isSelf />
+				</a>
 			</Tip>
 		</div>
 	</div>

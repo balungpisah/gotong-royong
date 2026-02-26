@@ -61,7 +61,26 @@
 		</button>
 	</Tip>
 
-	<input bind:this={imageInput} type="file" accept="image/*" multiple class="hidden" onchange={handleChange} />
-	<input bind:this={videoInput} type="file" accept="video/*" class="hidden" onchange={handleChange} />
-	<input bind:this={audioInput} type="file" accept="audio/*" class="hidden" onchange={handleChange} />
+	<input
+		bind:this={imageInput}
+		type="file"
+		accept="image/*"
+		multiple
+		class="hidden"
+		onchange={handleChange}
+	/>
+	<input
+		bind:this={videoInput}
+		type="file"
+		accept="video/*"
+		class="hidden"
+		onchange={handleChange}
+	/>
+	<input
+		bind:this={audioInput}
+		type="file"
+		accept="audio/*"
+		class="hidden"
+		onchange={handleChange}
+	/>
 </div>

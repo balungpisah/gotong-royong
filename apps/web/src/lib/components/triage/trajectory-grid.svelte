@@ -121,7 +121,9 @@
 	<!-- Header -->
 	<div class="text-center">
 		<p class="text-body font-medium text-foreground">Apa yang ingin kamu lakukan?</p>
-		<p class="mt-0.5 text-small text-muted-foreground">Pilih salah satu, atau langsung ceritakan di bawah</p>
+		<p class="mt-0.5 text-small text-muted-foreground">
+			Pilih salah satu, atau langsung ceritakan di bawah
+		</p>
 	</div>
 
 	<!-- Grid -->
@@ -137,7 +139,11 @@
 				onclick={() => onSelect(item.primer)}
 			>
 				<div class="flex size-8 shrink-0 items-center justify-center rounded-lg {colors.bgLight}">
-					<DynamicIcon name={item.icon} fallback={item.color === 'kelola' ? 'program' : item.color} class="size-4 {colors.text}" />
+					<DynamicIcon
+						name={item.icon}
+						fallback={item.color === 'kelola' ? 'program' : item.color}
+						class="size-4 {colors.text}"
+					/>
 				</div>
 				<div class="min-w-0 flex-1">
 					<p class="text-[13px] font-semibold leading-tight {colors.text}">
@@ -152,14 +158,14 @@
 	</div>
 
 	<!-- Free-text prompt — same visual weight as grid items -->
-	<div class="flex items-center gap-2.5 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-3 py-2.5">
+	<div
+		class="flex items-center gap-2.5 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-3 py-2.5"
+	>
 		<div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
 			<DynamicIcon name="message-circle" class="size-4 text-primary" />
 		</div>
 		<div class="min-w-0 flex-1">
-			<p class="text-[13px] font-semibold leading-tight text-primary">
-				Atau ceritakan langsung
-			</p>
+			<p class="text-[13px] font-semibold leading-tight text-primary">Atau ceritakan langsung</p>
 			<p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">
 				Ketik ceritamu di bawah — AI akan menentukan jalur yang tepat
 			</p>

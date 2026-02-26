@@ -4,7 +4,14 @@
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
 	import { setLocale, getLocale } from '$lib/paraglide/runtime';
-	import { getNavigationStore, getFeedStore, getNotificationStore, getUserStore, getThemeStore, getPreferencesStore } from '$lib/stores';
+	import {
+		getNavigationStore,
+		getFeedStore,
+		getNotificationStore,
+		getUserStore,
+		getThemeStore,
+		getPreferencesStore
+	} from '$lib/stores';
 	import { resolveTabIcon } from '$lib/utils';
 	import type { TabConfig } from '$lib/types';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -96,7 +103,12 @@
 	class:sidebar-expanded={expanded}
 	aria-label="App navigation"
 	onclick={toggleSidebar}
-	onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSidebar(); } }}
+	onkeydown={(e) => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			toggleSidebar();
+		}
+	}}
 >
 	<!-- Top section: feed filters -->
 	<div class="flex flex-1 flex-col gap-0.5 pt-3">
@@ -104,49 +116,55 @@
 			{@const Icon = resolveTabIcon(tab.iconName)}
 			{@const active = isActive(tab)}
 			<Tip text={tab.label} side="right">
-			<a
-				href={hrefForTab(tab)}
-				class="sidebar-item group"
-				class:sidebar-item-active={active}
-				aria-current={active ? 'page' : undefined}
-				onclick={(e) => { e.stopPropagation(); handleTabClick(tab, e); }}
-			>
-				<span class="sidebar-icon">
-					<Icon class="size-5" />
-				</span>
-				<span class="sidebar-label">{tab.label}</span>
+				<a
+					href={hrefForTab(tab)}
+					class="sidebar-item group"
+					class:sidebar-item-active={active}
+					aria-current={active ? 'page' : undefined}
+					onclick={(e) => {
+						e.stopPropagation();
+						handleTabClick(tab, e);
+					}}
+				>
+					<span class="sidebar-icon">
+						<Icon class="size-5" />
+					</span>
+					<span class="sidebar-label">{tab.label}</span>
 
-				{#if !tab.pinned && !active}
-					<button
-						type="button"
-						class="sidebar-remove"
-						onclick={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-							navStore.removeTab(tab.id);
-						}}
-						aria-label="Remove tab"
-					>
-						<X class="size-3" />
-					</button>
-				{/if}
-			</a>
+					{#if !tab.pinned && !active}
+						<button
+							type="button"
+							class="sidebar-remove"
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								navStore.removeTab(tab.id);
+							}}
+							aria-label="Remove tab"
+						>
+							<X class="size-3" />
+						</button>
+					{/if}
+				</a>
 			</Tip>
 		{/each}
 
 		<!-- Add tab button -->
 		<Tip text={m.shell_nav_add_tab()} side="right">
-		<button
-			type="button"
-			class="sidebar-item sidebar-item-muted"
-			onclick={(e) => { e.stopPropagation(); navStore.openAddPanel(); }}
-			aria-label={m.shell_nav_add_tab()}
-		>
-			<span class="sidebar-icon">
-				<Plus class="size-5" />
-			</span>
-			<span class="sidebar-label">{m.shell_nav_add_tab()}</span>
-		</button>
+			<button
+				type="button"
+				class="sidebar-item sidebar-item-muted"
+				onclick={(e) => {
+					e.stopPropagation();
+					navStore.openAddPanel();
+				}}
+				aria-label={m.shell_nav_add_tab()}
+			>
+				<span class="sidebar-icon">
+					<Plus class="size-5" />
+				</span>
+				<span class="sidebar-label">{m.shell_nav_add_tab()}</span>
+			</button>
 		</Tip>
 	</div>
 
@@ -157,99 +175,114 @@
 	<div class="flex flex-col gap-0.5 pb-3 pt-1">
 		<!-- Notifications -->
 		<Tip text={m.shell_nav_notifikasi()} side="right">
-		<a
-			href="{base}/notifikasi"
-			class="sidebar-item sidebar-item-muted"
-			onclick={(e) => e.stopPropagation()}
-			aria-label={m.shell_nav_notifikasi()}
-		>
-			<span class="sidebar-icon">
-				<BellRing class="size-5" />
-			</span>
-			<span class="sidebar-label">{m.shell_nav_notifikasi()}</span>
-			{#if notificationStore.hasUnread}
-				<span class="notif-badge">
-					{notificationStore.unreadCount > 9 ? '9+' : notificationStore.unreadCount}
+			<a
+				href="{base}/notifikasi"
+				class="sidebar-item sidebar-item-muted"
+				onclick={(e) => e.stopPropagation()}
+				aria-label={m.shell_nav_notifikasi()}
+			>
+				<span class="sidebar-icon">
+					<BellRing class="size-5" />
 				</span>
-			{/if}
-		</a>
+				<span class="sidebar-label">{m.shell_nav_notifikasi()}</span>
+				{#if notificationStore.hasUnread}
+					<span class="notif-badge">
+						{notificationStore.unreadCount > 9 ? '9+' : notificationStore.unreadCount}
+					</span>
+				{/if}
+			</a>
 		</Tip>
 
 		<!-- Profile -->
 		<Tip text={m.shell_nav_profil()} side="right">
-		<a
-			href="{base}/profil"
-			class="sidebar-item sidebar-item-muted"
-			onclick={(e) => e.stopPropagation()}
-			aria-label={m.shell_nav_profil()}
-		>
-			<span class="sidebar-icon">
-				<User class="size-5" />
-			</span>
-			<span class="sidebar-label">{userStore.displayName}</span>
-		</a>
+			<a
+				href="{base}/profil"
+				class="sidebar-item sidebar-item-muted"
+				onclick={(e) => e.stopPropagation()}
+				aria-label={m.shell_nav_profil()}
+			>
+				<span class="sidebar-icon">
+					<User class="size-5" />
+				</span>
+				<span class="sidebar-label">{userStore.displayName}</span>
+			</a>
 		</Tip>
 
 		<!-- Komunitas -->
 		<Tip text={m.shell_nav_komunitas()} side="right">
-		<a
-			href="{base}/komunitas"
-			class="sidebar-item sidebar-item-muted"
-			onclick={(e) => e.stopPropagation()}
-			aria-label={m.shell_nav_komunitas()}
-		>
-			<span class="sidebar-icon">
-				<Users class="size-5" />
-			</span>
-			<span class="sidebar-label">{m.shell_nav_komunitas()}</span>
-		</a>
+			<a
+				href="{base}/komunitas"
+				class="sidebar-item sidebar-item-muted"
+				onclick={(e) => e.stopPropagation()}
+				aria-label={m.shell_nav_komunitas()}
+			>
+				<span class="sidebar-icon">
+					<Users class="size-5" />
+				</span>
+				<span class="sidebar-label">{m.shell_nav_komunitas()}</span>
+			</a>
 		</Tip>
 
 		<!-- Language toggle -->
 		<Tip text={m.shell_lang_label()} side="right">
-		<button
-			type="button"
-			class="sidebar-item sidebar-item-muted"
-			onclick={(e) => { e.stopPropagation(); toggleLocale(); }}
-			aria-label={m.shell_lang_label()}
-		>
-			<span class="sidebar-icon">
-				<Globe class="size-5" />
-			</span>
-			<span class="sidebar-label">{localeLabel}</span>
-		</button>
+			<button
+				type="button"
+				class="sidebar-item sidebar-item-muted"
+				onclick={(e) => {
+					e.stopPropagation();
+					toggleLocale();
+				}}
+				aria-label={m.shell_lang_label()}
+			>
+				<span class="sidebar-icon">
+					<Globe class="size-5" />
+				</span>
+				<span class="sidebar-label">{localeLabel}</span>
+			</button>
 		</Tip>
 
 		<!-- Theme toggle -->
 		<Tip text={m.shell_theme_toggle()} side="right">
-		<button
-			type="button"
-			class="sidebar-item sidebar-item-muted"
-			onclick={(e) => { e.stopPropagation(); themeStore.toggle(); }}
-			aria-label={m.shell_theme_toggle()}
-		>
-			<span class="sidebar-icon">
-				<ThemeIcon class="size-5" />
-			</span>
-			<span class="sidebar-label">{m.shell_theme_label()}</span>
-		</button>
+			<button
+				type="button"
+				class="sidebar-item sidebar-item-muted"
+				onclick={(e) => {
+					e.stopPropagation();
+					themeStore.toggle();
+				}}
+				aria-label={m.shell_theme_toggle()}
+			>
+				<span class="sidebar-icon">
+					<ThemeIcon class="size-5" />
+				</span>
+				<span class="sidebar-label">{m.shell_theme_label()}</span>
+			</button>
 		</Tip>
 
 		<!-- Tooltip toggle -->
-		<Tip text={prefsStore.showTooltips ? m.shell_tooltip_active() : m.shell_tooltip_inactive()} side="right">
-		<button
-			type="button"
-			class="sidebar-item sidebar-item-muted"
-			onclick={(e) => { e.stopPropagation(); prefsStore.toggleTooltips(); }}
-			aria-label={prefsStore.showTooltips ? m.shell_tooltip_active() : m.shell_tooltip_inactive()}
+		<Tip
+			text={prefsStore.showTooltips ? m.shell_tooltip_active() : m.shell_tooltip_inactive()}
+			side="right"
 		>
-			<span class="sidebar-icon">
-				<CircleHelp class="size-5 transition-opacity {prefsStore.showTooltips ? '' : 'opacity-40'}" />
-			</span>
-			<span class="sidebar-label">{prefsStore.showTooltips ? m.shell_tooltip_active() : m.shell_tooltip_off()}</span>
-		</button>
+			<button
+				type="button"
+				class="sidebar-item sidebar-item-muted"
+				onclick={(e) => {
+					e.stopPropagation();
+					prefsStore.toggleTooltips();
+				}}
+				aria-label={prefsStore.showTooltips ? m.shell_tooltip_active() : m.shell_tooltip_inactive()}
+			>
+				<span class="sidebar-icon">
+					<CircleHelp
+						class="size-5 transition-opacity {prefsStore.showTooltips ? '' : 'opacity-40'}"
+					/>
+				</span>
+				<span class="sidebar-label"
+					>{prefsStore.showTooltips ? m.shell_tooltip_active() : m.shell_tooltip_off()}</span
+				>
+			</button>
 		</Tip>
-
 	</div>
 </nav>
 
@@ -290,7 +323,9 @@
 		font-size: 0.8125rem;
 		font-weight: 500;
 		cursor: pointer;
-		transition: background-color 150ms ease, color 150ms ease;
+		transition:
+			background-color 150ms ease,
+			color 150ms ease;
 		text-decoration: none;
 		white-space: nowrap;
 		flex-shrink: 0;
@@ -359,7 +394,9 @@
 		border-radius: var(--r-sm);
 		color: var(--color-muted-foreground);
 		opacity: 0;
-		transition: opacity 150ms ease, background-color 150ms ease;
+		transition:
+			opacity 150ms ease,
+			background-color 150ms ease;
 		cursor: pointer;
 	}
 

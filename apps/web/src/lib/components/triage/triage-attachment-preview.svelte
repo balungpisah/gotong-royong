@@ -23,11 +23,15 @@
 						class="size-12 rounded-lg object-cover ring-1 ring-border/40"
 					/>
 				{:else if att.type === 'video'}
-					<div class="flex size-12 items-center justify-center rounded-lg bg-muted ring-1 ring-border/40">
+					<div
+						class="flex size-12 items-center justify-center rounded-lg bg-muted ring-1 ring-border/40"
+					>
 						<Video class="size-5 text-muted-foreground" />
 					</div>
 				{:else}
-					<div class="flex size-12 items-center justify-center rounded-lg bg-muted ring-1 ring-border/40">
+					<div
+						class="flex size-12 items-center justify-center rounded-lg bg-muted ring-1 ring-border/40"
+					>
 						<Mic class="size-5 text-muted-foreground" />
 					</div>
 				{/if}
