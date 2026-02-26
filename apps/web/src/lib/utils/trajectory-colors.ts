@@ -1,9 +1,9 @@
 /**
  * Trajectory Color Utility — maps TrajectoryType to Tailwind CSS class strings.
  *
- * This is the new canonical color utility for the trajectory model.
- * The old `track-colors.ts` is kept for backward compat with components
- * still using the 5-track model.
+ * Canonical color utility for the trajectory model.
+ * Legacy 5-track hints (tuntaskan, wujudkan, etc.) are mapped via
+ * `resolveTrajectoryColor()` at the bottom of this file.
  *
  * @see docs/design/specs/ai-spec/04b-trajectory-map.md
  */
@@ -128,4 +128,34 @@ export function trajectoryColors(t: TrajectoryColorKey): TrajectoryColorSet {
 /** Get just the background class for a trajectory type (or 'kelola'). */
 export function trajectoryBgClass(t: TrajectoryColorKey): string {
 	return (TRAJECTORY_COLORS[t] ?? FALLBACK).bg;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy Track Hint Bridge
+// ---------------------------------------------------------------------------
+
+/** Maps old 5-track hint strings to the new trajectory model. */
+const LEGACY_TRACK_MAP: Record<string, TrajectoryColorKey> = {
+	tuntaskan: 'aksi',
+	wujudkan: 'program',
+	telusuri: 'pantau',
+	rayakan: 'pencapaian',
+	musyawarah: 'mufakat'
+};
+
+/**
+ * Resolve a color set from either a trajectory_type enum or a legacy track_hint string.
+ * Prefers trajectory_type when available; falls back to legacy mapping; returns null if neither.
+ */
+export function resolveTrajectoryColor(
+	hint?: string,
+	trajectoryType?: TrajectoryType
+): TrajectoryColorSet | null {
+	if (trajectoryType) return trajectoryColors(trajectoryType);
+	if (!hint) return null;
+	const mapped = LEGACY_TRACK_MAP[hint];
+	if (mapped) return trajectoryColors(mapped);
+	// Try direct match (hint might already be a trajectory type string)
+	if (hint in TRAJECTORY_COLORS) return trajectoryColors(hint as TrajectoryColorKey);
+	return FALLBACK;
 }

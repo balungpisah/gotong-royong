@@ -23,3 +23,5 @@ export {
 	Title as CardTitle,
 	Action as CardAction
 };
+
+export { cardVariants, type CardVariant, type CardPadding, type CardState } from './card.svelte';
