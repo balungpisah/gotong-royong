@@ -3139,6 +3139,145 @@ async fn discovery_feed_suggestions_endpoint_returns_aggregated_entities() {
 }
 
 #[tokio::test]
+async fn discovery_feed_preference_endpoints_persist_monitor_and_follow_state() {
+    let (state, app) = test_app_state_router();
+    let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let actor = actor_identity_for_tests("user-123");
+
+    service
+        .ingest_feed(FeedIngestInput {
+            source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
+            source_id: "witness-pref-1".into(),
+            actor,
+            title: "Preference Seed".into(),
+            summary: Some("seed".into()),
+            scope_id: Some("scope-rw-01".into()),
+            privacy_level: Some("public".into()),
+            occurred_at_ms: Some(1_000),
+            request_id: "feed-pref-seed".into(),
+            correlation_id: "feed-pref-corr".into(),
+            request_ts_ms: Some(1_000),
+            participant_ids: vec![],
+            payload: Some(json!({
+                "enrichment": {
+                    "entity_tags": [
+                        {
+                            "entity_id": "ent-rt05",
+                            "entity_type": "lingkungan",
+                            "label": "RT 05 Menteng",
+                            "follower_count": 12
+                        }
+                    ]
+                }
+            })),
+        })
+        .await
+        .expect("seed feed row");
+
+    let set_monitor_request = Request::builder()
+        .method("POST")
+        .uri("/v1/feed/preferences/monitor/witness-pref-1")
+        .header(CONTENT_TYPE, "application/json")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::from(r#"{"monitored":true}"#))
+        .unwrap();
+    let set_monitor_response = app
+        .clone()
+        .oneshot(set_monitor_request)
+        .await
+        .expect("set monitor response");
+    assert_eq!(set_monitor_response.status(), StatusCode::OK);
+
+    let set_follow_request = Request::builder()
+        .method("POST")
+        .uri("/v1/feed/preferences/follow/ent-rt05")
+        .header(CONTENT_TYPE, "application/json")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::from(r#"{"followed":true}"#))
+        .unwrap();
+    let set_follow_response = app
+        .clone()
+        .oneshot(set_follow_request)
+        .await
+        .expect("set follow response");
+    assert_eq!(set_follow_response.status(), StatusCode::OK);
+
+    let feed_request = Request::builder()
+        .method("GET")
+        .uri("/v1/feed?scope_id=scope-rw-01&limit=10")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let feed_response = app
+        .clone()
+        .oneshot(feed_request)
+        .await
+        .expect("feed response");
+    assert_eq!(feed_response.status(), StatusCode::OK);
+    let feed_body = to_bytes(feed_response.into_body(), usize::MAX)
+        .await
+        .expect("feed body");
+    let feed_json: serde_json::Value = serde_json::from_slice(&feed_body).expect("feed json");
+    let feed_items = feed_json
+        .get("items")
+        .and_then(|value| value.as_array())
+        .expect("feed items");
+    let first_payload = feed_items
+        .first()
+        .and_then(|item| item.get("payload"))
+        .and_then(|value| value.as_object())
+        .expect("payload object");
+    assert_eq!(first_payload.get("monitored"), Some(&json!(true)));
+    assert_eq!(
+        first_payload.get("witness_id"),
+        Some(&json!("witness-pref-1"))
+    );
+    let first_entity_tag = first_payload
+        .get("enrichment")
+        .and_then(|value| value.get("entity_tags"))
+        .and_then(|value| value.as_array())
+        .and_then(|rows| rows.first())
+        .and_then(|value| value.as_object())
+        .expect("entity tag");
+    assert_eq!(first_entity_tag.get("followed"), Some(&json!(true)));
+
+    let suggestions_request = Request::builder()
+        .method("GET")
+        .uri("/v1/feed/suggestions?scope_id=scope-rw-01&limit=10")
+        .header(
+            "authorization",
+            format!("Bearer {}", test_token("test-secret")),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let suggestions_response = app
+        .clone()
+        .oneshot(suggestions_request)
+        .await
+        .expect("suggestions response");
+    assert_eq!(suggestions_response.status(), StatusCode::OK);
+    let suggestions_body = to_bytes(suggestions_response.into_body(), usize::MAX)
+        .await
+        .expect("suggestions body");
+    let suggestions: Vec<serde_json::Value> =
+        serde_json::from_slice(&suggestions_body).expect("suggestions json");
+    let rt05 = suggestions
+        .iter()
+        .find(|item| item.get("entity_id") == Some(&json!("ent-rt05")))
+        .expect("rt05 suggestion");
+    assert_eq!(rt05.get("followed"), Some(&json!(true)));
+}
+
+#[tokio::test]
 async fn discovery_feed_pagination_skips_hidden_rows_for_actor_visibility() {
     let (state, app) = test_app_state_router();
     let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());

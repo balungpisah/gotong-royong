@@ -1280,8 +1280,26 @@ impl GroupRepository for SurrealGroupRepository {
                 DomainError::Validation(format!("invalid summary payload: {err}"))
             })?;
             let mut summary_response = client
-                .query("CREATE group_summary CONTENT $payload")
-                .bind(("payload", summary_payload))
+                .query(
+                    "CREATE group_summary SET \
+                        group_id = $group_id, \
+                        name = $name, \
+                        description = $description, \
+                        entity_type = $entity_type, \
+                        join_policy = $join_policy, \
+                        member_count = $member_count, \
+                        witness_count = $witness_count, \
+                        updated_at = <datetime>$updated_at \
+                     RETURN AFTER",
+                )
+                .bind(("group_id", summary_payload["group_id"].clone()))
+                .bind(("name", summary_payload["name"].clone()))
+                .bind(("description", summary_payload["description"].clone()))
+                .bind(("entity_type", summary_payload["entity_type"].clone()))
+                .bind(("join_policy", summary_payload["join_policy"].clone()))
+                .bind(("member_count", summary_payload["member_count"].clone()))
+                .bind(("witness_count", summary_payload["witness_count"].clone()))
+                .bind(("updated_at", summary_payload["updated_at"].clone()))
                 .await
                 .map_err(SurrealGroupRepository::map_surreal_error)?;
             let summary_rows: Vec<Value> = summary_response
@@ -1298,8 +1316,21 @@ impl GroupRepository for SurrealGroupRepository {
                     DomainError::Validation(format!("invalid member payload: {err}"))
                 })?;
                 client
-                    .query("CREATE group_member CONTENT $payload")
-                    .bind(("payload", payload))
+                    .query(
+                        "CREATE group_member SET \
+                            group_id = $group_id, \
+                            user_id = $user_id, \
+                            name = $name, \
+                            avatar_url = $avatar_url, \
+                            role = $role, \
+                            joined_at = <datetime>$joined_at",
+                    )
+                    .bind(("group_id", payload["group_id"].clone()))
+                    .bind(("user_id", payload["user_id"].clone()))
+                    .bind(("name", payload["name"].clone()))
+                    .bind(("avatar_url", payload["avatar_url"].clone()))
+                    .bind(("role", payload["role"].clone()))
+                    .bind(("joined_at", payload["joined_at"].clone()))
                     .await
                     .map_err(SurrealGroupRepository::map_surreal_error)?;
             }
@@ -1309,8 +1340,25 @@ impl GroupRepository for SurrealGroupRepository {
                     DomainError::Validation(format!("invalid request payload: {err}"))
                 })?;
                 client
-                    .query("CREATE group_join_request CONTENT $payload")
-                    .bind(("payload", payload))
+                    .query(
+                        "CREATE group_join_request SET \
+                            request_id = $request_id, \
+                            group_id = $group_id, \
+                            user_id = $user_id, \
+                            name = $name, \
+                            avatar_url = $avatar_url, \
+                            message = $message, \
+                            status = $status, \
+                            requested_at = <datetime>$requested_at",
+                    )
+                    .bind(("request_id", payload["request_id"].clone()))
+                    .bind(("group_id", payload["group_id"].clone()))
+                    .bind(("user_id", payload["user_id"].clone()))
+                    .bind(("name", payload["name"].clone()))
+                    .bind(("avatar_url", payload["avatar_url"].clone()))
+                    .bind(("message", payload["message"].clone()))
+                    .bind(("status", payload["status"].clone()))
+                    .bind(("requested_at", payload["requested_at"].clone()))
                     .await
                     .map_err(SurrealGroupRepository::map_surreal_error)?;
             }
@@ -1604,8 +1652,21 @@ impl GroupRepository for SurrealGroupRepository {
                     DomainError::Validation(format!("invalid member payload: {err}"))
                 })?;
                 client
-                    .query("CREATE group_member CONTENT $payload")
-                    .bind(("payload", payload))
+                    .query(
+                        "CREATE group_member SET \
+                            group_id = $group_id, \
+                            user_id = $user_id, \
+                            name = $name, \
+                            avatar_url = $avatar_url, \
+                            role = $role, \
+                            joined_at = <datetime>$joined_at",
+                    )
+                    .bind(("group_id", payload["group_id"].clone()))
+                    .bind(("user_id", payload["user_id"].clone()))
+                    .bind(("name", payload["name"].clone()))
+                    .bind(("avatar_url", payload["avatar_url"].clone()))
+                    .bind(("role", payload["role"].clone()))
+                    .bind(("joined_at", payload["joined_at"].clone()))
                     .await
                     .map_err(SurrealGroupRepository::map_surreal_error)?;
             }
@@ -1620,8 +1681,25 @@ impl GroupRepository for SurrealGroupRepository {
                     DomainError::Validation(format!("invalid request payload: {err}"))
                 })?;
                 client
-                    .query("CREATE group_join_request CONTENT $payload")
-                    .bind(("payload", payload))
+                    .query(
+                        "CREATE group_join_request SET \
+                            request_id = $request_id, \
+                            group_id = $group_id, \
+                            user_id = $user_id, \
+                            name = $name, \
+                            avatar_url = $avatar_url, \
+                            message = $message, \
+                            status = $status, \
+                            requested_at = <datetime>$requested_at",
+                    )
+                    .bind(("request_id", payload["request_id"].clone()))
+                    .bind(("group_id", payload["group_id"].clone()))
+                    .bind(("user_id", payload["user_id"].clone()))
+                    .bind(("name", payload["name"].clone()))
+                    .bind(("avatar_url", payload["avatar_url"].clone()))
+                    .bind(("message", payload["message"].clone()))
+                    .bind(("status", payload["status"].clone()))
+                    .bind(("requested_at", payload["requested_at"].clone()))
                     .await
                     .map_err(SurrealGroupRepository::map_surreal_error)?;
             }

@@ -61,6 +61,7 @@ CHECKS=(
   "0028_chat_message_request_index_order_check.surql"
   "0029_group_read_model_schema_check.surql"
   "0030_webhook_payload_flexible_check.surql"
+  "0031_feed_preference_schema_check.surql"
 )
 
 run_check() {

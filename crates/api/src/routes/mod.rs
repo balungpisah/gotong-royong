@@ -179,6 +179,14 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/v1/moderations/:content_id", get(get_moderation_view))
         .route("/v1/feed/suggestions", get(list_discovery_feed_suggestions))
+        .route(
+            "/v1/feed/preferences/monitor/:witness_id",
+            post(set_feed_monitor_preference),
+        )
+        .route(
+            "/v1/feed/preferences/follow/:entity_id",
+            post(set_feed_follow_preference),
+        )
         .route("/v1/feed", get(list_discovery_feed))
         .route("/v1/search", get(list_discovery_search))
         .route("/v1/ontology/concepts", post(upsert_ontology_concept))
@@ -249,6 +257,7 @@ pub fn router(state: AppState) -> Router {
             "/v1/witnesses/:witness_id/signals/resolutions",
             get(list_witness_signal_resolutions),
         )
+        .route("/v1/witnesses", post(create_witness))
         .route("/v1/groups", post(create_group).get(list_groups))
         .route("/v1/groups/me", get(list_my_groups))
         .route("/v1/groups/:group_id", get(get_group).patch(update_group))
@@ -3248,6 +3257,68 @@ struct CreateContributionRequest {
     pub metadata: Option<HashMap<String, Value>>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum WitnessCreateRoute {
+    Komunitas,
+    Vault,
+    Siaga,
+    CatatanKomunitas,
+    Kelola,
+}
+
+impl WitnessCreateRoute {
+    fn to_mode(&self) -> Mode {
+        match self {
+            Self::Komunitas | Self::Kelola => Mode::Komunitas,
+            Self::Vault => Mode::CatatanSaksi,
+            Self::Siaga => Mode::Siaga,
+            Self::CatatanKomunitas => Mode::CatatanKomunitas,
+        }
+    }
+
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Komunitas => "komunitas",
+            Self::Vault => "vault",
+            Self::Siaga => "siaga",
+            Self::CatatanKomunitas => "catatan_komunitas",
+            Self::Kelola => "kelola",
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct CreateWitnessRequest {
+    #[validate(length(min = 1, max = 200))]
+    pub title: String,
+    pub summary: Option<String>,
+    pub route: WitnessCreateRoute,
+    pub track_hint: Option<String>,
+    pub seed_hint: Option<String>,
+    pub rahasia_level: Option<String>,
+    pub triage_result: Option<Value>,
+    pub triage_messages: Option<Vec<Value>>,
+}
+
+fn normalize_rahasia_level(value: Option<&str>) -> String {
+    match value.map(str::trim) {
+        Some("L1") => "L1".to_string(),
+        Some("L2") => "L2".to_string(),
+        Some("L3") => "L3".to_string(),
+        _ => "L0".to_string(),
+    }
+}
+
+fn privacy_level_from_rahasia_level(value: &str) -> String {
+    match value {
+        "L1" => "l1".to_string(),
+        "L2" => "l2".to_string(),
+        "L3" => "l3".to_string(),
+        _ => "public".to_string(),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct ContributionListQuery {
     pub author_id: Option<String>,
@@ -3321,12 +3392,151 @@ async fn create_contribution(
                 request_id.to_string(),
                 correlation_id.to_string(),
                 &contribution,
+                None,
+                None,
             )
             .await?;
 
             let response = IdempotencyResponse {
                 status_code: StatusCode::CREATED.as_u16(),
                 body: serde_json::to_value(&contribution).map_err(|_| ApiError::Internal)?,
+            };
+
+            state
+                .idempotency
+                .complete(&key, response.clone())
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, "idempotency complete failed");
+                    ApiError::Internal
+                })?;
+
+            Ok(to_response(response))
+        }
+    }
+}
+
+async fn create_witness(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Extension(auth): Extension<AuthContext>,
+    Json(payload): Json<CreateWitnessRequest>,
+) -> Result<Response, ApiError> {
+    validation::validate(&payload)?;
+    let actor = actor_identity(&auth)?;
+    let request_id = request_id_from_headers(&headers)?;
+    let correlation_id = correlation_id_from_headers(&headers)?;
+
+    let key = IdempotencyKey::new("witness_create", actor.user_id.clone(), request_id.clone());
+    let outcome = state.idempotency.begin(&key).await.map_err(|err| {
+        tracing::error!(error = %err, "idempotency begin failed");
+        ApiError::Internal
+    })?;
+
+    match outcome {
+        BeginOutcome::Replay(response) => Ok(to_response(response)),
+        BeginOutcome::InProgress => Err(ApiError::Conflict),
+        BeginOutcome::Started => {
+            let summary = payload
+                .summary
+                .clone()
+                .map(|text| text.trim().to_string())
+                .filter(|text| !text.is_empty());
+            let rahasia_level = normalize_rahasia_level(payload.rahasia_level.as_deref());
+
+            let mut metadata = HashMap::new();
+            metadata.insert(
+                "route".to_string(),
+                Value::String(payload.route.as_str().to_string()),
+            );
+            metadata.insert(
+                "rahasia_level".to_string(),
+                Value::String(rahasia_level.clone()),
+            );
+            metadata.insert("status".to_string(), Value::String("open".to_string()));
+            metadata.insert("message_count".to_string(), Value::from(0));
+            metadata.insert("unread_count".to_string(), Value::from(0));
+            if let Some(track_hint) = payload.track_hint.clone() {
+                metadata.insert("track_hint".to_string(), Value::String(track_hint));
+            }
+            if let Some(seed_hint) = payload.seed_hint.clone() {
+                metadata.insert("seed_hint".to_string(), Value::String(seed_hint));
+            }
+            if let Some(triage_result) = payload.triage_result.clone() {
+                metadata.insert("triage_result".to_string(), triage_result);
+            }
+            if let Some(triage_messages) = payload.triage_messages.clone() {
+                metadata.insert("triage_messages".to_string(), Value::Array(triage_messages));
+            }
+
+            let service = ContributionService::new(request_repos::contribution_repo(&state, &auth));
+            let contribution = service
+                .create(
+                    actor.clone(),
+                    request_id.clone(),
+                    correlation_id.clone(),
+                    ContributionCreate {
+                        mode: payload.route.to_mode(),
+                        contribution_type: ContributionType::Custom,
+                        title: payload.title.clone(),
+                        description: summary.clone(),
+                        evidence_url: None,
+                        skill_ids: vec![],
+                        metadata: Some(metadata.clone()),
+                    },
+                )
+                .await
+                .map_err(map_domain_error)?;
+
+            if state.config.webhook_enabled {
+                if let Err(err) = enqueue_webhook_outbox_event(
+                    &state,
+                    &request_id,
+                    &correlation_id,
+                    ContributionService::into_tandang_event_payload(&contribution),
+                )
+                .await
+                {
+                    tracing::warn!(
+                        error = %err,
+                        event_type = "contribution_created",
+                        "failed to enqueue witness webhook outbox event"
+                    );
+                }
+            }
+
+            let mut feed_payload = serde_json::Map::new();
+            for (key, value) in metadata {
+                feed_payload.insert(key, value);
+            }
+            feed_payload.insert(
+                "witness_id".to_string(),
+                Value::String(contribution.contribution_id.clone()),
+            );
+
+            ingest_discovery_contribution_feed(
+                &state,
+                &actor,
+                request_id.to_string(),
+                correlation_id.to_string(),
+                &contribution,
+                Some(privacy_level_from_rahasia_level(&rahasia_level)),
+                Some(Value::Object(feed_payload)),
+            )
+            .await?;
+
+            let response = IdempotencyResponse {
+                status_code: StatusCode::CREATED.as_u16(),
+                body: serde_json::json!({
+                    "witness_id": contribution.contribution_id,
+                    "title": contribution.title,
+                    "summary": contribution.description,
+                    "track_hint": payload.track_hint,
+                    "seed_hint": payload.seed_hint,
+                    "rahasia_level": rahasia_level,
+                    "author_id": actor.user_id,
+                    "created_at_ms": contribution.created_at_ms,
+                }),
             };
 
             state
@@ -3387,6 +3597,28 @@ struct FeedSuggestionsQueryParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct FeedMonitorPreferenceRequest {
+    monitored: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct FeedMonitorPreferenceResponse {
+    witness_id: String,
+    monitored: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct FeedFollowPreferenceRequest {
+    followed: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct FeedFollowPreferenceResponse {
+    entity_id: String,
+    followed: bool,
+}
+
+#[derive(Debug, Deserialize)]
 struct SearchListQueryParams {
     #[serde(alias = "query")]
     pub query_text: Option<String>,
@@ -3418,18 +3650,358 @@ struct DiscoveryUnreadCountResponse {
     unread_count: usize,
 }
 
+const FEED_MONITOR_PREFERENCE_TABLE: &str = "feed_monitor_preference";
+const FEED_FOLLOW_PREFERENCE_TABLE: &str = "feed_follow_preference";
+
+fn feed_preference_key(actor_id: &str, target_id: &str) -> String {
+    format!("{actor_id}:{target_id}")
+}
+
+fn extract_witness_id(item: &gotong_domain::discovery::FeedItem) -> String {
+    item.payload
+        .as_ref()
+        .and_then(Value::as_object)
+        .and_then(|payload| payload.get("witness_id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| item.source_id.clone())
+}
+
+fn extract_entity_ids(item: &gotong_domain::discovery::FeedItem) -> Vec<String> {
+    item.payload
+        .as_ref()
+        .and_then(Value::as_object)
+        .and_then(|payload| payload.get("enrichment"))
+        .and_then(Value::as_object)
+        .and_then(|enrichment| enrichment.get("entity_tags"))
+        .and_then(Value::as_array)
+        .map(|tags| {
+            tags.iter()
+                .filter_map(|tag| {
+                    tag.as_object()
+                        .and_then(|obj| obj.get("entity_id"))
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .map(str::to_string)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn ensure_payload_object(payload: Option<Value>) -> serde_json::Map<String, Value> {
+    match payload {
+        Some(Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    }
+}
+
+fn apply_follow_preferences_to_payload(
+    payload: &mut serde_json::Map<String, Value>,
+    follow_map: &HashMap<String, bool>,
+) {
+    let Some(Value::Object(enrichment)) = payload.get_mut("enrichment") else {
+        return;
+    };
+    let Some(Value::Array(entity_tags)) = enrichment.get_mut("entity_tags") else {
+        return;
+    };
+    for tag in entity_tags {
+        let Some(tag_obj) = tag.as_object_mut() else {
+            continue;
+        };
+        let entity_id = tag_obj
+            .get("entity_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let Some(entity_id) = entity_id else {
+            continue;
+        };
+        if let Some(followed) = follow_map.get(entity_id) {
+            tag_obj.insert("followed".to_string(), Value::Bool(*followed));
+        }
+    }
+}
+
+async fn persist_feed_monitor_preference(
+    state: &AppState,
+    auth: &AuthContext,
+    actor_id: &str,
+    witness_id: &str,
+    monitored: bool,
+) -> Result<(), ApiError> {
+    if let Some(session) = auth.surreal_db_session.as_ref() {
+        let record_id = feed_preference_key(actor_id, witness_id);
+        if monitored {
+            session
+                .client()
+                .query(format!(
+                    "UPSERT type::thing('{FEED_MONITOR_PREFERENCE_TABLE}', $record_id) CONTENT {{ user_id: $user_id, witness_id: $witness_id, monitored: $monitored, updated_at_ms: $updated_at_ms }};"
+                ))
+                .bind(("record_id", record_id))
+                .bind(("user_id", actor_id.to_string()))
+                .bind(("witness_id", witness_id.to_string()))
+                .bind(("monitored", monitored))
+                .bind(("updated_at_ms", gotong_domain::jobs::now_ms()))
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, actor_id = %actor_id, witness_id = %witness_id, "failed to persist monitor preference");
+                    ApiError::Internal
+                })?;
+        } else {
+            session
+                .client()
+                .query(format!(
+                    "DELETE type::thing('{FEED_MONITOR_PREFERENCE_TABLE}', $record_id);"
+                ))
+                .bind(("record_id", record_id))
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, actor_id = %actor_id, witness_id = %witness_id, "failed to delete monitor preference");
+                    ApiError::Internal
+                })?;
+        }
+        return Ok(());
+    }
+
+    let key = feed_preference_key(actor_id, witness_id);
+    let mut prefs = state.feed_monitor_preferences.write().await;
+    if monitored {
+        prefs.insert(key, true);
+    } else {
+        prefs.remove(&key);
+    }
+    Ok(())
+}
+
+async fn persist_feed_follow_preference(
+    state: &AppState,
+    auth: &AuthContext,
+    actor_id: &str,
+    entity_id: &str,
+    followed: bool,
+) -> Result<(), ApiError> {
+    if let Some(session) = auth.surreal_db_session.as_ref() {
+        let record_id = feed_preference_key(actor_id, entity_id);
+        if followed {
+            session
+                .client()
+                .query(format!(
+                    "UPSERT type::thing('{FEED_FOLLOW_PREFERENCE_TABLE}', $record_id) CONTENT {{ user_id: $user_id, entity_id: $entity_id, followed: $followed, updated_at_ms: $updated_at_ms }};"
+                ))
+                .bind(("record_id", record_id))
+                .bind(("user_id", actor_id.to_string()))
+                .bind(("entity_id", entity_id.to_string()))
+                .bind(("followed", followed))
+                .bind(("updated_at_ms", gotong_domain::jobs::now_ms()))
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, actor_id = %actor_id, entity_id = %entity_id, "failed to persist follow preference");
+                    ApiError::Internal
+                })?;
+        } else {
+            session
+                .client()
+                .query(format!(
+                    "DELETE type::thing('{FEED_FOLLOW_PREFERENCE_TABLE}', $record_id);"
+                ))
+                .bind(("record_id", record_id))
+                .await
+                .map_err(|err| {
+                    tracing::error!(error = %err, actor_id = %actor_id, entity_id = %entity_id, "failed to delete follow preference");
+                    ApiError::Internal
+                })?;
+        }
+        return Ok(());
+    }
+
+    let key = feed_preference_key(actor_id, entity_id);
+    let mut prefs = state.feed_follow_preferences.write().await;
+    if followed {
+        prefs.insert(key, true);
+    } else {
+        prefs.remove(&key);
+    }
+    Ok(())
+}
+
+async fn load_monitor_preferences(
+    state: &AppState,
+    auth: &AuthContext,
+    actor_id: &str,
+    witness_ids: &[String],
+) -> Result<HashMap<String, bool>, ApiError> {
+    if witness_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    if let Some(session) = auth.surreal_db_session.as_ref() {
+        let mut response = session
+            .client()
+            .query(format!(
+                "SELECT witness_id, monitored FROM {FEED_MONITOR_PREFERENCE_TABLE} WHERE user_id = $user_id AND witness_id IN $witness_ids;"
+            ))
+            .bind(("user_id", actor_id.to_string()))
+            .bind(("witness_ids", witness_ids.to_vec()))
+            .await
+            .map_err(|err| {
+                tracing::error!(error = %err, actor_id = %actor_id, "failed to load monitor preferences");
+                ApiError::Internal
+            })?;
+        let rows: Vec<Value> = response.take(0).map_err(|err| {
+            tracing::error!(error = %err, actor_id = %actor_id, "failed to decode monitor preferences");
+            ApiError::Internal
+        })?;
+        let mapped = rows
+            .into_iter()
+            .filter_map(|row| {
+                let obj = row.as_object()?;
+                let witness_id = obj
+                    .get("witness_id")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())?
+                    .to_string();
+                let monitored = obj
+                    .get("monitored")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                Some((witness_id, monitored))
+            })
+            .collect();
+        return Ok(mapped);
+    }
+
+    let prefs = state.feed_monitor_preferences.read().await;
+    let result = witness_ids
+        .iter()
+        .filter_map(|witness_id| {
+            let key = feed_preference_key(actor_id, witness_id);
+            prefs.get(&key).map(|value| (witness_id.clone(), *value))
+        })
+        .collect();
+    Ok(result)
+}
+
+async fn load_follow_preferences(
+    state: &AppState,
+    auth: &AuthContext,
+    actor_id: &str,
+    entity_ids: &[String],
+) -> Result<HashMap<String, bool>, ApiError> {
+    if entity_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    if let Some(session) = auth.surreal_db_session.as_ref() {
+        let mut response = session
+            .client()
+            .query(format!(
+                "SELECT entity_id, followed FROM {FEED_FOLLOW_PREFERENCE_TABLE} WHERE user_id = $user_id AND entity_id IN $entity_ids;"
+            ))
+            .bind(("user_id", actor_id.to_string()))
+            .bind(("entity_ids", entity_ids.to_vec()))
+            .await
+            .map_err(|err| {
+                tracing::error!(error = %err, actor_id = %actor_id, "failed to load follow preferences");
+                ApiError::Internal
+            })?;
+        let rows: Vec<Value> = response.take(0).map_err(|err| {
+            tracing::error!(error = %err, actor_id = %actor_id, "failed to decode follow preferences");
+            ApiError::Internal
+        })?;
+        let mapped = rows
+            .into_iter()
+            .filter_map(|row| {
+                let obj = row.as_object()?;
+                let entity_id = obj
+                    .get("entity_id")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())?
+                    .to_string();
+                let followed = obj
+                    .get("followed")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                Some((entity_id, followed))
+            })
+            .collect();
+        return Ok(mapped);
+    }
+
+    let prefs = state.feed_follow_preferences.read().await;
+    let result = entity_ids
+        .iter()
+        .filter_map(|entity_id| {
+            let key = feed_preference_key(actor_id, entity_id);
+            prefs.get(&key).map(|value| (entity_id.clone(), *value))
+        })
+        .collect();
+    Ok(result)
+}
+
+async fn set_feed_monitor_preference(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(witness_id): Path<String>,
+    Json(payload): Json<FeedMonitorPreferenceRequest>,
+) -> Result<Json<FeedMonitorPreferenceResponse>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let witness_id = witness_id.trim().to_string();
+    if witness_id.is_empty() {
+        return Err(ApiError::Validation("witness_id is required".into()));
+    }
+    persist_feed_monitor_preference(
+        &state,
+        &auth,
+        &actor.user_id,
+        &witness_id,
+        payload.monitored,
+    )
+    .await?;
+    Ok(Json(FeedMonitorPreferenceResponse {
+        witness_id,
+        monitored: payload.monitored,
+    }))
+}
+
+async fn set_feed_follow_preference(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    Path(entity_id): Path<String>,
+    Json(payload): Json<FeedFollowPreferenceRequest>,
+) -> Result<Json<FeedFollowPreferenceResponse>, ApiError> {
+    let actor = actor_identity(&auth)?;
+    let entity_id = entity_id.trim().to_string();
+    if entity_id.is_empty() {
+        return Err(ApiError::Validation("entity_id is required".into()));
+    }
+    persist_feed_follow_preference(&state, &auth, &actor.user_id, &entity_id, payload.followed)
+        .await?;
+    Ok(Json(FeedFollowPreferenceResponse {
+        entity_id,
+        followed: payload.followed,
+    }))
+}
+
 async fn list_discovery_feed(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthContext>,
     Query(query): Query<FeedListQueryParams>,
 ) -> Result<Json<PagedFeed>, ApiError> {
     let actor = actor_identity(&auth)?;
+    let actor_id = actor.user_id.clone();
     let service = DiscoveryService::new(
         request_repos::feed_repo(&state, &auth),
         request_repos::notification_repo(&state, &auth),
     );
     let request = FeedListQuery {
-        actor_id: actor.user_id,
+        actor_id: actor_id.clone(),
         cursor: query.cursor,
         limit: query.limit,
         scope_id: query.scope_id,
@@ -3438,7 +4010,29 @@ async fn list_discovery_feed(
         to_ms: query.to_ms,
         involvement_only: query.involvement_only.unwrap_or(false),
     };
-    let response = service.list_feed(request).await.map_err(map_domain_error)?;
+    let mut response = service.list_feed(request).await.map_err(map_domain_error)?;
+
+    let witness_ids: Vec<String> = response.items.iter().map(extract_witness_id).collect();
+    let entity_ids: Vec<String> = response
+        .items
+        .iter()
+        .flat_map(extract_entity_ids)
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    let monitor_map = load_monitor_preferences(&state, &auth, &actor_id, &witness_ids).await?;
+    let follow_map = load_follow_preferences(&state, &auth, &actor_id, &entity_ids).await?;
+
+    for item in &mut response.items {
+        let witness_id = extract_witness_id(item);
+        let monitored = monitor_map.get(&witness_id).copied().unwrap_or(false);
+        let mut payload = ensure_payload_object(item.payload.take());
+        payload.insert("witness_id".to_string(), Value::String(witness_id));
+        payload.insert("monitored".to_string(), Value::Bool(monitored));
+        apply_follow_preferences_to_payload(&mut payload, &follow_map);
+        item.payload = Some(Value::Object(payload));
+    }
+
     Ok(Json(response))
 }
 
@@ -3448,22 +4042,30 @@ async fn list_discovery_feed_suggestions(
     Query(query): Query<FeedSuggestionsQueryParams>,
 ) -> Result<Json<Vec<FeedSuggestion>>, ApiError> {
     let actor = actor_identity(&auth)?;
+    let actor_id = actor.user_id.clone();
     let service = DiscoveryService::new(
         request_repos::feed_repo(&state, &auth),
         request_repos::notification_repo(&state, &auth),
     );
     let request = FeedSuggestionsQuery {
-        actor_id: actor.user_id,
+        actor_id: actor_id.clone(),
         limit: query.limit,
         scope_id: query.scope_id,
         privacy_level: query.privacy_level,
         from_ms: query.from_ms,
         to_ms: query.to_ms,
     };
-    let response = service
+    let mut response = service
         .list_feed_suggestions(request)
         .await
         .map_err(map_domain_error)?;
+    let entity_ids: Vec<String> = response.iter().map(|item| item.entity_id.clone()).collect();
+    let follow_map = load_follow_preferences(&state, &auth, &actor_id, &entity_ids).await?;
+    for suggestion in &mut response {
+        if let Some(followed) = follow_map.get(&suggestion.entity_id) {
+            suggestion.followed = *followed;
+        }
+    }
     Ok(Json(response))
 }
 
@@ -5175,8 +5777,19 @@ async fn ingest_discovery_contribution_feed(
     request_id: String,
     correlation_id: String,
     contribution: &Contribution,
+    privacy_level: Option<String>,
+    payload: Option<Value>,
 ) -> Result<(), ApiError> {
     let service = DiscoveryService::new(state.feed_repo.clone(), state.notification_repo.clone());
+    let metadata_payload = payload.or_else(|| {
+        contribution.metadata.as_ref().map(|metadata| {
+            let mut object = serde_json::Map::new();
+            for (key, value) in metadata {
+                object.insert(key.clone(), value.clone());
+            }
+            Value::Object(object)
+        })
+    });
     let input = FeedIngestInput {
         source_type: FEED_SOURCE_CONTRIBUTION.to_string(),
         source_id: contribution.contribution_id.clone(),
@@ -5184,13 +5797,13 @@ async fn ingest_discovery_contribution_feed(
         title: contribution.title.clone(),
         summary: contribution.description.clone(),
         scope_id: None,
-        privacy_level: Some("public".to_string()),
+        privacy_level: Some(privacy_level.unwrap_or_else(|| "public".to_string())),
         occurred_at_ms: Some(contribution.created_at_ms),
         request_id,
         correlation_id,
         request_ts_ms: Some(contribution.created_at_ms),
         participant_ids: vec![],
-        payload: None,
+        payload: metadata_payload,
     };
     service.ingest_feed(input).await.map_err(map_domain_error)?;
     Ok(())

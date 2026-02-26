@@ -106,6 +106,7 @@ for migration_file in \
   "0027_hot_path_pack_c_feed_participant_edge.surql" \
   "0028_chat_message_request_index_order.surql" \
   "0029_group_read_model_schema.surql" \
-  "0030_webhook_payload_flexible.surql"; do
+  "0030_webhook_payload_flexible.surql" \
+  "0031_feed_preference_schema.surql"; do
   run_migration "$migration_file"
 done

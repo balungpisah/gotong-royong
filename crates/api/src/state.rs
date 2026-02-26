@@ -85,6 +85,8 @@ pub struct AppState {
     pub notification_repo: Arc<dyn NotificationRepository>,
     pub webhook_outbox_repo: Arc<dyn WebhookOutboxRepository>,
     pub group_repo: Arc<dyn GroupRepository>,
+    pub feed_monitor_preferences: Arc<RwLock<HashMap<String, bool>>>,
+    pub feed_follow_preferences: Arc<RwLock<HashMap<String, bool>>>,
     pub chat_realtime: ChatRealtimeBus,
     pub chat_attachment_storage: ChatAttachmentStorage,
     pub triage_sessions: Arc<RwLock<HashMap<String, TriageSessionState>>>,
@@ -482,6 +484,8 @@ impl AppState {
         let markov_client = Arc::new(MarkovReadClient::from_config(&config));
         let triage_sessions = Arc::new(RwLock::new(HashMap::new()));
         let witness_signals = Arc::new(RwLock::new(HashMap::new()));
+        let feed_monitor_preferences = Arc::new(RwLock::new(HashMap::new()));
+        let feed_follow_preferences = Arc::new(RwLock::new(HashMap::new()));
         Ok(Self {
             config,
             markov_client,
@@ -500,6 +504,8 @@ impl AppState {
             notification_repo,
             webhook_outbox_repo,
             group_repo,
+            feed_monitor_preferences,
+            feed_follow_preferences,
             chat_realtime,
             chat_attachment_storage,
             triage_sessions,
@@ -530,6 +536,8 @@ impl AppState {
         let markov_client = Arc::new(MarkovReadClient::from_config(&config));
         let triage_sessions = Arc::new(RwLock::new(HashMap::new()));
         let witness_signals = Arc::new(RwLock::new(HashMap::new()));
+        let feed_monitor_preferences = Arc::new(RwLock::new(HashMap::new()));
+        let feed_follow_preferences = Arc::new(RwLock::new(HashMap::new()));
         Self {
             config,
             markov_client,
@@ -548,6 +556,8 @@ impl AppState {
             notification_repo,
             webhook_outbox_repo,
             group_repo,
+            feed_monitor_preferences,
+            feed_follow_preferences,
             chat_realtime,
             chat_attachment_storage,
             triage_sessions,
@@ -581,6 +591,8 @@ impl AppState {
         let markov_client = Arc::new(MarkovReadClient::from_config(&config));
         let triage_sessions = Arc::new(RwLock::new(HashMap::new()));
         let witness_signals = Arc::new(RwLock::new(HashMap::new()));
+        let feed_monitor_preferences = Arc::new(RwLock::new(HashMap::new()));
+        let feed_follow_preferences = Arc::new(RwLock::new(HashMap::new()));
         Self {
             config,
             markov_client,
@@ -599,6 +611,8 @@ impl AppState {
             notification_repo,
             webhook_outbox_repo,
             group_repo,
+            feed_monitor_preferences,
+            feed_follow_preferences,
             chat_realtime,
             chat_attachment_storage,
             triage_sessions,
