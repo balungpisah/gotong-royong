@@ -1,6 +1,10 @@
 > [← Back to AI Spec index](../AI-SPEC-v0.2.md)
 > Design spec: [04-ai-00-triage.md](./04-ai-00-triage.md)
 
+> Superseded on 2026-02-26.
+> Runtime source of truth moved to:
+> `docs/research/contracts/triage-witness-feed-contract-v1.md`
+
 # AI-00 Triage — Edge-Pod Implementation Contract
 
 > **Status:** Draft v0.1

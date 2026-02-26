@@ -1,5 +1,11 @@
 # Edge-Pod Endpoint Contracts for Gotong-Royong (Research Handoff)
 
+> Superseded on 2026-02-26 for runtime triage->witness flow.
+> Runtime source of truth:
+> `docs/research/contracts/triage-witness-feed-contract-v1.md`
+>
+> This document remains as research/archive context only.
+
 This document is the practical handoff from Gotong-Royong research to Edge-Pod implementation.
 
 Goal:

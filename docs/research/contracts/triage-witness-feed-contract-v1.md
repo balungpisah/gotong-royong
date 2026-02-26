@@ -284,6 +284,28 @@ This is the canonical placement for phase-to-ESCO demand used by notification ro
   - `program_refs`
   - `stempel_state`
   - `impact_verification`
+  - `dev_meta` (optional; non-production seeded cards only)
+
+### 6.1 Dev seeded feed metadata (`dev_meta`)
+
+`stream_item.data.dev_meta` is optional and only intended for development/test seeded cards.
+Production-authored cards should omit this object.
+
+```json
+{
+  "dev_meta": {
+    "is_seed": true,
+    "seed_batch_id": "fixture-taxonomy-v1",
+    "seed_origin": "fixture | db | operator_stub"
+  }
+}
+```
+
+Rules:
+- `is_seed` is required when `dev_meta` is present.
+- `seed_batch_id` is optional but recommended for matrix/audit runs.
+- `seed_origin` is optional and constrained to `fixture | db | operator_stub`.
+- Frontend may show explicit `SEED` affordances only in development mode.
 
 ## 7) Related Operator Contract
 
@@ -298,3 +320,6 @@ contract (`triage.v1`) before API response persistence.
 
 Trajectory taxonomy should be cross-referenced with Tandang signal behavior using:
 - `docs/research/contracts/trajectory-tandang-signal-crosswalk-v1.md`
+
+Seeded card metadata conventions for dev/test coverage are defined in:
+- `docs/research/contracts/feed-seed-metadata-v1.md`
