@@ -33,6 +33,8 @@ The canonical stack decision (ADR-001) has been promoted to `docs/architecture/a
 | File | Status | Description |
 |------|--------|-------------|
 | `triage-witness-feed-contract-v1.md` | [ACTIVE REF] | Canonical runtime contract for triage sessions and session-authoritative witness materialization |
+| `feed-card-blocks-v1.md` | [ACTIVE REF] | Canonical block inventory and trajectory profiles for feed card rendering (`witness/system/data`) |
+| `chat-interaction-blocks-v1.md` | [ACTIVE REF] | Canonical block catalog for conversation + structured layers in chat-driven phases |
 | `feed-seed-metadata-v1.md` | [ACTIVE REF] | Canonical optional metadata contract for seeded feed cards (`dev_meta`) used in dev/test |
 | `ai-endpoint-map-v1.md` | [ACTIVE REF] | Canonical registry of runtime AI endpoints: prompt/version, contract links, fallback, validation gate, observability |
 | `triage-operator-output-contract-v1.md` | [ACTIVE REF] | Canonical operator->orchestrator contract (`triage_draft/triage_final`) with payload semantics per operator |

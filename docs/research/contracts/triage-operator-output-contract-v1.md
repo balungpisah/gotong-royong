@@ -61,6 +61,10 @@ Rules:
     "track_hint": "obrolkan",
     "seed_hint": "Aspirasi"
   },
+  "blocks": {
+    "conversation": ["ai_inline_card", "diff_card"],
+    "structured": ["document", "list", "vote", "computed"]
+  },
   "payload": {
     "context": "proposal",
     "decision_steps": [
@@ -83,7 +87,21 @@ Top-level fields:
 - `questions[]`: follow-up prompts for next turn
 - `missing_fields[]`: unresolved required fields
 - `routing`: routing/taxonomy metadata
+- `blocks`: declared block usage for UI planning (optional in draft, required in final)
 - `payload`: operator-specific JSON (partial in draft, full in final)
+
+`blocks` contract:
+```json
+{
+  "conversation": ["ai_inline_card", "diff_card", "vote_card", "credit_nudge_card"],
+  "structured": ["list", "document", "form", "computed", "display", "vote", "reference"]
+}
+```
+
+Rules:
+- `conversation` values must be from `chat-interaction-blocks-v1.md` conversation blocks.
+- `structured` values must be from the 7 block primitives.
+- `triage_final` must include `blocks`. `triage_draft` may omit it.
 
 ### 3.1 Final Output Examples by Kind
 
@@ -97,6 +115,7 @@ Top-level fields:
   "output_kind": "witness",
   "checklist": [{ "field": "problem_scope", "filled": true, "required_for_final": true }],
   "routing": { "route": "komunitas", "trajectory_type": "aksi" },
+  "blocks": { "conversation": ["ai_inline_card", "diff_card"], "structured": ["document", "list", "computed"] },
   "payload": { "trajectory": "A", "path_plan": { "plan_id": "plan-1", "version": 1, "title": "...", "summary": "...", "branches": [{ "branch_id": "main", "label": "Utama", "parent_checkpoint_id": null, "phases": [{ "phase_id": "p1", "title": "...", "objective": "...", "status": "planned", "source": "ai", "locked_fields": [], "checkpoints": [{ "checkpoint_id": "c1", "title": "...", "status": "open", "source": "ai", "locked_fields": [] }] }] }] } }
 }
 ```
@@ -111,6 +130,7 @@ Top-level fields:
   "output_kind": "data",
   "checklist": [{ "field": "claim", "filled": true, "required_for_final": true }],
   "routing": { "route": "catatan_komunitas", "trajectory_type": "data", "taxonomy": { "category_code": "commodity_price", "category_label": "Harga Komoditas", "quality": "community_observation" } },
+  "blocks": { "conversation": ["ai_inline_card", "diff_card"], "structured": ["form", "document", "reference"] },
   "payload": { "record_type": "data", "claim": "Harga telur Rp32.000/kg", "observed_at": "2026-02-26T06:00:00Z", "category": "harga_pangan" }
 }
 ```
@@ -125,6 +145,7 @@ Top-level fields:
   "output_kind": "kelola",
   "checklist": [{ "field": "group_name", "filled": true, "required_for_final": true }],
   "routing": { "route": "kelola" },
+  "blocks": { "conversation": ["ai_inline_card", "diff_card"], "structured": ["form", "list", "reference"] },
   "payload": { "action": "create", "group_detail": { "name": "Ronda RT 04", "description": "Koordinasi ronda malam", "join_policy": "persetujuan", "entity_type": "kelompok" } }
 }
 ```
@@ -143,10 +164,27 @@ Top-level fields:
 | `siaga` | `siaga` | `data` | `SiagaPayload` |
 | `kelola` | none (group lifecycle) | `kelola` | `KelolaPayload` |
 
+### 4.1 Operator → Blocks (reference)
+
+| Operator | Conversation blocks | Structured blocks |
+|---|---|
+| `masalah` | `ai_inline_card`, `diff_card` | `document`, `list`, `computed` |
+| `musyawarah` | `ai_inline_card`, `diff_card`, `vote_card` | `document`, `list`, `vote`, `computed` |
+| `pantau` | `ai_inline_card`, `diff_card` | `list`, `document`, `computed` |
+| `program` | `ai_inline_card`, `diff_card` | `list`, `form`, `computed` |
+| `catat` | `ai_inline_card`, `diff_card` | `form`, `document`, `reference` |
+| `bantuan` | `ai_inline_card`, `diff_card` | `form`, `list`, `computed` |
+| `rayakan` | `ai_inline_card`, `diff_card` | `display`, `document`, `reference` |
+| `siaga` | `ai_inline_card`, `diff_card`, `vote_card` | `form`, `list`, `computed` |
+| `kelola` | `ai_inline_card`, `diff_card` | `form`, `list`, `reference` |
+
+Note: `vote_card` is reserved for consensus/confirmation flows (`musyawarah`, `siaga`).
+
 Consistency requirements:
 - `operator=kelola` -> `output_kind=kelola` and `routing.route=kelola`
 - `output_kind=data` -> `routing.taxonomy` required
 - `output_kind=witness` -> `routing.trajectory_type` must be one of `aksi|advokasi|pantau|mufakat|mediasi|program`
+- `triage_final` -> `blocks` required
 
 ## 5) Final Payload Contracts (when `triage_stage=triage_final`)
 
