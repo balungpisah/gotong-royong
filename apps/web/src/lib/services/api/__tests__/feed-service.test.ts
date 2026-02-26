@@ -41,6 +41,34 @@ describe('ApiFeedService', () => {
 						payload: {
 							witness_id: 'witness-1',
 							monitored: true,
+							dev_meta: {
+								is_seed: true,
+								seed_batch_id: 'db-seed-2026-02-26',
+								seed_origin: 'db'
+							},
+							program_refs: [
+								{
+									program_id: 'program:mbg',
+									label: 'Makan Bergizi Gratis',
+									source: 'llm_inferred',
+									confidence: 0.82
+								}
+							],
+							stempel_state: {
+								state: 'objection_window',
+								min_participants: 3,
+								participant_count: 5,
+								objection_count: 0,
+								objection_deadline_ms: 1_700_000_123_000
+							},
+							impact_verification: {
+								status: 'open',
+								opened_at_ms: 1_700_000_000_000,
+								closes_at_ms: 1_700_086_400_000,
+								yes_count: 2,
+								no_count: 0,
+								min_vouches: 3
+							},
 							enrichment: {
 								title: 'Judul enrichment',
 								trajectory_type: 'data',
@@ -90,6 +118,31 @@ describe('ApiFeedService', () => {
 			sentiment: 'curious',
 			intensity: 3,
 			monitored: true,
+			dev_meta: {
+				is_seed: true,
+				seed_batch_id: 'db-seed-2026-02-26',
+				seed_origin: 'db'
+			},
+			program_refs: [
+				{
+					program_id: 'program:mbg',
+					label: 'Makan Bergizi Gratis',
+					source: 'llm_inferred',
+					confidence: 0.82
+				}
+			],
+			stempel_state: {
+				state: 'objection_window',
+				min_participants: 3,
+				participant_count: 5,
+				objection_count: 0
+			},
+			impact_verification: {
+				status: 'open',
+				yes_count: 2,
+				no_count: 0,
+				min_vouches: 3
+			},
 			latest_event: {
 				event_id: 'feed-1',
 				event_type: 'community_note',
@@ -146,6 +199,44 @@ describe('ApiFeedService', () => {
 				verb: 'memberi vouch'
 			}
 		});
+	});
+
+	it('drops invalid dev_meta payload fields safely', async () => {
+		const { client, get } = makeApiClient();
+		get.mockResolvedValueOnce({
+			items: [
+				{
+					kind: 'witness',
+					stream_id: 'w-feed-3',
+					sort_timestamp: '2023-11-14T22:13:22.000Z',
+					data: {
+						feed_id: 'feed-3',
+						source_type: 'ontology_note',
+						source_id: 'source-3',
+						actor_id: 'user-3',
+						actor_username: 'Sinta',
+						title: 'Catatan',
+						privacy_level: 'public',
+						occurred_at_ms: 1_700_000_002_000,
+						created_at_ms: 1_700_000_002_100,
+						payload: {
+							dev_meta: {
+								is_seed: 'yes',
+								seed_origin: 'unknown-origin'
+							}
+						}
+					}
+				}
+			]
+		});
+
+		const service = new ApiFeedService(client);
+		const page = await service.list();
+
+		if (page.items[0].kind !== 'witness') {
+			throw new Error('expected witness stream item');
+		}
+		expect(page.items[0].data.dev_meta).toBeUndefined();
 	});
 
 	it('maps suggestions from backend endpoint', async () => {

@@ -58,34 +58,20 @@ describe('ApiWitnessService', () => {
 
 		const service = new ApiWitnessService(client, fallback);
 		const detail = await service.create({
-			title: 'Jalan Rusak RT 05',
-			summary: 'Lubang besar belum diperbaiki',
-			route: 'komunitas',
-			track_hint: 'tuntaskan',
-			seed_hint: 'Keresahan',
-			confidence: { score: 0.92, label: 'Tuntaskan · 92%' },
-			rahasia_level: 'L0',
-			triage_result: {
-				bar_state: 'ready',
-				route: 'komunitas'
-			},
-			triage_messages: [
-				{ role: 'user', text: 'Jalan di RT 05 berlubang' },
-				{ role: 'ai', text: 'Siap, kita catat sebagai saksi komunitas.' }
-			]
+			schema_version: 'triage.v1',
+			triage_session_id: 'triage-sess-100'
 		});
 
 		expect(detail.witness_id).toBe('witness-100');
 		expect(detail.title).toBe('Jalan Rusak RT 05');
 		expect(detail.plan).toBeNull();
-		expect(detail.messages).toHaveLength(2);
+		expect(detail.messages).toHaveLength(0);
 		expect(post).toHaveBeenCalledWith(
 			'/witnesses',
 			expect.objectContaining({
 				body: expect.objectContaining({
-					title: 'Jalan Rusak RT 05',
-					route: 'komunitas',
-					rahasia_level: 'L0'
+					schema_version: 'triage.v1',
+					triage_session_id: 'triage-sess-100'
 				})
 			})
 		);

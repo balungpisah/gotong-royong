@@ -19,6 +19,9 @@ const makeApiClient = () => {
 };
 
 const makeFallbackResult = (): TriageResult => ({
+	schema_version: 'triage.v1',
+	status: 'draft',
+	kind: 'witness',
 	bar_state: 'probing',
 	route: 'komunitas',
 	confidence: { score: 0.4, label: 'Menganalisis...' }
@@ -45,6 +48,9 @@ describe('ApiTriageService', () => {
 		post.mockResolvedValue({
 			session_id: 'triage-sess-1',
 			result: {
+				schema_version: 'triage.v1',
+				status: 'draft',
+				kind: 'witness',
 				bar_state: 'probing',
 				route: 'komunitas',
 				trajectory_type: 'aksi',
@@ -73,6 +79,9 @@ describe('ApiTriageService', () => {
 				return {
 					session_id: 'triage-sess-2',
 					result: {
+						schema_version: 'triage.v1',
+						status: 'draft',
+						kind: 'witness',
 						bar_state: 'probing',
 						route: 'komunitas',
 						confidence: { score: 0.4, label: 'Komunitas · 40%' }
@@ -82,6 +91,9 @@ describe('ApiTriageService', () => {
 			if (path === '/triage/sessions/triage-sess-2/messages') {
 				return {
 					result: {
+						schema_version: 'triage.v1',
+						status: 'draft',
+						kind: 'witness',
 						bar_state: 'leaning',
 						route: 'komunitas',
 						confidence: { score: 0.7, label: 'Komunitas · 70%' }

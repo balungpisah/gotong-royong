@@ -71,13 +71,14 @@ const resolveWitnessIdFromPayload = (payload: JsonRecord | undefined): string | 
 	const target = isRecord(payload?.target) ? payload.target : undefined;
 	const context = isRecord(payload?.context) ? payload.context : undefined;
 	return (
-		asString(payload?.witness_id) ??
-		asString(target?.witness_id) ??
-		asString(context?.witness_id)
+		asString(payload?.witness_id) ?? asString(target?.witness_id) ?? asString(context?.witness_id)
 	);
 };
 
-const resolveWitnessId = (item: ApiNotificationItem, payload: JsonRecord | undefined): string | undefined => {
+const resolveWitnessId = (
+	item: ApiNotificationItem,
+	payload: JsonRecord | undefined
+): string | undefined => {
 	const fromPayload = resolveWitnessIdFromPayload(payload);
 	if (fromPayload) {
 		return fromPayload;
@@ -88,7 +89,10 @@ const resolveWitnessId = (item: ApiNotificationItem, payload: JsonRecord | undef
 	return undefined;
 };
 
-const resolveTargetPath = (payload: JsonRecord | undefined, witnessId: string | undefined): string | undefined => {
+const resolveTargetPath = (
+	payload: JsonRecord | undefined,
+	witnessId: string | undefined
+): string | undefined => {
 	const target = isRecord(payload?.target) ? payload.target : undefined;
 	const context = isRecord(payload?.context) ? payload.context : undefined;
 	const explicitPath =

@@ -166,7 +166,10 @@ const mapActiveHighlights = (insightsData: JsonRecord): CommunityDashboard['acti
 				0,
 				Math.round(metricValue ?? asNumber(entry.verified_solutions) ?? 0)
 			);
-			const idSeed = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+			const idSeed = name
+				.toLowerCase()
+				.replace(/[^a-z0-9]+/g, '-')
+				.replace(/^-+|-+$/g, '');
 			return {
 				user_id: `lb-${rank}-${idSeed || 'user'}`,
 				name,
@@ -176,9 +179,7 @@ const mapActiveHighlights = (insightsData: JsonRecord): CommunityDashboard['acti
 				streak_days: 0
 			};
 		})
-		.filter(
-			(row): row is CommunityDashboard['active_highlights'][number] => Boolean(row)
-		)
+		.filter((row): row is CommunityDashboard['active_highlights'][number] => Boolean(row))
 		.slice(0, 8);
 };
 
@@ -239,9 +240,7 @@ const mapDashboard = (
 	const pulseData = Object.keys(insightsData).length > 0 ? insightsData : overviewData;
 	const totalUsers = Math.max(
 		0,
-		Math.round(
-			asNumber(pulseData.total_users) ?? asNumber(overviewData.total_users) ?? 0
-		)
+		Math.round(asNumber(pulseData.total_users) ?? asNumber(overviewData.total_users) ?? 0)
 	);
 	const tierDistribution = mapTierDistribution(pulseData, totalUsers);
 	const competence = normalizeScore(asNumber(pulseData.average_competence), 0);

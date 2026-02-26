@@ -1,16 +1,20 @@
 import type { ApiClient } from '$lib/api';
 import type {
+	FeedDevMeta,
 	FeedEventType,
 	FeedItem,
 	FeedSource,
 	FeedStreamItem,
 	FollowableEntity,
+	ImpactVerification,
 	MyRelation,
+	ProgramReference,
 	RahasiaLevel,
 	SignalCounts,
 	SignalLabels,
 	Sentiment,
 	SystemCardData,
+	TriageStempelState,
 	TrajectoryType
 } from '$lib/types';
 import type { FeedService, Paginated } from '../types';
@@ -135,7 +139,12 @@ const mapPrivacyToRahasia = (
 	}
 
 	const normalized = (privacyLevel ?? '').trim().toLowerCase();
-	if (!normalized || normalized === 'public' || normalized === 'open' || normalized === 'unrestricted') {
+	if (
+		!normalized ||
+		normalized === 'public' ||
+		normalized === 'open' ||
+		normalized === 'unrestricted'
+	) {
 		return 'L0';
 	}
 	if (normalized === 'l0') return 'L0';
@@ -278,9 +287,10 @@ const mapMyRelation = (payload: JsonRecord | undefined): MyRelation | undefined 
 	const supported = asBoolean(raw.supported) ?? false;
 	const voteCast = asString(raw.vote_cast);
 	const vouchType = asString(raw.vouch_type);
-	const allowedVouchType = vouchType && ['positive', 'skeptical', 'conditional', 'mentorship'].includes(vouchType)
-		? vouchType
-		: undefined;
+	const allowedVouchType =
+		vouchType && ['positive', 'skeptical', 'conditional', 'mentorship'].includes(vouchType)
+			? vouchType
+			: undefined;
 
 	const relation: MyRelation = {
 		vouched,
@@ -314,7 +324,120 @@ const mapSignalCounts = (payload: JsonRecord | undefined): SignalCounts | undefi
 	};
 };
 
-const resolveTrajectory = (sourceType: string, enrichment: JsonRecord | undefined): TrajectoryType => {
+const mapProgramRefs = (payload: JsonRecord | undefined): ProgramReference[] | undefined => {
+	const triageResult = isRecord(payload?.triage_result) ? payload?.triage_result : undefined;
+	const raw =
+		(Array.isArray(payload?.program_refs) ? payload?.program_refs : undefined) ??
+		(Array.isArray(triageResult?.program_refs) ? triageResult?.program_refs : undefined);
+	if (!Array.isArray(raw)) {
+		return undefined;
+	}
+	const mapped = raw
+		.map((item) => {
+			if (!isRecord(item)) return undefined;
+			const programId = asString(item.program_id);
+			const label = asString(item.label);
+			const source = asString(item.source);
+			const confidence = asNumber(item.confidence);
+			if (!programId || !label || !source || confidence == null) {
+				return undefined;
+			}
+			return {
+				program_id: programId,
+				label,
+				source,
+				confidence
+			} satisfies ProgramReference;
+		})
+		.filter((item): item is ProgramReference => Boolean(item));
+	return mapped.length > 0 ? mapped : undefined;
+};
+
+const mapStempelState = (payload: JsonRecord | undefined): TriageStempelState | undefined => {
+	const triageResult = isRecord(payload?.triage_result) ? payload?.triage_result : undefined;
+	const raw = isRecord(payload?.stempel_state)
+		? payload?.stempel_state
+		: isRecord(triageResult?.stempel_state)
+			? triageResult?.stempel_state
+			: undefined;
+	if (!isRecord(raw)) return undefined;
+	const state = asString(raw.state);
+	if (
+		state !== 'draft' &&
+		state !== 'proposed' &&
+		state !== 'objection_window' &&
+		state !== 'locked'
+	) {
+		return undefined;
+	}
+	const minParticipants = asNumber(raw.min_participants);
+	const participantCount = asNumber(raw.participant_count);
+	const objectionCount = asNumber(raw.objection_count);
+	if (minParticipants == null || participantCount == null || objectionCount == null) {
+		return undefined;
+	}
+	return {
+		state,
+		proposed_at_ms: asNumber(raw.proposed_at_ms),
+		objection_deadline_ms: asNumber(raw.objection_deadline_ms),
+		locked_at_ms: asNumber(raw.locked_at_ms),
+		min_participants: minParticipants,
+		participant_count: participantCount,
+		objection_count: objectionCount,
+		latest_objection_at_ms: asNumber(raw.latest_objection_at_ms),
+		latest_objection_reason: asString(raw.latest_objection_reason)
+	};
+};
+
+const mapImpactVerification = (payload: JsonRecord | undefined): ImpactVerification | undefined => {
+	const raw = payload?.impact_verification;
+	if (!isRecord(raw)) return undefined;
+	const status = asString(raw.status);
+	if (
+		status !== 'not_open' &&
+		status !== 'open' &&
+		status !== 'verified' &&
+		status !== 'disputed'
+	) {
+		return undefined;
+	}
+	const yesCount = asNumber(raw.yes_count);
+	const noCount = asNumber(raw.no_count);
+	const minVouches = asNumber(raw.min_vouches);
+	if (yesCount == null || noCount == null || minVouches == null) {
+		return undefined;
+	}
+	return {
+		status,
+		opened_at_ms: asNumber(raw.opened_at_ms),
+		closes_at_ms: asNumber(raw.closes_at_ms),
+		yes_count: yesCount,
+		no_count: noCount,
+		min_vouches: minVouches
+	};
+};
+
+const mapDevMeta = (payload: JsonRecord | undefined): FeedDevMeta | undefined => {
+	const raw = payload?.dev_meta;
+	if (!isRecord(raw)) return undefined;
+	const isSeed = asBoolean(raw.is_seed);
+	if (isSeed == null) return undefined;
+	const originCandidate = asString(raw.seed_origin);
+	const seedOrigin =
+		originCandidate === 'fixture' || originCandidate === 'db' || originCandidate === 'operator_stub'
+			? originCandidate
+			: undefined;
+	return {
+		is_seed: isSeed,
+		seed_batch_id: asString(raw.seed_batch_id),
+		seed_origin: seedOrigin
+	};
+};
+
+const resolveTrajectory = (
+	sourceType: string,
+	enrichment: JsonRecord | undefined
+): TrajectoryType => {
 	const candidate = asString(enrichment?.trajectory_type);
 	if (candidate && TRAJECTORY_TYPES.has(candidate as TrajectoryType)) {
 		return candidate as TrajectoryType;
@@ -355,7 +478,10 @@ const toFeedItem = (item: ApiFeedItem): FeedItem => {
 			event_type: mapSourceToEventType(item.source_type),
 			actor_name: item.actor_username,
 			actor_role:
-				actorRole === 'pelapor' || actorRole === 'relawan' || actorRole === 'koordinator' || actorRole === 'saksi'
+				actorRole === 'pelapor' ||
+				actorRole === 'relawan' ||
+				actorRole === 'koordinator' ||
+				actorRole === 'saksi'
 					? actorRole
 					: undefined,
 			timestamp,
@@ -379,15 +505,23 @@ const toFeedItem = (item: ApiFeedItem): FeedItem => {
 		sentiment: resolveSentiment(enrichment),
 		intensity: asNumber(enrichment?.intensity),
 		cover_url: asString(payload?.cover_url) ?? asString(enrichment?.cover_url),
-		body: asString(enrichment?.body) ?? (item.summary ?? undefined),
+		body: asString(enrichment?.body) ?? item.summary ?? undefined,
 		signal_labels: mapSignalLabels(enrichment),
 		my_relation: relation,
 		signal_counts: mapSignalCounts(payload),
-		monitored: asBoolean(payload?.monitored) ?? (relation ? relation.vouched || relation.witnessed || relation.flagged || relation.vote_cast != null : false),
+		monitored:
+			asBoolean(payload?.monitored) ??
+			(relation
+				? relation.vouched || relation.witnessed || relation.flagged || relation.vote_cast != null
+				: false),
 		deadline: asString(payload?.deadline),
 		deadline_label: asString(payload?.deadline_label),
+		program_refs: mapProgramRefs(payload),
+		stempel_state: mapStempelState(payload),
+		impact_verification: mapImpactVerification(payload),
 		quorum_target: asNumber(payload?.quorum_target),
-		quorum_current: asNumber(payload?.quorum_current)
+		quorum_current: asNumber(payload?.quorum_current),
+		dev_meta: mapDevMeta(payload)
 	};
 };
 
@@ -429,7 +563,12 @@ const extractSuggestionRows = (
 const isSystemCardData = (value: unknown): value is SystemCardData => {
 	if (!isRecord(value)) return false;
 	const variant = asString(value.variant);
-	if (variant !== 'suggestion' && variant !== 'tip' && variant !== 'milestone' && variant !== 'prompt') {
+	if (
+		variant !== 'suggestion' &&
+		variant !== 'tip' &&
+		variant !== 'milestone' &&
+		variant !== 'prompt'
+	) {
 		return false;
 	}
 	if (!asString(value.icon) || !asString(value.title) || typeof value.dismissible !== 'boolean') {
@@ -455,10 +594,7 @@ const toFeedStreamItem = (item: ApiFeedStreamItem): FeedStreamItem | undefined =
 	if (item.kind === 'witness') {
 		const sortTimestamp =
 			asString(item.sort_timestamp) ??
-			toIsoTime(
-				asNumber(item.data.occurred_at_ms) ??
-					asNumber(item.data.created_at_ms)
-			);
+			toIsoTime(asNumber(item.data.occurred_at_ms) ?? asNumber(item.data.created_at_ms));
 		return {
 			stream_id: asString(item.stream_id) ?? `w-${item.data.feed_id}`,
 			sort_timestamp: sortTimestamp,
@@ -482,11 +618,11 @@ const isApiFeedItem = (value: unknown): value is ApiFeedItem => {
 	if (!isRecord(value)) return false;
 	return Boolean(
 		asString(value.feed_id) &&
-			asString(value.source_type) &&
-			asString(value.source_id) &&
-			asString(value.actor_id) &&
-			asString(value.actor_username) &&
-			asString(value.title)
+		asString(value.source_type) &&
+		asString(value.source_id) &&
+		asString(value.actor_id) &&
+		asString(value.actor_username) &&
+		asString(value.title)
 	);
 };
 
@@ -517,11 +653,12 @@ export class ApiFeedService implements FeedService {
 		});
 
 		const responseStream = (response as ApiFeedStreamResponse).stream;
-		const rawStreamItems: unknown[] = Array.isArray(responseStream) && responseStream.length > 0
-			? responseStream
-			: Array.isArray(response.items)
-				? response.items
-				: [];
+		const rawStreamItems: unknown[] =
+			Array.isArray(responseStream) && responseStream.length > 0
+				? responseStream
+				: Array.isArray(response.items)
+					? response.items
+					: [];
 		const streamItems = rawStreamItems.every(isApiFeedStreamItem)
 			? rawStreamItems
 					.map((item) => toFeedStreamItem(item))

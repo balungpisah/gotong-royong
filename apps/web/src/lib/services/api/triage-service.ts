@@ -1,5 +1,11 @@
 import type { ApiClient } from '$lib/api';
-import type { ContextBarState, EntryRoute, TriageResult } from '$lib/types';
+import type {
+	ContextBarState,
+	EntryRoute,
+	TriageKind,
+	TriageResult,
+	TriageStatus
+} from '$lib/types';
 import type { TriageService } from '../types';
 
 type JsonRecord = Record<string, unknown>;
@@ -31,6 +37,9 @@ const ENTRY_ROUTES = new Set<EntryRoute>([
 	'catatan_komunitas',
 	'kelola'
 ]);
+const TRIAGE_STATUSES = new Set<TriageStatus>(['draft', 'final']);
+const TRIAGE_KINDS = new Set<TriageKind>(['witness', 'data']);
+const TRIAGE_SCHEMA_VERSION = 'triage.v1';
 
 const isRecord = (value: unknown): value is JsonRecord =>
 	typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -42,9 +51,15 @@ const readResult = (raw: unknown): TriageResult | undefined => {
 	if (!isRecord(raw)) return undefined;
 	const barState = asString(raw.bar_state);
 	const route = asString(raw.route);
-	if (!barState || !route) return undefined;
+	const schemaVersion = asString(raw.schema_version);
+	const status = asString(raw.status);
+	const kind = asString(raw.kind);
+	if (!barState || !route || !schemaVersion || !status || !kind) return undefined;
 	if (!BAR_STATES.has(barState as ContextBarState)) return undefined;
 	if (!ENTRY_ROUTES.has(route as EntryRoute)) return undefined;
+	if (schemaVersion !== TRIAGE_SCHEMA_VERSION) return undefined;
+	if (!TRIAGE_STATUSES.has(status as TriageStatus)) return undefined;
+	if (!TRIAGE_KINDS.has(kind as TriageKind)) return undefined;
 	return raw as unknown as TriageResult;
 };
 

@@ -5,7 +5,6 @@ import type {
 	PathPlan,
 	RahasiaLevel,
 	SeedHint,
-	SystemMessage,
 	UserMessage,
 	Witness,
 	WitnessCreateInput,
@@ -122,9 +121,9 @@ const isApiFeedItem = (value: unknown): value is ApiFeedItem => {
 	if (!isRecord(value)) return false;
 	return Boolean(
 		asString(value.feed_id) &&
-			asString(value.source_id) &&
-			asString(value.actor_id) &&
-			asString(value.title)
+		asString(value.source_id) &&
+		asString(value.actor_id) &&
+		asString(value.title)
 	);
 };
 
@@ -237,38 +236,6 @@ const makeRequestId = (prefix: string) => {
 	return `${prefix}-${randomPart}`;
 };
 
-const buildCreatedWitnessMessages = (
-	input: WitnessCreateInput,
-	witnessId: string,
-	nowIso: string
-): ChatMessage[] =>
-	input.triage_messages.map((message, index) => {
-		if (message.role === 'user') {
-			return {
-				message_id: `msg-${witnessId}-${index}`,
-				timestamp: nowIso,
-				witness_id: witnessId,
-				type: 'user',
-				author: {
-					user_id: 'me',
-					name: 'Saya',
-					role: 'pelapor'
-				},
-				is_self: true,
-				content: message.text
-			} satisfies UserMessage;
-		}
-
-		return {
-			message_id: `msg-${witnessId}-${index}`,
-			timestamp: nowIso,
-			witness_id: witnessId,
-			type: 'system',
-			subtype: 'plan_updated',
-			content: message.text
-		} satisfies SystemMessage;
-	});
-
 interface ApiWitnessServiceOptions {
 	allowMockFallback?: boolean;
 }
@@ -301,14 +268,8 @@ export class ApiWitnessService implements WitnessService {
 			const response = await this.client.post<ApiWitnessCreateResponse>('/witnesses', {
 				headers: this.idempotencyHeaders('witness-create'),
 				body: {
-					title: input.title,
-					summary: input.summary,
-					route: input.route,
-					track_hint: input.track_hint,
-					seed_hint: input.seed_hint,
-					rahasia_level: input.rahasia_level,
-					triage_result: input.triage_result,
-					triage_messages: input.triage_messages
+					schema_version: input.schema_version,
+					triage_session_id: input.triage_session_id
 				}
 			});
 
@@ -317,7 +278,7 @@ export class ApiWitnessService implements WitnessService {
 				throw new Error('invalid witness create response');
 			}
 
-			const detail = this.buildCreatedWitnessDetail(witnessId, input, response);
+			const detail = this.buildCreatedWitnessDetail(witnessId, response);
 			void this.ensureThread(detail.witness_id, true).catch(() => undefined);
 			return detail;
 		} catch (error) {
@@ -562,29 +523,36 @@ export class ApiWitnessService implements WitnessService {
 
 	private buildCreatedWitnessDetail(
 		witnessId: string,
-		input: WitnessCreateInput,
 		response: ApiWitnessCreateResponse
 	): WitnessDetail {
 		const createdAt = toIso(asNumber(response.created_at_ms));
-		const messages = buildCreatedWitnessMessages(input, witnessId, createdAt);
 		const createdBy = asString(response.author_id) ?? 'me';
+		const rahasiaLevel = mapPrivacyToRahasia(asString(response.rahasia_level) ?? 'public');
+		const title = asString(response.title) ?? `Saksi ${witnessId}`;
+		const summary = asString(response.summary) ?? title;
+		const trackHint = asString(response.track_hint);
+		const seedHintCandidate = asString(response.seed_hint);
+		const seedHint =
+			seedHintCandidate && SEED_HINTS.has(seedHintCandidate as SeedHint)
+				? (seedHintCandidate as SeedHint)
+				: undefined;
 
 		return {
 			witness_id: witnessId,
-			title: asString(response.title) ?? input.title,
-			summary: asString(response.summary) ?? input.summary,
-			track_hint: input.track_hint,
-			seed_hint: input.seed_hint,
+			title,
+			summary,
+			track_hint: trackHint,
+			seed_hint: seedHint,
 			status: 'open',
-			rahasia_level: input.rahasia_level,
+			rahasia_level: rahasiaLevel,
 			created_at: createdAt,
 			updated_at: createdAt,
 			created_by: createdBy,
 			member_count: 1,
-			message_count: messages.length,
+			message_count: 0,
 			unread_count: 0,
-			messages,
-			plan: input.proposed_plan ?? null,
+			messages: [],
+			plan: null,
 			blocks: [],
 			members: [
 				{
@@ -593,8 +561,7 @@ export class ApiWitnessService implements WitnessService {
 					role: 'pelapor',
 					joined_at: createdAt
 				}
-			],
-			triage: input.triage_result
+			]
 		};
 	}
 
