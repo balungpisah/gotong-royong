@@ -3,7 +3,7 @@
 
 # Operator Map — AI-00 Triage Architecture
 
-> **Status:** Draft v0.2
+> **Status:** Draft v0.2 (design reference; runtime contract moved)
 > **Last updated:** 2026-02-23
 >
 > This document defines the 9 uniform operators for AI-00 triage.
@@ -11,6 +11,9 @@
 > for group lifecycle management. All operators emit the same
 > `OperatorResponse` canonical envelope with an operator-specific payload.
 > Classification is inline in the orchestrator (not a separate operator).
+>
+> Runtime canonical contract source:
+> `docs/research/contracts/triage-operator-output-contract-v1.md`
 >
 > **Breaking change from v0.1:** The operator/skill distinction is removed.
 > Everything that handles a trajectory is an "operator". Model tier is a

@@ -32,8 +32,12 @@ The canonical stack decision (ADR-001) has been promoted to `docs/architecture/a
 
 | File | Status | Description |
 |------|--------|-------------|
+| `triage-witness-feed-contract-v1.md` | [ACTIVE REF] | Canonical runtime contract for triage sessions and session-authoritative witness materialization |
+| `triage-operator-output-contract-v1.md` | [ACTIVE REF] | Canonical operator->orchestrator contract (`triage_draft/triage_final`) with payload semantics per operator |
+| `triage-operator-output-contract-v1.schema.json` | [ACTIVE REF] | Strict JSON Schema for validating operator outputs (`schema_version=operator.v1`) |
+| `trajectory-tandang-signal-crosswalk-v1.md` | [ACTIVE REF] | Cross-reference matrix between trajectory taxonomy and Tandang signal patterns, including gap-detection contract |
 | `feature-contract-map.md` | [ACTIVE REF] | Maps each UI feature to its backend API contract, ownership, and trigger |
-| `edgepod-endpoint-contracts.md` | [ACTIVE REF] | Full Edge-Pod endpoint matrix with prompt bundle |
+| `edgepod-endpoint-contracts.md` | [HISTORICAL] | Legacy research matrix; superseded for runtime by `triage-witness-feed-contract-v1.md` |
 | `edgepod-endpoint-contracts.schema.json` | [ACTIVE REF] | Strict JSON contract bundle for all Edge-Pod endpoints |
 | `edgepod-endpoint-contracts.contract-map.md` | [ACTIVE REF] | Compact endpoint summary for quick handoff |
 | `edgepod-endpoint-contracts/EP-*.schema.json` | [ACTIVE REF] | Per-endpoint JSON contract files (EP-00 through EP-11) |

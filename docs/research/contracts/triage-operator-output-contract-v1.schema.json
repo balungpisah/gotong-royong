@@ -1,0 +1,930 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gotong-royong.internal/schema/triage-operator-output-contract-v1.schema.json",
+  "title": "Triage Operator Output Contract v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "operator",
+    "triage_stage",
+    "output_kind",
+    "checklist",
+    "routing",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "operator.v1"
+    },
+    "operator": {
+      "type": "string",
+      "enum": [
+        "masalah",
+        "musyawarah",
+        "pantau",
+        "catat",
+        "bantuan",
+        "rayakan",
+        "siaga",
+        "program",
+        "kelola"
+      ]
+    },
+    "triage_stage": {
+      "type": "string",
+      "enum": ["triage_draft", "triage_final"]
+    },
+    "output_kind": {
+      "type": "string",
+      "enum": ["witness", "data", "kelola"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "checklist": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/ChecklistItem" }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "missing_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "routing": { "$ref": "#/definitions/Routing" },
+    "payload": {
+      "type": "object",
+      "minProperties": 1
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "triage_stage": { "const": "triage_draft" } },
+        "required": ["triage_stage"]
+      },
+      "then": {
+        "required": ["questions", "missing_fields"],
+        "properties": {
+          "questions": { "minItems": 1 },
+          "missing_fields": { "minItems": 1 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "triage_stage": { "const": "triage_final" } },
+        "required": ["triage_stage"]
+      },
+      "then": {
+        "properties": {
+          "missing_fields": { "maxItems": 0 },
+          "questions": { "maxItems": 0 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operator": {
+            "enum": ["masalah", "musyawarah", "pantau", "program"]
+          }
+        },
+        "required": ["operator"]
+      },
+      "then": {
+        "properties": {
+          "output_kind": { "const": "witness" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operator": {
+            "enum": ["catat", "bantuan", "rayakan", "siaga"]
+          }
+        },
+        "required": ["operator"]
+      },
+      "then": {
+        "properties": {
+          "output_kind": { "const": "data" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operator": { "const": "kelola" }
+        },
+        "required": ["operator"]
+      },
+      "then": {
+        "properties": {
+          "output_kind": { "const": "kelola" },
+          "routing": {
+            "type": "object",
+            "required": ["route"],
+            "properties": {
+              "route": { "const": "kelola" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "output_kind": { "const": "data" } },
+        "required": ["output_kind"]
+      },
+      "then": {
+        "properties": {
+          "routing": {
+            "required": ["taxonomy", "trajectory_type"],
+            "properties": {
+              "trajectory_type": {
+                "enum": ["data", "vault", "bantuan", "pencapaian", "siaga"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "output_kind": { "const": "witness" } },
+        "required": ["output_kind"]
+      },
+      "then": {
+        "properties": {
+          "routing": {
+            "required": ["trajectory_type"],
+            "properties": {
+              "trajectory_type": {
+                "enum": ["aksi", "advokasi", "pantau", "mufakat", "mediasi", "program"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "triage_stage": { "const": "triage_final" },
+          "operator": { "const": "masalah" }
+        },
+        "required": ["triage_stage", "operator"]
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/MasalahPayload" } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "triage_stage": { "const": "triage_final" },
+          "operator": { "const": "musyawarah" }
+        },
+        "required": ["triage_stage", "operator"]
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/MusyawarahPayload" } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "triage_stage": { "const": "triage_final" },
+          "operator": { "const": "pantau" }
+        },
+        "required": ["triage_stage", "operator"]
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/PantauPayload" } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "triage_stage": { "const": "triage_final" },
+          "operator": { "const": "catat" }
+        },
+        "required": ["triage_stage", "operator"]
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/CatatPayload" } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "triage_stage": { "const": "triage_final" },
+          "operator": { "const": "bantuan" }
+        },
+        "required": ["triage_stage", "operator"]
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/BantuanPayload" } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "triage_stage": { "const": "triage_final" },
+          "operator": { "const": "rayakan" }
+        },
+        "required": ["triage_stage", "operator"]
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/RayakanPayload" } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "triage_stage": { "const": "triage_final" },
+          "operator": { "const": "siaga" }
+        },
+        "required": ["triage_stage", "operator"]
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/SiagaPayload" } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "triage_stage": { "const": "triage_final" },
+          "operator": { "const": "program" }
+        },
+        "required": ["triage_stage", "operator"]
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/ProgramPayload" } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "triage_stage": { "const": "triage_final" },
+          "operator": { "const": "kelola" }
+        },
+        "required": ["triage_stage", "operator"]
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/KelolaPayload" } }
+      }
+    }
+  ],
+  "definitions": {
+    "ChecklistItem": {
+      "type": "object",
+      "required": ["field", "filled", "required_for_final"],
+      "properties": {
+        "field": { "type": "string", "minLength": 1 },
+        "filled": { "type": "boolean" },
+        "value": { "type": "string" },
+        "required_for_final": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "Routing": {
+      "type": "object",
+      "required": ["route"],
+      "properties": {
+        "route": {
+          "type": "string",
+          "enum": ["komunitas", "vault", "siaga", "catatan_komunitas", "kelola"]
+        },
+        "trajectory_type": {
+          "type": "string",
+          "enum": [
+            "aksi",
+            "advokasi",
+            "pantau",
+            "mufakat",
+            "mediasi",
+            "program",
+            "data",
+            "vault",
+            "bantuan",
+            "pencapaian",
+            "siaga"
+          ]
+        },
+        "track_hint": { "type": "string", "minLength": 1 },
+        "seed_hint": {
+          "type": "string",
+          "enum": ["Keresahan", "Aspirasi", "Kejadian", "Rencana", "Pertanyaan"]
+        },
+        "taxonomy": { "$ref": "#/definitions/Taxonomy" },
+        "program_refs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ProgramReference" }
+        },
+        "stempel_state": { "$ref": "#/definitions/StempelState" }
+      },
+      "additionalProperties": false
+    },
+    "Taxonomy": {
+      "type": "object",
+      "required": ["category_code", "category_label", "quality"],
+      "properties": {
+        "category_code": {
+          "type": "string",
+          "enum": [
+            "commodity_price",
+            "public_service",
+            "training",
+            "employment",
+            "health",
+            "education",
+            "infrastructure",
+            "safety_alert",
+            "environment",
+            "community_event",
+            "other_custom"
+          ]
+        },
+        "category_label": { "type": "string", "minLength": 1 },
+        "custom_label": { "type": "string", "minLength": 1 },
+        "quality": {
+          "type": "string",
+          "enum": ["official_source", "community_observation", "unverified_claim"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProgramReference": {
+      "type": "object",
+      "required": ["program_id", "label", "source", "confidence"],
+      "properties": {
+        "program_id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "StempelState": {
+      "type": "object",
+      "required": [
+        "state",
+        "min_participants",
+        "participant_count",
+        "objection_count"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["draft", "proposed", "objection_window", "locked"]
+        },
+        "proposed_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "objection_deadline_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "locked_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_participants": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "participant_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "objection_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latest_objection_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latest_objection_reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlanItemStatus": {
+      "type": "string",
+      "enum": ["planned", "active", "open", "completed", "blocked", "skipped"]
+    },
+    "SourceTag": {
+      "type": "string",
+      "enum": ["ai", "human", "system"]
+    },
+    "Checkpoint": {
+      "type": "object",
+      "required": [
+        "checkpoint_id",
+        "title",
+        "status",
+        "source",
+        "locked_fields"
+      ],
+      "properties": {
+        "checkpoint_id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/definitions/PlanItemStatus" },
+        "source": { "$ref": "#/definitions/SourceTag" },
+        "locked_fields": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "description": { "type": "string" },
+        "evidence_required": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "PhaseAssistNeed": {
+      "type": "object",
+      "required": ["esco_skill_uri", "skill_label", "reason", "urgency", "min_people"],
+      "properties": {
+        "esco_skill_uri": { "type": "string", "minLength": 1 },
+        "skill_label": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "urgency": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "min_people": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "Phase": {
+      "type": "object",
+      "required": [
+        "phase_id",
+        "title",
+        "objective",
+        "status",
+        "source",
+        "locked_fields",
+        "checkpoints"
+      ],
+      "properties": {
+        "phase_id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "objective": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/definitions/PlanItemStatus" },
+        "source": { "$ref": "#/definitions/SourceTag" },
+        "locked_fields": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "checkpoints": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/Checkpoint" }
+        },
+        "assist_needs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PhaseAssistNeed" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Branch": {
+      "type": "object",
+      "required": ["branch_id", "label", "parent_checkpoint_id", "phases"],
+      "properties": {
+        "branch_id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "parent_checkpoint_id": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ]
+        },
+        "phases": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/Phase" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PathPlan": {
+      "type": "object",
+      "required": ["plan_id", "version", "title", "summary", "branches"],
+      "properties": {
+        "plan_id": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "track_hint": { "type": "string", "minLength": 1 },
+        "seed_hint": {
+          "type": "string",
+          "enum": ["Keresahan", "Aspirasi", "Kejadian", "Rencana", "Pertanyaan"]
+        },
+        "branches": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/Branch" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MasalahPayload": {
+      "type": "object",
+      "required": ["trajectory", "path_plan"],
+      "properties": {
+        "trajectory": { "type": "string", "enum": ["A", "B"] },
+        "path_plan": { "$ref": "#/definitions/PathPlan" }
+      },
+      "additionalProperties": false
+    },
+    "DecisionStep": {
+      "type": "object",
+      "required": ["question", "rationale", "order"],
+      "properties": {
+        "question": { "type": "string", "minLength": 1 },
+        "options": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rationale": { "type": "string", "minLength": 1 },
+        "order": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "StempelCandidate": {
+      "type": "object",
+      "required": ["summary", "rationale"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "objection_window_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "MusyawarahPayload": {
+      "type": "object",
+      "required": ["context", "decision_steps"],
+      "properties": {
+        "context": { "type": "string", "enum": ["proposal", "dispute"] },
+        "decision_steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/DecisionStep" }
+        },
+        "on_consensus": {
+          "type": "string",
+          "enum": ["spawn_aksi"]
+        },
+        "stempel_candidate": { "$ref": "#/definitions/StempelCandidate" }
+      },
+      "additionalProperties": false
+    },
+    "TimelineEvent": {
+      "type": "object",
+      "required": ["event", "date", "source"],
+      "properties": {
+        "event": { "type": "string", "minLength": 1 },
+        "date": {
+          "type": "string",
+          "oneOf": [
+            { "format": "date-time" },
+            { "format": "date" }
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": ["user", "news", "official"]
+        },
+        "evidence_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PantauPayload": {
+      "type": "object",
+      "required": ["case_type", "timeline_seed", "tracking_points"],
+      "properties": {
+        "case_type": { "type": "string", "minLength": 1 },
+        "timeline_seed": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/TimelineEvent" }
+        },
+        "tracking_points": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "CatatPayload": {
+      "type": "object",
+      "required": ["record_type", "claim", "observed_at", "category"],
+      "properties": {
+        "record_type": {
+          "type": "string",
+          "enum": ["data", "vault"]
+        },
+        "claim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proof_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "hash": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "MatchedResource": {
+      "type": "object",
+      "required": ["resource_id", "name", "relevance", "match_reason"],
+      "properties": {
+        "resource_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relevance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "match_reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "BantuanPayload": {
+      "type": "object",
+      "required": ["help_type", "description", "urgency", "matched_resources"],
+      "properties": {
+        "help_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "urgency": {
+          "type": "string",
+          "enum": ["rendah", "sedang", "tinggi"]
+        },
+        "matched_resources": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/MatchedResource" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RayakanPayload": {
+      "type": "object",
+      "required": ["achievement", "contributors", "impact_summary"],
+      "properties": {
+        "achievement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contributors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "linked_witness_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impact_summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "SiagaPayload": {
+      "type": "object",
+      "required": ["threat_type", "severity", "location", "description", "source", "expires_at"],
+      "properties": {
+        "threat_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["waspada", "siaga", "darurat"]
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RotationEntry": {
+      "type": "object",
+      "required": ["participant", "slot"],
+      "properties": {
+        "participant": {
+          "type": "string",
+          "minLength": 1
+        },
+        "slot": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProgramPayload": {
+      "type": "object",
+      "required": ["activity_name", "frequency", "rotation"],
+      "properties": {
+        "activity_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frequency": {
+          "type": "string",
+          "enum": ["harian", "mingguan", "bulanan", "custom"]
+        },
+        "frequency_detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rotation": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/RotationEntry" }
+        },
+        "next_occurrence": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "KelolaGroupDetail": {
+      "type": "object",
+      "required": ["name", "description", "join_policy", "entity_type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "join_policy": {
+          "type": "string",
+          "enum": ["terbuka", "persetujuan", "undangan"]
+        },
+        "entity_type": {
+          "type": "string",
+          "enum": ["kelompok", "lembaga"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "KelolaPayload": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "edit", "invite", "join", "leave"]
+        },
+        "group_detail": { "$ref": "#/definitions/KelolaGroupDetail" },
+        "group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "invited_user_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": ["create", "edit"]
+              }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "required": ["group_detail"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": ["edit", "invite", "join", "leave"]
+              }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "required": ["group_id"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": { "const": "invite" }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "required": ["invited_user_ids"],
+            "properties": {
+              "invited_user_ids": { "minItems": 1 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
