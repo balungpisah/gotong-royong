@@ -29,6 +29,8 @@ bun run build
 - `PUBLIC_GR_USE_API_SIGNAL=true` enables witness signal flows via `/v1/witnesses/:witness_id/signals*`.
 - `PUBLIC_GR_USE_API_GROUP=true` enables group lifecycle flows via `/v1/groups*`.
 - `GR_API_PROXY_TARGET=http://127.0.0.1:3000` proxies browser `/v1/*` calls to local backend during `bun dev` (recommended for live API wiring).
+- `GR_AUTH_DEV_BYPASS_ENABLED=true` skips `/masuk` redirects in `NODE_ENV=development` by injecting a local dev session in `hooks.server.ts`.
+- `GR_AUTH_DEV_BYPASS_USER_ID=dev-user` overrides the synthetic user id used by the dev bypass.
 - Default (unset) is API-first; set any of these to `false` only for local dev/test mock runs.
 - Production guard: runtime rejects `PUBLIC_GR_USE_API_*=false` and disables API-service mock fallback paths.
 - Cutover tracker and remaining debt: `../../docs/research/frontend-service-api-cutover-backlog.md`.

@@ -43,6 +43,8 @@ bunx playwright install chromium
 | `JWT_SECRET` | Yes for authenticated flows | none | `src/lib/auth/server.ts` | If unset, all requests are treated as unauthenticated. Use a 32+ character secret. |
 | `GR_SESSION_COOKIE_NAME` | No | `gr_session` | `src/lib/auth/server.ts` | Override only if cookie naming must differ by environment. |
 | `GR_API_PROXY_TARGET` | No | unset | `vite.config.ts` | When set (e.g. `http://127.0.0.1:3000`), `bun dev` proxies browser `/v1/*` calls to backend for live API wiring. |
+| `GR_AUTH_DEV_BYPASS_ENABLED` | No | `false` | `src/hooks.server.ts` | Dev-only auth bypass for protected-route redirects; only effective when `NODE_ENV=development`. |
+| `GR_AUTH_DEV_BYPASS_USER_ID` | No | `dev-user` | `src/hooks.server.ts` | Optional synthetic user id used when `GR_AUTH_DEV_BYPASS_ENABLED=true`. |
 | `PUBLIC_GR_USE_API_NOTIFICATIONS` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
 | `PUBLIC_GR_USE_API_FEED` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
 | `PUBLIC_GR_USE_API_CHAT` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |

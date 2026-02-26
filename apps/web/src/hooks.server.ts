@@ -14,6 +14,29 @@ import { resolveAuthSession } from '$lib/auth/server';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 
 const NO_STORE_CACHE_CONTROL = 'no-store, no-cache, must-revalidate, private, max-age=0';
+const DEV_BYPASS_TOKEN = 'dev-bypass-token';
+const DEV_BYPASS_USER_ID = 'dev-user';
+
+const envFlagEnabled = (value: string | undefined) => {
+	if (!value) {
+		return false;
+	}
+
+	return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+};
+
+const devAuthBypassEnabled = () =>
+	process.env.NODE_ENV === 'development' &&
+	envFlagEnabled(process.env.GR_AUTH_DEV_BYPASS_ENABLED ?? process.env.AUTH_DEV_BYPASS_ENABLED);
+
+const devBypassSession = (): AuthSession => ({
+	token: DEV_BYPASS_TOKEN,
+	user: {
+		id: process.env.GR_AUTH_DEV_BYPASS_USER_ID?.trim() || DEV_BYPASS_USER_ID,
+		role: 'user',
+		exp: Math.floor(Date.now() / 1000) + 60 * 60 * 12
+	}
+});
 
 const stripBasePath = (pathname: string) => {
 	if (!base) {
@@ -50,7 +73,8 @@ const noStoreRedirect = (location: string) =>
 	);
 
 const authHandle: Handle = async ({ event, resolve }) => {
-	const session = await resolveAuthSession(event.cookies, event.request.headers);
+	const resolvedSession = await resolveAuthSession(event.cookies, event.request.headers);
+	const session = resolvedSession ?? (devAuthBypassEnabled() ? devBypassSession() : null);
 	const user = session?.user ?? null;
 	const role = user?.role ?? 'anonymous';
 
