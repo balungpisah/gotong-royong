@@ -23,8 +23,11 @@
 </script>
 
 {#if size === 'compact'}
-	<span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-caption font-medium {bgClass}">
-		{weather.emoji} {weather.label}
+	<span
+		class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-caption font-medium {bgClass}"
+	>
+		{weather.emoji}
+		{weather.label}
 		<span class="font-bold">{weather.multiplier}×</span>
 	</span>
 {:else}
@@ -34,6 +37,8 @@
 			<p class="text-h3 font-bold text-foreground">{capitalize(weather.weather)}</p>
 			<p class="text-caption text-muted-foreground">{weather.label}</p>
 		</div>
-		<span class="ml-auto rounded-full bg-card/50 px-3 py-1 text-body font-bold">{weather.multiplier}×</span>
+		<span class="ml-auto rounded-full bg-card/50 px-3 py-1 text-body font-bold"
+			>{weather.multiplier}×</span
+		>
 	</div>
 {/if}

@@ -101,8 +101,8 @@
 			/>
 
 			<!-- Bars -->
-			{#each bars as weekBars, i}
-				{#each weekBars as rect}
+			{#each bars as weekBars, i (i)}
+				{#each weekBars as rect (rect.key)}
 					<rect
 						x={rect.x}
 						y={rect.y}
@@ -121,8 +121,8 @@
 						text-anchor="middle"
 						style="font-size: var(--font-size-caption)"
 						fill="currentColor"
-						fill-opacity="0.5"
-					>{data[i].week_label}</text>
+						fill-opacity="0.5">{data[i].week_label}</text
+					>
 				{/if}
 			{/each}
 		</svg>
@@ -130,7 +130,7 @@
 
 	<!-- Legend -->
 	<div class="mt-3 flex flex-wrap gap-3">
-		{#each signalKeys as key}
+		{#each signalKeys as key (key)}
 			<div class="flex items-center gap-1.5">
 				<div class="size-2.5 rounded-full" style="background: {signalColors[key]}"></div>
 				<span class="text-caption text-muted-foreground">{signalLabels[key]}</span>

@@ -24,16 +24,20 @@
 >
 	<h3 class="text-small font-semibold text-foreground">{m.komunitas_icj_title()}</h3>
 	<div class="mt-3 space-y-3">
-		{#each axes as axis}
+		{#each axes as axis (axis.label)}
 			<div class="flex items-center gap-3">
-				<span class="w-28 shrink-0 text-caption font-medium" style="color: {axis.color}">{axis.label}</span>
+				<span class="w-28 shrink-0 text-caption font-medium" style="color: {axis.color}"
+					>{axis.label}</span
+				>
 				<div class="h-2.5 flex-1 rounded-full bg-muted/30">
 					<div
 						class="h-full rounded-full transition-all duration-700"
 						style="width: {axis.value * 100}%; background: {axis.color}"
 					></div>
 				</div>
-				<span class="w-10 shrink-0 text-right text-caption font-bold" style="color: {axis.color}">{(axis.value * 100).toFixed(0)}</span>
+				<span class="w-10 shrink-0 text-right text-caption font-bold" style="color: {axis.color}"
+					>{(axis.value * 100).toFixed(0)}</span
+				>
 			</div>
 		{/each}
 	</div>

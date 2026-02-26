@@ -30,7 +30,9 @@
 			{#if member.avatar_url}
 				<img src={member.avatar_url} alt={member.name} class="size-9 rounded-full object-cover" />
 			{:else}
-				<div class="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+				<div
+					class="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary"
+				>
 					<span class="text-small font-bold">{member.name.slice(0, 2).toUpperCase()}</span>
 				</div>
 			{/if}
@@ -86,4 +88,3 @@
 		</div>
 	{/each}
 </div>
-

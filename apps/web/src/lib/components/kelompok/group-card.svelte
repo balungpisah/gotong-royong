@@ -21,15 +21,19 @@
 	const canRequest = $derived(group.join_policy === 'persetujuan');
 </script>
 
-<article class="group rounded-xl border border-border/50 bg-card p-4 transition hover:border-border">
+<article
+	class="group rounded-xl border border-border/50 bg-card p-4 transition hover:border-border"
+>
 	<div class="flex items-start gap-3">
-		<div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+		<div
+			class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+		>
 			<UsersIcon class="size-5" />
 		</div>
 
 		<div class="min-w-0 flex-1">
 			<div class="flex items-start justify-between gap-2">
-				<a href={href} class="min-w-0">
+				<a {href} class="min-w-0">
 					<h3 class="truncate text-body font-bold text-foreground hover:underline">
 						{group.name}
 					</h3>
@@ -43,14 +47,16 @@
 
 			<div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground/70">
 				<span class="inline-flex items-center gap-1">
-					<UsersIcon class="size-3" /> {m.group_stat_members({ count: group.member_count })}
+					<UsersIcon class="size-3" />
+					{m.group_stat_members({ count: group.member_count })}
 				</span>
 				<span>•</span>
 				<span>{m.group_stat_witnesses({ count: group.witness_count })}</span>
 				{#if showManageHint}
 					<span>•</span>
 					<span class="inline-flex items-center gap-1">
-						<SettingsIcon class="size-3" /> {m.group_manage_hint()}
+						<SettingsIcon class="size-3" />
+						{m.group_manage_hint()}
 					</span>
 				{/if}
 			</div>
@@ -58,19 +64,12 @@
 	</div>
 
 	<div class="mt-3 flex items-center gap-2">
-		<Button
-			variant="secondary"
-			href={href}
-			class="flex-1"
-		>
+		<Button variant="secondary" {href} class="flex-1">
 			{m.group_action_view()}
 		</Button>
 
 		{#if canJoinNow}
-			<Button
-				variant="default"
-				onclick={() => onJoin?.(group.group_id)}
-			>
+			<Button variant="default" onclick={() => onJoin?.(group.group_id)}>
 				<UserPlusIcon class="mr-1 size-3.5" />
 				{m.group_action_join()}
 			</Button>
@@ -95,4 +94,3 @@
 		{/if}
 	</div>
 </article>
-

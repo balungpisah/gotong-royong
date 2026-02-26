@@ -9,33 +9,12 @@
 	}
 
 	const { members }: Props = $props();
-
-	function initials(name: string): string {
-		return name
-			.split(' ')
-			.map((w) => w[0])
-			.join('')
-			.slice(0, 2)
-			.toUpperCase();
-	}
-
-	const tierColors: Record<number, string> = {
-		0: 'var(--c-tier-0)',
-		1: 'var(--c-tier-1)',
-		2: 'var(--c-tier-2)',
-		3: 'var(--c-tier-3)',
-		4: 'var(--c-tier-4)'
-	};
-
-	function tierColor(tier: number): string {
-		return tierColors[tier] ?? '#9E9E9E';
-	}
 </script>
 
 <div>
 	<h3 class="text-small font-semibold text-foreground">{m.komunitas_active_title()}</h3>
 	<div class="mt-3 flex gap-3 overflow-x-auto pb-2" style="scrollbar-width: none;">
-		{#each members as member, i}
+		{#each members as member, i (member.user_id)}
 			<motion.div
 				class="min-w-[160px] flex-shrink-0 rounded-xl border border-border/30 bg-card p-3 shadow-sm"
 				initial={{ opacity: 0, y: 12 }}
@@ -45,21 +24,32 @@
 				<!-- Avatar + name -->
 				<div class="flex items-center gap-2">
 					<TandangAvatar
-						person={{ user_id: member.user_id, name: member.name, avatar_url: member.avatar_url, tier: member.tier }}
+						person={{
+							user_id: member.user_id,
+							name: member.name,
+							avatar_url: member.avatar_url,
+							tier: member.tier
+						}}
 						size="sm"
 						showTierDot
 					/>
 					<div class="min-w-0">
 						<p class="truncate text-caption font-bold text-foreground">{member.name}</p>
-						<span class="text-caption text-muted-foreground">{m.komunitas_contributions({ count: String(member.contributions_this_week) })}</span>
+						<span class="text-caption text-muted-foreground"
+							>{m.komunitas_contributions({ count: String(member.contributions_this_week) })}</span
+						>
 					</div>
 				</div>
 
 				<!-- Highlight reason -->
-				<p class="mt-2 text-caption leading-relaxed text-muted-foreground">{member.highlight_reason}</p>
+				<p class="mt-2 text-caption leading-relaxed text-muted-foreground">
+					{member.highlight_reason}
+				</p>
 
 				{#if member.streak_days > 7}
-					<p class="mt-1 text-caption text-amber-600">🔥 {m.komunitas_streak_days({ days: String(member.streak_days) })}</p>
+					<p class="mt-1 text-caption text-amber-600">
+						🔥 {m.komunitas_streak_days({ days: String(member.streak_days) })}
+					</p>
 				{/if}
 			</motion.div>
 		{/each}

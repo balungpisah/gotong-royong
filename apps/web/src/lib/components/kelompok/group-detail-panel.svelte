@@ -37,12 +37,12 @@
 		editJoinPolicy = group.join_policy;
 	});
 
-	const showRequestsTab = $derived(
-		!!group && group.join_policy === 'persetujuan' && canManage
-	);
+	const showRequestsTab = $derived(!!group && group.join_policy === 'persetujuan' && canManage);
 	const showSettingsTab = $derived(!!group && canManage);
 
-	const canJoinNow = $derived(!!group && group.join_policy === 'terbuka' && group.my_membership_status !== 'approved');
+	const canJoinNow = $derived(
+		!!group && group.join_policy === 'terbuka' && group.my_membership_status !== 'approved'
+	);
 	const canRequestJoin = $derived(
 		!!group &&
 			group.join_policy === 'persetujuan' &&
@@ -65,7 +65,8 @@
 				<div class="mt-2 flex flex-wrap items-center gap-2 text-caption text-muted-foreground/70">
 					<GroupPrivacyBadge joinPolicy={group.join_policy} />
 					<span class="inline-flex items-center gap-1">
-						<UsersIcon class="size-3" /> {m.group_stat_members({ count: group.member_count })}
+						<UsersIcon class="size-3" />
+						{m.group_stat_members({ count: group.member_count })}
 					</span>
 					<span>•</span>
 					<span>{m.group_stat_witnesses({ count: group.witness_count })}</span>
@@ -74,20 +75,12 @@
 
 			<div class="shrink-0">
 				{#if store.isCurrentMember}
-					<Button
-						variant="secondary"
-						size="sm"
-						onclick={() => store.leaveGroup(group.group_id)}
-					>
+					<Button variant="secondary" size="sm" onclick={() => store.leaveGroup(group.group_id)}>
 						<UserMinusIcon class="mr-1 size-3.5" />
 						{m.group_action_leave()}
 					</Button>
 				{:else if canJoinNow}
-					<Button
-						variant="default"
-						size="sm"
-						onclick={() => store.joinGroup(group.group_id)}
-					>
+					<Button variant="default" size="sm" onclick={() => store.joinGroup(group.group_id)}>
 						<UserPlusIcon class="mr-1 size-3.5" />
 						{m.group_action_join()}
 					</Button>
@@ -96,17 +89,22 @@
 						variant="outline"
 						size="sm"
 						class="bg-primary/10 text-primary hover:bg-primary/15"
-						onclick={() => store.requestJoinGroup(group.group_id, requestMessage.trim() || undefined)}
+						onclick={() =>
+							store.requestJoinGroup(group.group_id, requestMessage.trim() || undefined)}
 					>
 						<UserPlusIcon class="mr-1 size-3.5" />
 						{m.group_action_request_join()}
 					</Button>
 				{:else if isPending}
-					<span class="inline-flex items-center rounded-lg bg-muted/40 px-3 py-2 text-small font-semibold text-muted-foreground">
+					<span
+						class="inline-flex items-center rounded-lg bg-muted/40 px-3 py-2 text-small font-semibold text-muted-foreground"
+					>
 						{m.group_request_pending()}
 					</span>
 				{:else}
-					<span class="inline-flex items-center rounded-lg bg-muted/40 px-3 py-2 text-small font-semibold text-muted-foreground">
+					<span
+						class="inline-flex items-center rounded-lg bg-muted/40 px-3 py-2 text-small font-semibold text-muted-foreground"
+					>
 						{m.group_action_invite_only()}
 					</span>
 				{/if}
@@ -117,10 +115,7 @@
 			<div class="mt-3 rounded-lg border border-border/40 bg-muted/10 p-3">
 				<div class="flex flex-col gap-1.5">
 					<InputLabel>{m.group_request_message_label()}</InputLabel>
-					<Input
-						placeholder={m.group_request_message_placeholder()}
-						bind:value={requestMessage}
-					/>
+					<Input placeholder={m.group_request_message_placeholder()} bind:value={requestMessage} />
 				</div>
 			</div>
 		{/if}
@@ -134,7 +129,9 @@
 			<Button
 				variant="ghost"
 				size="pill"
-				class={tab === 'anggota' ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}
+				class={tab === 'anggota'
+					? 'bg-primary/10 text-primary'
+					: 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}
 				onclick={() => (tab = 'anggota')}
 			>
 				{m.group_tab_members()}
@@ -144,7 +141,9 @@
 				<Button
 					variant="ghost"
 					size="pill"
-					class={tab === 'permintaan' ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}
+					class={tab === 'permintaan'
+						? 'bg-primary/10 text-primary'
+						: 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}
 					onclick={() => (tab = 'permintaan')}
 				>
 					{m.group_tab_requests({ count: store.pendingRequestCount })}
@@ -155,7 +154,9 @@
 				<Button
 					variant="ghost"
 					size="pill"
-					class={tab === 'pengaturan' ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}
+					class={tab === 'pengaturan'
+						? 'bg-primary/10 text-primary'
+						: 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}
 					onclick={() => (tab = 'pengaturan')}
 				>
 					<SettingsIcon class="mr-1 size-3.5" />
@@ -194,11 +195,7 @@
 
 						<div class="flex flex-col gap-1.5">
 							<InputLabel>{m.group_settings_description()}</InputLabel>
-							<Textarea
-								rows={3}
-								class="resize-none"
-								bind:value={editDescription}
-							/>
+							<Textarea rows={3} class="resize-none" bind:value={editDescription} />
 						</div>
 
 						<div class="flex flex-col gap-1.5">
@@ -221,8 +218,7 @@
 										name: editName.trim(),
 										description: editDescription.trim(),
 										join_policy: editJoinPolicy
-									})
-								}
+									})}
 							>
 								{m.group_settings_save()}
 							</Button>
@@ -231,10 +227,7 @@
 						<div class="mt-2 rounded-lg border border-border/40 bg-background p-3">
 							<p class="text-small font-semibold text-foreground">{m.group_invite_title()}</p>
 							<div class="mt-2 flex items-center gap-2">
-								<Input
-									placeholder={m.group_invite_user_placeholder()}
-									bind:value={inviteUserId}
-								/>
+								<Input placeholder={m.group_invite_user_placeholder()} bind:value={inviteUserId} />
 								<Button
 									variant="outline"
 									size="sm"

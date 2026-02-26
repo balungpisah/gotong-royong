@@ -63,10 +63,7 @@
 	<div class="mt-4 space-y-3">
 		<div class="flex flex-col gap-1.5">
 			<InputLabel>{m.group_create_name_label()}</InputLabel>
-			<Input
-				placeholder={m.group_create_name_placeholder()}
-				bind:value={name}
-			/>
+			<Input placeholder={m.group_create_name_placeholder()} bind:value={name} />
 		</div>
 
 		<div class="flex flex-col gap-1.5">
@@ -107,11 +104,7 @@
 		{/if}
 
 		<div class="flex items-center justify-end gap-2">
-			<Button
-				type="submit"
-				variant="default"
-				disabled={!canSubmit || store.creating}
-			>
+			<Button type="submit" variant="default" disabled={!canSubmit || store.creating}>
 				{store.creating ? m.group_create_creating() : m.group_create_submit()}
 			</Button>
 		</div>

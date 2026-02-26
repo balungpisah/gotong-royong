@@ -20,7 +20,7 @@
 
 	<!-- Stacked bar -->
 	<div class="mt-3 flex h-8 overflow-hidden rounded-full">
-		{#each tiers as tier}
+		{#each tiers as tier (tier.tier_name)}
 			<div
 				class="transition-all duration-700"
 				style="width: {tier.percentage}%; background: {tier.color}"
@@ -31,7 +31,7 @@
 
 	<!-- Legend -->
 	<div class="mt-3 flex flex-wrap gap-3">
-		{#each tiers as tier}
+		{#each tiers as tier (tier.tier_name)}
 			<div class="flex items-center gap-1.5">
 				<div class="size-2.5 rounded-full" style="background: {tier.color}"></div>
 				<span class="text-caption text-muted-foreground">
