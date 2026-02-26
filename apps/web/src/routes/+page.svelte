@@ -3,12 +3,10 @@
 	import { getWitnessStore, getNotificationStore, getFeedStore } from '$lib/stores';
 	import { ChatInput } from '$lib/components/shell';
 	import {
-		PulseActivityCard,
 		WitnessDetailPanel,
-		FeedEventCard,
-		FeedSystemCard,
 		DiscoverView,
-		ContextBox
+		ContextBox,
+		resolveFeedStreamRenderer
 	} from '$lib/components/pulse';
 	import Activity from '@lucide/svelte/icons/activity';
 	import EyeIcon from '@lucide/svelte/icons/eye';
@@ -155,6 +153,24 @@
 		}
 		return [triageEntry, ...feedStore.filteredStream];
 	});
+
+	const resolveMasonryRenderer = (item: MasonryItem) => {
+		if (item.kind === 'triage') {
+			return {
+				component: ChatInput,
+				props: {
+					onWitnessCreated: handleWitnessCreated
+				}
+			};
+		}
+		return resolveFeedStreamRenderer(item, {
+			selectedWitnessId,
+			onSelectWitness: selectWitness,
+			onToggleMonitor: (witnessId) => feedStore.toggleMonitor(witnessId),
+			onShareWitness: shareFeedItem,
+			onDismissSystemCard: (streamId) => feedStore.dismissCard(streamId)
+		});
+	};
 
 	const skeletonItems = [
 		{ id: 1, h: 260 },
@@ -393,22 +409,10 @@
 						columnClass="masonry-col-constrain"
 					>
 						{#snippet children({ item: streamItem })}
-							{#if streamItem.kind === 'triage'}
-								<ChatInput onWitnessCreated={handleWitnessCreated} />
-							{:else if streamItem.kind === 'witness'}
-								<FeedEventCard
-									item={streamItem.data}
-									selected={selectedWitnessId === streamItem.data.witness_id}
-									onclick={() => selectWitness(streamItem.data.witness_id)}
-									onToggleMonitor={() => feedStore.toggleMonitor(streamItem.data.witness_id)}
-									onShare={() => shareFeedItem(streamItem.data)}
-								/>
-							{:else if streamItem.kind === 'system'}
-								<FeedSystemCard
-									card={streamItem.data}
-									onDismiss={() => feedStore.dismissCard(streamItem.stream_id)}
-								/>
-							{/if}
+							{@const rendered = resolveMasonryRenderer(streamItem)}
+							{@const CardComponent = rendered.component as any}
+							{@const cardProps = rendered.props as any}
+							<CardComponent {...cardProps} />
 						{/snippet}
 					</Masonry>
 				</div>

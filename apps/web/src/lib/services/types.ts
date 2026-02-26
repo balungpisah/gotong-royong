@@ -16,6 +16,7 @@ import type {
 	UserProfile,
 	AppNotification,
 	FeedItem,
+	FeedStreamItem,
 	FollowableEntity,
 	TriageResult,
 	TandangProfile,
@@ -134,7 +135,7 @@ export interface NotificationService {
 }
 
 export interface FeedService {
-	list(opts?: { cursor?: string; limit?: number }): Promise<Paginated<FeedItem>>;
+	list(opts?: { cursor?: string; limit?: number }): Promise<Paginated<FeedStreamItem>>;
 	listSuggestions(): Promise<FollowableEntity[]>;
 	setMonitorPreference(witnessId: string, monitored: boolean): Promise<void>;
 	setEntityFollowPreference(entityId: string, followed: boolean): Promise<void>;

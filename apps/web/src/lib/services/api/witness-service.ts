@@ -33,8 +33,20 @@ interface ApiFeedItem {
 	payload?: unknown;
 }
 
+interface ApiFeedWitnessStreamItem {
+	kind: 'witness';
+	data: ApiFeedItem;
+}
+
+interface ApiFeedSystemStreamItem {
+	kind: 'system';
+	data: unknown;
+}
+
+type ApiFeedStreamItem = ApiFeedWitnessStreamItem | ApiFeedSystemStreamItem;
+
 interface ApiPagedFeed {
-	items: ApiFeedItem[];
+	items: Array<ApiFeedItem | ApiFeedStreamItem>;
 	next_cursor?: string | null;
 }
 
@@ -105,6 +117,21 @@ const asString = (value: unknown): string | undefined =>
 
 const asNumber = (value: unknown): number | undefined =>
 	typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+const isApiFeedItem = (value: unknown): value is ApiFeedItem => {
+	if (!isRecord(value)) return false;
+	return Boolean(
+		asString(value.feed_id) &&
+			asString(value.source_id) &&
+			asString(value.actor_id) &&
+			asString(value.title)
+	);
+};
+
+const isFeedWitnessStreamItem = (value: unknown): value is ApiFeedWitnessStreamItem => {
+	if (!isRecord(value)) return false;
+	return value.kind === 'witness' && isApiFeedItem(value.data);
+};
 
 const mapPrivacyToRahasia = (privacy: string | null | undefined): RahasiaLevel => {
 	const normalized = (privacy ?? '').trim().toLowerCase();
@@ -311,7 +338,7 @@ export class ApiWitnessService implements WitnessService {
 				limit: opts?.limit
 			}
 		});
-		const deduped = this.mapFeedToWitnesses(response.items);
+		const deduped = this.mapFeedToWitnesses(this.extractFeedItems(response.items));
 		const filtered = opts?.status ? deduped.filter((item) => item.status === opts.status) : deduped;
 		return {
 			items: filtered,
@@ -614,7 +641,7 @@ export class ApiWitnessService implements WitnessService {
 				limit: 50
 			}
 		});
-		const mapped = this.mapFeedToWitnesses(response.items);
+		const mapped = this.mapFeedToWitnesses(this.extractFeedItems(response.items));
 		const match = mapped.find((item) => item.witness_id === witnessId);
 		if (match) {
 			return match;
@@ -634,6 +661,17 @@ export class ApiWitnessService implements WitnessService {
 			message_count: 0,
 			unread_count: 0
 		};
+	}
+
+	private extractFeedItems(items: Array<ApiFeedItem | ApiFeedStreamItem>): ApiFeedItem[] {
+		return items
+			.map((item) => {
+				if (isFeedWitnessStreamItem(item)) {
+					return item.data;
+				}
+				return isApiFeedItem(item) ? item : undefined;
+			})
+			.filter((item): item is ApiFeedItem => Boolean(item));
 	}
 
 	private async fetchWitnessMembers(witnessId: string): Promise<WitnessMember[]> {

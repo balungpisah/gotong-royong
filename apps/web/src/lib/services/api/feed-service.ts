@@ -1,15 +1,16 @@
 import type { ApiClient } from '$lib/api';
 import type {
-	ContentSignalType,
 	FeedEventType,
 	FeedItem,
 	FeedSource,
+	FeedStreamItem,
 	FollowableEntity,
 	MyRelation,
 	RahasiaLevel,
 	SignalCounts,
 	SignalLabels,
 	Sentiment,
+	SystemCardData,
 	TrajectoryType
 } from '$lib/types';
 import type { FeedService, Paginated } from '../types';
@@ -29,7 +30,30 @@ interface ApiFeedItem {
 	payload?: unknown;
 }
 
-interface ApiPagedFeed {
+interface ApiFeedWitnessStreamItem {
+	stream_id?: string;
+	sort_timestamp?: string;
+	kind: 'witness';
+	data: ApiFeedItem;
+}
+
+interface ApiFeedSystemStreamItem {
+	stream_id?: string;
+	sort_timestamp?: string;
+	kind: 'system';
+	data: SystemCardData;
+}
+
+type ApiFeedStreamItem = ApiFeedWitnessStreamItem | ApiFeedSystemStreamItem;
+
+interface ApiFeedStreamResponse {
+	items?: ApiFeedItem[] | ApiFeedStreamItem[];
+	stream?: ApiFeedStreamItem[];
+	next_cursor?: string | null;
+	has_more?: boolean;
+}
+
+interface ApiPagedFeedLegacy {
 	items: ApiFeedItem[];
 	next_cursor?: string | null;
 }
@@ -402,6 +426,81 @@ const extractSuggestionRows = (
 	return [];
 };
 
+const isSystemCardData = (value: unknown): value is SystemCardData => {
+	if (!isRecord(value)) return false;
+	const variant = asString(value.variant);
+	if (variant !== 'suggestion' && variant !== 'tip' && variant !== 'milestone' && variant !== 'prompt') {
+		return false;
+	}
+	if (!asString(value.icon) || !asString(value.title) || typeof value.dismissible !== 'boolean') {
+		return false;
+	}
+	const payload = value.payload;
+	if (!isRecord(payload)) return false;
+	const payloadVariant = asString(payload.variant);
+	return payloadVariant === variant;
+};
+
+const toFeedStreamItemFromLegacy = (item: ApiFeedItem): FeedStreamItem => {
+	const sortTimestamp = toIsoTime(asNumber(item.occurred_at_ms) ?? asNumber(item.created_at_ms));
+	return {
+		stream_id: `w-${item.feed_id}`,
+		sort_timestamp: sortTimestamp,
+		kind: 'witness',
+		data: toFeedItem(item)
+	};
+};
+
+const toFeedStreamItem = (item: ApiFeedStreamItem): FeedStreamItem | undefined => {
+	if (item.kind === 'witness') {
+		const sortTimestamp =
+			asString(item.sort_timestamp) ??
+			toIsoTime(
+				asNumber(item.data.occurred_at_ms) ??
+					asNumber(item.data.created_at_ms)
+			);
+		return {
+			stream_id: asString(item.stream_id) ?? `w-${item.data.feed_id}`,
+			sort_timestamp: sortTimestamp,
+			kind: 'witness',
+			data: toFeedItem(item.data)
+		};
+	}
+
+	if (!isSystemCardData(item.data)) {
+		return undefined;
+	}
+	return {
+		stream_id: asString(item.stream_id) ?? `sys-${Math.random().toString(36).slice(2, 8)}`,
+		sort_timestamp: asString(item.sort_timestamp) ?? new Date().toISOString(),
+		kind: 'system',
+		data: item.data
+	};
+};
+
+const isApiFeedItem = (value: unknown): value is ApiFeedItem => {
+	if (!isRecord(value)) return false;
+	return Boolean(
+		asString(value.feed_id) &&
+			asString(value.source_type) &&
+			asString(value.source_id) &&
+			asString(value.actor_id) &&
+			asString(value.actor_username) &&
+			asString(value.title)
+	);
+};
+
+const isApiFeedStreamItem = (value: unknown): value is ApiFeedStreamItem => {
+	if (!isRecord(value)) return false;
+	const kind = asString(value.kind);
+	if (kind !== 'witness' && kind !== 'system') return false;
+	if (!('data' in value)) return false;
+	if (kind === 'witness') {
+		return isApiFeedItem(value.data);
+	}
+	return isSystemCardData(value.data);
+};
+
 export class ApiFeedService implements FeedService {
 	private readonly client: ApiClient;
 
@@ -409,17 +508,31 @@ export class ApiFeedService implements FeedService {
 		this.client = client;
 	}
 
-	async list(opts?: { cursor?: string; limit?: number }): Promise<Paginated<FeedItem>> {
-		const response = await this.client.get<ApiPagedFeed>('/feed', {
+	async list(opts?: { cursor?: string; limit?: number }): Promise<Paginated<FeedStreamItem>> {
+		const response = await this.client.get<ApiFeedStreamResponse | ApiPagedFeedLegacy>('/feed', {
 			query: {
 				cursor: opts?.cursor,
 				limit: opts?.limit
 			}
 		});
 
+		const responseStream = (response as ApiFeedStreamResponse).stream;
+		const rawStreamItems: unknown[] = Array.isArray(responseStream) && responseStream.length > 0
+			? responseStream
+			: Array.isArray(response.items)
+				? response.items
+				: [];
+		const streamItems = rawStreamItems.every(isApiFeedStreamItem)
+			? rawStreamItems
+					.map((item) => toFeedStreamItem(item))
+					.filter((item): item is FeedStreamItem => Boolean(item))
+			: rawStreamItems
+					.filter((item): item is ApiFeedItem => isApiFeedItem(item))
+					.map((item) => toFeedStreamItemFromLegacy(item));
+
 		return {
-			items: response.items.map(toFeedItem),
-			total: response.items.length,
+			items: streamItems,
+			total: streamItems.length,
 			cursor: response.next_cursor ?? undefined
 		};
 	}

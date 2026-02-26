@@ -426,9 +426,10 @@ export interface FeedListRequest {
 
 /** Response shape for the feed list endpoint. */
 export interface FeedListResponse {
-	/** Feed items, sorted by sort_timestamp DESC (newest first).
-	 *  The backend MUST guarantee this sort order. */
-	items: FeedStreamItem[];
+	/** Back-compat witness rows from discovery feed source table. */
+	items: FeedItem[];
+	/** Polymorphic stream for UI rendering (witness + system cards). */
+	stream: FeedStreamItem[];
 	/** Cursor for the next page — sort_timestamp of the last item.
 	 *  Null when there are no more items. */
 	next_cursor: string | null;

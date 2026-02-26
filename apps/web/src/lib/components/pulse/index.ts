@@ -14,6 +14,12 @@ export { default as FeedSuggestionCard } from './feed-suggestion-card.svelte';
 export { default as FeedSystemCard } from './feed-system-card.svelte';
 export { default as DiscoverView } from './discover-view.svelte';
 export { default as EntityPill } from './entity-pill.svelte';
+export {
+	resolveFeedStreamRenderer,
+	registeredFeedStreamKinds,
+	type FeedStreamRenderContext,
+	type FeedStreamRenderNode
+} from './feed-stream-registry';
 
 // Context box system
 export { default as PanelPinnedCard } from './panel-pinned-card.svelte';
