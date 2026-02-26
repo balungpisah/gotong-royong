@@ -28,9 +28,16 @@
 	// Notification type → icon & style mapping
 	// ---------------------------------------------------------------------------
 
-	const typeConfig: Record<NotificationType, { icon: typeof RefreshCw; color: string; label: string }> = {
+	const typeConfig: Record<
+		NotificationType,
+		{ icon: typeof RefreshCw; color: string; label: string }
+	> = {
 		phase_change: { icon: RefreshCw, color: 'text-signal-proof bg-signal-proof/10', label: 'Fase' },
-		vote_open: { icon: BarChart3, color: 'text-signal-dukung bg-signal-dukung/10', label: 'Voting' },
+		vote_open: {
+			icon: BarChart3,
+			color: 'text-signal-dukung bg-signal-dukung/10',
+			label: 'Voting'
+		},
 		evidence_needed: { icon: Search, color: 'text-waspada bg-waspada/10', label: 'Bukti' },
 		diff_proposed: { icon: Pencil, color: 'text-tandang bg-tandang/10', label: 'Perubahan' },
 		mention: { icon: AtSign, color: 'text-berhasil bg-berhasil/10', label: 'Sebutan' },
@@ -138,7 +145,7 @@
 			<p class="mt-3 text-small">Memuat notifikasi...</p>
 		</div>
 
-	<!-- Empty state -->
+		<!-- Empty state -->
 	{:else if store.notifications.length === 0}
 		{#if store.error}
 			<motion.div
@@ -147,12 +154,15 @@
 				animate={{ opacity: 1, scale: 1 }}
 				transition={{ duration: 0.3 }}
 			>
-				<div class="flex size-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+				<div
+					class="flex size-14 items-center justify-center rounded-full bg-destructive/10 text-destructive"
+				>
 					<Inbox class="size-7" />
 				</div>
 				<p class="mt-4 text-body font-semibold text-foreground">Gagal memuat notifikasi</p>
 				<p class="mt-1 max-w-sm text-caption text-muted-foreground">{store.error}</p>
-				<Button variant="outline" size="sm" class="mt-4" onclick={handleRetryLoad}>Coba lagi</Button>
+				<Button variant="outline" size="sm" class="mt-4" onclick={handleRetryLoad}>Coba lagi</Button
+				>
 			</motion.div>
 		{:else}
 			<motion.div
@@ -169,7 +179,7 @@
 			</motion.div>
 		{/if}
 
-	<!-- Notification list -->
+		<!-- Notification list -->
 	{:else}
 		<!-- Unread section -->
 		{#if unread.length > 0}
@@ -189,17 +199,23 @@
 							onclick={() => handleClick(notif)}
 						>
 							<!-- Unread dot -->
-							<div class="absolute left-2.5 top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary"></div>
+							<div
+								class="absolute left-2.5 top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary"
+							></div>
 
 							<!-- Type icon -->
-							<div class="flex size-9 shrink-0 items-center justify-center rounded-lg {config.color}">
+							<div
+								class="flex size-9 shrink-0 items-center justify-center rounded-lg {config.color}"
+							>
 								<config.icon class="size-4" />
 							</div>
 
 							<!-- Content -->
 							<div class="min-w-0 flex-1 text-left">
 								<div class="flex items-center gap-2">
-									<span class="truncate text-small font-semibold text-foreground">{notif.title}</span>
+									<span class="truncate text-small font-semibold text-foreground"
+										>{notif.title}</span
+									>
 									<Badge variant="outline" class="shrink-0 text-small">{config.label}</Badge>
 								</div>
 								<p class="mt-0.5 line-clamp-2 text-caption leading-relaxed text-muted-foreground">
@@ -235,17 +251,25 @@
 							onclick={() => handleClick(notif)}
 						>
 							<!-- Type icon -->
-							<div class="flex size-9 shrink-0 items-center justify-center rounded-lg {config.color} opacity-60">
+							<div
+								class="flex size-9 shrink-0 items-center justify-center rounded-lg {config.color} opacity-60"
+							>
 								<config.icon class="size-4" />
 							</div>
 
 							<!-- Content -->
 							<div class="min-w-0 flex-1 text-left">
 								<div class="flex items-center gap-2">
-									<span class="truncate text-small font-medium text-foreground/70">{notif.title}</span>
-									<Badge variant="outline" class="shrink-0 text-small opacity-60">{config.label}</Badge>
+									<span class="truncate text-small font-medium text-foreground/70"
+										>{notif.title}</span
+									>
+									<Badge variant="outline" class="shrink-0 text-small opacity-60"
+										>{config.label}</Badge
+									>
 								</div>
-								<p class="mt-0.5 line-clamp-2 text-caption leading-relaxed text-muted-foreground/60">
+								<p
+									class="mt-0.5 line-clamp-2 text-caption leading-relaxed text-muted-foreground/60"
+								>
 									{notif.body}
 								</p>
 								<p class="mt-1 text-small text-muted-foreground/40">{timeAgo(notif.created_at)}</p>

@@ -44,7 +44,8 @@
 			{displayTag}
 		</Badge>
 		<span class="text-sm text-muted-foreground">
-			{filteredWitnesses.length} {m.tag_page_witness_count()}
+			{filteredWitnesses.length}
+			{m.tag_page_witness_count()}
 		</span>
 	</div>
 

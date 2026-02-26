@@ -54,4 +54,3 @@ export const actions = {
 		throw redirect(303, HOME_PATH);
 	}
 } satisfies Actions;
-

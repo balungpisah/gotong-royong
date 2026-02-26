@@ -18,13 +18,28 @@
 
 	const semantik = [
 		{ name: '--c-berhasil', tw: 'bg-berhasil', hex: '#2E7D32', label: 'Berhasil' },
-		{ name: '--c-berhasil-lembut', tw: 'bg-berhasil-lembut', hex: '#E8F5E9', label: 'Berhasil Lembut' },
+		{
+			name: '--c-berhasil-lembut',
+			tw: 'bg-berhasil-lembut',
+			hex: '#E8F5E9',
+			label: 'Berhasil Lembut'
+		},
 		{ name: '--c-peringatan', tw: 'bg-peringatan', hex: '#E65100', label: 'Peringatan' },
-		{ name: '--c-peringatan-lembut', tw: 'bg-peringatan-lembut', hex: '#FFF3E0', label: 'Peringatan Lembut' },
+		{
+			name: '--c-peringatan-lembut',
+			tw: 'bg-peringatan-lembut',
+			hex: '#FFF3E0',
+			label: 'Peringatan Lembut'
+		},
 		{ name: '--c-bahaya', tw: 'bg-bahaya', hex: '#C62828', label: 'Bahaya' },
 		{ name: '--c-bahaya-lembut', tw: 'bg-bahaya-lembut', hex: '#FFEBEE', label: 'Bahaya Lembut' },
 		{ name: '--c-keterangan', tw: 'bg-keterangan', hex: '#4E342E', label: 'Keterangan' },
-		{ name: '--c-keterangan-lembut', tw: 'bg-keterangan-lembut', hex: '#EFEBE9', label: 'Keterangan Lembut' }
+		{
+			name: '--c-keterangan-lembut',
+			tw: 'bg-keterangan-lembut',
+			hex: '#EFEBE9',
+			label: 'Keterangan Lembut'
+		}
 	];
 
 	const tracks = [

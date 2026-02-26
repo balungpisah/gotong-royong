@@ -46,7 +46,8 @@
 					</p>
 					<details class="mt-2">
 						<summary class="cursor-pointer text-small text-muted-foreground">Raw JSON</summary>
-						<pre class="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-small">{JSON.stringify(
+						<pre
+							class="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-small">{JSON.stringify(
 								userStore.profile,
 								null,
 								2
@@ -138,7 +139,8 @@
 					</div>
 					<details class="mt-2">
 						<summary class="cursor-pointer text-small text-muted-foreground">Messages JSON</summary>
-						<pre class="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-small">{JSON.stringify(
+						<pre
+							class="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-small">{JSON.stringify(
 								witnessStore.currentMessages.map((m) => ({ id: m.message_id, type: m.type })),
 								null,
 								2

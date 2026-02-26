@@ -64,7 +64,12 @@
 	{/if}
 
 	{#if discoverable.length > 0}
-		<GroupListView groups={discoverable} title={m.group_section_discover()} {onJoin} {onRequestJoin} />
+		<GroupListView
+			groups={discoverable}
+			title={m.group_section_discover()}
+			{onJoin}
+			{onRequestJoin}
+		/>
 	{:else}
 		<section class="rounded-xl border border-dashed border-border/40 bg-muted/10 p-4">
 			<h2 class="text-sm font-bold text-foreground">{m.group_section_discover()}</h2>

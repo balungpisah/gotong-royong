@@ -1,20 +1,19 @@
 <script lang="ts">
 	import type { FeedStreamItem } from '$lib/types';
 	import { mockFeedItem1, mockFeedItem2, mockFeedItem3 } from '$lib/fixtures/mock-feed';
-	import {
-		registeredFeedStreamKinds,
-		resolveFeedStreamRenderer
-	} from '$lib/components/pulse';
+	import { registeredFeedStreamKinds, resolveFeedStreamRenderer } from '$lib/components/pulse';
 	import systemMatrix from './matrix.json';
 
 	let selectedWitnessId = $state<string | null>(null);
 
-	const witnessMatrix: FeedStreamItem[] = [mockFeedItem1, mockFeedItem2, mockFeedItem3].map((item) => ({
-		stream_id: `w-${item.witness_id}`,
-		sort_timestamp: item.latest_event.timestamp,
-		kind: 'witness',
-		data: item
-	}));
+	const witnessMatrix: FeedStreamItem[] = [mockFeedItem1, mockFeedItem2, mockFeedItem3].map(
+		(item) => ({
+			stream_id: `w-${item.witness_id}`,
+			sort_timestamp: item.latest_event.timestamp,
+			kind: 'witness',
+			data: item
+		})
+	);
 
 	const streamMatrix = [
 		witnessMatrix[0],

@@ -96,35 +96,33 @@
 </svelte:head>
 
 <TooltipProvider delayDuration={300}>
-{#if isLoginPage}
-	<!-- Login: minimal centered layout -->
-	<main class="mx-auto flex min-h-dvh w-full max-w-screen-md px-4 py-6">
-		{@render children()}
-	</main>
-{:else if isDevPage}
-	<!-- Dev gallery: pass-through (dev has its own layout with sidebar) -->
-	<div class="min-h-dvh bg-background text-foreground">
-		{@render children()}
-	</div>
-{:else}
-	<!-- App shell: sidebar (fixed) + header + content -->
-	<div class="min-h-dvh bg-background text-foreground quadrille-bg lg:pl-[68px]">
-		<!-- Desktop left sidebar — fixed to left edge of viewport -->
-		<AppSidebar />
-
-		<div class="mx-auto flex min-h-dvh w-full max-w-screen-xl flex-col">
-			<AppHeader />
-
-			<main
-				class="relative flex w-full min-w-0 flex-1 flex-col px-4 py-6 pb-24 lg:pb-8"
-			>
-				{@render children()}
-			</main>
+	{#if isLoginPage}
+		<!-- Login: minimal centered layout -->
+		<main class="mx-auto flex min-h-dvh w-full max-w-screen-md px-4 py-6">
+			{@render children()}
+		</main>
+	{:else if isDevPage}
+		<!-- Dev gallery: pass-through (dev has its own layout with sidebar) -->
+		<div class="min-h-dvh bg-background text-foreground">
+			{@render children()}
 		</div>
+	{:else}
+		<!-- App shell: sidebar (fixed) + header + content -->
+		<div class="min-h-dvh bg-background text-foreground quadrille-bg lg:pl-[68px]">
+			<!-- Desktop left sidebar — fixed to left edge of viewport -->
+			<AppSidebar />
 
-		<!-- Mobile bottom tab bar (< lg) -->
-		<TabBar />
-		<AddTabSheet />
-	</div>
-{/if}
+			<div class="mx-auto flex min-h-dvh w-full max-w-screen-xl flex-col">
+				<AppHeader />
+
+				<main class="relative flex w-full min-w-0 flex-1 flex-col px-4 py-6 pb-24 lg:pb-8">
+					{@render children()}
+				</main>
+			</div>
+
+			<!-- Mobile bottom tab bar (< lg) -->
+			<TabBar />
+			<AddTabSheet />
+		</div>
+	{/if}
 </TooltipProvider>

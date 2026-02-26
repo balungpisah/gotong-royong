@@ -1,87 +1,87 @@
 [
-  {
-    "stream_id": "sys-suggestion-dev",
-    "sort_timestamp": "2026-02-26T00:00:00.000Z",
-    "kind": "system",
-    "data": {
-      "variant": "suggestion",
-      "icon": "💡",
-      "title": "Ikuti topik yang relevan",
-      "description": "Dapatkan update tentang isu yang Anda pedulikan.",
-      "dismissible": true,
-      "payload": {
-        "variant": "suggestion",
-        "entities": [
-          {
-            "entity_id": "ent-rt05",
-            "entity_type": "lingkungan",
-            "label": "RT 05 Menteng",
-            "followed": false,
-            "description": "Komunitas warga RT 05",
-            "witness_count": 12,
-            "follower_count": 44
-          },
-          {
-            "entity_id": "topik:infrastruktur",
-            "entity_type": "topik",
-            "label": "Infrastruktur",
-            "followed": true,
-            "description": "Perbaikan fasilitas lingkungan",
-            "witness_count": 8,
-            "follower_count": 19
-          }
-        ]
-      }
-    }
-  },
-  {
-    "stream_id": "sys-tip-dev",
-    "sort_timestamp": "2026-02-26T00:00:00.000Z",
-    "kind": "system",
-    "data": {
-      "variant": "tip",
-      "icon": "📸",
-      "title": "Tahukah Anda?",
-      "description": "Anda bisa melampirkan foto dan video sebagai bukti untuk memperkuat laporan.",
-      "dismissible": true,
-      "payload": {
-        "variant": "tip",
-        "tip_id": "tip-evidence-upload"
-      }
-    }
-  },
-  {
-    "stream_id": "sys-milestone-dev",
-    "sort_timestamp": "2026-02-26T00:00:00.000Z",
-    "kind": "system",
-    "data": {
-      "variant": "milestone",
-      "icon": "🎉",
-      "title": "Komunitas makin aktif!",
-      "description": "Sinyal partisipasi warga meningkat dari aktivitas feed terbaru.",
-      "dismissible": true,
-      "payload": {
-        "variant": "milestone",
-        "metric_label": "Aktivitas saksi terlihat",
-        "metric_value": "24"
-      }
-    }
-  },
-  {
-    "stream_id": "sys-prompt-dev",
-    "sort_timestamp": "2026-02-26T00:00:00.000Z",
-    "kind": "system",
-    "data": {
-      "variant": "prompt",
-      "icon": "🧭",
-      "title": "Belum ada update baru",
-      "description": "Mulai saksi baru untuk memantik gotong royong.",
-      "dismissible": false,
-      "payload": {
-        "variant": "prompt",
-        "cta_label": "Buat Saksi",
-        "cta_action": "create_witness"
-      }
-    }
-  }
+	{
+		"stream_id": "sys-suggestion-dev",
+		"sort_timestamp": "2026-02-26T00:00:00.000Z",
+		"kind": "system",
+		"data": {
+			"variant": "suggestion",
+			"icon": "💡",
+			"title": "Ikuti topik yang relevan",
+			"description": "Dapatkan update tentang isu yang Anda pedulikan.",
+			"dismissible": true,
+			"payload": {
+				"variant": "suggestion",
+				"entities": [
+					{
+						"entity_id": "ent-rt05",
+						"entity_type": "lingkungan",
+						"label": "RT 05 Menteng",
+						"followed": false,
+						"description": "Komunitas warga RT 05",
+						"witness_count": 12,
+						"follower_count": 44
+					},
+					{
+						"entity_id": "topik:infrastruktur",
+						"entity_type": "topik",
+						"label": "Infrastruktur",
+						"followed": true,
+						"description": "Perbaikan fasilitas lingkungan",
+						"witness_count": 8,
+						"follower_count": 19
+					}
+				]
+			}
+		}
+	},
+	{
+		"stream_id": "sys-tip-dev",
+		"sort_timestamp": "2026-02-26T00:00:00.000Z",
+		"kind": "system",
+		"data": {
+			"variant": "tip",
+			"icon": "📸",
+			"title": "Tahukah Anda?",
+			"description": "Anda bisa melampirkan foto dan video sebagai bukti untuk memperkuat laporan.",
+			"dismissible": true,
+			"payload": {
+				"variant": "tip",
+				"tip_id": "tip-evidence-upload"
+			}
+		}
+	},
+	{
+		"stream_id": "sys-milestone-dev",
+		"sort_timestamp": "2026-02-26T00:00:00.000Z",
+		"kind": "system",
+		"data": {
+			"variant": "milestone",
+			"icon": "🎉",
+			"title": "Komunitas makin aktif!",
+			"description": "Sinyal partisipasi warga meningkat dari aktivitas feed terbaru.",
+			"dismissible": true,
+			"payload": {
+				"variant": "milestone",
+				"metric_label": "Aktivitas saksi terlihat",
+				"metric_value": "24"
+			}
+		}
+	},
+	{
+		"stream_id": "sys-prompt-dev",
+		"sort_timestamp": "2026-02-26T00:00:00.000Z",
+		"kind": "system",
+		"data": {
+			"variant": "prompt",
+			"icon": "🧭",
+			"title": "Belum ada update baru",
+			"description": "Mulai saksi baru untuk memantik gotong royong.",
+			"dismissible": false,
+			"payload": {
+				"variant": "prompt",
+				"cta_label": "Buat Saksi",
+				"cta_action": "create_witness"
+			}
+		}
+	}
 ]

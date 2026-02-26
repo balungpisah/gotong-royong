@@ -82,8 +82,8 @@
 
 <h1 class="mb-2 text-h1 font-extrabold">Typography Scale</h1>
 <p class="mb-8 text-body text-muted-foreground">
-	8-step scale based on Major Third (1.25) ratio. Nunito typeface throughout.
-	Use ONLY these tokens — avoid raw text-xs/text-sm/text-base.
+	8-step scale based on Major Third (1.25) ratio. Nunito typeface throughout. Use ONLY these tokens
+	— avoid raw text-xs/text-sm/text-base.
 </p>
 
 <!-- Type Scale -->
@@ -99,9 +99,7 @@
 					<span class="text-small text-muted-foreground">{s.size} / {s.lh}</span>
 					<span class="text-small text-muted-foreground">{s.weight}</span>
 				</div>
-				<p class={s.class}>
-					Gotong royong untuk masa depan yang lebih baik.
-				</p>
+				<p class={s.class}>Gotong royong untuk masa depan yang lebih baik.</p>
 				<p class="text-caption text-kayu">{s.use}</p>
 			</div>
 		{/each}

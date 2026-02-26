@@ -44,7 +44,9 @@
 				</a>
 			{/each}
 			<div class="mt-4 border-t border-border pt-4">
-				<p class="mb-2 px-3 text-small font-semibold uppercase tracking-wider text-muted-foreground">
+				<p
+					class="mb-2 px-3 text-small font-semibold uppercase tracking-wider text-muted-foreground"
+				>
 					Renderers
 				</p>
 				{#each renderers as comp (comp.href)}
@@ -57,7 +59,9 @@
 				{/each}
 			</div>
 			<div class="mt-4 border-t border-border pt-4">
-				<p class="mb-2 px-3 text-small font-semibold uppercase tracking-wider text-muted-foreground">
+				<p
+					class="mb-2 px-3 text-small font-semibold uppercase tracking-wider text-muted-foreground"
+				>
 					Stores
 				</p>
 				<a

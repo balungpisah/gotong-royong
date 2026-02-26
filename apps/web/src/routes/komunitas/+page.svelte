@@ -36,7 +36,9 @@
 				<div>
 					<p class="text-body font-bold text-foreground">{m.group_nav_title()}</p>
 					<p class="mt-0.5 text-small text-muted-foreground/80">{m.group_nav_subtitle()}</p>
-					<p class="mt-2 text-caption text-muted-foreground/70">{m.group_nav_count({ count: myGroupCount })}</p>
+					<p class="mt-2 text-caption text-muted-foreground/70">
+						{m.group_nav_count({ count: myGroupCount })}
+					</p>
 				</div>
 				<div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
 					<UsersIcon class="size-5" />

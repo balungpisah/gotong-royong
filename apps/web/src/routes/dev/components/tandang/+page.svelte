@@ -11,12 +11,16 @@
 	<div>
 		<h1 class="text-h1 font-extrabold">Tandang Panel (Witness Detail)</h1>
 		<p class="mt-1 text-body text-muted-foreground">
-			Full witness detail with Octalysis enrichment: progress bar, member presence, scarcity nudges, story narrative phases, celebration moments
+			Full witness detail with Octalysis enrichment: progress bar, member presence, scarcity nudges,
+			story narrative phases, celebration moments
 		</p>
 	</div>
 
 	<!-- Panel container — simulates right-panel context box width -->
-	<div class="mx-auto w-full max-w-lg rounded-lg border border-border bg-card shadow-sm" style="height: 700px;">
+	<div
+		class="mx-auto w-full max-w-lg rounded-lg border border-border bg-card shadow-sm"
+		style="height: 700px;"
+	>
 		<WitnessDetailPanel
 			{detail}
 			feedItem={mockFeedItem1}

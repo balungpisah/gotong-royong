@@ -36,8 +36,10 @@
 			</div>
 		</div>
 	{:else if detail}
-		<div class="h-[calc(100dvh-10rem)] min-h-[28rem] overflow-hidden rounded-xl border border-border/40 bg-card">
-			<WitnessDetailPanel detail={detail} onSendMessage={handleSendMessage} />
+		<div
+			class="h-[calc(100dvh-10rem)] min-h-[28rem] overflow-hidden rounded-xl border border-border/40 bg-card"
+		>
+			<WitnessDetailPanel {detail} onSendMessage={handleSendMessage} />
 		</div>
 	{:else if witnessStore.detailError}
 		<div class="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">

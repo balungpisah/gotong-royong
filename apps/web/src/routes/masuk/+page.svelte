@@ -29,29 +29,13 @@
 			<form method="POST" class="space-y-3">
 				<div class="flex flex-col gap-1.5">
 					<InputLabel for="email">Email</InputLabel>
-					<Input
-						id="email"
-						name="email"
-						type="email"
-						autocomplete="email"
-						required
-					/>
+					<Input id="email" name="email" type="email" autocomplete="email" required />
 				</div>
 				<div class="flex flex-col gap-1.5">
 					<InputLabel for="pass">Password</InputLabel>
-					<Input
-						id="pass"
-						name="pass"
-						type="password"
-						autocomplete="current-password"
-						required
-					/>
+					<Input id="pass" name="pass" type="password" autocomplete="current-password" required />
 				</div>
-				<Button
-					type="submit"
-					variant="default"
-					class="w-full"
-				>
+				<Button type="submit" variant="default" class="w-full">
 					{m.auth_login_title()}
 				</Button>
 			</form>
