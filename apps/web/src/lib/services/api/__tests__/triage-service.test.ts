@@ -58,6 +58,43 @@ describe('ApiTriageService', () => {
 					conversation: ['ai_inline_card', 'diff_card'],
 					structured: ['document', 'list', 'computed']
 				},
+				structured_payload: [
+					{
+						type: 'document',
+						id: 'doc-1',
+						sections: [
+							{
+								id: 'sec-1',
+								content: 'Ringkasan konteks',
+								source: 'ai',
+								locked_fields: []
+							}
+						]
+					}
+				],
+				conversation_payload: [
+					{
+						message_id: 'm-1',
+						type: 'ai_card',
+						timestamp: '2026-02-26T00:00:00Z',
+						witness_id: 'triage-preview',
+						title: 'Ringkasan Operator',
+						blocks: [
+							{
+								type: 'document',
+								id: 'doc-2',
+								sections: [
+									{
+										id: 'sec-2',
+										content: 'Butuh validasi lokasi',
+										source: 'ai',
+										locked_fields: []
+									}
+								]
+							}
+						]
+					}
+				],
 				confidence: { score: 0.4, label: 'Komunitas · 40%' }
 			}
 		});
@@ -71,6 +108,10 @@ describe('ApiTriageService', () => {
 		expect(result.trajectory_type).toBe('aksi');
 		expect(result.blocks?.conversation).toEqual(['ai_inline_card', 'diff_card']);
 		expect(result.blocks?.structured).toEqual(['document', 'list', 'computed']);
+		expect(result.structured_payload?.length).toBe(1);
+		expect(result.structured_payload?.[0]?.type).toBe('document');
+		expect(result.conversation_payload?.length).toBe(1);
+		expect(result.conversation_payload?.[0]?.type).toBe('ai_card');
 		expect(post).toHaveBeenCalledWith('/triage/sessions', {
 			body: { content: 'jalan rusak', attachments: undefined }
 		});
@@ -91,6 +132,36 @@ describe('ApiTriageService', () => {
 					conversation: ['ai_inline_card', 'unknown_block'],
 					structured: ['document']
 				},
+				structured_payload: [
+					{
+						type: 'vote',
+						id: 'vote-1',
+						question: 'Setuju?',
+						vote_type: 'consensus',
+						options: [{ id: 'o1', label: 'Ya', count: 1 }],
+						quorum: 0.5,
+						total_eligible: 10,
+						total_voted: 1,
+						duration_hours: 24
+					}
+				],
+				conversation_payload: [
+					{
+						message_id: 'm-2',
+						type: 'diff_card',
+						timestamp: '2026-02-26T00:00:00Z',
+						witness_id: 'triage-preview',
+						diff: {
+							diff_id: 'd-1',
+							target_type: 'document',
+							target_id: 'doc-1',
+							summary: 'Saran',
+							items: [{ operation: 'modify', path: 'title', label: 'Ubah judul' }],
+							source: 'ai',
+							generated_at: '2026-02-26T00:00:00Z'
+						}
+					}
+				],
 				confidence: { score: 0.4, label: 'Komunitas · 40%' }
 			}
 		});
@@ -99,6 +170,8 @@ describe('ApiTriageService', () => {
 		const result = await service.startTriage('jalan rusak');
 
 		expect(result.blocks).toBeUndefined();
+		expect(result.structured_payload).toBeUndefined();
+		expect(result.conversation_payload).toBeUndefined();
 	});
 
 	it('uses session id for follow-up message', async () => {

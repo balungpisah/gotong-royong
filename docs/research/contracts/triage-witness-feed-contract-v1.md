@@ -37,6 +37,12 @@ Every triage response includes:
       "conversation": ["ai_inline_card", "diff_card"],
       "structured": ["document", "list", "computed"]
     },
+    "structured_payload": [
+      { "type": "document", "id": "triage-doc-1", "...": "block payload" }
+    ],
+    "conversation_payload": [
+      { "type": "ai_card", "message_id": "triage-ai-card-1", "...": "chat card payload" }
+    ],
     "taxonomy": {
       "category_code": "infrastructure",
       "category_label": "Laporan Warga",
@@ -85,6 +91,15 @@ Every triage response includes:
 - optional in `draft`, required in `final` when triage is derived from `operator.v1`.
 - `conversation[]` declares chat-layer blocks (e.g. `ai_inline_card`, `diff_card`, `vote_card`).
 - `structured[]` declares structured-layer primitives (`list|document|form|computed|display|vote|reference`).
+
+`structured_payload` semantics:
+- optional in `draft`, expected in `final` when backend can materialize structured output.
+- items are renderable block objects matching one primitive:
+  `list | document | form | computed | display | vote | reference`.
+
+`conversation_payload` semantics:
+- optional in `draft`, expected in `final` when backend can materialize chat cards.
+- items are renderable chat card messages (`ai_card | diff_card | vote_card`).
 
 `kind` semantics:
 - `witness`: lifecycle card candidate; valid input for `POST /v1/witnesses`.

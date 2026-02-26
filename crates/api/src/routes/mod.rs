@@ -1443,6 +1443,662 @@ fn triage_operator_blocks_payload(operator: &str) -> Value {
     }
 }
 
+fn triage_operator_structured_payload(
+    contract: &TriageOperatorOutput,
+    _route: &str,
+    _trajectory_type: Option<&str>,
+) -> Option<Value> {
+    if contract.triage_stage != "triage_final" {
+        return None;
+    }
+
+    let payload = &contract.payload;
+    let confidence_pct = (contract.confidence.unwrap_or(0.8) * 100.0).round() as i64;
+
+    let blocks = match contract.operator.as_str() {
+        "masalah" => {
+            let plan = payload.get("path_plan");
+            let summary = plan
+                .and_then(|p| p.get("summary"))
+                .and_then(Value::as_str)
+                .unwrap_or("Rencana aksi awal hasil triase.");
+            let first_phase_title = plan
+                .and_then(|p| p.get("branches"))
+                .and_then(Value::as_array)
+                .and_then(|branches| branches.first())
+                .and_then(|branch| branch.get("phases"))
+                .and_then(Value::as_array)
+                .and_then(|phases| phases.first())
+                .and_then(|phase| phase.get("title"))
+                .and_then(Value::as_str)
+                .unwrap_or("Validasi konteks");
+            let trajectory = payload
+                .get("trajectory")
+                .and_then(Value::as_str)
+                .unwrap_or("A");
+
+            json!([
+                {
+                    "type": "document",
+                    "id": "triage-doc-masalah",
+                    "title": "Ringkasan Masalah",
+                    "sections": [
+                        {
+                            "id": "sec-1",
+                            "heading": "Konteks",
+                            "content": summary,
+                            "source": "ai",
+                            "locked_fields": []
+                        }
+                    ]
+                },
+                {
+                    "type": "list",
+                    "id": "triage-list-masalah",
+                    "display": "checklist",
+                    "title": "Langkah Awal",
+                    "items": [
+                        {
+                            "id": "item-1",
+                            "label": format!("Fase pertama: {first_phase_title}"),
+                            "status": "open",
+                            "source": "ai",
+                            "locked_fields": []
+                        },
+                        {
+                            "id": "item-2",
+                            "label": format!("Jalur tindakan: {trajectory}"),
+                            "status": "open",
+                            "source": "ai",
+                            "locked_fields": []
+                        }
+                    ]
+                },
+                {
+                    "type": "computed",
+                    "id": "triage-confidence-masalah",
+                    "display": "confidence",
+                    "label": "Keyakinan Triage",
+                    "value": confidence_pct,
+                    "max": 100,
+                    "unit": "%"
+                }
+            ])
+        }
+        "musyawarah" => {
+            let context = payload
+                .get("context")
+                .and_then(Value::as_str)
+                .unwrap_or("proposal");
+            let step = payload
+                .get("decision_steps")
+                .and_then(Value::as_array)
+                .and_then(|steps| steps.first());
+            let question = step
+                .and_then(|item| item.get("question"))
+                .and_then(Value::as_str)
+                .unwrap_or("Apakah usulan disepakati?");
+            let options = step
+                .and_then(|item| item.get("options"))
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_else(|| {
+                    vec![
+                        json!("Setuju"),
+                        json!("Tidak Setuju"),
+                        json!("Perlu Revisi"),
+                    ]
+                });
+            let vote_options = options
+                .iter()
+                .enumerate()
+                .map(|(i, option)| {
+                    let label = option.as_str().unwrap_or("Pilihan");
+                    json!({
+                        "id": format!("opt-{}", i + 1),
+                        "label": label,
+                        "count": 0
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            json!([
+                {
+                    "type": "document",
+                    "id": "triage-doc-musyawarah",
+                    "title": "Konteks Musyawarah",
+                    "sections": [
+                        {
+                            "id": "sec-1",
+                            "heading": "Jenis",
+                            "content": format!("Konteks saat ini: {context}."),
+                            "source": "ai",
+                            "locked_fields": []
+                        }
+                    ]
+                },
+                {
+                    "type": "vote",
+                    "id": "triage-vote-musyawarah",
+                    "question": question,
+                    "vote_type": "consensus",
+                    "options": vote_options,
+                    "quorum": 0.5,
+                    "total_eligible": 10,
+                    "total_voted": 0,
+                    "duration_hours": 24,
+                    "ends_at": "2026-12-31T23:59:59Z"
+                }
+            ])
+        }
+        "pantau" => {
+            let timeline_seed = payload
+                .get("timeline_seed")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let timeline_items = if timeline_seed.is_empty() {
+                vec![json!({
+                    "id": "item-1",
+                    "label": "Catatan awal pemantauan dibuat",
+                    "status": "open",
+                    "source": "ai",
+                    "locked_fields": []
+                })]
+            } else {
+                timeline_seed
+                    .iter()
+                    .enumerate()
+                    .map(|(i, event)| {
+                        let label = event
+                            .get("event")
+                            .and_then(Value::as_str)
+                            .unwrap_or("Peristiwa");
+                        let date = event.get("date").and_then(Value::as_str).unwrap_or("-");
+                        json!({
+                            "id": format!("item-{}", i + 1),
+                            "label": format!("{date}: {label}"),
+                            "status": "open",
+                            "source": "ai",
+                            "locked_fields": []
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            };
+
+            json!([
+                {
+                    "type": "list",
+                    "id": "triage-list-pantau",
+                    "display": "timeline",
+                    "title": "Timeline Pantau",
+                    "items": timeline_items
+                },
+                {
+                    "type": "computed",
+                    "id": "triage-comp-pantau",
+                    "display": "counter",
+                    "label": "Jumlah Titik Pantau",
+                    "value": payload.get("tracking_points").and_then(Value::as_array).map(|arr| arr.len()).unwrap_or(0),
+                    "unit": "titik"
+                }
+            ])
+        }
+        "program" => {
+            let activity_name = payload
+                .get("activity_name")
+                .and_then(Value::as_str)
+                .unwrap_or("Program Komunitas");
+            let frequency = payload
+                .get("frequency")
+                .and_then(Value::as_str)
+                .unwrap_or("mingguan");
+            let rotation = payload
+                .get("rotation")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let rotation_items = rotation
+                .iter()
+                .enumerate()
+                .map(|(i, entry)| {
+                    let participant = entry
+                        .get("participant")
+                        .and_then(Value::as_str)
+                        .unwrap_or("Peserta");
+                    let slot = entry.get("slot").and_then(Value::as_str).unwrap_or("-");
+                    json!({
+                        "id": format!("item-{}", i + 1),
+                        "label": format!("{participant} · {slot}"),
+                        "status": "open",
+                        "source": "ai",
+                        "locked_fields": []
+                    })
+                })
+                .collect::<Vec<_>>();
+            json!([
+                {
+                    "type": "form",
+                    "id": "triage-form-program",
+                    "title": "Konfigurasi Program",
+                    "fields": [
+                        {
+                            "id": "activity_name",
+                            "label": "Nama Kegiatan",
+                            "field_type": "text",
+                            "value": activity_name,
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        },
+                        {
+                            "id": "frequency",
+                            "label": "Frekuensi",
+                            "field_type": "text",
+                            "value": frequency,
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        }
+                    ]
+                },
+                {
+                    "type": "list",
+                    "id": "triage-list-program",
+                    "display": "table",
+                    "title": "Rotasi Peserta",
+                    "items": rotation_items
+                }
+            ])
+        }
+        "catat" => {
+            let claim = payload
+                .get("claim")
+                .and_then(Value::as_str)
+                .unwrap_or("Catatan komunitas");
+            let category = payload
+                .get("category")
+                .and_then(Value::as_str)
+                .unwrap_or("catatan_komunitas");
+            let observed_at = payload
+                .get("observed_at")
+                .and_then(Value::as_str)
+                .unwrap_or("2026-01-01T00:00:00Z");
+            json!([
+                {
+                    "type": "form",
+                    "id": "triage-form-catat",
+                    "title": "Ringkasan Data",
+                    "fields": [
+                        {
+                            "id": "claim",
+                            "label": "Klaim",
+                            "field_type": "textarea",
+                            "value": claim,
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        },
+                        {
+                            "id": "category",
+                            "label": "Kategori",
+                            "field_type": "text",
+                            "value": category,
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        },
+                        {
+                            "id": "observed_at",
+                            "label": "Waktu Observasi",
+                            "field_type": "date",
+                            "value": observed_at,
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        }
+                    ]
+                }
+            ])
+        }
+        "bantuan" => {
+            let resources = payload
+                .get("matched_resources")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let resource_items = resources
+                .iter()
+                .enumerate()
+                .map(|(i, entry)| {
+                    let name = entry.get("name").and_then(Value::as_str).unwrap_or("Sumber Daya");
+                    let reason = entry
+                        .get("match_reason")
+                        .and_then(Value::as_str)
+                        .unwrap_or("Cocok dengan kebutuhan");
+                    json!({
+                        "id": format!("item-{}", i + 1),
+                        "label": format!("{name} · {reason}"),
+                        "status": "open",
+                        "source": "ai",
+                        "locked_fields": []
+                    })
+                })
+                .collect::<Vec<_>>();
+            json!([
+                {
+                    "type": "form",
+                    "id": "triage-form-bantuan",
+                    "title": "Permintaan Bantuan",
+                    "fields": [
+                        {
+                            "id": "help_type",
+                            "label": "Jenis Bantuan",
+                            "field_type": "text",
+                            "value": payload.get("help_type").and_then(Value::as_str).unwrap_or("dukungan_komunitas"),
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        },
+                        {
+                            "id": "description",
+                            "label": "Deskripsi",
+                            "field_type": "textarea",
+                            "value": payload.get("description").and_then(Value::as_str).unwrap_or(""),
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        }
+                    ]
+                },
+                {
+                    "type": "list",
+                    "id": "triage-list-bantuan",
+                    "display": "checklist",
+                    "title": "Sumber Daya Terkait",
+                    "items": resource_items
+                }
+            ])
+        }
+        "rayakan" => {
+            let achievement = payload
+                .get("achievement")
+                .and_then(Value::as_str)
+                .unwrap_or("Pencapaian komunitas");
+            let impact = payload
+                .get("impact_summary")
+                .and_then(Value::as_str)
+                .unwrap_or("Dampak positif untuk lingkungan.");
+            let contributors = payload
+                .get("contributors")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let contributor_items = contributors
+                .iter()
+                .enumerate()
+                .map(|(i, name)| {
+                    json!({
+                        "id": format!("item-{}", i + 1),
+                        "label": name.as_str().unwrap_or("Kontributor").to_string(),
+                        "status": "completed",
+                        "source": "ai",
+                        "locked_fields": []
+                    })
+                })
+                .collect::<Vec<_>>();
+            json!([
+                {
+                    "type": "display",
+                    "id": "triage-display-rayakan",
+                    "title": achievement,
+                    "content": impact
+                },
+                {
+                    "type": "list",
+                    "id": "triage-list-rayakan",
+                    "display": "checklist",
+                    "title": "Kontributor",
+                    "items": contributor_items
+                }
+            ])
+        }
+        "siaga" => {
+            let severity = payload
+                .get("severity")
+                .and_then(Value::as_str)
+                .unwrap_or("waspada");
+            let severity_score = match severity {
+                "darurat" => 100,
+                "siaga" => 70,
+                _ => 40,
+            };
+            json!([
+                {
+                    "type": "form",
+                    "id": "triage-form-siaga",
+                    "title": "Ringkasan Siaga",
+                    "fields": [
+                        {
+                            "id": "threat_type",
+                            "label": "Jenis Ancaman",
+                            "field_type": "text",
+                            "value": payload.get("threat_type").and_then(Value::as_str).unwrap_or("peringatan_warga"),
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        },
+                        {
+                            "id": "location",
+                            "label": "Lokasi",
+                            "field_type": "text",
+                            "value": payload.get("location").and_then(Value::as_str).unwrap_or("Area komunitas"),
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        }
+                    ]
+                },
+                {
+                    "type": "computed",
+                    "id": "triage-comp-siaga",
+                    "display": "status",
+                    "label": "Skala Keparahan",
+                    "value": severity_score,
+                    "max": 100,
+                    "unit": "%"
+                }
+            ])
+        }
+        "kelola" => {
+            let detail = payload.get("group_detail");
+            let name = detail
+                .and_then(|value| value.get("name"))
+                .and_then(Value::as_str)
+                .unwrap_or("Kelompok Baru");
+            let description = detail
+                .and_then(|value| value.get("description"))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let join_policy = detail
+                .and_then(|value| value.get("join_policy"))
+                .and_then(Value::as_str)
+                .unwrap_or("terbuka");
+
+            json!([
+                {
+                    "type": "form",
+                    "id": "triage-form-kelola",
+                    "title": "Rencana Kelompok",
+                    "fields": [
+                        {
+                            "id": "name",
+                            "label": "Nama Kelompok",
+                            "field_type": "text",
+                            "value": name,
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        },
+                        {
+                            "id": "description",
+                            "label": "Deskripsi",
+                            "field_type": "textarea",
+                            "value": description,
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        },
+                        {
+                            "id": "join_policy",
+                            "label": "Kebijakan Gabung",
+                            "field_type": "text",
+                            "value": join_policy,
+                            "protected": false,
+                            "source": "ai",
+                            "locked_fields": []
+                        }
+                    ]
+                }
+            ])
+        }
+        _ => {
+            json!([
+                {
+                    "type": "document",
+                    "id": "triage-doc-default",
+                    "sections": [
+                        {
+                            "id": "sec-1",
+                            "content": "Belum ada payload terstruktur.",
+                            "source": "ai",
+                            "locked_fields": []
+                        }
+                    ]
+                }
+            ])
+        }
+    };
+
+    Some(blocks)
+}
+
+fn triage_operator_conversation_payload(
+    contract: &TriageOperatorOutput,
+    structured_payload: Option<&Value>,
+) -> Option<Value> {
+    if contract.triage_stage != "triage_final" {
+        return None;
+    }
+
+    let blocks = contract.blocks.as_ref()?;
+    let timestamp = gotong_domain::util::format_ms_rfc3339(gotong_domain::jobs::now_ms());
+    let witness_id = "triage-preview";
+    let mut items: Vec<Value> = Vec::new();
+
+    if blocks
+        .conversation
+        .iter()
+        .any(|item| item.as_str() == "ai_inline_card")
+    {
+        let ai_blocks = structured_payload
+            .and_then(Value::as_array)
+            .map(|arr| arr.iter().take(2).cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
+        items.push(json!({
+            "message_id": "triage-ai-card-1",
+            "type": "ai_card",
+            "timestamp": timestamp,
+            "witness_id": witness_id,
+            "badge": "ringkasan",
+            "title": "Ringkasan Operator",
+            "blocks": ai_blocks
+        }));
+    }
+
+    if blocks
+        .conversation
+        .iter()
+        .any(|item| item.as_str() == "diff_card")
+    {
+        let first_checklist_field = contract
+            .checklist
+            .first()
+            .map(|item| item.field.as_str())
+            .unwrap_or("core_context");
+        items.push(json!({
+            "message_id": "triage-diff-card-1",
+            "type": "diff_card",
+            "timestamp": timestamp,
+            "witness_id": witness_id,
+            "diff": {
+                "diff_id": "triage-diff-1",
+                "target_type": "document",
+                "target_id": "triage-doc-1",
+                "summary": "Saran penyempurnaan hasil triase",
+                "evidence": ["Disusun dari jawaban pengguna pada sesi triase."],
+                "items": [
+                    {
+                        "operation": "modify",
+                        "path": first_checklist_field,
+                        "label": format!("Lengkapi konteks pada {first_checklist_field}"),
+                        "old_value": null,
+                        "new_value": "Konteks diperjelas untuk materialisasi.",
+                        "protected": false
+                    }
+                ],
+                "source": "ai",
+                "generated_at": timestamp
+            }
+        }));
+    }
+
+    if blocks
+        .conversation
+        .iter()
+        .any(|item| item.as_str() == "vote_card")
+    {
+        let vote_block = structured_payload
+            .and_then(Value::as_array)
+            .and_then(|arr| {
+                arr.iter()
+                    .find(|block| block.get("type").and_then(Value::as_str) == Some("vote"))
+            })
+            .cloned()
+            .unwrap_or_else(|| {
+                json!({
+                    "type": "vote",
+                    "id": "triage-vote-1",
+                    "question": "Apakah usulan ini disetujui?",
+                    "vote_type": "consensus",
+                    "options": [
+                        { "id": "opt-1", "label": "Setuju", "count": 0 },
+                        { "id": "opt-2", "label": "Tidak Setuju", "count": 0 }
+                    ],
+                    "quorum": 0.5,
+                    "total_eligible": 10,
+                    "total_voted": 0,
+                    "duration_hours": 24,
+                    "ends_at": "2026-12-31T23:59:59Z"
+                })
+            });
+
+        items.push(json!({
+            "message_id": "triage-vote-card-1",
+            "type": "vote_card",
+            "timestamp": timestamp,
+            "witness_id": witness_id,
+            "block": vote_block
+        }));
+    }
+
+    if items.is_empty() {
+        None
+    } else {
+        Some(Value::Array(items))
+    }
+}
+
 fn triage_operator_output_payload(route: &str, trajectory_type: Option<&str>, step: u8) -> Value {
     let operator = triage_operator_name(route, trajectory_type);
     let output_kind = triage_operator_output_kind(route, trajectory_type);
@@ -2026,6 +2682,18 @@ fn triage_result_from_operator_contract(contract: &TriageOperatorOutput, step: u
     {
         payload["blocks"] = blocks_value;
     }
+    if let Some(structured_payload) =
+        triage_operator_structured_payload(contract, route, trajectory_type)
+    {
+        payload["structured_payload"] = structured_payload.clone();
+        if let Some(conversation_payload) =
+            triage_operator_conversation_payload(contract, Some(&structured_payload))
+        {
+            payload["conversation_payload"] = conversation_payload;
+        }
+    } else if let Some(conversation_payload) = triage_operator_conversation_payload(contract, None) {
+        payload["conversation_payload"] = conversation_payload;
+    }
 
     let stempel_state = contract
         .routing
@@ -2174,6 +2842,8 @@ mod triage_operator_contract_tests {
         assert_eq!(result.get("route"), Some(&json!("komunitas")));
         assert!(result.get("proposed_plan").is_some_and(Value::is_object));
         assert!(result.get("blocks").is_some_and(Value::is_object));
+        assert!(result.get("structured_payload").is_some_and(Value::is_array));
+        assert!(result.get("conversation_payload").is_some_and(Value::is_array));
     }
 
     #[test]

@@ -8,10 +8,11 @@
  * @see docs/design/specs/UI-GUIDELINE-v1.0.md §6
  */
 
-import type { TrackHint } from './blocks';
+import type { Block, TrackHint } from './blocks';
 import type { PathPlan, SeedHint } from './path-plan';
 import type { TrajectoryType, CardEnrichment } from './card-enrichment';
 import type { KelolaPayload } from './operator';
+import type { AiCardMessage, DiffCardMessage, VoteCardMessage } from './chat';
 
 // ---------------------------------------------------------------------------
 // Context Bar States
@@ -111,6 +112,8 @@ export interface TriageBlocks {
 	structured: TriageStructuredBlockId[];
 }
 
+export type TriageConversationMessage = AiCardMessage | DiffCardMessage | VoteCardMessage;
+
 /** Confidence level for the AI classification. */
 export interface TriageConfidence {
 	/** 0-1 confidence score. */
@@ -160,6 +163,10 @@ export interface TriageResult {
 	card_enrichment?: CardEnrichment;
 	/** Canonical renderable card payload from backend triage. */
 	card?: TriageCard;
+	/** Structured block payload rendered in triage-ready preview. */
+	structured_payload?: Block[];
+	/** Conversation-layer card payload rendered in triage chat preview. */
+	conversation_payload?: TriageConversationMessage[];
 	/** Token budget tracking — drives the "Sisa Energi AI" energy bar. */
 	budget?: TriageBudget;
 	/** Proposed path plan (when bar_state is 'ready'). */

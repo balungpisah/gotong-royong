@@ -1,5 +1,6 @@
 import type { ApiClient } from '$lib/api';
 import type {
+	Block,
 	ContextBarState,
 	EntryRoute,
 	TriageConversationBlockId,
@@ -60,6 +61,23 @@ const TRIAGE_STRUCTURED_BLOCKS = new Set<TriageStructuredBlockId>([
 	'vote',
 	'reference'
 ]);
+const SOURCE_TAGS = new Set(['ai', 'human', 'system']);
+const LIST_ITEM_STATUSES = new Set(['open', 'completed', 'blocked', 'skipped']);
+const LIST_DISPLAYS = new Set(['checklist', 'table', 'timeline', 'gallery']);
+const FORM_FIELD_TYPES = new Set(['text', 'number', 'date', 'select', 'textarea', 'toggle', 'file']);
+const COMPUTED_DISPLAYS = new Set(['progress', 'status', 'score', 'counter', 'confidence']);
+const VOTE_TYPES = new Set(['standard', 'weighted', 'quorum_1_5x', 'consensus']);
+const REFERENCE_TYPES = new Set(['seed', 'plan', 'checkpoint', 'document']);
+const DIFF_OPERATIONS = new Set(['add', 'remove', 'modify', 'reorder']);
+const DIFF_TARGET_TYPES = new Set(['list', 'document', 'form', 'checkpoint', 'phase']);
+const AI_BADGE_VARIANTS = new Set([
+	'classified',
+	'suggested',
+	'stalled',
+	'dampak',
+	'ringkasan',
+	'duplikat'
+]);
 
 const isRecord = (value: unknown): value is JsonRecord =>
 	typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -73,6 +91,154 @@ const readStringArray = (value: unknown): string[] | undefined => {
 		.map((entry) => asString(entry))
 		.filter((entry): entry is string => entry !== undefined);
 	return strings.length === value.length ? strings : undefined;
+};
+
+const isStringArray = (value: unknown): value is string[] =>
+	Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isSourceMeta = (value: unknown): boolean => {
+	if (!isRecord(value)) return false;
+	return SOURCE_TAGS.has(String(value.source)) && isStringArray(value.locked_fields);
+};
+
+const isListItem = (value: unknown): boolean => {
+	if (!isRecord(value)) return false;
+	if (!asString(value.id) || !asString(value.label)) return false;
+	if (!LIST_ITEM_STATUSES.has(String(value.status))) return false;
+	if (!isSourceMeta(value)) return false;
+	if (value.children !== undefined) {
+		if (!Array.isArray(value.children)) return false;
+		if (!value.children.every((child) => isListItem(child))) return false;
+	}
+	return true;
+};
+
+const isBlock = (value: unknown): value is Block => {
+	if (!isRecord(value)) return false;
+	const type = asString(value.type);
+	const id = asString(value.id);
+	if (!type || !id || !TRIAGE_STRUCTURED_BLOCKS.has(type as TriageStructuredBlockId)) return false;
+
+	switch (type) {
+		case 'list':
+			return LIST_DISPLAYS.has(String(value.display)) && Array.isArray(value.items) && value.items.every(isListItem);
+		case 'document':
+			return (
+				Array.isArray(value.sections) &&
+				value.sections.every(
+					(section) =>
+						isRecord(section) &&
+						!!asString(section.id) &&
+						!!asString(section.content) &&
+						isSourceMeta(section)
+				)
+			);
+		case 'form':
+			return (
+				Array.isArray(value.fields) &&
+				value.fields.every(
+					(field) =>
+						isRecord(field) &&
+						!!asString(field.id) &&
+						!!asString(field.label) &&
+						FORM_FIELD_TYPES.has(String(field.field_type)) &&
+						typeof field.protected === 'boolean' &&
+						isSourceMeta(field)
+				)
+			);
+		case 'computed':
+			return (
+				COMPUTED_DISPLAYS.has(String(value.display)) &&
+				!!asString(value.label) &&
+				typeof value.value === 'number'
+			);
+		case 'display':
+			return !!asString(value.title) && !!asString(value.content);
+		case 'vote':
+			return (
+				!!asString(value.question) &&
+				VOTE_TYPES.has(String(value.vote_type)) &&
+				Array.isArray(value.options) &&
+				value.options.every(
+					(option) =>
+						isRecord(option) &&
+						!!asString(option.id) &&
+						!!asString(option.label) &&
+						typeof option.count === 'number'
+				) &&
+				typeof value.quorum === 'number' &&
+				typeof value.total_eligible === 'number' &&
+				typeof value.total_voted === 'number' &&
+				typeof value.duration_hours === 'number' &&
+				!!asString(value.ends_at)
+			);
+		case 'reference':
+			return (
+				!!asString(value.ref_id) &&
+				REFERENCE_TYPES.has(String(value.ref_type)) &&
+				!!asString(value.title)
+			);
+		default:
+			return false;
+	}
+};
+
+const readStructuredPayload = (value: unknown): Block[] | undefined => {
+	if (!Array.isArray(value)) return undefined;
+	const blocks = value.filter((item): item is Block => isBlock(item));
+	return blocks.length === value.length ? blocks : undefined;
+};
+
+const isChatMessageBase = (value: unknown): boolean =>
+	isRecord(value) && !!asString(value.message_id) && !!asString(value.timestamp) && !!asString(value.witness_id);
+
+const isAiCardMessage = (value: unknown): boolean => {
+	if (!isRecord(value) || value.type !== 'ai_card') return false;
+	if (!isChatMessageBase(value) || !Array.isArray(value.blocks) || !value.blocks.every(isBlock)) return false;
+	if (value.badge !== undefined && !AI_BADGE_VARIANTS.has(String(value.badge))) return false;
+	return true;
+};
+
+const isDiffCardMessage = (value: unknown): boolean => {
+	if (!isRecord(value) || value.type !== 'diff_card') return false;
+	if (!isChatMessageBase(value)) return false;
+	if (!isRecord(value.diff)) return false;
+	const diff = value.diff;
+	if (
+		!asString(diff.diff_id) ||
+		!DIFF_TARGET_TYPES.has(String(diff.target_type)) ||
+		!asString(diff.target_id) ||
+		!asString(diff.summary) ||
+		diff.source !== 'ai' ||
+		!asString(diff.generated_at) ||
+		!Array.isArray(diff.items)
+	) {
+		return false;
+	}
+
+	return diff.items.every(
+		(item) =>
+			isRecord(item) &&
+			DIFF_OPERATIONS.has(String(item.operation)) &&
+			!!asString(item.path) &&
+			!!asString(item.label) &&
+			typeof item.protected === 'boolean'
+	);
+};
+
+const isVoteCardMessage = (value: unknown): boolean => {
+	if (!isRecord(value) || value.type !== 'vote_card') return false;
+	if (!isChatMessageBase(value)) return false;
+	return isBlock(value.block) && value.block.type === 'vote';
+};
+
+const readConversationPayload = (value: unknown): TriageResult['conversation_payload'] | undefined => {
+	if (!Array.isArray(value)) return undefined;
+	const parsed = value.filter(
+		(item): item is NonNullable<TriageResult['conversation_payload']>[number] =>
+			isAiCardMessage(item) || isDiffCardMessage(item) || isVoteCardMessage(item)
+	);
+	return parsed.length === value.length ? parsed : undefined;
 };
 
 const readBlocks = (value: unknown): TriageResult['blocks'] | undefined => {
@@ -110,7 +276,9 @@ const readResult = (raw: unknown): TriageResult | undefined => {
 	if (!TRIAGE_KINDS.has(kind as TriageKind)) return undefined;
 	return {
 		...(raw as unknown as TriageResult),
-		blocks: readBlocks(raw.blocks)
+		blocks: readBlocks(raw.blocks),
+		structured_payload: readStructuredPayload(raw.structured_payload),
+		conversation_payload: readConversationPayload(raw.conversation_payload)
 	};
 };
 

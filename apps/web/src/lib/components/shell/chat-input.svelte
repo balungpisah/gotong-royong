@@ -12,11 +12,13 @@
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import Plus from '@lucide/svelte/icons/plus';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
-	import Settings from '@lucide/svelte/icons/settings';
-	import TrajectoryGrid from '$lib/components/triage/trajectory-grid.svelte';
-	import TriageAttachmentPicker from '$lib/components/triage/triage-attachment-picker.svelte';
-	import TriageAttachmentPreview from '$lib/components/triage/triage-attachment-preview.svelte';
-	import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/types';
+import Settings from '@lucide/svelte/icons/settings';
+import TrajectoryGrid from '$lib/components/triage/trajectory-grid.svelte';
+import TriageAttachmentPicker from '$lib/components/triage/triage-attachment-picker.svelte';
+import TriageAttachmentPreview from '$lib/components/triage/triage-attachment-preview.svelte';
+import { BlockRenderer } from '$lib/components/blocks';
+import CardEnvelope from '$lib/components/chat/card-envelope.svelte';
+import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/types';
 	import Zap from '@lucide/svelte/icons/zap';
 	import Video from '@lucide/svelte/icons/video';
 	import Mic from '@lucide/svelte/icons/mic';
@@ -133,6 +135,8 @@
 	);
 	const declaredConversationBlocks = $derived(triageStore.blocks?.conversation ?? []);
 	const declaredStructuredBlocks = $derived(triageStore.blocks?.structured ?? []);
+	const structuredPayload = $derived(triageStore.structuredPayload);
+	const conversationPayload = $derived(triageStore.conversationPayload);
 
 	function blockLabel(blockId: string): string {
 		const labels: Record<string, string> = {
@@ -531,6 +535,14 @@
 						</div>
 					{/if}
 
+					{#if triageStore.isReady && conversationPayload.length > 0}
+						<div class="mt-1 space-y-0.5">
+							{#each conversationPayload as item (item.message_id)}
+								<CardEnvelope message={item} defaultExpanded={false} dotVariant="minor" />
+							{/each}
+						</div>
+					{/if}
+
 					{#if triageStore.isReady}
 						{#if triageStore.route === 'kelola'}
 							<!-- Kelola result card -->
@@ -571,6 +583,16 @@
 														<Badge variant="outline" class="text-[10px] uppercase">
 															STRUCT · {blockLabel(blockId)}
 														</Badge>
+													{/each}
+												</div>
+											</div>
+										{/if}
+										{#if structuredPayload.length > 0}
+											<div class="mt-2 rounded-lg border border-border/30 bg-card px-2.5 py-2">
+												<p class="mb-1.5 text-small font-medium text-foreground">Structured preview</p>
+												<div class="space-y-2">
+													{#each structuredPayload as block (block.id)}
+														<BlockRenderer {block} />
 													{/each}
 												</div>
 											</div>
@@ -657,6 +679,16 @@
 														<Badge variant="outline" class="text-[10px] uppercase">
 															STRUCT · {blockLabel(blockId)}
 														</Badge>
+													{/each}
+												</div>
+											</div>
+										{/if}
+										{#if structuredPayload.length > 0}
+											<div class="mt-2 rounded-lg border border-border/30 bg-card px-2.5 py-2">
+												<p class="mb-1.5 text-small font-medium text-foreground">Structured preview</p>
+												<div class="space-y-2">
+													{#each structuredPayload as block (block.id)}
+														<BlockRenderer {block} />
 													{/each}
 												</div>
 											</div>

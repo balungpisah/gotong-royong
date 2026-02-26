@@ -33,6 +33,8 @@ export class TriageStore {
 	);
 	proposedPlan = $derived(this.result?.proposed_plan ?? null);
 	blocks = $derived(this.result?.blocks ?? null);
+	structuredPayload = $derived(this.result?.structured_payload ?? []);
+	conversationPayload = $derived(this.result?.conversation_payload ?? []);
 	confidence = $derived(this.result?.confidence ?? null);
 	trackHint = $derived(this.result?.track_hint ?? null);
 	seedHint = $derived(this.result?.seed_hint ?? null);
