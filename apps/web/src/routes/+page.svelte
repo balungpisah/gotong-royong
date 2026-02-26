@@ -14,6 +14,7 @@
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import Masonry from 'svelte-bricks';
 	import { shareFeedItem } from '$lib/utils/share';
+	import { Button } from '$lib/components/ui/button';
 
 	const witnessStore = getWitnessStore();
 	const notificationStore = getNotificationStore();
@@ -212,29 +213,29 @@
 				<div class="flex h-full items-center justify-center">
 					<div class="flex flex-col items-center gap-3 text-muted-foreground">
 						<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
-						<p class="text-xs">{m.pulse_loading_detail()}</p>
+						<p class="text-small">{m.pulse_loading_detail()}</p>
 					</div>
 				</div>
 			{:else if selectedWitnessId && witnessStore.detailError}
 				<div class="flex h-full items-center justify-center p-6">
 					<div class="w-full max-w-sm rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-center">
-						<p class="text-sm font-semibold text-foreground">Gagal memuat detail tandang</p>
-						<p class="mt-1 text-xs text-muted-foreground">{witnessStore.detailError}</p>
+						<p class="text-body font-semibold text-foreground">Gagal memuat detail tandang</p>
+						<p class="mt-1 text-small text-muted-foreground">{witnessStore.detailError}</p>
 						<div class="mt-3 flex justify-center gap-2">
-							<button
-								type="button"
-								class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+							<Button
+								variant="outline"
+								size="sm"
 								onclick={retryWitnessDetailLoad}
 							>
 								Coba lagi
-							</button>
-							<button
-								type="button"
-								class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"
+							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
 								onclick={closeDetail}
 							>
 								Tutup
-							</button>
+							</Button>
 						</div>
 					</div>
 				</div>
@@ -263,14 +264,14 @@
 					role="status"
 					aria-live="polite"
 				>
-					<p class="text-xs text-destructive">{feedStore.error}</p>
-					<button
-						type="button"
-						class="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+					<p class="text-small text-destructive">{feedStore.error}</p>
+					<Button
+						variant="outline"
+						size="sm"
 						onclick={retryFeedLoad}
 					>
 						Coba lagi
-					</button>
+					</Button>
 				</div>
 			{/if}
 
@@ -280,14 +281,14 @@
 					role="status"
 					aria-live="polite"
 				>
-					<p class="text-xs text-destructive">{witnessStore.listError}</p>
-					<button
-						type="button"
-						class="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+					<p class="text-small text-destructive">{witnessStore.listError}</p>
+					<Button
+						variant="outline"
+						size="sm"
 						onclick={retryWitnessListLoad}
 					>
 						Coba lagi
-					</button>
+					</Button>
 				</div>
 			{/if}
 
@@ -297,14 +298,14 @@
 					role="status"
 					aria-live="polite"
 				>
-					<p class="text-xs text-destructive">{witnessStore.detailError}</p>
-					<button
-						type="button"
-						class="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+					<p class="text-small text-destructive">{witnessStore.detailError}</p>
+					<Button
+						variant="outline"
+						size="sm"
 						onclick={retryWitnessDetailLoad}
 					>
 						Coba lagi
-					</button>
+					</Button>
 				</div>
 			{/if}
 
@@ -349,14 +350,14 @@
 					>
 						<Activity class="size-6" />
 					</div>
-					<p class="max-w-xs text-sm text-muted-foreground">{feedStore.error}</p>
-					<button
-						type="button"
-						class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+					<p class="max-w-xs text-body text-muted-foreground">{feedStore.error}</p>
+					<Button
+						variant="outline"
+						size="sm"
 						onclick={retryFeedLoad}
 					>
 						Coba lagi
-					</button>
+					</Button>
 				</div>
 				{:else if masonryStream.length === 0}
 					<div
@@ -371,7 +372,7 @@
 							<Activity class="size-6" />
 						{/if}
 					</div>
-					<p class="max-w-xs text-sm text-muted-foreground">
+					<p class="max-w-xs text-body text-muted-foreground">
 						{feedStore.filter === 'semua'
 							? m.pulse_empty_state()
 							: feedStore.filter === 'pantauan'

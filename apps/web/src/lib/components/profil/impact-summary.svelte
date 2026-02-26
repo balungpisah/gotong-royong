@@ -29,7 +29,7 @@
 	transition={{ duration: 0.35, delay: 0.15 }}
 >
 	<div class="rounded-xl border border-border/30 bg-muted/10 p-4">
-		<h3 class="text-xs font-semibold text-foreground">{m.profil_impact_title()}</h3>
+		<h3 class="text-small font-semibold text-foreground">{m.profil_impact_title()}</h3>
 		<p class="mt-0.5 text-caption text-muted-foreground">{m.profil_impact_subtitle()}</p>
 
 		<div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -44,7 +44,7 @@
 					<div class="flex size-8 items-center justify-center rounded-lg {metric.color}">
 						<Icon class="size-4" />
 					</div>
-					<p class="text-xl font-bold text-foreground">{metric.value}</p>
+					<p class="text-h2 font-bold text-foreground">{metric.value}</p>
 					<p class="text-caption text-muted-foreground leading-tight">{metric.label}</p>
 				</motion.div>
 			{/each}

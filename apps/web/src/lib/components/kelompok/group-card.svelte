@@ -5,6 +5,7 @@
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import UserPlusIcon from '@lucide/svelte/icons/user-plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		group: GroupSummary;
@@ -29,14 +30,14 @@
 		<div class="min-w-0 flex-1">
 			<div class="flex items-start justify-between gap-2">
 				<a href={href} class="min-w-0">
-					<h3 class="truncate text-sm font-bold text-foreground hover:underline">
+					<h3 class="truncate text-body font-bold text-foreground hover:underline">
 						{group.name}
 					</h3>
 				</a>
 				<GroupPrivacyBadge joinPolicy={group.join_policy} />
 			</div>
 
-			<p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground/80">
+			<p class="mt-1 line-clamp-2 text-small leading-relaxed text-muted-foreground/80">
 				{group.description}
 			</p>
 
@@ -57,40 +58,40 @@
 	</div>
 
 	<div class="mt-3 flex items-center gap-2">
-		<a
+		<Button
+			variant="secondary"
 			href={href}
-			class="inline-flex flex-1 items-center justify-center rounded-lg bg-muted/40 px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-muted/60"
+			class="flex-1"
 		>
 			{m.group_action_view()}
-		</a>
+		</Button>
 
 		{#if canJoinNow}
-			<button
-				type="button"
+			<Button
+				variant="default"
 				onclick={() => onJoin?.(group.group_id)}
-				class="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
 			>
 				<UserPlusIcon class="mr-1 size-3.5" />
 				{m.group_action_join()}
-			</button>
+			</Button>
 		{:else if canRequest}
-			<button
-				type="button"
+			<Button
+				variant="outline"
+				class="bg-primary/10 text-primary hover:bg-primary/15"
 				onclick={() => onRequestJoin?.(group.group_id)}
-				class="inline-flex items-center justify-center rounded-lg bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/15"
 			>
 				<UserPlusIcon class="mr-1 size-3.5" />
 				{m.group_action_request_join()}
-			</button>
+			</Button>
 		{:else}
-			<button
-				type="button"
+			<Button
+				variant="secondary"
 				disabled
-				class="inline-flex items-center justify-center rounded-lg bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground"
+				class="text-muted-foreground"
 				title={m.group_invite_only_tooltip()}
 			>
 				{m.group_action_invite_only()}
-			</button>
+			</Button>
 		{/if}
 	</div>
 </article>

@@ -138,7 +138,7 @@
 					<div class="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-card bg-online"></div>
 				</div>
 				<div class="min-w-0 flex-1">
-					<h2 class="truncate text-sm font-bold text-foreground">{profile.name}</h2>
+					<h2 class="truncate text-body font-bold text-foreground">{profile.name}</h2>
 					<p class="text-caption text-muted-foreground">
 						{#if locationLabel}{locationLabel} · {/if}{m.profil_member_since_active({ year: joinedYear })}
 					</p>
@@ -178,19 +178,19 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.3, delay: 0.15 }}
 				>
-					<h3 class="text-xs font-semibold text-foreground">{m.profil_stats_title()}</h3>
+					<h3 class="text-small font-semibold text-foreground">{m.profil_stats_title()}</h3>
 					<div class="mt-2 grid grid-cols-3 gap-2">
 						<div class="rounded-lg bg-muted/20 p-2.5 text-center">
-							<p class="text-xl font-bold text-foreground">{stats.evidence_submitted}</p>
-							<p class="text-xs text-muted-foreground">{m.profil_stat_tandang()}</p>
+							<p class="text-h2 font-bold text-foreground">{stats.evidence_submitted}</p>
+							<p class="text-small text-muted-foreground">{m.profil_stat_tandang()}</p>
 						</div>
 						<div class="rounded-lg bg-muted/20 p-2.5 text-center">
-							<p class="text-xl font-bold text-foreground">{stats.witnesses_participated}</p>
-							<p class="text-xs text-muted-foreground">{m.profil_stat_saksi()}</p>
+							<p class="text-h2 font-bold text-foreground">{stats.witnesses_participated}</p>
+							<p class="text-small text-muted-foreground">{m.profil_stat_saksi()}</p>
 						</div>
 						<div class="rounded-lg bg-muted/20 p-2.5 text-center">
-							<p class="text-xl font-bold text-foreground">{stats.resolutions_completed}</p>
-							<p class="text-xs text-muted-foreground">{m.profil_stat_resolusi()}</p>
+							<p class="text-h2 font-bold text-foreground">{stats.resolutions_completed}</p>
+							<p class="text-small text-muted-foreground">{m.profil_stat_resolusi()}</p>
 						</div>
 					</div>
 				</motion.div>
@@ -204,7 +204,7 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.3, delay: 0.2 }}
 				>
-					<h3 class="text-xs font-semibold text-foreground">{m.profil_tandang_title()}</h3>
+					<h3 class="text-small font-semibold text-foreground">{m.profil_tandang_title()}</h3>
 					<p class="mt-0.5 text-caption text-muted-foreground">{m.profil_tandang_subtitle()}</p>
 					<div class="mt-3 space-y-2.5">
 						{#each tandangRows as signal}
@@ -238,7 +238,7 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.35, delay: 0.3 }}
 				>
-					<h3 class="text-xs font-semibold text-foreground">{m.profil_engagement_title()}</h3>
+					<h3 class="text-small font-semibold text-foreground">{m.profil_engagement_title()}</h3>
 					<p class="mt-0.5 text-caption text-muted-foreground">{m.profil_octalysis_subtitle()}</p>
 					<div class="mt-3 space-y-2">
 						{#each octalysisRows as drive}
@@ -250,7 +250,7 @@
 										style="width: {drive.score}%; opacity: {0.4 + (drive.score / 100) * 0.6}"
 									></div>
 								</div>
-								<span class="w-6 text-right text-xs font-medium text-foreground">{drive.score}</span>
+								<span class="w-6 text-right text-small font-medium text-foreground">{drive.score}</span>
 							</div>
 						{/each}
 					</div>
@@ -265,14 +265,14 @@
 					animate={{ opacity: 1 }}
 					transition={{ duration: 0.3, delay: 0.4 }}
 				>
-					<h3 class="text-xs font-semibold text-foreground">{m.pulse_recent_activity()}</h3>
+					<h3 class="text-small font-semibold text-foreground">{m.pulse_recent_activity()}</h3>
 					<div class="mt-2 space-y-1.5">
 						{#each activity as item}
 							<div class="flex items-start gap-2 rounded-lg px-2 py-1.5">
 								<div class="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/40"></div>
 								<div>
 									<p class="text-caption leading-relaxed text-foreground/80">{item.text}</p>
-									<p class="text-xs text-muted-foreground">{timeAgo(item.timestamp)}</p>
+									<p class="text-small text-muted-foreground">{timeAgo(item.timestamp)}</p>
 								</div>
 							</div>
 						{/each}

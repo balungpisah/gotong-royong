@@ -31,9 +31,9 @@
 	<div class="flex items-center gap-4 rounded-xl p-5 {bgClass}">
 		<span class="text-4xl">{weather.emoji}</span>
 		<div>
-			<p class="text-base font-bold text-foreground">{capitalize(weather.weather)}</p>
+			<p class="text-h3 font-bold text-foreground">{capitalize(weather.weather)}</p>
 			<p class="text-caption text-muted-foreground">{weather.label}</p>
 		</div>
-		<span class="ml-auto rounded-full bg-card/50 px-3 py-1 text-sm font-bold">{weather.multiplier}×</span>
+		<span class="ml-auto rounded-full bg-card/50 px-3 py-1 text-body font-bold">{weather.multiplier}×</span>
 	</div>
 {/if}

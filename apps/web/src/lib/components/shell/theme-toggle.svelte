@@ -4,6 +4,7 @@
 	import Sun from '@lucide/svelte/icons/sun';
 	import Moon from '@lucide/svelte/icons/moon';
 	import Monitor from '@lucide/svelte/icons/monitor';
+	import { Button } from '$lib/components/ui/button';
 
 	const themeStore = getThemeStore();
 
@@ -16,12 +17,13 @@
 	const Icon = $derived(iconMap[themeStore.mode]);
 </script>
 
-<button
-	type="button"
+<Button
+	variant="ghost"
+	size="icon"
 	onclick={() => themeStore.toggle()}
-	class="relative inline-flex items-center justify-center rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+	class="rounded-full"
 	aria-label={m.shell_theme_toggle()}
 	title={m.shell_theme_toggle()}
 >
 	<Icon class="size-5" />
-</button>
+</Button>

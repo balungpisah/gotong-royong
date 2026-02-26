@@ -49,7 +49,7 @@
 	<div class="flex h-full items-center justify-center">
 		<div class="flex flex-col items-center gap-3 text-muted-foreground">
 			<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
-			<p class="text-xs">{m.loading_tandang_profile()}</p>
+			<p class="text-small">{m.loading_tandang_profile()}</p>
 		</div>
 	</div>
 {:else if profile}
@@ -67,17 +67,17 @@
 						<span class="absolute bottom-0 right-0 size-2 rounded-full bg-online ring-1 ring-background"></span>
 					</div>
 					<div class="min-w-0 flex-1">
-						<p class="truncate text-sm font-bold leading-tight text-foreground">{profile.name}</p>
+						<p class="truncate text-body font-bold leading-tight text-foreground">{profile.name}</p>
 						<p class="truncate text-caption text-muted-foreground">
 							{#if profile.location}{profile.location} · {/if}{m.profil_member_since({ year: String(joinedYear) })}
 						</p>
 						<div class="mt-1 flex flex-nowrap items-center gap-1">
 							<span
-								class="inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-xs leading-tight font-medium"
+								class="inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-small leading-tight font-medium"
 								style="border-color: color-mix(in srgb, {tierColor} 30%, transparent); background-color: color-mix(in srgb, {tierColor} 10%, transparent); color: {tierColor};"
 							>{profile.tier.pips} {profile.tier.name}</span>
 							{#if showFlameBadge}
-								<span class="inline-flex items-center gap-0.5 rounded-full border border-peringatan/30 bg-peringatan/10 px-2 py-0.5 text-xs leading-tight font-medium text-peringatan">
+								<span class="inline-flex items-center gap-0.5 rounded-full border border-peringatan/30 bg-peringatan/10 px-2 py-0.5 text-small leading-tight font-medium text-peringatan">
 									🔥 {profile.consistency.streak_days}h
 								</span>
 							{/if}
@@ -147,7 +147,7 @@
 	</div>
 {:else if userStore.tandangError}
 	<div class="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-		<p class="text-xs text-red-500">{userStore.tandangError}</p>
+		<p class="text-small text-red-500">{userStore.tandangError}</p>
 	</div>
 {/if}
 

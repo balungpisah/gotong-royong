@@ -7,6 +7,7 @@
 	import type { TabConfig } from '$lib/types';
 	import TabBarItem from './tab-bar-item.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
+	import { Button } from '$lib/components/ui/button';
 
 	const navStore = getNavigationStore();
 	const feedStore = getFeedStore();
@@ -66,15 +67,15 @@
 		{/each}
 
 		<!-- Add tab button -->
-		<button
-			type="button"
+		<Button
+			variant="ghost"
 			onclick={() => navStore.openAddPanel()}
-			class="inline-flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+			class="inline-flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-small font-medium"
 			aria-label={m.shell_nav_add_tab()}
 		>
 			<Plus class="size-4" />
 			<span class="sr-only">{m.shell_nav_add_tab()}</span>
-		</button>
+		</Button>
 	</div>
 </nav>
 

@@ -54,7 +54,7 @@
 					style="width: {progressPercent}%"
 				></div>
 			</div>
-			<span class="text-muted-foreground shrink-0 text-xs">
+			<span class="text-muted-foreground shrink-0 text-small">
 				{completedCheckpoints}/{totalCheckpoints}
 			</span>
 		</div>

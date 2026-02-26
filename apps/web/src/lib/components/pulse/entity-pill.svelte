@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { EntityTag } from '$lib/types';
 	import Tip from '$lib/components/ui/tip.svelte';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		tag: EntityTag;
@@ -26,7 +27,7 @@
 	);
 
 	const pillClass = $derived(
-		`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-xs leading-tight transition-colors ${
+		`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-small leading-tight transition-colors ${
 			tag.followed
 				? 'border-primary/30 bg-primary/5 text-primary'
 				: 'border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted/50'
@@ -52,14 +53,15 @@
 			{@render pillContent()}
 		</a>
 	{:else if onclick}
-		<button
-			type="button"
+		<Button
+			variant="ghost"
+			size="pill"
 			onclick={onclick}
 			onkeydown={handleKeydown}
 			class={pillClass}
 		>
 			{@render pillContent()}
-		</button>
+		</Button>
 	{:else}
 		<span class={pillClass}>
 			{@render pillContent()}

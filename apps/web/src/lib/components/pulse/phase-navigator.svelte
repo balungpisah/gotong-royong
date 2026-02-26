@@ -20,6 +20,7 @@
 	import User from '@lucide/svelte/icons/user';
 	import Bot from '@lucide/svelte/icons/bot';
 	import Settings from '@lucide/svelte/icons/settings';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		phases: Phase[];
@@ -267,17 +268,17 @@
 {#if phases.length > 0}
 	<div class="flex flex-col" data-slot="phase-navigator">
 		<!-- Handlebar — always visible -->
-		<button
-			type="button"
+		<Button
+			variant="ghost"
 			onclick={toggle}
-			class="flex w-full items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-1.5 text-left transition hover:bg-muted/40"
+			class="flex w-full items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-1.5 text-left transition hover:bg-muted/40 h-auto"
 		>
 			<MapPin class="size-3.5 shrink-0 text-muted-foreground" />
-			<span class="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
+			<span class="min-w-0 flex-1 truncate text-small font-medium text-foreground">
 				{handlebarTitle}
 			</span>
 			{#if handlebarMeta}
-				<span class="shrink-0 text-xs text-muted-foreground">{handlebarMeta}</span>
+				<span class="shrink-0 text-small text-muted-foreground">{handlebarMeta}</span>
 			{/if}
 			<Badge variant={handlebarBadgeVariant} class="shrink-0 text-[10px]">
 				{m.pulse_nav_phase({ num: focusedIndex + 1 })} {m.pulse_nav_of_total({ total: phases.length })}
@@ -287,7 +288,7 @@
 					? 'rotate-180'
 					: ''}"
 			/>
-		</button>
+		</Button>
 
 		<!-- Expanded: story-style phase carousel -->
 		{#if expanded}
@@ -301,7 +302,7 @@
 								style="width: {progressPercent}%"
 							></div>
 						</div>
-						<span class="shrink-0 text-xs text-muted-foreground">
+						<span class="shrink-0 text-small text-muted-foreground">
 							{completedCheckpoints}/{totalCheckpoints}
 						</span>
 					</div>
@@ -315,23 +316,25 @@
 					>
 						<!-- Navigation arrows -->
 						{#if focusedIndex > 0}
-							<button
-								type="button"
+							<Button
+								variant="ghost"
+								size="icon-sm"
 								onclick={goLeft}
-								class="absolute left-0 top-1/2 z-10 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition hover:bg-muted"
+								class="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-muted/60 text-muted-foreground hover:bg-muted size-6"
 							>
 								<ChevronLeft class="size-3.5" />
-							</button>
+							</Button>
 						{/if}
 
 						{#if focusedIndex < phases.length - 1}
-							<button
-								type="button"
+							<Button
+								variant="ghost"
+								size="icon-sm"
 								onclick={goRight}
-								class="absolute right-0 top-1/2 z-10 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition hover:bg-muted"
+								class="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-muted/60 text-muted-foreground hover:bg-muted size-6"
 							>
 								<ChevronRight class="size-3.5" />
-							</button>
+							</Button>
 						{/if}
 
 						<!-- Current phase card — slides in horizontally -->
@@ -343,7 +346,7 @@
 								>
 									<!-- CD1: Chapter header with narrative framing -->
 									<div class="mb-1 flex items-center gap-1.5">
-										<span class="font-['Caveat'] text-xs text-muted-foreground/60">
+										<span class="font-['Caveat'] text-small text-muted-foreground/60">
 											{chapterLabel}
 										</span>
 									</div>
@@ -357,7 +360,7 @@
 										{:else}
 											<Eye class="size-3.5 text-primary" />
 										{/if}
-										<span class="text-xs font-semibold text-foreground">
+										<span class="text-small font-semibold text-foreground">
 											{focusedPhase.title}
 										</span>
 										<Badge variant={handlebarBadgeVariant} class="text-[10px]">
@@ -367,14 +370,14 @@
 
 									<!-- Narrative status line -->
 									{#if narrativeStatus}
-										<p class="mb-1.5 text-xs text-muted-foreground/70">
+										<p class="mb-1.5 text-small text-muted-foreground/70">
 											{narrativeStatus}
 										</p>
 									{/if}
 
 									<!-- Objective -->
 									{#if focusedPhase.objective}
-										<p class="mb-2 text-xs italic text-muted-foreground {isFuturePhase ? 'blur-[2px] select-none' : ''}">
+										<p class="mb-2 text-small italic text-muted-foreground {isFuturePhase ? 'blur-[2px] select-none' : ''}">
 											{focusedPhase.objective}
 										</p>
 									{/if}
@@ -398,7 +401,7 @@
 									{#if focusedPhase.status === 'completed'}
 										<div class="mb-2 flex items-center gap-1.5 rounded-md bg-berhasil/10 px-2 py-1">
 											<Sparkles class="size-3 text-berhasil animate-pulse" />
-											<span class="text-xs font-medium text-berhasil">
+											<span class="text-small font-medium text-berhasil">
 												Bab ini berhasil dituntaskan oleh warga!
 											</span>
 										</div>
@@ -411,7 +414,7 @@
 												{@const { icon: Icon, colorClass } = getCheckpointIconAndColor(cp.status)}
 												{@const SourceIcon = getSourceIcon(cp.source)}
 												{@const completed = cp.status === 'completed'}
-												<li class="flex items-start gap-2 text-xs">
+												<li class="flex items-start gap-2 text-small">
 													<Icon class="mt-0.5 size-3.5 shrink-0 {colorClass}" />
 													<div class="min-w-0 flex-1">
 														<span
@@ -422,7 +425,7 @@
 															{cp.title}
 														</span>
 														{#if cp.description}
-															<p class="mt-0.5 text-xs text-muted-foreground">
+															<p class="mt-0.5 text-small text-muted-foreground">
 																{cp.description}
 															</p>
 														{/if}
@@ -446,7 +449,7 @@
 									{#if isFuturePhase}
 										<div class="flex flex-col items-center gap-1 py-3 text-center">
 											<Lock class="size-5 text-muted-foreground/30" />
-											<span class="text-xs text-muted-foreground/50">
+											<span class="text-small text-muted-foreground/50">
 												Selesaikan bab sebelumnya untuk membuka
 											</span>
 											{#if focusedTotal > 0}

@@ -24,7 +24,7 @@
 			<Activity class="size-5" />
 		</div>
 		<div>
-			<h2 class="text-xl font-bold text-foreground">{dashboard.community_name}</h2>
+			<h2 class="text-h2 font-bold text-foreground">{dashboard.community_name}</h2>
 			<p class="text-caption text-muted-foreground">{m.komunitas_member_count({ count: String(dashboard.member_count) })}</p>
 		</div>
 	</div>

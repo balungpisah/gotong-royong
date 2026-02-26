@@ -33,7 +33,7 @@
 </script>
 
 <div>
-	<h3 class="text-xs font-semibold text-foreground">{m.komunitas_active_title()}</h3>
+	<h3 class="text-small font-semibold text-foreground">{m.komunitas_active_title()}</h3>
 	<div class="mt-3 flex gap-3 overflow-x-auto pb-2" style="scrollbar-width: none;">
 		{#each members as member, i}
 			<motion.div

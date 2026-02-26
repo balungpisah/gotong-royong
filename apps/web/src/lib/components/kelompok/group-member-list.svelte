@@ -4,6 +4,7 @@
 	import CrownIcon from '@lucide/svelte/icons/crown';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import UserMinusIcon from '@lucide/svelte/icons/user-minus';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		members: GroupMember[];
@@ -30,53 +31,57 @@
 				<img src={member.avatar_url} alt={member.name} class="size-9 rounded-full object-cover" />
 			{:else}
 				<div class="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-					<span class="text-xs font-bold">{member.name.slice(0, 2).toUpperCase()}</span>
+					<span class="text-small font-bold">{member.name.slice(0, 2).toUpperCase()}</span>
 				</div>
 			{/if}
 
 			<div class="min-w-0 flex-1">
-				<p class="truncate text-sm font-semibold text-foreground">{member.name}</p>
+				<p class="truncate text-body font-semibold text-foreground">{member.name}</p>
 				<p class="text-[11px] text-muted-foreground/70">{roleLabel(member.role)}</p>
 			</div>
 
 			{#if canManage && onUpdateRole}
 				<div class="hidden items-center gap-1 sm:flex">
-					<button
-						type="button"
-						class="rounded-md p-1 text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						class="text-muted-foreground/70 hover:text-foreground"
 						title={m.group_action_make_admin()}
 						onclick={() => onUpdateRole?.(member.user_id, 'admin')}
 					>
 						<CrownIcon class="size-4" />
-					</button>
-					<button
-						type="button"
-						class="rounded-md p-1 text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						class="text-muted-foreground/70 hover:text-foreground"
 						title={m.group_action_make_moderator()}
 						onclick={() => onUpdateRole?.(member.user_id, 'moderator')}
 					>
 						<ShieldIcon class="size-4" />
-					</button>
-					<button
-						type="button"
-						class="rounded-md p-1 text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						class="text-muted-foreground/70 hover:text-foreground"
 						title={m.group_action_make_member()}
 						onclick={() => onUpdateRole?.(member.user_id, 'anggota')}
 					>
-						<span class="text-xs font-bold">A</span>
-					</button>
+						<span class="text-small font-bold">A</span>
+					</Button>
 				</div>
 			{/if}
 
 			{#if canManage && onRemove}
-				<button
-					type="button"
-					class="rounded-md p-1 text-bahaya/80 transition hover:bg-bahaya/10 hover:text-bahaya"
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					class="text-bahaya/80 hover:bg-bahaya/10 hover:text-bahaya"
 					title={m.group_action_remove_member()}
 					onclick={() => onRemove?.(member.user_id)}
 				>
 					<UserMinusIcon class="size-4" />
-				</button>
+				</Button>
 			{/if}
 		</div>
 	{/each}

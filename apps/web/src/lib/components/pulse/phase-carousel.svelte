@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Phase } from '$lib/types';
 	import { Badge } from '$lib/components/ui/badge';
+	import * as Card from '$lib/components/ui/card';
 	import { StatusIndicator, type StatusIndicatorStatus } from '$lib/components/ui/status-indicator';
 	import CheckCircle from '@lucide/svelte/icons/check-circle-2';
 	import Circle from '@lucide/svelte/icons/circle';
@@ -113,7 +114,7 @@
 								: 'bg-muted-foreground/30'}"
 					></span>
 					{#if i === activeIndex}
-						<span class="text-xs font-medium text-primary">
+						<span class="text-small font-medium text-primary">
 							{i + 1}/{phases.length}
 						</span>
 					{/if}
@@ -133,13 +134,13 @@
 
 	<!-- Phase content -->
 	{#if currentPhase}
-		<div
-			class="rounded-xl border border-border/60 bg-card p-4"
+		<Card.Root
+			padding="compact"
 			ontouchstart={onTouchStart}
 			ontouchmove={onTouchMove}
 			ontouchend={onTouchEnd}
 			role="tabpanel"
-			tabindex="0"
+			tabindex={0}
 			aria-label="Fase: {currentPhase.title}"
 		>
 			<!-- Phase title & status -->
@@ -147,11 +148,11 @@
 				<div class="min-w-0 flex-1">
 					<div class="flex items-center gap-2">
 						<StatusIndicator status={phaseStatusMap[currentPhase.status] ?? 'active'} />
-						<h3 class="truncate text-sm font-semibold text-foreground">
+						<h3 class="truncate text-body font-semibold text-foreground">
 							{currentPhase.title}
 						</h3>
 					</div>
-					<p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+					<p class="mt-1 text-small leading-relaxed text-muted-foreground">
 						{currentPhase.objective}
 					</p>
 				</div>
@@ -175,7 +176,7 @@
 					<ul class="flex flex-col gap-2">
 						{#each currentPhase.checkpoints as cp (cp.checkpoint_id)}
 							{@const Icon = checkpointStatusIcon(cp.status)}
-							<li class="flex items-start gap-2 text-xs">
+							<li class="flex items-start gap-2 text-small">
 								<Icon
 									class="mt-0.5 size-3.5 shrink-0 {cp.status === 'completed'
 										? 'text-berhasil'
@@ -194,7 +195,7 @@
 										{cp.title}
 									</span>
 									{#if cp.description}
-										<p class="mt-0.5 text-xs text-muted-foreground">
+										<p class="mt-0.5 text-small text-muted-foreground">
 											{cp.description}
 										</p>
 									{/if}
@@ -207,6 +208,6 @@
 					</ul>
 				</div>
 			{/if}
-		</div>
+		</Card.Root>
 	{/if}
 </div>

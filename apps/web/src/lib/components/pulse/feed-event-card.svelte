@@ -23,6 +23,7 @@
 	import { getMoodColor, moodShadow } from '$lib/utils/mood-color';
 	import { TandangAvatar } from '$lib/components/ui/tandang-avatar';
 	import { getSignalStore, getFeedStore } from '$lib/stores';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		item: FeedItem;
@@ -274,7 +275,7 @@
 				{#if countdown}
 					<div class="flex items-center gap-1.5">
 						<ClockIcon class="size-3 {countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-waspada' : 'text-muted-foreground/60'}" />
-						<span class="text-xs font-semibold
+						<span class="text-small font-semibold
 							{countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-waspada' : 'text-muted-foreground/70'}">
 							{item.deadline_label ?? 'Berakhir'}: {countdown.label}
 						</span>
@@ -299,7 +300,7 @@
 
 		<!-- Repost attribution -->
 		{#if item.repost}
-			<p class="mb-2.5 flex items-center gap-1.5 text-xs text-muted-foreground/70">
+			<p class="mb-2.5 flex items-center gap-1.5 text-small text-muted-foreground/70">
 				{#if item.repost.reposter_avatar}
 					<img src={item.repost.reposter_avatar} alt="" class="inline-block size-4 rounded-full" />
 				{/if}
@@ -326,9 +327,9 @@
 
 		<!-- Event meta — verb + time -->
 		<div class="mt-2 flex items-center gap-1.5">
-			<span class="text-xs text-muted-foreground/60">{item.latest_event.verb}</span>
-			<span class="text-xs text-muted-foreground/25">·</span>
-			<span class="text-xs text-muted-foreground/45">{timeAgo(item.latest_event.timestamp)}</span>
+			<span class="text-small text-muted-foreground/60">{item.latest_event.verb}</span>
+			<span class="text-small text-muted-foreground/25">·</span>
+			<span class="text-small text-muted-foreground/45">{timeAgo(item.latest_event.timestamp)}</span>
 		</div>
 
 		<!-- Body — AI-summarized narrative from the saksi conversation -->
@@ -410,7 +411,7 @@
 
 		<!-- ── Resolution badge (completed witnesses only) ──────────── -->
 		{#if isTerminalWitness && resolutionCount > 0}
-			<div class="mt-2 flex items-center gap-1.5 rounded-md bg-berhasil/8 px-2.5 py-1.5 text-xs text-berhasil">
+			<div class="mt-2 flex items-center gap-1.5 rounded-md bg-berhasil/8 px-2.5 py-1.5 text-small text-berhasil">
 				<CheckCircle2Icon class="size-3.5 shrink-0" />
 				<span class="font-medium">{m.signal_resolution_count({ count: resolutionCount })}</span>
 			</div>
@@ -442,17 +443,18 @@
 			{/if}
 
 			<!-- Member count -->
-			<span class="inline-flex items-center gap-0.5 text-xs text-muted-foreground/60">
+			<span class="inline-flex items-center gap-0.5 text-small text-muted-foreground/60">
 				<UsersIcon class="size-2.5" />
 				{item.member_count}
 			</span>
 
 			<!-- Dukung (support) button — non-Tandang social action -->
-			<button
-				class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all duration-150
-					{isSupported
-						? 'bg-rose-500/12 text-rose-500 border border-rose-500/25 hover:bg-rose-500/18'
-						: 'text-muted-foreground/50 hover:text-rose-400 hover:bg-rose-500/8 border border-transparent'}"
+			<Button
+				variant="ghost"
+				size="pill"
+				class={isSupported
+					? 'bg-rose-500/12 text-rose-500 border border-rose-500/25 hover:bg-rose-500/18'
+					: 'text-muted-foreground/50 hover:text-rose-400 hover:bg-rose-500/8 border border-transparent'}
 				onclick={(e) => { e.stopPropagation(); feedStore.toggleDukung(item.witness_id); }}
 				aria-label={isSupported ? 'Batal dukung' : 'Dukung'}
 				aria-pressed={isSupported}
@@ -461,41 +463,46 @@
 				{#if dukungCount > 0}
 					<span>{dukungCount}</span>
 				{/if}
-			</button>
+			</Button>
 
 			<div class="flex-1"></div>
 
 			<!-- Actions (pantau: faint when idle, full on hover/active) -->
 			<div class="flex items-center gap-0.5 {item.monitored ? '' : 'opacity-30'} transition-opacity duration-150 group-hover:opacity-100">
 				<Tip text={item.monitored ? 'Berhenti pantau' : 'Pantau'}>
-					<button
-						class="inline-flex items-center justify-center rounded-md p-1 transition
-							{item.monitored
-								? 'text-primary bg-primary/10 hover:bg-primary/20'
-								: 'text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground'}"
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						class={item.monitored
+							? 'text-primary bg-primary/10 hover:bg-primary/20'
+							: 'text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground'}
 						onclick={(e) => { e.stopPropagation(); onToggleMonitor?.(); }}
 						aria-label={item.monitored ? 'Berhenti pantau' : 'Pantau'}
 					>
 						<EyeIcon class="size-3" />
-					</button>
+					</Button>
 				</Tip>
 				<Tip text="Simpan">
-					<button
-						class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-muted/60 hover:text-foreground"
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						class="text-muted-foreground/50 hover:text-foreground"
 						onclick={(e) => e.stopPropagation()}
 						aria-label="Simpan"
 					>
 						<BookmarkIcon class="size-3" />
-					</button>
+					</Button>
 				</Tip>
 				<Tip text="Bagikan">
-					<button
-						class="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/50 transition hover:bg-primary/10 hover:text-primary"
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						class="text-muted-foreground/50 hover:bg-primary/10 hover:text-primary"
 						onclick={(e) => { e.stopPropagation(); onShare?.(); }}
 						aria-label="Bagikan"
 					>
 						<Share2Icon class="size-3" />
-					</button>
+					</Button>
 				</Tip>
 			</div>
 		</div>

@@ -79,7 +79,7 @@
 	transition={{ duration: 0.35, delay: 0.4 }}
 	class="rounded-xl border border-border/30 bg-muted/10 p-4"
 >
-	<h3 class="text-xs font-semibold text-foreground">{m.komunitas_signal_flow_title()}</h3>
+	<h3 class="text-small font-semibold text-foreground">{m.komunitas_signal_flow_title()}</h3>
 
 	<div class="mt-3 w-full overflow-hidden">
 		<svg

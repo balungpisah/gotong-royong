@@ -24,6 +24,8 @@
 	import DynamicIcon from '$lib/components/ui/dynamic-icon.svelte';
 	import { trajectoryColors, type TrajectoryColorKey } from '$lib/utils/trajectory-colors';
 	import { m } from '$lib/paraglide/messages';
+	import { Button } from '$lib/components/ui/button';
+	import { cn } from '$lib/utils';
 
 	interface Props {
 		/** Called when user taps an intent — sends the primer message. */
@@ -118,18 +120,20 @@
 <div class="trajectory-grid flex flex-col gap-3 px-1 py-2">
 	<!-- Header -->
 	<div class="text-center">
-		<p class="text-sm font-medium text-foreground">Apa yang ingin kamu lakukan?</p>
-		<p class="mt-0.5 text-xs text-muted-foreground">Pilih salah satu, atau langsung ceritakan di bawah</p>
+		<p class="text-body font-medium text-foreground">Apa yang ingin kamu lakukan?</p>
+		<p class="mt-0.5 text-small text-muted-foreground">Pilih salah satu, atau langsung ceritakan di bawah</p>
 	</div>
 
 	<!-- Grid -->
 	<div class="grid grid-cols-2 gap-2">
 		{#each INTENTS as item (item.name)}
 			{@const colors = trajectoryColors(item.color)}
-			<button
-				type="button"
-				class="trajectory-chip group flex items-start gap-2.5 rounded-xl border border-border/40 bg-card/60 px-3 py-2.5 text-left transition-all hover:border-border/80 hover:bg-card hover:shadow-sm active:scale-[0.97]"
-				class:col-span-2={item.fullWidth}
+			<Button
+				variant="ghost"
+				class={cn(
+					'trajectory-chip group flex h-auto items-start gap-2.5 rounded-xl border border-border/40 bg-card/60 px-3 py-2.5 text-left hover:border-border/80 hover:bg-card hover:shadow-sm active:scale-[0.97]',
+					item.fullWidth && 'col-span-2'
+				)}
 				onclick={() => onSelect(item.primer)}
 			>
 				<div class="flex size-8 shrink-0 items-center justify-center rounded-lg {colors.bgLight}">
@@ -143,7 +147,7 @@
 						{item.desc}
 					</p>
 				</div>
-			</button>
+			</Button>
 		{/each}
 	</div>
 

@@ -69,7 +69,7 @@
 
 		<!-- Info -->
 		<div class="flex-1 min-w-0">
-			<h2 class="{isCompact ? 'text-base' : 'text-xl'} font-bold text-foreground truncate">{profile.name}</h2>
+			<h2 class="{isCompact ? 'text-h3' : 'text-h2'} font-bold text-foreground truncate">{profile.name}</h2>
 			<p class="text-caption text-muted-foreground mt-0.5">
 				{#if profile.location}{profile.location} · {/if}{#if isCompact && profile.community_name}{profile.community_name} · {/if}{m.profil_member_since({ year: String(joinedYear) })}
 			</p>

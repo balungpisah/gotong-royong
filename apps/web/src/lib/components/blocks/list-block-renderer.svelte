@@ -26,7 +26,7 @@
 </script>
 
 {#if block.title}
-	<h3 class="mb-3 text-sm font-bold text-foreground">{block.title}</h3>
+	<h3 class="mb-3 text-body font-bold text-foreground">{block.title}</h3>
 {/if}
 
 {#if block.display === 'checklist'}
@@ -37,7 +37,7 @@
 				<StatusIcon class={cn('mt-0.5 size-4 shrink-0', statusColors[item.status])} />
 				<div class="flex-1">
 					<div class="flex items-center gap-2">
-						<span class={cn('text-sm', item.status === 'completed' && 'line-through text-muted-foreground')}>
+						<span class={cn('text-body', item.status === 'completed' && 'line-through text-muted-foreground')}>
 							{item.label}
 						</span>
 						<SourceBadge source={item.source} />
@@ -48,7 +48,7 @@
 								{@const ChildIcon = statusIcons[child.status]}
 								<div class="flex items-center gap-2">
 									<ChildIcon class={cn('size-3.5 shrink-0', statusColors[child.status])} />
-									<span class={cn('text-xs', child.status === 'completed' && 'line-through text-muted-foreground')}>
+									<span class={cn('text-small', child.status === 'completed' && 'line-through text-muted-foreground')}>
 										{child.label}
 									</span>
 									<SourceBadge source={child.source} />
@@ -62,7 +62,7 @@
 	</div>
 {:else if block.display === 'table'}
 	<div class="overflow-x-auto rounded-lg border border-border" data-slot="list-block">
-		<table class="w-full text-sm">
+		<table class="w-full text-body">
 			<thead>
 				<tr class="border-b border-border bg-kapas">
 					<th class="px-3 py-2 text-left font-semibold text-foreground">Item</th>
@@ -95,7 +95,7 @@
 					<StatusIcon class="size-3 text-white" />
 				</div>
 				<div>
-					<p class="text-sm font-medium">{item.label}</p>
+					<p class="text-body font-medium">{item.label}</p>
 					<div class="mt-1 flex items-center gap-2">
 						<SourceBadge source={item.source} />
 					</div>
@@ -107,9 +107,9 @@
 	<div class="grid grid-cols-2 gap-3 sm:grid-cols-3" data-slot="list-block">
 		{#each block.items as item (item.id)}
 			<div class="rounded-lg border border-border bg-card p-3">
-				<p class="text-sm font-medium">{item.label}</p>
+				<p class="text-body font-medium">{item.label}</p>
 				<div class="mt-2 flex items-center gap-2">
-					<Badge variant={item.status === 'completed' ? 'success' : 'secondary'} class="text-xs">
+					<Badge variant={item.status === 'completed' ? 'success' : 'secondary'} class="text-small">
 						{item.status}
 					</Badge>
 					<SourceBadge source={item.source} />

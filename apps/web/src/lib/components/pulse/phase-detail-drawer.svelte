@@ -61,7 +61,7 @@
 			onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? handleToggle() : null}
 		>
 			<div class="flex items-center gap-2">
-				<span class="text-xs font-medium text-foreground">{phase.title}</span>
+				<span class="text-small font-medium text-foreground">{phase.title}</span>
 				<Badge variant={phaseBadgeVariant} class="text-[10px]">
 					{phase.status}
 				</Badge>
@@ -78,7 +78,7 @@
 				transition:slide={{ duration: 200 }}
 			>
 				{#if phase.objective}
-					<p class="mb-2 text-xs italic text-muted-foreground">{phase.objective}</p>
+					<p class="mb-2 text-small italic text-muted-foreground">{phase.objective}</p>
 				{/if}
 
 				{#if phase.checkpoints && phase.checkpoints.length > 0}
@@ -86,14 +86,14 @@
 						{#each phase.checkpoints as cp}
 							{@const { icon: Icon, colorClass } = getCheckpointIconAndColor(cp.status)}
 							{@const completed = cp.status === 'completed'}
-							<li class="flex items-start gap-2 text-xs">
+							<li class="flex items-start gap-2 text-small">
 								<Icon class="mt-0.5 size-3.5 shrink-0 {colorClass}" />
 								<div class="min-w-0 flex-1">
 									<span class={completed ? 'text-muted-foreground line-through' : 'text-foreground'}>
 										{cp.title}
 									</span>
 									{#if cp.description}
-										<p class="mt-0.5 text-xs text-muted-foreground">{cp.description}</p>
+										<p class="mt-0.5 text-small text-muted-foreground">{cp.description}</p>
 									{/if}
 								</div>
 								{#if cp.evidence_required}

@@ -34,9 +34,9 @@
 		>
 			<div class="flex items-start justify-between gap-3">
 				<div>
-					<p class="text-sm font-bold text-foreground">{m.group_nav_title()}</p>
-					<p class="mt-0.5 text-xs text-muted-foreground/80">{m.group_nav_subtitle()}</p>
-					<p class="mt-2 text-[11px] text-muted-foreground/70">{m.group_nav_count({ count: myGroupCount })}</p>
+					<p class="text-body font-bold text-foreground">{m.group_nav_title()}</p>
+					<p class="mt-0.5 text-small text-muted-foreground/80">{m.group_nav_subtitle()}</p>
+					<p class="mt-2 text-caption text-muted-foreground/70">{m.group_nav_count({ count: myGroupCount })}</p>
 				</div>
 				<div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
 					<UsersIcon class="size-5" />
@@ -49,7 +49,7 @@
 		<div class="flex h-64 items-center justify-center">
 			<div class="flex flex-col items-center gap-3 text-muted-foreground">
 				<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
-				<p class="text-xs">{m.loading_community()}</p>
+				<p class="text-small">{m.loading_community()}</p>
 			</div>
 		</div>
 	{:else if dashboard}
@@ -62,7 +62,7 @@
 			{#if dashboard.avg_tier !== undefined}
 				<div class="flex items-center gap-2 rounded-lg bg-muted/10 px-4 py-2">
 					<span class="text-caption text-muted-foreground">{m.komunitas_avg_tier()}</span>
-					<span class="text-sm font-bold text-foreground">{dashboard.avg_tier.toFixed(1)}</span>
+					<span class="text-body font-bold text-foreground">{dashboard.avg_tier.toFixed(1)}</span>
 				</div>
 			{/if}
 			<CommunityIcjSummary summary={dashboard.icj_summary} />
@@ -72,7 +72,7 @@
 		</div>
 	{:else if store.dashboardError}
 		<div class="flex h-64 flex-col items-center justify-center gap-3 text-center">
-			<p class="text-xs text-red-500">{store.dashboardError}</p>
+			<p class="text-small text-red-500">{store.dashboardError}</p>
 		</div>
 	{/if}
 </div>

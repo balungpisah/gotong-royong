@@ -27,7 +27,7 @@
 	<div class="flex h-full items-center justify-center">
 		<div class="flex flex-col items-center gap-3 text-muted-foreground">
 			<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
-			<p class="text-xs">{m.loading_community_dashboard()}</p>
+			<p class="text-small">{m.loading_community_dashboard()}</p>
 		</div>
 	</div>
 {:else if dashboard}
@@ -40,7 +40,7 @@
 						<Activity class="size-3.5" />
 					</div>
 					<div class="min-w-0 flex-1">
-						<p class="truncate text-sm font-bold leading-tight text-foreground">{dashboard.community_name}</p>
+						<p class="truncate text-body font-bold leading-tight text-foreground">{dashboard.community_name}</p>
 						<p class="truncate text-caption text-muted-foreground">{m.komunitas_member_count({ count: String(dashboard.member_count) })}</p>
 					</div>
 				</div>
@@ -77,7 +77,7 @@
 	</div>
 {:else if store.dashboardError}
 	<div class="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-		<p class="text-xs text-red-500">{store.dashboardError}</p>
+		<p class="text-small text-red-500">{store.dashboardError}</p>
 	</div>
 {/if}
 

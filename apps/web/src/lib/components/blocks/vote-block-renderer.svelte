@@ -4,6 +4,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Progress } from '$lib/components/ui/progress';
 	import CheckCircle from '@lucide/svelte/icons/circle-check';
+	import { Button } from '$lib/components/ui/button';
 
 	let { block, onvote, bare = false }: { block: VoteBlock; onvote?: (optionId: string) => void; bare?: boolean } = $props();
 
@@ -28,16 +29,17 @@
 
 <div class={cn('flex flex-col gap-3', !bare && 'rounded-lg border border-border bg-card p-4')} data-slot="vote-block">
 	<div class="flex items-start justify-between gap-2">
-		<p class="text-sm font-bold text-foreground">{block.question}</p>
-		<Badge variant="info" class="shrink-0 text-xs">{voteTypeLabels[block.vote_type] || block.vote_type}</Badge>
+		<p class="text-body font-bold text-foreground">{block.question}</p>
+		<Badge variant="info" class="shrink-0 text-small">{voteTypeLabels[block.vote_type] || block.vote_type}</Badge>
 	</div>
 
 	<div class="flex flex-col gap-2">
 		{#each block.options as option (option.id)}
 			{@const optPercent = block.total_voted > 0 ? Math.round((option.count / block.total_voted) * 100) : 0}
-			<button
+			<Button
+				variant="ghost"
 				class={cn(
-					'relative flex items-center justify-between rounded-md border px-3 py-2 text-sm transition',
+					'relative flex h-auto items-center justify-between rounded-md border px-3 py-2 text-body',
 					isEnded || block.user_voted
 						? 'cursor-default border-border'
 						: 'cursor-pointer border-border hover:border-api hover:bg-api/5'
@@ -46,26 +48,26 @@
 				onclick={() => onvote?.(option.id)}
 			>
 				<span class="z-10 font-medium">{option.label}</span>
-				<span class="z-10 text-xs text-muted-foreground">{option.count} ({optPercent}%)</span>
+				<span class="z-10 text-small text-muted-foreground">{option.count} ({optPercent}%)</span>
 				{#if block.total_voted > 0}
 					<div
 						class="absolute inset-y-0 left-0 rounded-md bg-api/10"
 						style="width: {optPercent}%"
 					></div>
 				{/if}
-			</button>
+			</Button>
 		{/each}
 	</div>
 
 	<div class="flex flex-col gap-1.5">
-		<div class="flex items-center justify-between text-xs text-muted-foreground">
+		<div class="flex items-center justify-between text-small text-muted-foreground">
 			<span>Kuorum: {quorumPercent}% / {quorumTarget}%</span>
 			<span>{block.total_voted}/{block.total_eligible} suara</span>
 		</div>
 		<Progress value={quorumPercent} max={100} class="h-1" />
 	</div>
 
-	<div class="flex items-center justify-between text-xs">
+	<div class="flex items-center justify-between text-small">
 		{#if block.user_voted}
 			<div class="flex items-center gap-1 text-berhasil">
 				<CheckCircle class="size-3" />

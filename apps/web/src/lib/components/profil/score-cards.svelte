@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { motion } from '@humanspeak/svelte-motion';
+	import * as Card from '$lib/components/ui/card';
 	import type { TandangScores } from '$lib/types';
 	import { m } from '$lib/paraglide/messages';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		scores: TandangScores;
@@ -54,18 +56,19 @@
 								style="width: {card.value * 100}%; background: {card.color};"
 							></div>
 						</div>
-						<span class="w-8 text-right text-sm font-bold text-foreground">{(card.value * 100).toFixed(0)}</span>
+						<span class="w-8 text-right text-body font-bold text-foreground">{(card.value * 100).toFixed(0)}</span>
 					</div>
 
 					<!-- Competence domain breakdown (inline) -->
 					{#if i === 1}
 						<div class="ml-5 mt-1.5">
-							<button
+							<Button
+	variant="ghost"
 								onclick={() => (expanded = !expanded)}
-								class="text-caption text-muted-foreground hover:text-foreground transition-colors"
+								class="h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 							>
 								{expanded ? m.common_collapse() : m.profil_view_domains()}
-							</button>
+							</Button>
 
 							{#if expanded}
 								<div class="mt-1.5 space-y-1.5">
@@ -106,10 +109,7 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.3, delay: 0.05 * i }}
 				>
-					<div
-						class="rounded-xl border border-border/30 bg-card p-4 shadow-sm"
-						style="border-top: 4px solid {card.color};"
-					>
+					<Card.Root padding="compact" class="shadow-sm" style="border-top: 4px solid {card.color};">
 						<div class="text-caption font-medium text-muted-foreground">
 							{card.label}
 						</div>
@@ -129,12 +129,13 @@
 						<!-- Competence domain breakdown -->
 						{#if i === 1}
 							<div class="mt-3">
-								<button
+								<Button
+	variant="ghost"
 									onclick={() => (expanded = !expanded)}
-									class="text-caption text-muted-foreground hover:text-foreground transition-colors"
+									class="h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 								>
 									{expanded ? m.common_collapse() : m.profil_view_domains()}
-								</button>
+								</Button>
 
 								{#if expanded}
 									<div class="mt-2 space-y-1.5">
@@ -163,7 +164,7 @@
 								{/if}
 							</div>
 						{/if}
-					</div>
+					</Card.Root>
 				</motion.div>
 			{/each}
 		</div>

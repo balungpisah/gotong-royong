@@ -69,18 +69,18 @@
 			<!-- Title row -->
 			<div class="flex items-center gap-2">
 				<StatusIndicator status={statusMap[witness.status] ?? 'active'} />
-				<h3 class="truncate text-sm font-semibold text-foreground">
+				<h3 class="truncate text-body font-semibold text-foreground">
 					{witness.title}
 				</h3>
 			</div>
 
 			<!-- Summary -->
-			<p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+			<p class="mt-1 line-clamp-2 text-small leading-relaxed text-muted-foreground">
 				{witness.summary}
 			</p>
 
 			<!-- Meta row -->
-			<div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+			<div class="mt-3 flex flex-wrap items-center gap-2 text-small text-muted-foreground">
 				{#if witness.track_hint}
 					<Badge
 						variant={trackVariantMap[witness.track_hint] ?? 'secondary'}

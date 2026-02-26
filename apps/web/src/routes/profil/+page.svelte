@@ -27,7 +27,7 @@
 	<div class="flex h-64 items-center justify-center">
 		<div class="flex flex-col items-center gap-3 text-muted-foreground">
 			<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
-			<p class="text-xs">{m.loading_profile()}</p>
+			<p class="text-small">{m.loading_profile()}</p>
 		</div>
 	</div>
 {:else if profile}
@@ -63,7 +63,7 @@
 	</div>
 {:else if userStore.tandangError}
 	<div class="flex h-64 flex-col items-center justify-center gap-3 text-center">
-		<p class="text-xs text-red-500">{userStore.tandangError}</p>
+		<p class="text-small text-red-500">{userStore.tandangError}</p>
 	</div>
 {/if}
 

@@ -38,7 +38,7 @@
 
 		<div class="mt-4 space-y-2 overflow-y-auto pb-6">
 			{#if navStore.suggestions.length > 0}
-				<p class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+				<p class="mb-3 text-small font-semibold uppercase tracking-wider text-muted-foreground">
 					{m.shell_add_tab_suggested()}
 				</p>
 
@@ -55,10 +55,10 @@
 							</div>
 
 							<div class="min-w-0 flex-1">
-								<p class="text-sm font-medium capitalize text-foreground">
+								<p class="text-body font-medium capitalize text-foreground">
 									{suggestion.label}
 								</p>
-								<p class="text-xs text-muted-foreground">
+								<p class="text-small text-muted-foreground">
 									{suggestion.witnessCount}
 									{m.tag_page_witness_count()}
 								</p>
@@ -78,7 +78,7 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="py-8 text-center text-sm text-muted-foreground">
+				<p class="py-8 text-center text-body text-muted-foreground">
 					{m.shell_add_tab_all_tags()}
 				</p>
 			{/if}

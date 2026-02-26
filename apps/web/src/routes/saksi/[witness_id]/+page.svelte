@@ -26,13 +26,13 @@
 </script>
 
 <div class="mx-auto w-full max-w-3xl space-y-4">
-	<a href="/" class="text-xs font-semibold text-primary hover:underline">Kembali ke beranda</a>
+	<a href="/" class="text-small font-semibold text-primary hover:underline">Kembali ke beranda</a>
 
 	{#if witnessStore.detailLoading && !detail}
 		<div class="flex h-48 items-center justify-center">
 			<div class="flex flex-col items-center gap-3 text-muted-foreground">
 				<div class="size-7 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
-				<p class="text-xs">Memuat detail saksi...</p>
+				<p class="text-small">Memuat detail saksi...</p>
 			</div>
 		</div>
 	{:else if detail}
@@ -41,10 +41,10 @@
 		</div>
 	{:else if witnessStore.detailError}
 		<div class="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
-			<p class="text-xs text-destructive">{witnessStore.detailError}</p>
+			<p class="text-small text-destructive">{witnessStore.detailError}</p>
 			<button
 				type="button"
-				class="mt-2 rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted/40"
+				class="mt-2 rounded-md border border-border px-2 py-1 text-small text-foreground hover:bg-muted/40"
 				onclick={retryLoadDetail}
 			>
 				Coba lagi

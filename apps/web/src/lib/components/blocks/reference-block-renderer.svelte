@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ReferenceBlock } from '$lib/types';
-	import { cn, trackColors } from '$lib/utils';
+	import { cn } from '$lib/utils';
+	import { resolveTrajectoryColor } from '$lib/utils/trajectory-colors';
 	import { Badge } from '$lib/components/ui/badge';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 
@@ -13,7 +14,7 @@
 		document: 'Dokumen'
 	};
 
-	const colors = $derived(block.track_hint ? trackColors(block.track_hint) : null);
+	const colors = $derived(resolveTrajectoryColor(block.track_hint));
 </script>
 
 <button
@@ -31,9 +32,9 @@
 				{refTypeLabels[block.ref_type] || block.ref_type}
 			</Badge>
 		</div>
-		<p class="text-sm font-medium text-foreground">{block.title}</p>
+		<p class="text-body font-medium text-foreground">{block.title}</p>
 		{#if block.snippet}
-			<p class="mt-1 text-xs text-muted-foreground line-clamp-2">{block.snippet}</p>
+			<p class="mt-1 text-small text-muted-foreground line-clamp-2">{block.snippet}</p>
 		{/if}
 	</div>
 	<ExternalLink class="mt-1 size-4 shrink-0 text-muted-foreground" />

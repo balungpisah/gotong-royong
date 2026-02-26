@@ -72,7 +72,7 @@
 			>
 				<div class="relative z-10 size-2 shrink-0 rounded-full bg-primary/40"></div>
 				<MessageCircle class="size-3 shrink-0 text-primary/50" />
-				<span class="min-w-0 flex-1 truncate text-xs italic text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
+				<span class="min-w-0 flex-1 truncate text-small italic text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
 					Ruang Interaksi
 				</span>
 				<ChevronDown
@@ -82,7 +82,7 @@
 
 			{#if onboardingExpanded}
 				<div class="pl-5 pt-1" transition:slide={{ duration: 150 }}>
-					<div class="space-y-2.5 rounded-lg border border-border/40 bg-card/60 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+					<div class="space-y-2.5 rounded-lg border border-border/40 bg-card/60 px-3 py-2.5 text-small leading-relaxed text-muted-foreground">
 						<p class="font-medium text-foreground/70">👋 Selamat datang di ruang diskusi!</p>
 						<p>Ini tempat kamu dan anggota lain berdiskusi, berbagi informasi, dan bekerja sama menuntaskan saksi ini tahap demi tahap.</p>
 

@@ -28,18 +28,18 @@
 		<div class="flex items-center gap-2.5">
 			<a
 				href="{base}/"
-				class="text-sm font-extrabold tracking-wide text-foreground uppercase"
+				class="text-body font-extrabold tracking-wide text-foreground uppercase"
 			>
 				{m.shell_brand_name()}
 			</a>
 			<div class="flex items-center gap-1.5 text-primary/70">
 				<Activity class="size-3.5" />
-				<span class="text-xs font-medium tracking-wide">Detak Komunitas</span>
+				<span class="text-small font-medium tracking-wide">Detak Komunitas</span>
 			</div>
 		</div>
 
 		<!-- Tagline (desktop only) -->
-		<p class="hidden flex-1 text-center text-sm text-muted-foreground md:block">
+		<p class="hidden flex-1 text-center text-body text-muted-foreground md:block">
 			{m.shell_brand_tagline()}
 		</p>
 
@@ -58,7 +58,7 @@
 					<BellRing class="size-5" />
 					{#if notificationStore.hasUnread}
 						<span
-							class="absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-white"
+							class="absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full bg-destructive text-small font-bold text-white"
 						>
 							{notificationStore.unreadCount > 9 ? '9+' : notificationStore.unreadCount}
 						</span>

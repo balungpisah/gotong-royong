@@ -45,7 +45,7 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between gap-2 border-b border-border/50 px-4 py-3">
 		<div class="flex items-center gap-2">
-			<h4 class="text-sm font-bold text-foreground">{phase.title}</h4>
+			<h4 class="text-body font-bold text-foreground">{phase.title}</h4>
 			<Badge variant={statusVariant(phase.status)} class="text-[10px]">{phase.status}</Badge>
 		</div>
 		<SourceBadge source={phase.source} />
@@ -53,7 +53,7 @@
 
 	<!-- Objective -->
 	<div class="border-b border-border/30 px-4 py-2">
-		<div class="prose prose-sm max-w-none text-xs text-muted-foreground">
+		<div class="prose prose-sm max-w-none text-small text-muted-foreground">
 			{@html renderMarkdown(phase.objective)}
 		</div>
 	</div>
@@ -66,7 +66,7 @@
 				<CpIcon class={cn('mt-0.5 size-4 shrink-0', statusColors[cp.status] || 'text-batu')} />
 				<div class="flex-1">
 					<div class="flex items-center gap-2">
-						<span class={cn('text-sm', cp.status === 'completed' && 'line-through text-muted-foreground')}>
+						<span class={cn('text-body', cp.status === 'completed' && 'line-through text-muted-foreground')}>
 							{cp.title}
 						</span>
 						{#if cp.evidence_required}
@@ -74,7 +74,7 @@
 						{/if}
 					</div>
 					{#if cp.description}
-						<p class="text-xs text-muted-foreground">{cp.description}</p>
+						<p class="text-small text-muted-foreground">{cp.description}</p>
 					{/if}
 				</div>
 				<SourceBadge source={cp.source} />

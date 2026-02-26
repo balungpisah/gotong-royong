@@ -379,7 +379,7 @@
 						<div class="flex h-full items-center justify-center">
 							<div class="flex flex-col items-center gap-3 text-muted-foreground">
 								<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
-								<p class="text-xs">{m.pulse_loading_detail()}</p>
+								<p class="text-small">{m.pulse_loading_detail()}</p>
 							</div>
 						</div>
 					{:else}
@@ -388,7 +388,7 @@
 							<div class="flex size-12 items-center justify-center rounded-xl bg-muted/30 text-muted-foreground">
 								<ClipboardList class="size-6" />
 							</div>
-							<p class="text-xs text-muted-foreground">
+							<p class="text-small text-muted-foreground">
 								Pilih tandang dari feed untuk melihat detail
 							</p>
 						</div>

@@ -30,7 +30,7 @@
 	transition={{ duration: 0.35, delay: 0.2 }}
 >
 	<div class="rounded-xl border border-border/30 bg-muted/10 p-4">
-		<h3 class="text-xs font-semibold text-foreground">{m.profil_consistency_title()}</h3>
+		<h3 class="text-small font-semibold text-foreground">{m.profil_consistency_title()}</h3>
 
 		<!-- Multiplier badge -->
 		<div class="mt-3 flex items-center gap-3">
@@ -52,14 +52,14 @@
 					<Flame class="size-3" />
 					<span class="text-caption">{m.profil_streak_label()}</span>
 				</div>
-				<p class="mt-1 text-sm font-bold text-foreground">{m.profil_streak_weeks({ weeks: String(consistency.streak_weeks) })}</p>
+				<p class="mt-1 text-body font-bold text-foreground">{m.profil_streak_weeks({ weeks: String(consistency.streak_weeks) })}</p>
 			</div>
 			<div class="rounded-lg bg-muted/20 p-2.5">
 				<div class="flex items-center gap-1.5 text-muted-foreground">
 					<CalendarDays class="size-3" />
 					<span class="text-caption">{m.profil_thirty_days()}</span>
 				</div>
-				<p class="mt-1 text-sm font-bold text-foreground">{m.profil_contributions_count({ count: String(consistency.contributions_30d) })}</p>
+				<p class="mt-1 text-body font-bold text-foreground">{m.profil_contributions_count({ count: String(consistency.contributions_30d) })}</p>
 			</div>
 			<div class="rounded-lg bg-muted/20 p-2.5">
 				<span class="text-caption text-muted-foreground">{m.profil_quality_avg()}</span>
@@ -76,10 +76,10 @@
 						<AlertTriangle class="size-3" />
 						<span class="text-caption">{m.profil_gap_label()}</span>
 					</div>
-					<p class="mt-1 text-sm font-bold text-waspada">{m.profil_gap_days({ days: String(consistency.gap_days) })}</p>
+					<p class="mt-1 text-body font-bold text-waspada">{m.profil_gap_days({ days: String(consistency.gap_days) })}</p>
 				{:else}
 					<span class="text-caption text-muted-foreground">{m.profil_gap_label()}</span>
-					<p class="mt-1 text-sm font-bold text-berhasil">{m.profil_gap_days({ days: String(consistency.gap_days) })} ✓</p>
+					<p class="mt-1 text-body font-bold text-berhasil">{m.profil_gap_days({ days: String(consistency.gap_days) })} ✓</p>
 				{/if}
 			</div>
 		</div>

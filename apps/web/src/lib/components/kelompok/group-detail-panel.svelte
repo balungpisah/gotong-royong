@@ -4,10 +4,16 @@
 	import GroupPrivacyBadge from './group-privacy-badge.svelte';
 	import GroupMemberList from './group-member-list.svelte';
 	import GroupPendingRequests from './group-pending-requests.svelte';
+	import * as Card from '$lib/components/ui/card';
+	import { Input } from '$lib/components/ui/input';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { Select } from '$lib/components/ui/select';
+	import InputLabel from '$lib/components/ui/input/input-label.svelte';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import UserPlusIcon from '@lucide/svelte/icons/user-plus';
 	import UserMinusIcon from '@lucide/svelte/icons/user-minus';
+	import { Button } from '$lib/components/ui/button';
 
 	const store = getGroupStore();
 
@@ -51,12 +57,12 @@
 		<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
 	</div>
 {:else if group}
-	<section class="rounded-xl border border-border/50 bg-card p-4">
+	<Card.Root padding="compact">
 		<header class="flex items-start justify-between gap-3">
 			<div class="min-w-0">
-				<h2 class="truncate text-base font-bold text-foreground">{group.name}</h2>
-				<p class="mt-1 text-xs leading-relaxed text-muted-foreground/80">{group.description}</p>
-				<div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground/70">
+				<h2 class="truncate text-h3 font-bold text-foreground">{group.name}</h2>
+				<p class="mt-1 text-small leading-relaxed text-muted-foreground/80">{group.description}</p>
+				<div class="mt-2 flex flex-wrap items-center gap-2 text-caption text-muted-foreground/70">
 					<GroupPrivacyBadge joinPolicy={group.join_policy} />
 					<span class="inline-flex items-center gap-1">
 						<UsersIcon class="size-3" /> {m.group_stat_members({ count: group.member_count })}
@@ -68,38 +74,39 @@
 
 			<div class="shrink-0">
 				{#if store.isCurrentMember}
-					<button
-						type="button"
+					<Button
+						variant="secondary"
+						size="sm"
 						onclick={() => store.leaveGroup(group.group_id)}
-						class="inline-flex items-center justify-center rounded-lg bg-muted/40 px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-muted/60"
 					>
 						<UserMinusIcon class="mr-1 size-3.5" />
 						{m.group_action_leave()}
-					</button>
+					</Button>
 				{:else if canJoinNow}
-					<button
-						type="button"
+					<Button
+						variant="default"
+						size="sm"
 						onclick={() => store.joinGroup(group.group_id)}
-						class="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
 					>
 						<UserPlusIcon class="mr-1 size-3.5" />
 						{m.group_action_join()}
-					</button>
+					</Button>
 				{:else if canRequestJoin}
-					<button
-						type="button"
+					<Button
+						variant="outline"
+						size="sm"
+						class="bg-primary/10 text-primary hover:bg-primary/15"
 						onclick={() => store.requestJoinGroup(group.group_id, requestMessage.trim() || undefined)}
-						class="inline-flex items-center justify-center rounded-lg bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/15"
 					>
 						<UserPlusIcon class="mr-1 size-3.5" />
 						{m.group_action_request_join()}
-					</button>
+					</Button>
 				{:else if isPending}
-					<span class="inline-flex items-center rounded-lg bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground">
+					<span class="inline-flex items-center rounded-lg bg-muted/40 px-3 py-2 text-small font-semibold text-muted-foreground">
 						{m.group_request_pending()}
 					</span>
 				{:else}
-					<span class="inline-flex items-center rounded-lg bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground">
+					<span class="inline-flex items-center rounded-lg bg-muted/40 px-3 py-2 text-small font-semibold text-muted-foreground">
 						{m.group_action_invite_only()}
 					</span>
 				{/if}
@@ -108,53 +115,52 @@
 
 		{#if group.join_policy === 'persetujuan' && !store.isCurrentMember && group.my_membership_status === 'none'}
 			<div class="mt-3 rounded-lg border border-border/40 bg-muted/10 p-3">
-				<label class="block">
-					<span class="text-xs font-semibold text-foreground">{m.group_request_message_label()}</span>
-					<input
-						class="mt-1 w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm outline-none focus:border-primary/60"
+				<div class="flex flex-col gap-1.5">
+					<InputLabel>{m.group_request_message_label()}</InputLabel>
+					<Input
 						placeholder={m.group_request_message_placeholder()}
 						bind:value={requestMessage}
 					/>
-				</label>
+				</div>
 			</div>
 		{/if}
 
 		{#if store.errors.action}
-			<p class="mt-3 text-xs text-bahaya">{store.errors.action}</p>
+			<p class="mt-3 text-small text-bahaya">{store.errors.action}</p>
 		{/if}
 
 		<!-- Tabs -->
 		<div class="mt-4 flex flex-wrap items-center gap-2">
-			<button
-				type="button"
-				class="rounded-full px-3 py-1.5 text-xs font-semibold transition
-					{tab === 'anggota' ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}"
+			<Button
+				variant="ghost"
+				size="pill"
+				class={tab === 'anggota' ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}
 				onclick={() => (tab = 'anggota')}
 			>
 				{m.group_tab_members()}
-			</button>
+			</Button>
 
 			{#if showRequestsTab}
-				<button
-					type="button"
-					class="rounded-full px-3 py-1.5 text-xs font-semibold transition
-						{tab === 'permintaan' ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}"
+				<Button
+					variant="ghost"
+					size="pill"
+					class={tab === 'permintaan' ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}
 					onclick={() => (tab = 'permintaan')}
 				>
 					{m.group_tab_requests({ count: store.pendingRequestCount })}
-				</button>
+				</Button>
 			{/if}
 
 			{#if showSettingsTab}
-				<button
-					type="button"
-					class="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold transition
-						{tab === 'pengaturan' ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}"
+				<Button
+					variant="ghost"
+					size="pill"
+					class={tab === 'pengaturan' ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground hover:bg-muted/60'}
 					onclick={() => (tab = 'pengaturan')}
 				>
 					<SettingsIcon class="mr-1 size-3.5" />
 					{m.group_tab_settings()}
-				</button>
+				</Button>
 			{/if}
 		</div>
 
@@ -175,48 +181,41 @@
 				/>
 			{:else if tab === 'pengaturan'}
 				<div class="rounded-lg border border-border/40 bg-muted/10 p-3">
-					<div class="flex items-center gap-2 text-xs font-semibold text-foreground">
+					<div class="flex items-center gap-2 text-small font-semibold text-foreground">
 						<SettingsIcon class="size-4" />
 						<span>{m.group_settings_title()}</span>
 					</div>
 
 					<div class="mt-3 grid gap-3">
-						<label class="block">
-							<span class="text-xs font-semibold text-foreground">{m.group_settings_name()}</span>
-							<input
-								class="mt-1 w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm outline-none focus:border-primary/60"
-								bind:value={editName}
-							/>
-						</label>
+						<div class="flex flex-col gap-1.5">
+							<InputLabel>{m.group_settings_name()}</InputLabel>
+							<Input bind:value={editName} />
+						</div>
 
-						<label class="block">
-							<span class="text-xs font-semibold text-foreground">{m.group_settings_description()}</span>
-							<textarea
-								class="mt-1 w-full resize-none rounded-lg border border-border/60 bg-background px-3 py-2 text-sm outline-none focus:border-primary/60"
+						<div class="flex flex-col gap-1.5">
+							<InputLabel>{m.group_settings_description()}</InputLabel>
+							<Textarea
 								rows={3}
+								class="resize-none"
 								bind:value={editDescription}
-							></textarea>
-						</label>
+							/>
+						</div>
 
-						<label class="block">
-							<span class="text-xs font-semibold text-foreground">{m.group_settings_join_policy()}</span>
-							<select
-								class="mt-1 w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm outline-none focus:border-primary/60"
-								bind:value={editJoinPolicy}
-							>
+						<div class="flex flex-col gap-1.5">
+							<InputLabel>{m.group_settings_join_policy()}</InputLabel>
+							<Select bind:value={editJoinPolicy}>
 								<option value="terbuka">{m.group_policy_terbuka()}</option>
 								<option value="persetujuan">{m.group_policy_persetujuan()}</option>
 								<option value="undangan">{m.group_policy_undangan()}</option>
-							</select>
-							<p class="mt-1 text-[11px] text-muted-foreground/70">
+							</Select>
+							<p class="mt-1 text-caption text-muted-foreground/70">
 								{m.group_settings_privacy_note()}
 							</p>
-						</label>
+						</div>
 
 						<div class="flex justify-end">
-							<button
-								type="button"
-								class="inline-flex items-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+							<Button
+								variant="default"
 								onclick={() =>
 									store.updateGroup(group.group_id, {
 										name: editName.trim(),
@@ -226,20 +225,20 @@
 								}
 							>
 								{m.group_settings_save()}
-							</button>
+							</Button>
 						</div>
 
 						<div class="mt-2 rounded-lg border border-border/40 bg-background p-3">
-							<p class="text-xs font-semibold text-foreground">{m.group_invite_title()}</p>
+							<p class="text-small font-semibold text-foreground">{m.group_invite_title()}</p>
 							<div class="mt-2 flex items-center gap-2">
-								<input
-									class="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm outline-none focus:border-primary/60"
+								<Input
 									placeholder={m.group_invite_user_placeholder()}
 									bind:value={inviteUserId}
 								/>
-								<button
-									type="button"
-									class="inline-flex shrink-0 items-center rounded-lg bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/15"
+								<Button
+									variant="outline"
+									size="sm"
+									class="shrink-0 bg-primary/10 text-primary hover:bg-primary/15"
 									disabled={inviteUserId.trim().length === 0}
 									onclick={() => {
 										store.invite(group.group_id, inviteUserId.trim());
@@ -247,17 +246,17 @@
 									}}
 								>
 									{m.group_invite_send()}
-								</button>
+								</Button>
 							</div>
-							<p class="mt-1 text-[11px] text-muted-foreground/70">{m.group_invite_note()}</p>
+							<p class="mt-1 text-caption text-muted-foreground/70">{m.group_invite_note()}</p>
 						</div>
 					</div>
 				</div>
 			{/if}
 		</div>
-	</section>
+	</Card.Root>
 {:else if store.errors.detail}
-	<div class="rounded-xl border border-border/50 bg-card p-4">
-		<p class="text-xs text-bahaya">{store.errors.detail}</p>
-	</div>
+	<Card.Root padding="compact">
+		<p class="text-small text-bahaya">{store.errors.detail}</p>
+	</Card.Root>
 {/if}

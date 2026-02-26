@@ -8,7 +8,7 @@
 </script>
 
 {#if block.title}
-	<h3 class="mb-3 text-sm font-bold text-foreground">{block.title}</h3>
+	<h3 class="mb-3 text-body font-bold text-foreground">{block.title}</h3>
 {/if}
 
 <div class="flex flex-col gap-4" data-slot="document-block">
@@ -16,7 +16,7 @@
 		<div class="relative rounded-md border border-border/50 bg-card p-3">
 			<div class="mb-2 flex items-center gap-2">
 				{#if section.heading}
-					<h4 class="text-xs font-bold uppercase tracking-wide text-foreground">{section.heading}</h4>
+					<h4 class="text-small font-bold uppercase tracking-wide text-foreground">{section.heading}</h4>
 				{/if}
 				<SourceBadge source={section.source} />
 				{#if section.locked_fields.length > 0}

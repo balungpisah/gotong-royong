@@ -21,6 +21,7 @@
 	import Video from '@lucide/svelte/icons/video';
 	import Mic from '@lucide/svelte/icons/mic';
 	import type { BadgeVariant } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		onWitnessCreated?: (witnessId: string) => void;
@@ -369,7 +370,7 @@
 	>
 		<!-- "Mulai di sini" badge -->
 		<div class="mb-2.5">
-			<span class="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold tracking-wide text-primary-foreground uppercase">
+			<span class="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-small font-bold tracking-wide text-primary-foreground uppercase">
 				<Sparkles class="size-2.5" />
 				{m.triage_start_here()}
 			</span>
@@ -381,7 +382,7 @@
 			</div>
 			<div class="flex-1 min-w-0">
 				<p class="text-[13px] font-semibold text-foreground leading-tight">{m.triage_tell_story()}</p>
-				<p class="mt-0.5 text-xs text-muted-foreground truncate">
+				<p class="mt-0.5 text-small text-muted-foreground truncate">
 					{m.triage_tap_to_start()}
 				</p>
 			</div>
@@ -407,12 +408,12 @@
 	>
 		<!-- Header -->
 		<div class="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
-			<div class="flex items-center gap-2 text-xs text-muted-foreground">
+			<div class="flex items-center gap-2 text-small text-muted-foreground">
 				<Sparkles class="size-3.5 text-primary" />
 				<span class="font-medium">{m.triage_ai_label()}</span>
 				{#if triageStore.confidence}
 					<span
-						class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+						class="rounded-full bg-primary/10 px-2 py-0.5 text-small font-medium text-primary"
 					>
 						{triageStore.confidence.label}
 					</span>
@@ -432,27 +433,29 @@
 			<div class="flex items-center gap-1">
 				{#if hasSession}
 					<Tip text={m.triage_restart()}>
-						<button
-							type="button"
+						<Button
+							variant="ghost"
+							size="icon-sm"
 							onclick={handleReset}
-							class="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+							class="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
 							aria-label={m.triage_restart()}
 							tabindex={expanded ? 0 : -1}
 						>
 							<RotateCcw class="size-3.5" />
-						</button>
+						</Button>
 					</Tip>
 				{/if}
 				<Tip text={m.common_close()}>
-					<button
-						type="button"
+					<Button
+						variant="ghost"
+						size="icon-sm"
 						onclick={collapse}
-						class="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+						class="size-7"
 						aria-label={m.common_close()}
 						tabindex={expanded ? 0 : -1}
 					>
 						<X class="size-4" />
-					</button>
+					</Button>
 				</Tip>
 			</div>
 		</div>
@@ -464,8 +467,8 @@
 					<div class="flex size-10 items-center justify-center rounded-full bg-muted">
 						<RotateCcw class="size-5 text-muted-foreground" />
 					</div>
-					<p class="text-sm font-medium text-foreground">{m.triage_session_complete()}</p>
-					<p class="text-xs text-muted-foreground">
+					<p class="text-body font-medium text-foreground">{m.triage_session_complete()}</p>
+					<p class="text-small text-muted-foreground">
 						{m.triage_cooldown({ seconds: String(Math.ceil(cooldownRemaining / 1000)) })}
 					</p>
 				</div>
@@ -477,7 +480,7 @@
 						{#if msg.role === 'user'}
 							<div class="flex justify-end">
 								<div
-									class="max-w-[80%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm text-primary-foreground"
+									class="max-w-[80%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-body text-primary-foreground"
 								>
 									{msg.text}
 									{#if msg.attachments?.length}
@@ -507,7 +510,7 @@
 									<Sparkles class="size-3 text-primary" />
 								</div>
 								<div
-									class="max-w-[80%] rounded-2xl rounded-bl-md bg-muted/70 px-3 py-2 text-sm text-foreground"
+									class="max-w-[80%] rounded-2xl rounded-bl-md bg-muted/70 px-3 py-2 text-body text-foreground"
 								>
 									{msg.text}
 								</div>
@@ -551,7 +554,7 @@
 									{m.triage_intent_kelola_name()}
 								</Badge>
 								{#if triageStore.confidence}
-									<span class="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+									<span class="ml-auto flex items-center gap-1 text-small text-muted-foreground">
 										<Gauge class="size-3" />
 										{triageStore.confidence.label}
 									</span>
@@ -560,20 +563,20 @@
 							{#if triageStore.result?.kelola_result?.group_detail}
 								{@const detail = triageStore.result.kelola_result.group_detail}
 								<div class="px-3 py-2.5">
-									<p class="text-sm font-semibold text-foreground leading-tight">
+									<p class="text-body font-semibold text-foreground leading-tight">
 										{detail.name}
 									</p>
-									<p class="mt-1 text-xs text-muted-foreground line-clamp-2">
+									<p class="mt-1 text-small text-muted-foreground line-clamp-2">
 										{detail.description}
 									</p>
 								</div>
 							{/if}
 							<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
-								<button
-									type="button"
+								<Button
+									variant="default"
 									onclick={handleCreateGroup}
 									disabled={groupStore.creating}
-									class="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+									class="flex-1 bg-blue-600 hover:bg-blue-700"
 								>
 									{#if groupStore.creating}
 										<div class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
@@ -582,15 +585,14 @@
 										<Plus class="size-4" />
 										{m.triage_create_group()}
 									{/if}
-								</button>
-								<button
-									type="button"
+								</Button>
+								<Button
+									variant="outline"
 									disabled
 									title={m.common_coming_soon()}
-									class="rounded-lg border border-border/50 px-3 py-2 text-sm font-medium text-muted-foreground transition disabled:cursor-not-allowed disabled:opacity-40"
 								>
 									{m.triage_modify()}
-								</button>
+								</Button>
 							</div>
 						</div>
 						{:else}
@@ -604,13 +606,13 @@
 									</Badge>
 								{/if}
 								{#if triageStore.seedHint}
-									<span class="flex items-center gap-1 text-xs text-muted-foreground">
+									<span class="flex items-center gap-1 text-small text-muted-foreground">
 										<Sprout class="size-3" />
 										{triageStore.seedHint}
 									</span>
 								{/if}
 								{#if triageStore.confidence}
-									<span class="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+									<span class="ml-auto flex items-center gap-1 text-small text-muted-foreground">
 										<Gauge class="size-3" />
 										{triageStore.confidence.label}
 									</span>
@@ -620,15 +622,15 @@
 							<!-- Plan summary -->
 							{#if triageStore.proposedPlan}
 								<div class="px-3 py-2.5">
-									<p class="text-sm font-semibold text-foreground leading-tight">
+									<p class="text-body font-semibold text-foreground leading-tight">
 										{triageStore.proposedPlan.title}
 									</p>
 									{#if triageStore.proposedPlan.summary}
-										<p class="mt-1 text-xs text-muted-foreground line-clamp-2">
+										<p class="mt-1 text-small text-muted-foreground line-clamp-2">
 											{triageStore.proposedPlan.summary}
 										</p>
 									{/if}
-									<div class="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+									<div class="mt-2 flex items-center gap-1.5 text-small text-muted-foreground">
 										<Layers class="size-3" />
 										<span>{m.triage_phases({ count: String(planPhaseCount) })}</span>
 										{#if firstPhaseTitle}
@@ -641,11 +643,11 @@
 
 							<!-- Action buttons -->
 							<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
-								<button
-									type="button"
+								<Button
+									variant="default"
 									onclick={handleCreateWitness}
 									disabled={witnessStore.creating}
-									class="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+									class="flex-1"
 								>
 									{#if witnessStore.creating}
 										<div class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
@@ -654,15 +656,14 @@
 										<Plus class="size-4" />
 										{m.triage_create_witness()}
 									{/if}
-								</button>
-								<button
-									type="button"
+								</Button>
+								<Button
+									variant="outline"
 									disabled
 									title={m.common_coming_soon()}
-									class="rounded-lg border border-border/50 px-3 py-2 text-sm font-medium text-muted-foreground transition disabled:cursor-not-allowed disabled:opacity-40"
 								>
 									{m.triage_modify()}
-								</button>
+								</Button>
 							</div>
 						</div>
 						{/if}
@@ -677,15 +678,15 @@
 				role="status"
 				aria-live="polite"
 			>
-				<p class="text-xs text-destructive">{triageSubmitError}</p>
-				<button
-					type="button"
+				<p class="text-small text-destructive">{triageSubmitError}</p>
+				<Button
+					variant="outline"
+					size="sm"
 					onclick={() => handleSubmit()}
 					disabled={!canSend}
-					class="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					Coba lagi
-				</button>
+				</Button>
 			</div>
 		{/if}
 
@@ -713,17 +714,18 @@
 						disabled={triageStore.loading || triageStore.isReady || isOnCooldown}
 						rows={1}
 						tabindex={expanded ? 0 : -1}
-						class="w-full resize-none rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+						class="w-full resize-none rounded-lg border border-border/50 bg-background px-3 py-2 text-body text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 					></textarea>
 				</div>
 
 				<Tip text={m.shell_chat_send()}>
-					<button
-						type="button"
+					<Button
+						variant="default"
+						size="icon"
 						onclick={() => handleSubmit()}
 						disabled={!canSend}
 						tabindex={expanded ? 0 : -1}
-						class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+						class="shrink-0"
 						aria-label={m.shell_chat_send()}
 					>
 						{#if triageStore.loading}
@@ -733,7 +735,7 @@
 						{:else}
 							<SendHorizontal class="size-4" />
 						{/if}
-					</button>
+					</Button>
 				</Tip>
 			</div>
 		</div>

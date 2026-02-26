@@ -1,10 +1,12 @@
 <script lang="ts">
 	import type { PathPlan } from '$lib/types';
-	import { cn, trackColors } from '$lib/utils';
+	import { cn } from '$lib/utils';
+	import { resolveTrajectoryColor } from '$lib/utils/trajectory-colors';
 	import { Badge } from '$lib/components/ui/badge';
 	import PhaseBreadcrumb from './phase-breadcrumb.svelte';
 	import PhaseCard from './phase-card.svelte';
 	import GitBranch from '@lucide/svelte/icons/git-branch';
+	import { Button } from '$lib/components/ui/button';
 
 	let { plan }: { plan: PathPlan } = $props();
 
@@ -16,7 +18,7 @@
 
 	const activeBranch = $derived(plan.branches.find(b => b.branch_id === activeBranchId) || plan.branches[0]);
 
-	const colors = $derived(plan.track_hint ? trackColors(plan.track_hint) : null);
+	const colors = $derived(resolveTrajectoryColor(plan.track_hint));
 
 	const seedHintLabels: Record<string, string> = {
 		Keresahan: '😟 Keresahan',
@@ -31,10 +33,10 @@
 	<!-- Header -->
 	<div class="flex flex-col gap-2">
 		<div class="flex items-start justify-between gap-2">
-			<h2 class="text-base font-bold text-foreground">{plan.title}</h2>
+			<h2 class="text-h3 font-bold text-foreground">{plan.title}</h2>
 			<Badge variant="secondary" class="shrink-0 text-[10px]">v{plan.version}</Badge>
 		</div>
-		<p class="text-sm text-muted-foreground">{plan.summary}</p>
+		<p class="text-body text-muted-foreground">{plan.summary}</p>
 		<div class="flex flex-wrap gap-2">
 			{#if plan.track_hint}
 				<Badge variant={`track-${plan.track_hint}` as any} class="text-[10px]">{plan.track_hint}</Badge>
@@ -50,17 +52,13 @@
 		<div class="flex items-center gap-2">
 			<GitBranch class="size-4 text-muted-foreground" />
 			{#each plan.branches as branch (branch.branch_id)}
-				<button
-					class={cn(
-						'rounded-full px-3 py-1 text-xs font-medium transition',
-						branch.branch_id === activeBranchId
-							? 'bg-primary text-primary-foreground'
-							: 'bg-muted text-muted-foreground hover:text-foreground'
-					)}
+				<Button
+					size="pill"
+					variant={branch.branch_id === activeBranchId ? "default" : "secondary"}
 					onclick={() => activeBranchId = branch.branch_id}
 				>
 					{branch.label}
-				</button>
+				</Button>
 			{/each}
 		</div>
 	{/if}

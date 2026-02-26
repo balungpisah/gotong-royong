@@ -22,7 +22,7 @@
 	transition={{ duration: 0.35, delay: 0.1 }}
 	class="rounded-xl border border-border/30 bg-muted/10 p-4"
 >
-	<h3 class="text-xs font-semibold text-foreground">{m.komunitas_icj_title()}</h3>
+	<h3 class="text-small font-semibold text-foreground">{m.komunitas_icj_title()}</h3>
 	<div class="mt-3 space-y-3">
 		{#each axes as axis}
 			<div class="flex items-center gap-3">

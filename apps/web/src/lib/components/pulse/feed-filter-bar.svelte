@@ -22,14 +22,14 @@
 		<button
 			role="tab"
 			aria-selected={activeFilter === filter.key}
-			class="inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors
+			class="inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-small font-semibold whitespace-nowrap transition-colors
 				{activeFilter === filter.key
 				? 'bg-primary text-primary-foreground shadow-sm'
 				: 'bg-kapas text-kayu hover:bg-batu/40'}"
 			onclick={() => onFilterChange(filter.key)}
 		>
 			{#if filter.icon}
-				<span class="text-xs">{filter.icon}</span>
+				<span class="text-small">{filter.icon}</span>
 			{/if}
 			{filter.labelKey()}
 		</button>

@@ -126,7 +126,7 @@
 			role="status"
 			aria-live="polite"
 		>
-			<p class="text-xs text-destructive">{store.error}</p>
+			<p class="text-small text-destructive">{store.error}</p>
 			<Button variant="outline" size="sm" onclick={handleRetryLoad}>Coba lagi</Button>
 		</div>
 	{/if}
@@ -135,7 +135,7 @@
 	{#if store.loading}
 		<div class="flex flex-col items-center justify-center py-16 text-muted-foreground">
 			<Loader2 class="size-8 animate-spin" />
-			<p class="mt-3 text-xs">Memuat notifikasi...</p>
+			<p class="mt-3 text-small">Memuat notifikasi...</p>
 		</div>
 
 	<!-- Empty state -->
@@ -150,7 +150,7 @@
 				<div class="flex size-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
 					<Inbox class="size-7" />
 				</div>
-				<p class="mt-4 text-sm font-semibold text-foreground">Gagal memuat notifikasi</p>
+				<p class="mt-4 text-body font-semibold text-foreground">Gagal memuat notifikasi</p>
 				<p class="mt-1 max-w-sm text-caption text-muted-foreground">{store.error}</p>
 				<Button variant="outline" size="sm" class="mt-4" onclick={handleRetryLoad}>Coba lagi</Button>
 			</motion.div>
@@ -164,7 +164,7 @@
 				<div class="flex size-14 items-center justify-center rounded-full bg-muted/20">
 					<Inbox class="size-7 text-muted-foreground" />
 				</div>
-				<p class="mt-4 text-sm font-medium text-foreground">Tidak ada notifikasi</p>
+				<p class="mt-4 text-body font-medium text-foreground">Tidak ada notifikasi</p>
 				<p class="mt-1 text-caption text-muted-foreground">Semua sudah bersih!</p>
 			</motion.div>
 		{/if}
@@ -175,8 +175,8 @@
 		{#if unread.length > 0}
 			<div>
 				<div class="flex items-center gap-2 px-1 pb-2">
-					<span class="text-xs font-semibold text-foreground">Belum dibaca</span>
-					<Badge variant="secondary" class="text-xs">{unread.length}</Badge>
+					<span class="text-small font-semibold text-foreground">Belum dibaca</span>
+					<Badge variant="secondary" class="text-small">{unread.length}</Badge>
 				</div>
 				<div class="space-y-2">
 					{#each unread as notif, i (notif.notification_id)}
@@ -199,13 +199,13 @@
 							<!-- Content -->
 							<div class="min-w-0 flex-1 text-left">
 								<div class="flex items-center gap-2">
-									<span class="truncate text-xs font-semibold text-foreground">{notif.title}</span>
-									<Badge variant="outline" class="shrink-0 text-xs">{config.label}</Badge>
+									<span class="truncate text-small font-semibold text-foreground">{notif.title}</span>
+									<Badge variant="outline" class="shrink-0 text-small">{config.label}</Badge>
 								</div>
 								<p class="mt-0.5 line-clamp-2 text-caption leading-relaxed text-muted-foreground">
 									{notif.body}
 								</p>
-								<p class="mt-1 text-xs text-muted-foreground/60">{timeAgo(notif.created_at)}</p>
+								<p class="mt-1 text-small text-muted-foreground/60">{timeAgo(notif.created_at)}</p>
 							</div>
 						</motion.button>
 					{/each}
@@ -222,7 +222,7 @@
 		{#if read.length > 0}
 			<div>
 				<div class="px-1 pb-2">
-					<span class="text-xs font-semibold text-muted-foreground">Sudah dibaca</span>
+					<span class="text-small font-semibold text-muted-foreground">Sudah dibaca</span>
 				</div>
 				<div class="space-y-2">
 					{#each read as notif, i (notif.notification_id)}
@@ -242,13 +242,13 @@
 							<!-- Content -->
 							<div class="min-w-0 flex-1 text-left">
 								<div class="flex items-center gap-2">
-									<span class="truncate text-xs font-medium text-foreground/70">{notif.title}</span>
-									<Badge variant="outline" class="shrink-0 text-xs opacity-60">{config.label}</Badge>
+									<span class="truncate text-small font-medium text-foreground/70">{notif.title}</span>
+									<Badge variant="outline" class="shrink-0 text-small opacity-60">{config.label}</Badge>
 								</div>
 								<p class="mt-0.5 line-clamp-2 text-caption leading-relaxed text-muted-foreground/60">
 									{notif.body}
 								</p>
-								<p class="mt-1 text-xs text-muted-foreground/40">{timeAgo(notif.created_at)}</p>
+								<p class="mt-1 text-small text-muted-foreground/40">{timeAgo(notif.created_at)}</p>
 							</div>
 						</motion.button>
 					{/each}

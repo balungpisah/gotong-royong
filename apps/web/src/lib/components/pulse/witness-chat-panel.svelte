@@ -100,13 +100,13 @@
 				<button
 					onclick={handleStempel}
 					disabled={stempeling}
-					class="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-primary/30 bg-primary/5 px-2 text-xs font-medium text-primary transition hover:bg-primary/10 active:scale-[0.97] disabled:opacity-50"
+					class="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-primary/30 bg-primary/5 px-2 text-small font-medium text-primary transition hover:bg-primary/10 active:scale-[0.97] disabled:opacity-50"
 					aria-label="Stempel — minta AI evaluasi kemajuan fase"
 				>
 					{#if stempeling}
 						<Loader2 class="size-3.5 animate-spin" />
 					{:else}
-						<span class="text-xs leading-none">✦</span>
+						<span class="text-small leading-none">✦</span>
 						<span>Stempel</span>
 					{/if}
 				</button>
@@ -121,7 +121,7 @@
 				onkeydown={handleKeydown}
 				placeholder="Tulis pesan..."
 				rows={1}
-				class="max-h-20 min-h-[36px] min-w-0 flex-1 resize-none rounded-xl border border-border/60 bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none"
+				class="max-h-20 min-h-[36px] min-w-0 flex-1 resize-none rounded-xl border border-border/60 bg-background px-3 py-2 text-small text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none"
 			></textarea>
 
 			<!-- Send -->

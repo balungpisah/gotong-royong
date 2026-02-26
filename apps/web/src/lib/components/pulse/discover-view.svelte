@@ -4,8 +4,10 @@
 	import { getFeedStore, getGroupStore } from '$lib/stores';
 	import { goto } from '$app/navigation';
 	import { GroupCard } from '$lib/components/kelompok';
+	import * as Card from '$lib/components/ui/card';
 	import Compass from '@lucide/svelte/icons/compass';
 	import Masonry from 'svelte-bricks';
+	import { Button } from '$lib/components/ui/button';
 	const feedStore = getFeedStore();
 	const groupStore = getGroupStore();
 
@@ -77,8 +79,8 @@
 			<Compass class="size-5" />
 		</div>
 		<div>
-			<h2 class="text-base font-bold text-foreground">{m.pulse_discover_title()}</h2>
-			<p class="text-xs text-muted-foreground">{m.pulse_discover_suggested()}</p>
+			<h2 class="text-h3 font-bold text-foreground">{m.pulse_discover_title()}</h2>
+			<p class="text-small text-muted-foreground">{m.pulse_discover_suggested()}</p>
 		</div>
 	</div>
 
@@ -92,7 +94,7 @@
 			>
 				<Compass class="size-6" />
 			</div>
-			<p class="max-w-xs text-sm text-muted-foreground">
+			<p class="max-w-xs text-body text-muted-foreground">
 				{m.pulse_discover_empty()}
 			</p>
 		</div>
@@ -108,20 +110,21 @@
 		>
 			{#snippet children({ item })}
 				{#if 'entityType' in item}
-					<section class="rounded-xl border border-border/50 bg-card p-4">
+					<Card.Root padding="compact">
 						<!-- Group header -->
 						<div class="flex items-center justify-between gap-2">
-							<h3 class="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+							<h3 class="flex items-center gap-1.5 text-body font-semibold text-foreground">
 								<span>{iconMap[item.entityType]}</span>
 								<span>{labelMap[item.entityType]}</span>
 							</h3>
 							{#if item.entities.some((e) => !e.followed)}
-								<button
+								<Button
+									variant="link"
+									class="h-auto p-0"
 									onclick={() => followAllInGroup(item.entities)}
-									class="text-xs font-semibold text-primary hover:underline"
 								>
 									{m.pulse_discover_follow_all_group()}
-								</button>
+								</Button>
 							{/if}
 						</div>
 
@@ -130,36 +133,35 @@
 							{#each item.entities as entity (entity.entity_id)}
 								<div class="flex items-center justify-between gap-3">
 									<div class="min-w-0 flex-1">
-										<p class="truncate text-sm font-medium text-foreground">
+										<p class="truncate text-body font-medium text-foreground">
 											{entity.label}
 										</p>
 										{#if entity.description}
-											<p class="mt-0.5 truncate text-xs text-muted-foreground">
+											<p class="mt-0.5 truncate text-small text-muted-foreground">
 												{entity.description}
 											</p>
 										{/if}
-										<p class="text-xs text-muted-foreground/70">
+										<p class="text-small text-muted-foreground/70">
 											{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {m.discover_followers({ count: String(entity.follower_count) })}
 										</p>
 									</div>
 
-									<button
+									<Button
+										variant={entity.followed ? 'outline' : 'default'}
+										size="pill"
+										class={entity.followed ? 'bg-primary/10 text-primary' : ''}
 										onclick={() => feedStore.toggleFollow(entity.entity_id)}
-										class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors
-											{entity.followed
-											? 'bg-primary/10 text-primary'
-											: 'bg-primary text-primary-foreground hover:bg-primary/90'}"
 									>
 										{entity.followed ? m.pulse_feed_entity_following() : m.pulse_feed_entity_follow()}
-									</button>
+									</Button>
 								</div>
 							{/each}
 						</div>
-					</section>
+					</Card.Root>
 				{:else}
 					<!-- Placeholder cards (trending, nearby) -->
 					<section class="rounded-xl border border-dashed border-border/40 bg-muted/10 p-4 text-center">
-						<p class="text-xs text-muted-foreground/60">
+						<p class="text-small text-muted-foreground/60">
 							{item.emoji} {item.label()} — {m.common_coming_soon()}
 						</p>
 					</section>
@@ -169,19 +171,19 @@
 	{/if}
 
 	<!-- Groups (Kelompok & Lembaga) — always visible, even for new users -->
-	<section class="rounded-xl border border-border/50 bg-card p-4">
+	<Card.Root padding="compact">
 		<div class="flex items-center justify-between gap-3">
 			<div>
-				<h3 class="text-sm font-bold text-foreground">{m.group_discover_section_title()}</h3>
-				<p class="mt-0.5 text-xs text-muted-foreground/80">{m.group_discover_section_subtitle()}</p>
+				<h3 class="text-body font-bold text-foreground">{m.group_discover_section_title()}</h3>
+				<p class="mt-0.5 text-small text-muted-foreground/80">{m.group_discover_section_subtitle()}</p>
 			</div>
-			<a href="/komunitas/kelompok" class="text-xs font-semibold text-primary hover:underline">
+			<a href="/komunitas/kelompok" class="text-small font-semibold text-primary hover:underline">
 				{m.common_view_all({ count: previewGroups.length })}
 			</a>
 		</div>
 
 		{#if previewGroups.length === 0}
-			<p class="mt-3 text-xs text-muted-foreground/80">{m.group_empty_discover()}</p>
+			<p class="mt-3 text-small text-muted-foreground/80">{m.group_empty_discover()}</p>
 		{:else}
 			<div class="mt-3 grid gap-3 sm:grid-cols-2">
 				{#each previewGroups as group (group.group_id)}
@@ -193,5 +195,5 @@
 				{/each}
 			</div>
 		{/if}
-	</section>
+	</Card.Root>
 </div>

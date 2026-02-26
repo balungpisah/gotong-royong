@@ -59,7 +59,7 @@
 	transition={{ duration: 0.35, delay: 0.25 }}
 >
 	<div class="rounded-xl border border-border/30 bg-muted/10 p-4">
-		<h3 class="mb-4 text-xs font-semibold text-foreground">{m.profil_contribution_trail()}</h3>
+		<h3 class="mb-4 text-small font-semibold text-foreground">{m.profil_contribution_trail()}</h3>
 
 		<div class="relative border-l-2 border-primary/20 pl-4 space-y-4">
 			{#each visibleItems as item, i}

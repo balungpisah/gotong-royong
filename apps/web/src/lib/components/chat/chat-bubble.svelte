@@ -66,7 +66,7 @@
 			<div class="flex items-center gap-1.5">
 				<a
 					href="/profil/{message.author.user_id}"
-					class="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+					class="text-small font-medium text-muted-foreground hover:text-foreground transition-colors"
 				>
 					{message.author.name}
 				</a>
@@ -85,7 +85,7 @@
 			</div>
 		{/if}
 		<div class={cn(
-			'rounded-2xl px-3 py-2 text-sm',
+			'rounded-2xl px-3 py-2 text-body',
 			message.is_self
 				? 'rounded-tr-sm bg-primary text-primary-foreground'
 				: 'rounded-tl-sm bg-card border border-border'

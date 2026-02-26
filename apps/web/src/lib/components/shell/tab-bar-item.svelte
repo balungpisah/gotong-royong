@@ -3,6 +3,7 @@
 	import { resolveTabIcon } from '$lib/utils';
 	import X from '@lucide/svelte/icons/x';
 	import type { Component } from 'svelte';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		href: string;
@@ -23,9 +24,9 @@
 		variants: {
 			layout: {
 				mobile:
-					'flex-col gap-1 rounded-lg px-2 py-2 text-xs',
+					'flex-col gap-1 rounded-lg px-2 py-2 text-small',
 				desktop:
-					'gap-2 rounded-full px-3 py-2 text-sm'
+					'gap-2 rounded-full px-3 py-2 text-body'
 			},
 			state: {
 				active: '',
@@ -74,9 +75,10 @@
 	<Icon class="size-4" />
 	<span>{label}</span>
 	{#if removable && !active}
-		<button
-			type="button"
-			class="ml-1 hidden rounded-full p-0.5 opacity-0 transition hover:bg-foreground/10 group-hover:opacity-100 md:inline-flex"
+		<Button
+			variant="ghost"
+			size="icon-sm"
+			class="ml-1 hidden size-5 rounded-full opacity-0 group-hover:opacity-100 md:inline-flex"
 			onclick={(e) => {
 				e.preventDefault();
 				e.stopPropagation();
@@ -85,6 +87,6 @@
 			aria-label="Remove tab"
 		>
 			<X class="size-3" />
-		</button>
+		</Button>
 	{/if}
 </a>

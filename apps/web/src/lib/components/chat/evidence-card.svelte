@@ -5,7 +5,7 @@
 </script>
 
 <div class="flex flex-col gap-2" data-slot="evidence-card">
-	<p class="text-sm text-foreground">{message.content}</p>
+	<p class="text-body text-foreground">{message.content}</p>
 	{#if message.attachments?.length}
 		<div class="flex flex-wrap gap-1.5">
 			{#each message.attachments as att}

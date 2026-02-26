@@ -64,7 +64,7 @@
 				<Activity class="size-5" />
 			</div>
 			<div>
-				<h2 class="text-sm font-bold text-foreground">{m.komunitas_pulse_title()}</h2>
+				<h2 class="text-body font-bold text-foreground">{m.komunitas_pulse_title()}</h2>
 				<p class="text-caption text-muted-foreground">{m.komunitas_pulse_subtitle()}</p>
 			</div>
 		</div>
@@ -84,7 +84,7 @@
 							<Users class="size-3.5" />
 							<span class="text-caption">{m.pulse_stats_active()}</span>
 						</div>
-						<p class="mt-1 text-xl font-bold text-foreground">{stats.active_witness_count}</p>
+						<p class="mt-1 text-h2 font-bold text-foreground">{stats.active_witness_count}</p>
 						<p class="text-caption text-berhasil">+{stats.active_witness_delta} {m.common_this_week()}</p>
 					</motion.div>
 
@@ -98,7 +98,7 @@
 							<MessageCircle class="size-3.5" />
 							<span class="text-caption">{m.komunitas_messages_today()}</span>
 						</div>
-						<p class="mt-1 text-xl font-bold text-foreground">{stats.messages_today}</p>
+						<p class="mt-1 text-h2 font-bold text-foreground">{stats.messages_today}</p>
 						<p class="text-caption text-muted-foreground">{m.komunitas_conversations({ count: String(stats.conversations_today) })}</p>
 					</motion.div>
 
@@ -112,7 +112,7 @@
 							<TrendingUp class="size-3.5" />
 							<span class="text-caption">{m.komunitas_resolution_rate()}</span>
 						</div>
-						<p class="mt-1 text-xl font-bold text-foreground">{stats.resolution_rate}%</p>
+						<p class="mt-1 text-h2 font-bold text-foreground">{stats.resolution_rate}%</p>
 						<div class="mt-1.5 h-1.5 w-full rounded-full bg-muted/40">
 							<div
 								class="h-full rounded-full bg-berhasil transition-all duration-500"
@@ -131,7 +131,7 @@
 							<Heart class="size-3.5" />
 							<span class="text-caption">{m.komunitas_tandang_signals()}</span>
 						</div>
-						<p class="mt-1 text-xl font-bold text-foreground">{stats.tandang_signals_this_week}</p>
+						<p class="mt-1 text-h2 font-bold text-foreground">{stats.tandang_signals_this_week}</p>
 						<p class="text-caption text-muted-foreground">{m.common_this_week()}</p>
 					</motion.div>
 				</div>
@@ -145,7 +145,7 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.35, delay: 0.2 }}
 				>
-					<h3 class="text-xs font-semibold text-foreground">{m.komunitas_participation_title()}</h3>
+					<h3 class="text-small font-semibold text-foreground">{m.komunitas_participation_title()}</h3>
 					<!-- Mini bar chart — single bar per day, no inner div -->
 					<div class="mt-3 flex items-end gap-1.5" style="height: 80px;">
 						{#each participation as point, i}
@@ -157,7 +157,7 @@
 							/>
 						{/each}
 					</div>
-					<div class="mt-1.5 flex justify-between text-xs text-muted-foreground">
+					<div class="mt-1.5 flex justify-between text-small text-muted-foreground">
 						{#each participation as point}
 							<span>{point.day}</span>
 						{/each}
@@ -173,14 +173,14 @@
 					animate={{ opacity: 1 }}
 					transition={{ duration: 0.3, delay: 0.4 }}
 				>
-					<h3 class="text-xs font-semibold text-foreground">{m.komunitas_activity_title()}</h3>
+					<h3 class="text-small font-semibold text-foreground">{m.komunitas_activity_title()}</h3>
 					<div class="mt-2 space-y-2">
 						{#each activity as item}
 							<div class="flex items-start gap-2.5 rounded-lg bg-muted/10 px-3 py-2">
 								<div class="mt-0.5 size-2 shrink-0 rounded-full {activityColors[item.icon_type] ?? 'bg-primary/50'}"></div>
 								<div class="min-w-0 flex-1">
 									<p class="text-caption leading-relaxed text-foreground/80">{item.text}</p>
-									<p class="mt-0.5 text-xs text-muted-foreground">{item.time_label} {m.time_ago_suffix()}</p>
+									<p class="mt-0.5 text-small text-muted-foreground">{item.time_label} {m.time_ago_suffix()}</p>
 								</div>
 							</div>
 						{/each}
@@ -196,7 +196,7 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.35, delay: 0.5 }}
 				>
-					<h3 class="text-xs font-semibold text-foreground">{m.komunitas_signals_this_week()}</h3>
+					<h3 class="text-small font-semibold text-foreground">{m.komunitas_signals_this_week()}</h3>
 					<div class="mt-3 space-y-2">
 						{#each signalRows as signal}
 							<div class="flex items-center gap-2">

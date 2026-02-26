@@ -11,6 +11,6 @@
 <div class="flex flex-col gap-1" data-slot="galang-message">
 	<span class="text-foreground">{message.content}</span>
 	{#if message.amount != null}
-		<span class="text-sm font-medium text-foreground">{formatCurrency(message.amount, message.currency)}</span>
+		<span class="text-body font-medium text-foreground">{formatCurrency(message.amount, message.currency)}</span>
 	{/if}
 </div>

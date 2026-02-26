@@ -5,6 +5,7 @@
 	import type { DukungRecord } from '$lib/types';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		given: DukungRecord[];
@@ -46,7 +47,7 @@
 >
 	<div class="rounded-xl border border-border/30 bg-muted/10 p-4">
 		<div class="flex items-center justify-between">
-			<h3 class="text-xs font-semibold text-foreground">{m.profil_dukung_title()}</h3>
+			<h3 class="text-small font-semibold text-foreground">{m.profil_dukung_title()}</h3>
 			{#if successRate !== undefined && successRate !== null}
 				<span class="rounded-full bg-berhasil-lembut px-2 py-0.5 text-caption font-medium text-berhasil">
 					{m.profil_dukung_success_rate({ pct: String(Math.round(successRate * 100)) })}
@@ -77,12 +78,13 @@
 					{/each}
 				</div>
 				{#if given.length > SHOW_LIMIT}
-					<button
+					<Button
+	variant="ghost"
 						onclick={() => (showAllGiven = !showAllGiven)}
-						class="mt-2 text-caption text-muted-foreground hover:text-foreground transition-colors"
+						class="mt-2 h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 					>
 						{showAllGiven ? m.common_close() : m.common_more({ count: String(given.length - SHOW_LIMIT) })}
-					</button>
+					</Button>
 				{/if}
 			</div>
 		{/if}
@@ -110,12 +112,13 @@
 					{/each}
 				</div>
 				{#if received.length > SHOW_LIMIT}
-					<button
+					<Button
+	variant="ghost"
 						onclick={() => (showAllReceived = !showAllReceived)}
-						class="mt-2 text-caption text-muted-foreground hover:text-foreground transition-colors"
+						class="mt-2 h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 					>
 						{showAllReceived ? m.common_close() : m.common_more({ count: String(received.length - SHOW_LIMIT) })}
-					</button>
+					</Button>
 				{/if}
 			</div>
 		{/if}

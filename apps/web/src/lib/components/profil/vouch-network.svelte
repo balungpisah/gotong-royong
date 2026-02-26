@@ -3,6 +3,7 @@
 	import type { VouchRelation, VouchBudget, VouchType } from '$lib/types';
 	import { m } from '$lib/paraglide/messages';
 	import { TandangAvatar } from '$lib/components/ui/tandang-avatar';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		vouchedBy: VouchRelation[];
@@ -81,7 +82,7 @@
 	transition={{ duration: 0.35, delay: 0.2 }}
 >
 	<div class="rounded-xl border border-border/30 bg-muted/10 p-4 space-y-4">
-		<h3 class="text-xs font-semibold text-foreground">{m.profil_vouch_network()}</h3>
+		<h3 class="text-small font-semibold text-foreground">{m.profil_vouch_network()}</h3>
 
 		<!-- Vouch budget bar -->
 		<div class="space-y-1">
@@ -139,12 +140,13 @@
 				{/each}
 			</div>
 			{#if vouchedBy.length > SHOW_LIMIT}
-				<button
+				<Button
+	variant="ghost"
 					onclick={() => (showAllVouchedBy = !showAllVouchedBy)}
-					class="mt-2 text-caption text-muted-foreground hover:text-foreground transition-colors"
+					class="mt-2 h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 				>
 					{showAllVouchedBy ? m.common_collapse() : m.common_view_all({ count: String(vouchedBy.length) })}
-				</button>
+				</Button>
 			{/if}
 		</div>
 
@@ -189,12 +191,13 @@
 				{/each}
 			</div>
 			{#if vouchingFor.length > SHOW_LIMIT}
-				<button
+				<Button
+	variant="ghost"
 					onclick={() => (showAllVouchingFor = !showAllVouchingFor)}
-					class="mt-2 text-caption text-muted-foreground hover:text-foreground transition-colors"
+					class="mt-2 h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 				>
 					{showAllVouchingFor ? m.common_collapse() : m.common_view_all({ count: String(vouchingFor.length) })}
-				</button>
+				</Button>
 			{/if}
 		</div>
 	</div>

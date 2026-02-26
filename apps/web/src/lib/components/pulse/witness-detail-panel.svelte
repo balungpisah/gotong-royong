@@ -230,19 +230,19 @@
 					<!-- LEFT: identity — flex-col so initiator pins to bottom, aligned with last phase row -->
 					<div class="min-w-0 flex-1 flex flex-col gap-1">
 						<div class="flex items-start gap-1.5 pr-4">
-							<span class="mt-0.5 text-sm select-none opacity-60">
+							<span class="mt-0.5 text-body select-none opacity-60">
 								{eventEmojiMap[feedItem.latest_event.event_type] ?? '📌'}
 							</span>
 							<div class="min-w-0 flex-1">
 								{#if feedItem.hook_line}
-									<p class="text-sm font-bold leading-snug text-foreground line-clamp-2">
+									<p class="text-body font-bold leading-snug text-foreground line-clamp-2">
 										{feedItem.hook_line}
 									</p>
-									<p class="mt-0.5 text-xs leading-snug text-muted-foreground/70 line-clamp-1">
+									<p class="mt-0.5 text-small leading-snug text-muted-foreground/70 line-clamp-1">
 										{feedItem.title}
 									</p>
 								{:else}
-									<p class="text-sm font-bold leading-snug text-foreground line-clamp-2">
+									<p class="text-body font-bold leading-snug text-foreground line-clamp-2">
 										{feedItem.title}
 									</p>
 								{/if}
@@ -294,9 +294,9 @@
 						>
 							<span class="flex items-center gap-1.5">
 								<UsersIcon class="size-3 text-muted-foreground" />
-								<span class="text-xs font-semibold text-foreground">Ikhtisar</span>
+								<span class="text-small font-semibold text-foreground">Ikhtisar</span>
 							</span>
-							<span class="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+							<span class="flex items-center gap-1.5 text-small text-muted-foreground/60">
 								<span>👥 {memberCount}</span>
 								<span>💬 {detail.message_count}</span>
 								<ChevronDown
@@ -327,7 +327,7 @@
 										{:else}
 											<Circle class="size-3 text-muted-foreground/40" />
 										{/if}
-										<span class="truncate text-xs {i === currentPhaseIndex ? 'font-semibold text-foreground' : 'text-muted-foreground'}">
+										<span class="truncate text-small {i === currentPhaseIndex ? 'font-semibold text-foreground' : 'text-muted-foreground'}">
 											{phase.title}
 										</span>
 									</span>
@@ -346,7 +346,7 @@
 				<div class="min-w-0 flex-1">
 					<div class="flex items-center gap-2">
 						<StatusIndicator status={statusMap[detail.status] ?? 'active'} />
-						<h2 class="truncate text-sm font-semibold text-foreground">
+						<h2 class="truncate text-body font-semibold text-foreground">
 							{detail.title}
 						</h2>
 					</div>
@@ -373,8 +373,8 @@
 				{#if expandedItem === 'overview'}
 					<!-- Overview: aggregate stats -->
 					<div class="space-y-1.5">
-						<p class="drawer-title text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ikhtisar</p>
-						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+						<p class="drawer-title text-small font-semibold text-muted-foreground uppercase tracking-wide">Ikhtisar</p>
+						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-muted-foreground">
 							<span class="inline-flex items-center gap-1">
 								<UsersIcon class="size-3" />
 								{memberCount} anggota
@@ -400,7 +400,7 @@
 					{@const counts = checkpointCounts(phase)}
 					<div class="space-y-2">
 						<div class="drawer-title flex items-center justify-between">
-							<p class="text-xs font-semibold text-foreground">
+							<p class="text-small font-semibold text-foreground">
 								{phase.title}
 							</p>
 							<span class="text-caption tabular-nums text-muted-foreground">
@@ -412,7 +412,7 @@
 						{/if}
 						<ul class="space-y-1">
 							{#each phase.checkpoints as cp (cp.checkpoint_id)}
-								<li class="flex items-start gap-1.5 text-xs">
+								<li class="flex items-start gap-1.5 text-small">
 									{#if cp.status === 'completed'}
 										<Check class="mt-0.5 size-3 shrink-0 text-berhasil" />
 										<span class="text-muted-foreground line-through">{cp.title}</span>

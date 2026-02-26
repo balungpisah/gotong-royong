@@ -18,7 +18,7 @@
 <div class="mx-auto w-full max-w-3xl space-y-4">
 	<a
 		href="/komunitas/kelompok"
-		class="text-xs font-semibold text-primary hover:underline"
+		class="text-small font-semibold text-primary hover:underline"
 	>
 		{m.group_back_to_list()}
 	</a>

@@ -2,6 +2,7 @@
 	import type { Phase } from '$lib/types';
 	import { cn } from '$lib/utils';
 	import { Tooltip, TooltipContent, TooltipTrigger } from '$lib/components/ui/tooltip';
+	import { Button } from '$lib/components/ui/button';
 
 	let { phases, onphaseselect }: { phases: Phase[]; onphaseselect?: (phaseId: string) => void } = $props();
 
@@ -34,9 +35,10 @@
 		<!-- Phase dot -->
 		<Tooltip>
 			<TooltipTrigger>
-				<button
+				<Button
+					variant="ghost"
 					class={cn(
-						'flex flex-col items-center gap-1.5',
+						'flex h-auto flex-col items-center gap-1.5 p-1',
 						onphaseselect && 'cursor-pointer'
 					)}
 					onclick={() => onphaseselect?.(phase.phase_id)}
@@ -50,17 +52,17 @@
 						)}
 					></div>
 					<span class={cn(
-						'max-w-[60px] truncate text-xs font-medium',
+						'max-w-[60px] truncate text-small font-medium',
 						phase.status === 'active' ? 'text-api' : phase.status === 'completed' ? 'text-berhasil' : 'text-muted-foreground'
 					)}>
 						{phase.title}
 					</span>
-				</button>
+				</Button>
 			</TooltipTrigger>
 			<TooltipContent>
 				<p class="font-semibold">{phase.title}</p>
-				<p class="text-xs opacity-80">{phase.objective}</p>
-				<p class="mt-1 text-xs capitalize">{phase.status} · {phase.checkpoints.length} titik periksa</p>
+				<p class="text-small opacity-80">{phase.objective}</p>
+				<p class="mt-1 text-small capitalize">{phase.status} · {phase.checkpoints.length} titik periksa</p>
 			</TooltipContent>
 		</Tooltip>
 	{/each}
