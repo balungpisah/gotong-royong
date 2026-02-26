@@ -26,7 +26,9 @@
 	};
 
 	const Icon = $derived(subtypeIcons[message.subtype] || ArrowRight);
-	const timeStr = $derived(new Date(message.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
+	const timeStr = $derived(
+		new Date(message.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+	);
 
 	// ---------------------------------------------------------------------------
 	// CD2: Celebration moments — special styling for milestone events
@@ -36,9 +38,7 @@
 		message.subtype === 'phase_completed' || message.subtype === 'checkpoint_completed'
 	);
 
-	const isWelcome = $derived(
-		message.subtype === 'member_joined'
-	);
+	const isWelcome = $derived(message.subtype === 'member_joined');
 
 	const pillClass = $derived.by(() => {
 		if (isCelebration) {

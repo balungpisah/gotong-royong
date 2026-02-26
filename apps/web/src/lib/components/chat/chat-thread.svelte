@@ -43,7 +43,11 @@
 				return 'phase';
 			case 'system': {
 				const sub = (message as SystemMessage).subtype;
-				if (sub === 'phase_completed' || sub === 'checkpoint_completed' || sub === 'phase_activated')
+				if (
+					sub === 'phase_completed' ||
+					sub === 'checkpoint_completed' ||
+					sub === 'phase_activated'
+				)
 					return 'phase';
 				return 'minor';
 			}
@@ -72,35 +76,61 @@
 			>
 				<div class="relative z-10 size-2 shrink-0 rounded-full bg-primary/40"></div>
 				<MessageCircle class="size-3 shrink-0 text-primary/50" />
-				<span class="min-w-0 flex-1 truncate text-small italic text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
+				<span
+					class="min-w-0 flex-1 truncate text-small italic text-muted-foreground/70 group-hover:text-muted-foreground transition-colors"
+				>
 					Ruang Interaksi
 				</span>
 				<ChevronDown
-					class="size-3 shrink-0 text-muted-foreground/40 transition-transform duration-150 {onboardingExpanded ? 'rotate-180' : ''}"
+					class="size-3 shrink-0 text-muted-foreground/40 transition-transform duration-150 {onboardingExpanded
+						? 'rotate-180'
+						: ''}"
 				/>
 			</button>
 
 			{#if onboardingExpanded}
 				<div class="pl-5 pt-1" transition:slide={{ duration: 150 }}>
-					<div class="space-y-2.5 rounded-lg border border-border/40 bg-card/60 px-3 py-2.5 text-small leading-relaxed text-muted-foreground">
+					<div
+						class="space-y-2.5 rounded-lg border border-border/40 bg-card/60 px-3 py-2.5 text-small leading-relaxed text-muted-foreground"
+					>
 						<p class="font-medium text-foreground/70">👋 Selamat datang di ruang diskusi!</p>
-						<p>Ini tempat kamu dan anggota lain berdiskusi, berbagi informasi, dan bekerja sama menuntaskan saksi ini tahap demi tahap.</p>
+						<p>
+							Ini tempat kamu dan anggota lain berdiskusi, berbagi informasi, dan bekerja sama
+							menuntaskan saksi ini tahap demi tahap.
+						</p>
 
 						<div class="space-y-1 rounded-md bg-primary/5 px-2.5 py-2">
 							<p class="font-medium text-foreground/70">✦ Evaluasi fase</p>
-							<p>Status fase diperbarui berdasarkan event backend yang masuk ke ruang interaksi ini.</p>
-							<p>Tombol evaluasi manual akan ditampilkan kembali setelah kontrak backend Stempel tersedia.</p>
+							<p>
+								Status fase diperbarui berdasarkan event backend yang masuk ke ruang interaksi ini.
+							</p>
+							<p>
+								Tombol evaluasi manual akan ditampilkan kembali setelah kontrak backend Stempel
+								tersedia.
+							</p>
 						</div>
 
 						<div class="space-y-1">
 							<p class="font-medium text-foreground/60">Cara membaca timeline:</p>
 							<ul class="space-y-0.5 pl-3">
-								<li><span class="text-muted-foreground/50">●</span> <strong>Titik di kiri</strong> — kartu aktivitas (saran AI, bukti, voting, dana). Ketuk untuk buka/tutup detail.</li>
-								<li><span class="text-muted-foreground/50">—</span> <strong>Garis di tengah</strong> — penanda fase (fase dimulai, selesai, hasil voting). Pembatas antar tahap.</li>
+								<li>
+									<span class="text-muted-foreground/50">●</span> <strong>Titik di kiri</strong> — kartu
+									aktivitas (saran AI, bukti, voting, dana). Ketuk untuk buka/tutup detail.
+								</li>
+								<li>
+									<span class="text-muted-foreground/50">—</span> <strong>Garis di tengah</strong> — penanda
+									fase (fase dimulai, selesai, hasil voting). Pembatas antar tahap.
+								</li>
 							</ul>
 						</div>
-						<p>Lihat daftar fase di panel atas — ketuk untuk lihat langkah yang perlu diselesaikan bersama di setiap fase.</p>
-						<p class="text-muted-foreground/50">Kartu ini akan otomatis tertutup saat aktivitas dimulai. Ketuk "Ruang Interaksi" untuk buka lagi.</p>
+						<p>
+							Lihat daftar fase di panel atas — ketuk untuk lihat langkah yang perlu diselesaikan
+							bersama di setiap fase.
+						</p>
+						<p class="text-muted-foreground/50">
+							Kartu ini akan otomatis tertutup saat aktivitas dimulai. Ketuk "Ruang Interaksi" untuk
+							buka lagi.
+						</p>
 					</div>
 				</div>
 			{/if}
@@ -113,7 +143,11 @@
 						<ChatBubble {message} />
 					</div>
 				{:else}
-					<CardEnvelope {message} defaultExpanded={i === lastCardIndex} dotVariant={getDotVariant(message)} />
+					<CardEnvelope
+						{message}
+						defaultExpanded={i === lastCardIndex}
+						dotVariant={getDotVariant(message)}
+					/>
 				{/if}
 			</div>
 		{/each}

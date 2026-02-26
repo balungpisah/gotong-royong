@@ -8,9 +8,14 @@
 	<p class="text-body text-foreground">{message.content}</p>
 	{#if message.attachments?.length}
 		<div class="flex flex-wrap gap-1.5">
-			{#each message.attachments as att}
+			{#each message.attachments as att, attIdx (attIdx)}
 				{#if att.type === 'image' || att.type === 'receipt'}
-					<img src={att.url} alt={att.alt || ''} class="h-16 w-auto rounded border border-border object-cover" loading="lazy" />
+					<img
+						src={att.url}
+						alt={att.alt || ''}
+						class="h-16 w-auto rounded border border-border object-cover"
+						loading="lazy"
+					/>
 				{/if}
 			{/each}
 		</div>

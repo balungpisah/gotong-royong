@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { safeSlide as slide } from '$lib/utils/safe-slide';
 	import type {
-		ChatMessage,
 		AiCardMessage,
 		DiffCardMessage,
 		VoteCardMessage,
@@ -28,10 +27,15 @@
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import Shield from '@lucide/svelte/icons/shield';
 	import FileText from '@lucide/svelte/icons/file-text';
-	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import type { Component } from 'svelte';
 
-	type CardMessage = AiCardMessage | DiffCardMessage | VoteCardMessage | EvidenceMessage | GalangMessage | SystemMessage;
+	type CardMessage =
+		| AiCardMessage
+		| DiffCardMessage
+		| VoteCardMessage
+		| EvidenceMessage
+		| GalangMessage
+		| SystemMessage;
 
 	interface Props {
 		message: CardMessage;
@@ -42,12 +46,7 @@
 
 	let { message, defaultExpanded = false, dotVariant = 'minor' }: Props = $props();
 
-	let expanded = $state(false);
-
-	// Sync initial value from prop (avoids state_referenced_locally warning)
-	$effect(() => {
-		expanded = defaultExpanded;
-	});
+	let expanded = $derived.by(() => defaultExpanded);
 
 	function toggle() {
 		expanded = !expanded;
@@ -114,9 +113,7 @@
 		switch (message.type) {
 			case 'ai_card': {
 				const msg = message as AiCardMessage;
-				const title = msg.badge
-					? (badgeLabels[msg.badge] ?? msg.badge)
-					: msg.title ?? 'AI';
+				const title = msg.badge ? (badgeLabels[msg.badge] ?? msg.badge) : (msg.title ?? 'AI');
 				const blockCount = msg.blocks.length;
 				const metric = blockCount > 1 ? `${blockCount} ${m.chat_card_blocks()}` : '';
 				return { icon: Bot, title, metric, actionLabel: '', actionVariant: 'secondary' };
@@ -161,7 +158,13 @@
 				const typeLabel = evidenceTypeLabels[msg.evidence_type] ?? msg.evidence_type;
 				const attachCount = msg.attachments?.length ?? 0;
 				const metric = attachCount > 0 ? `${typeLabel} · ${attachCount} lampiran` : typeLabel;
-				return { icon: FileCheck, title: msg.author.name, metric, actionLabel: '', actionVariant: 'secondary' };
+				return {
+					icon: FileCheck,
+					title: msg.author.name,
+					metric,
+					actionLabel: '',
+					actionVariant: 'secondary'
+				};
 			}
 			case 'galang': {
 				const msg = message as GalangMessage;
@@ -179,13 +182,24 @@
 					title: msg.content,
 					metric: amount,
 					actionLabel: subtypeLabel,
-					actionVariant: msg.subtype === 'contribution' ? 'success' : msg.subtype === 'disbursement' ? 'warning' : 'info'
+					actionVariant:
+						msg.subtype === 'contribution'
+							? 'success'
+							: msg.subtype === 'disbursement'
+								? 'warning'
+								: 'info'
 				};
 			}
 			case 'system': {
 				const msg = message as SystemMessage;
 				const icon = subtypeIcons[msg.subtype] || ArrowRight;
-				return { icon, title: msg.content, metric: '', actionLabel: '', actionVariant: 'secondary' };
+				return {
+					icon,
+					title: msg.content,
+					metric: '',
+					actionLabel: '',
+					actionVariant: 'secondary'
+				};
 			}
 			default:
 				return { icon: Bot, title: '', metric: '', actionLabel: '', actionVariant: 'secondary' };
@@ -202,10 +216,8 @@
 			// System messages get their own color logic
 			if (message.type === 'system') {
 				const sub = (message as SystemMessage).subtype;
-				if (sub === 'phase_completed' || sub === 'checkpoint_completed')
-					return 'bg-berhasil';
-				if (sub === 'phase_activated')
-					return 'bg-primary/60';
+				if (sub === 'phase_completed' || sub === 'checkpoint_completed') return 'bg-berhasil';
+				if (sub === 'phase_activated') return 'bg-primary/60';
 				return 'bg-muted-foreground/40';
 			}
 			// Filled dot — color reflects state of the block
@@ -235,7 +247,9 @@
 		<!-- Timeline dot — sits on top of the vertical line behind it -->
 		<div class="relative z-10 size-2 shrink-0 rounded-full bg-background {dotClass}"></div>
 		<Icon class="size-3 shrink-0 text-muted-foreground/50" />
-		<span class="min-w-0 flex-1 truncate text-small italic text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
+		<span
+			class="min-w-0 flex-1 truncate text-small italic text-muted-foreground/70 group-hover:text-muted-foreground transition-colors"
+		>
 			{config.title}
 		</span>
 		{#if config.metric}
@@ -257,7 +271,9 @@
 	<!-- Expanded content — unified Ruang Interaksi style wrapper -->
 	{#if expanded}
 		<div class="pl-5 pt-1" transition:slide={{ duration: 150 }}>
-			<div class="space-y-2.5 rounded-lg border border-border/40 bg-card/60 px-3 py-2.5 text-small leading-relaxed text-muted-foreground">
+			<div
+				class="space-y-2.5 rounded-lg border border-border/40 bg-card/60 px-3 py-2.5 text-small leading-relaxed text-muted-foreground"
+			>
 				{#if message.type === 'system'}
 					<p>{(message as SystemMessage).content}</p>
 				{:else if message.type === 'ai_card'}
