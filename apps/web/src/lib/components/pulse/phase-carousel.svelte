@@ -100,7 +100,8 @@
 			{#each phases as phase, i (phase.phase_id)}
 				<button
 					onclick={() => (activeIndex = i)}
-					class="group flex items-center gap-1 rounded-full px-1.5 py-0.5 transition {i === activeIndex
+					class="group flex items-center gap-1 rounded-full px-1.5 py-0.5 transition {i ===
+					activeIndex
 						? 'bg-primary/10'
 						: 'hover:bg-muted/60'}"
 					aria-label="Fase {i + 1}: {phase.title}"

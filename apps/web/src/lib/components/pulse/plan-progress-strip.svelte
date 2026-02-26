@@ -15,8 +15,7 @@
 
 	const completedCheckpoints = $derived(
 		phases.reduce(
-			(sum, phase) =>
-				sum + phase.checkpoints.filter((cp) => cp.status === 'completed').length,
+			(sum, phase) => sum + phase.checkpoints.filter((cp) => cp.status === 'completed').length,
 			0
 		)
 	);
@@ -67,7 +66,9 @@
 					class="flex flex-col items-center gap-0.5 focus:outline-none"
 					onclick={() => handleDotClick(index)}
 				>
-					<div class="h-2.5 w-2.5 rounded-full transition-all duration-200 {getDotClass(phase, index)}"></div>
+					<div
+						class="h-2.5 w-2.5 rounded-full transition-all duration-200 {getDotClass(phase, index)}"
+					></div>
 					<span class="text-muted-foreground max-w-[8ch] truncate text-[10px] leading-tight">
 						{phase.title}
 					</span>

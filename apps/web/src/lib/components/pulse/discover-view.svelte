@@ -11,6 +11,20 @@
 	const feedStore = getFeedStore();
 	const groupStore = getGroupStore();
 
+	type MasonryEntityGroupItem = {
+		id: EntityType;
+		entityType: EntityType;
+		entities: FollowableEntity[];
+	};
+
+	type MasonryPlaceholderItem = {
+		id: string;
+		emoji: string;
+		label: () => string;
+	};
+
+	type MasonryItem = MasonryEntityGroupItem | MasonryPlaceholderItem;
+
 	const iconMap: Record<EntityType, string> = {
 		lingkungan: '📍',
 		topik: '🏷️',
@@ -28,7 +42,7 @@
 	} as Record<EntityType, string>);
 
 	/** Group entities by type. */
-	const groupedEntities = $derived(() => {
+	const groupedEntities = $derived.by(() => {
 		const groups = new Map<EntityType, FollowableEntity[]>();
 		for (const entity of feedStore.suggestedEntities) {
 			const list = groups.get(entity.entity_type) ?? [];
@@ -39,8 +53,8 @@
 	});
 
 	/** Flattened array for Masonry keying. */
-	const masonryItems = $derived(
-		[...groupedEntities()].map(([entityType, entities]) => ({
+	const masonryItems = $derived.by<MasonryEntityGroupItem[]>(() =>
+		[...groupedEntities].map(([entityType, entities]) => ({
 			id: entityType,
 			entityType,
 			entities
@@ -48,10 +62,14 @@
 	);
 
 	/** Placeholder cards for the masonry grid. */
-	const placeholderItems = [
+	const placeholderItems: MasonryPlaceholderItem[] = [
 		{ id: 'trending', emoji: '🔥', label: () => m.pulse_discover_trending() },
 		{ id: 'nearby', emoji: '📍', label: () => m.pulse_discover_nearby() }
 	];
+
+	function isEntityGroupItem(item: MasonryItem): item is MasonryEntityGroupItem {
+		return 'entityType' in item;
+	}
 
 	function followAllInGroup(entities: FollowableEntity[]) {
 		for (const e of entities) {
@@ -59,6 +77,11 @@
 				feedStore.toggleFollow(e.entity_id);
 			}
 		}
+	}
+
+	function navigateToGroup(groupId: string) {
+		// Navigation to group detail page
+		goto(`/komunitas/kelompok/${groupId}`);
 	}
 
 	$effect(() => {
@@ -73,9 +96,7 @@
 <div class="flex flex-col gap-6">
 	<!-- Discover header -->
 	<div class="flex items-center gap-3">
-		<div
-			class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"
-		>
+		<div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
 			<Compass class="size-5" />
 		</div>
 		<div>
@@ -101,27 +122,28 @@
 	{:else}
 		<!-- Masonry entity groups -->
 		<Masonry
-			items={[...masonryItems, ...placeholderItems]}
-			getId={(item) => item.id}
+			items={[...masonryItems, ...placeholderItems] as MasonryItem[]}
+			getId={(item: MasonryItem) => item.id}
 			minColWidth={260}
 			maxColWidth={340}
 			gap={16}
 			animate={true}
 		>
 			{#snippet children({ item })}
-				{#if 'entityType' in item}
+				{@const typedItem = item as MasonryItem}
+				{#if isEntityGroupItem(typedItem)}
 					<Card.Root padding="compact">
 						<!-- Group header -->
 						<div class="flex items-center justify-between gap-2">
 							<h3 class="flex items-center gap-1.5 text-body font-semibold text-foreground">
-								<span>{iconMap[item.entityType]}</span>
-								<span>{labelMap[item.entityType]}</span>
+								<span>{iconMap[typedItem.entityType]}</span>
+								<span>{labelMap[typedItem.entityType]}</span>
 							</h3>
-							{#if item.entities.some((e) => !e.followed)}
+							{#if typedItem.entities.some((entity) => !entity.followed)}
 								<Button
 									variant="link"
 									class="h-auto p-0"
-									onclick={() => followAllInGroup(item.entities)}
+									onclick={() => followAllInGroup(typedItem.entities)}
 								>
 									{m.pulse_discover_follow_all_group()}
 								</Button>
@@ -130,7 +152,7 @@
 
 						<!-- Entity list -->
 						<div class="mt-3 space-y-2.5">
-							{#each item.entities as entity (entity.entity_id)}
+							{#each typedItem.entities as entity (entity.entity_id)}
 								<div class="flex items-center justify-between gap-3">
 									<div class="min-w-0 flex-1">
 										<p class="truncate text-body font-medium text-foreground">
@@ -142,7 +164,9 @@
 											</p>
 										{/if}
 										<p class="text-small text-muted-foreground/70">
-											{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {m.discover_followers({ count: String(entity.follower_count) })}
+											{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {m.discover_followers(
+												{ count: String(entity.follower_count) }
+											)}
 										</p>
 									</div>
 
@@ -152,7 +176,9 @@
 										class={entity.followed ? 'bg-primary/10 text-primary' : ''}
 										onclick={() => feedStore.toggleFollow(entity.entity_id)}
 									>
-										{entity.followed ? m.pulse_feed_entity_following() : m.pulse_feed_entity_follow()}
+										{entity.followed
+											? m.pulse_feed_entity_following()
+											: m.pulse_feed_entity_follow()}
 									</Button>
 								</div>
 							{/each}
@@ -160,9 +186,12 @@
 					</Card.Root>
 				{:else}
 					<!-- Placeholder cards (trending, nearby) -->
-					<section class="rounded-xl border border-dashed border-border/40 bg-muted/10 p-4 text-center">
+					<section
+						class="rounded-xl border border-dashed border-border/40 bg-muted/10 p-4 text-center"
+					>
 						<p class="text-small text-muted-foreground/60">
-							{item.emoji} {item.label()} — {m.common_coming_soon()}
+							{typedItem.emoji}
+							{typedItem.label()} — {m.common_coming_soon()}
 						</p>
 					</section>
 				{/if}
@@ -175,7 +204,9 @@
 		<div class="flex items-center justify-between gap-3">
 			<div>
 				<h3 class="text-body font-bold text-foreground">{m.group_discover_section_title()}</h3>
-				<p class="mt-0.5 text-small text-muted-foreground/80">{m.group_discover_section_subtitle()}</p>
+				<p class="mt-0.5 text-small text-muted-foreground/80">
+					{m.group_discover_section_subtitle()}
+				</p>
 			</div>
 			<a href="/komunitas/kelompok" class="text-small font-semibold text-primary hover:underline">
 				{m.common_view_all({ count: previewGroups.length })}
@@ -190,7 +221,7 @@
 					<GroupCard
 						{group}
 						onJoin={(groupId) => groupStore.joinGroup(groupId)}
-						onRequestJoin={(groupId) => goto(`/komunitas/kelompok/${groupId}`)}
+						onRequestJoin={navigateToGroup}
 					/>
 				{/each}
 			</div>

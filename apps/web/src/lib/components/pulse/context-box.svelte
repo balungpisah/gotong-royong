@@ -6,7 +6,11 @@
 	 *  The box keeps its full flex:1 width throughout. */
 	function slideFade(
 		_node: Element,
-		{ duration = 300, easing = cubicOut, x = 60 }: { duration?: number; easing?: (t: number) => number; x?: number } = {}
+		{
+			duration = 300,
+			easing = cubicOut,
+			x = 60
+		}: { duration?: number; easing?: (t: number) => number; x?: number } = {}
 	) {
 		return {
 			duration,
@@ -68,7 +72,7 @@
 		onStempel,
 		stempeling = false,
 		active = false,
-		selectedUserId = null,
+		selectedUserId = null
 	}: Props = $props();
 
 	// ---------------------------------------------------------------------------
@@ -95,10 +99,7 @@
 	);
 
 	/** Raised shadow matching the selected card's glow */
-	const panelShadow = $derived(
-		moodColor ? moodShadow(moodColor) : undefined
-	);
-
+	const panelShadow = $derived(moodColor ? moodShadow(moodColor) : undefined);
 
 	// ---------------------------------------------------------------------------
 	// Rolling sentence tab system
@@ -115,24 +116,68 @@
 	 */
 	const slot1Words = [
 		// -- readiness --
-		'berani', 'siap', 'mampu', 'mau', 'bisa',
+		'berani',
+		'siap',
+		'mampu',
+		'mau',
+		'bisa',
 		// -- emotion --
-		'ikhlas', 'bangga', 'semangat', 'rela', 'senang',
+		'ikhlas',
+		'bangga',
+		'semangat',
+		'rela',
+		'senang',
 		// -- determination --
-		'nekad', 'mantap', 'yakin', 'teguh', 'bulat',
+		'nekad',
+		'mantap',
+		'yakin',
+		'teguh',
+		'bulat',
 		// -- gen Z energy 🔥 --
-		'gas', 'hajar', 'gaskeun', 'gaspol', 'hayuk',
-		'cusss', 'otw', 'lesgo', 'santuy', 'sabi',
-		'gercep', 'auto', 'fix', 'pasti', 'langsung',
+		'gas',
+		'hajar',
+		'gaskeun',
+		'gaspol',
+		'hayuk',
+		'cusss',
+		'otw',
+		'lesgo',
+		'santuy',
+		'sabi',
+		'gercep',
+		'auto',
+		'fix',
+		'pasti',
+		'langsung',
 		// -- wholesome gaul --
-		'ayo', 'yuk', 'mari', 'kuy', 'joss',
-		'asik', 'sip', 'oke', 'done', 'bet',
+		'ayo',
+		'yuk',
+		'mari',
+		'kuy',
+		'joss',
+		'asik',
+		'sip',
+		'oke',
+		'done',
+		'bet',
 		// -- humble / gentle --
-		'coba', 'ikut', 'turut', 'ingin', 'niat',
+		'coba',
+		'ikut',
+		'turut',
+		'ingin',
+		'niat',
 		// -- pride / duty --
-		'wajib', 'harus', 'perlu', 'kudu', 'musti',
+		'wajib',
+		'harus',
+		'perlu',
+		'kudu',
+		'musti',
 		// -- communal spirit --
-		'kompak', 'bareng', 'gotong', 'solid', 'satu',
+		'kompak',
+		'bareng',
+		'gotong',
+		'solid',
+		'satu'
 	] as const;
 
 	/** Slot 2 connectors — "TANDANG ___ KOMUNITAS" (relation to community)
@@ -141,19 +186,35 @@
 	 */
 	const slot2Words = [
 		// -- directional --
-		'di', 'ke', 'dari',
+		'di',
+		'ke',
+		'dari',
 		// -- purposive --
-		'untuk', 'demi', 'bagi', 'guna',
+		'untuk',
+		'demi',
+		'bagi',
+		'guna',
 		// -- togetherness --
-		'bersama', 'bareng', 'sama',
+		'bersama',
+		'bareng',
+		'sama',
 		// -- relational --
-		'dalam', 'lewat', 'via', 'melalui',
+		'dalam',
+		'lewat',
+		'via',
+		'melalui',
 		// -- belonging --
-		'milik', 'punya', 'oleh',
+		'milik',
+		'punya',
+		'oleh',
 		// -- benefactive --
-		'buat', 'dukung', 'bantu',
+		'buat',
+		'dukung',
+		'bantu',
 		// -- gaul connectors --
-		'ala', 'rame', 'satu',
+		'ala',
+		'rame',
+		'satu'
 	] as const;
 
 	/** Pick a random index, avoiding the current one */
@@ -233,7 +294,7 @@
 	const tabMeta: Record<ContextTab, { icon: typeof ClipboardList; tip: string }> = {
 		project: { icon: ClipboardList, tip: 'Tandang — lihat detail inisiatif' },
 		self: { icon: User, tip: 'Aku — profil dan reputasi' },
-		community: { icon: BarChart3, tip: 'Komunitas — pulse dan statistik' },
+		community: { icon: BarChart3, tip: 'Komunitas — pulse dan statistik' }
 	};
 
 	// ---------------------------------------------------------------------------
@@ -274,7 +335,9 @@
 	<div
 		class="context-box hidden lg:flex flex-col
 			rounded-xl bg-card
-			{moodColor && activeTab === 'project' ? 'border border-foreground/90' : 'border border-border/20 shadow-sm'}"
+			{moodColor && activeTab === 'project'
+			? 'border border-foreground/90'
+			: 'border border-border/20 shadow-sm'}"
 		style:box-shadow={panelShadow}
 		in:slideFade={{ duration: 300, easing: cubicOut, x: 60 }}
 		out:slideFade={{ duration: 200, easing: cubicIn, x: 60 }}
@@ -347,11 +410,7 @@
 
 			<!-- Close button -->
 			<Tip text="Tutup panel">
-				<button
-					class="sentence-close"
-					onclick={onClose}
-					aria-label="Tutup panel"
-				>
+				<button class="sentence-close" onclick={onClose} aria-label="Tutup panel">
 					<X class="size-3.5" />
 				</button>
 			</Tip>
@@ -370,7 +429,7 @@
 						<WitnessDetailPanel
 							detail={witnessDetail}
 							{feedItem}
-							onSendMessage={onSendMessage}
+							{onSendMessage}
 							{onStempel}
 							sending={messageSending}
 							{stempeling}
@@ -378,14 +437,18 @@
 					{:else if detailLoading}
 						<div class="flex h-full items-center justify-center">
 							<div class="flex flex-col items-center gap-3 text-muted-foreground">
-								<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
+								<div
+									class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"
+								></div>
 								<p class="text-small">{m.pulse_loading_detail()}</p>
 							</div>
 						</div>
 					{:else}
 						<!-- Empty state: no tandang selected -->
 						<div class="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-							<div class="flex size-12 items-center justify-center rounded-xl bg-muted/30 text-muted-foreground">
+							<div
+								class="flex size-12 items-center justify-center rounded-xl bg-muted/30 text-muted-foreground"
+							>
 								<ClipboardList class="size-6" />
 							</div>
 							<p class="text-small text-muted-foreground">
@@ -427,7 +490,9 @@
 		flex: 1;
 		height: calc(100vh - 5.5rem);
 		overflow: hidden;
-		transition: box-shadow 300ms ease, border-color 300ms ease;
+		transition:
+			box-shadow 300ms ease,
+			border-color 300ms ease;
 	}
 
 	/* ── Sentence bar: grid anchors AKU / TANDANG / KOMUNITAS ── */
@@ -458,7 +523,9 @@
 		color: var(--color-muted-foreground);
 		cursor: pointer;
 		white-space: nowrap;
-		transition: color 150ms ease, background-color 150ms ease;
+		transition:
+			color 150ms ease,
+			background-color 150ms ease;
 	}
 
 	.sentence-tab:hover {
@@ -480,7 +547,9 @@
 		border-radius: var(--r-sm);
 		color: var(--color-muted-foreground);
 		cursor: pointer;
-		transition: background-color 150ms ease, color 150ms ease;
+		transition:
+			background-color 150ms ease,
+			color 150ms ease;
 		margin-left: 0.25rem;
 	}
 

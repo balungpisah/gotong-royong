@@ -68,8 +68,7 @@
 
 	const completedCheckpoints = $derived(
 		phases.reduce(
-			(sum, phase) =>
-				sum + phase.checkpoints.filter((cp) => cp.status === 'completed').length,
+			(sum, phase) => sum + phase.checkpoints.filter((cp) => cp.status === 'completed').length,
 			0
 		)
 	);
@@ -102,9 +101,7 @@
 	// ---------------------------------------------------------------------------
 
 	/** Story chapter label — "Bab 1 dari 3" */
-	const chapterLabel = $derived(
-		`Bab ${focusedIndex + 1} dari ${phases.length}`
-	);
+	const chapterLabel = $derived(`Bab ${focusedIndex + 1} dari ${phases.length}`);
 
 	/** Narrative status line — gives emotional weight to the current phase state */
 	const narrativeStatus = $derived.by(() => {
@@ -245,19 +242,6 @@
 		}
 	}
 
-	function getDotClass(phase: Phase, index: number): string {
-		if (index === focusedIndex) {
-			return 'bg-primary ring-2 ring-primary/30 scale-125';
-		}
-		if (phase.status === 'completed') {
-			return 'bg-berhasil';
-		}
-		if (phase.status === 'blocked') {
-			return 'bg-bahaya';
-		}
-		return 'bg-muted-foreground/30';
-	}
-
 	/** Phase dot label for story dots — shows chapter number or check mark */
 	function getDotContent(phase: Phase, index: number): string {
 		if (phase.status === 'completed') return '✓';
@@ -281,7 +265,8 @@
 				<span class="shrink-0 text-small text-muted-foreground">{handlebarMeta}</span>
 			{/if}
 			<Badge variant={handlebarBadgeVariant} class="shrink-0 text-[10px]">
-				{m.pulse_nav_phase({ num: focusedIndex + 1 })} {m.pulse_nav_of_total({ total: phases.length })}
+				{m.pulse_nav_phase({ num: focusedIndex + 1 })}
+				{m.pulse_nav_of_total({ total: phases.length })}
 			</Badge>
 			<ChevronDown
 				class="size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 {expanded
@@ -377,7 +362,11 @@
 
 									<!-- Objective -->
 									{#if focusedPhase.objective}
-										<p class="mb-2 text-small italic text-muted-foreground {isFuturePhase ? 'blur-[2px] select-none' : ''}">
+										<p
+											class="mb-2 text-small italic text-muted-foreground {isFuturePhase
+												? 'blur-[2px] select-none'
+												: ''}"
+										>
 											{focusedPhase.objective}
 										</p>
 									{/if}
@@ -387,7 +376,10 @@
 										<div class="mb-2 flex items-center gap-2">
 											<div class="relative h-1 flex-1 overflow-hidden rounded-full bg-muted">
 												<div
-													class="h-full rounded-full transition-all duration-300 {focusedPhase.status === 'completed' ? 'bg-berhasil' : 'bg-primary'}"
+													class="h-full rounded-full transition-all duration-300 {focusedPhase.status ===
+													'completed'
+														? 'bg-berhasil'
+														: 'bg-primary'}"
 													style="width: {focusedPercent}%"
 												></div>
 											</div>
@@ -431,7 +423,10 @@
 														{/if}
 													</div>
 													<!-- CD4: Source ownership tag -->
-													<span class="mt-0.5 inline-flex shrink-0 items-center gap-0.5 text-[10px] text-muted-foreground/50" title={getSourceLabel(cp.source)}>
+													<span
+														class="mt-0.5 inline-flex shrink-0 items-center gap-0.5 text-[10px] text-muted-foreground/50"
+														title={getSourceLabel(cp.source)}
+													>
 														<SourceIcon class="size-2.5" />
 													</span>
 													{#if cp.evidence_required && cp.status !== 'completed'}
@@ -471,15 +466,16 @@
 								type="button"
 								class="flex items-center justify-center focus:outline-none"
 								onclick={() => {
-								if (index !== focusedIndex) {
-									direction = index > focusedIndex ? 1 : -1;
-									focusedIndex = index;
-								}
-							}}
+									if (index !== focusedIndex) {
+										direction = index > focusedIndex ? 1 : -1;
+										focusedIndex = index;
+									}
+								}}
 								aria-label={phase.title}
 							>
 								<div
-									class="flex size-5 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-200 {index === focusedIndex
+									class="flex size-5 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-200 {index ===
+									focusedIndex
 										? 'bg-primary text-primary-foreground ring-2 ring-primary/30 scale-110'
 										: phase.status === 'completed'
 											? 'bg-berhasil/20 text-berhasil'

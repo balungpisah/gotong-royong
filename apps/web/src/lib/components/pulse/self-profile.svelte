@@ -32,15 +32,6 @@
 
 	const profile = $derived(userStore.profile);
 
-	const initials = $derived(
-		profile?.name
-			.split(' ')
-			.map((w) => w[0])
-			.join('')
-			.slice(0, 2)
-			.toUpperCase() ?? '??'
-	);
-
 	const joinedYear = $derived(
 		profile?.joined_at ? new Date(profile.joined_at).getFullYear().toString() : '—'
 	);
@@ -85,10 +76,30 @@
 	const tandangRows = $derived(
 		tandang
 			? [
-					{ label: m.signal_vouch(), received: tandang.vouch, icon: HandHeart, color: 'text-signal-vouch bg-signal-vouch/10' },
-					{ label: m.signal_dukung(), received: tandang.dukung, icon: Star, color: 'text-signal-dukung bg-signal-dukung/10' },
-					{ label: m.signal_proof(), received: tandang.proof_of_resolve, icon: Award, color: 'text-signal-proof bg-signal-proof/10' },
-					{ label: m.signal_skeptis(), received: tandang.skeptis, icon: Eye, color: 'text-signal-skeptis bg-signal-skeptis/10' }
+					{
+						label: m.signal_vouch(),
+						received: tandang.vouch,
+						icon: HandHeart,
+						color: 'text-signal-vouch bg-signal-vouch/10'
+					},
+					{
+						label: m.signal_dukung(),
+						received: tandang.dukung,
+						icon: Star,
+						color: 'text-signal-dukung bg-signal-dukung/10'
+					},
+					{
+						label: m.signal_proof(),
+						received: tandang.proof_of_resolve,
+						icon: Award,
+						color: 'text-signal-proof bg-signal-proof/10'
+					},
+					{
+						label: m.signal_skeptis(),
+						received: tandang.skeptis,
+						icon: Eye,
+						color: 'text-signal-skeptis bg-signal-skeptis/10'
+					}
 				]
 			: []
 	);
@@ -130,17 +141,24 @@
 				<!-- Avatar -->
 				<div class="relative">
 					<TandangAvatar
-						person={{ user_id: profile.user_id, name: profile.name, avatar_url: profile.avatar_url }}
+						person={{
+							user_id: profile.user_id,
+							name: profile.name,
+							avatar_url: profile.avatar_url
+						}}
 						size="lg"
 						isSelf
 					/>
 					<!-- Online indicator -->
-					<div class="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-card bg-online"></div>
+					<div
+						class="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-card bg-online"
+					></div>
 				</div>
 				<div class="min-w-0 flex-1">
 					<h2 class="truncate text-body font-bold text-foreground">{profile.name}</h2>
 					<p class="text-caption text-muted-foreground">
-						{#if locationLabel}{locationLabel} · {/if}{m.profil_member_since_active({ year: joinedYear })}
+						{#if locationLabel}{locationLabel} ·
+						{/if}{m.profil_member_since_active({ year: joinedYear })}
 					</p>
 				</div>
 			</motion.div>
@@ -152,16 +170,22 @@
 				animate={{ opacity: 1 }}
 				transition={{ duration: 0.3, delay: 0.1 }}
 			>
-				<span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-caption font-medium text-primary">
+				<span
+					class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-caption font-medium text-primary"
+				>
 					<Shield class="size-3" />
 					{tierLabel}
 				</span>
-				<span class="inline-flex items-center gap-1 rounded-full bg-waspada-lembut px-2.5 py-0.5 text-caption font-medium text-waspada">
+				<span
+					class="inline-flex items-center gap-1 rounded-full bg-waspada-lembut px-2.5 py-0.5 text-caption font-medium text-waspada"
+				>
 					<Star class="size-3" />
 					{tierLevel}
 				</span>
 				{#if roleBadge}
-					<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-caption font-medium {roleBadge.color}">
+					<span
+						class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-caption font-medium {roleBadge.color}"
+					>
 						<Crown class="size-3" />
 						{roleBadge.label}
 					</span>
@@ -250,7 +274,9 @@
 										style="width: {drive.score}%; opacity: {0.4 + (drive.score / 100) * 0.6}"
 									></div>
 								</div>
-								<span class="w-6 text-right text-small font-medium text-foreground">{drive.score}</span>
+								<span class="w-6 text-right text-small font-medium text-foreground"
+									>{drive.score}</span
+								>
 							</div>
 						{/each}
 					</div>

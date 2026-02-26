@@ -53,13 +53,7 @@
 			{@render pillContent()}
 		</a>
 	{:else if onclick}
-		<Button
-			variant="ghost"
-			size="pill"
-			onclick={onclick}
-			onkeydown={handleKeydown}
-			class={pillClass}
-		>
+		<Button variant="ghost" size="pill" {onclick} onkeydown={handleKeydown} class={pillClass}>
 			{@render pillContent()}
 		</Button>
 	{:else}

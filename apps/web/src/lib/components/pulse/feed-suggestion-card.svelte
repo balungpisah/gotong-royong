@@ -41,7 +41,9 @@
 						</p>
 					{/if}
 					<p class="text-small text-muted-foreground/70">
-						{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {m.discover_followers({ count: String(entity.follower_count) })}
+						{m.pulse_feed_suggestion_activities({ count: entity.witness_count })} · {m.discover_followers(
+							{ count: String(entity.follower_count) }
+						)}
 					</p>
 				</div>
 

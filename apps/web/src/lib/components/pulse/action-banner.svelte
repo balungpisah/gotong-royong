@@ -27,7 +27,9 @@
 		<div class="flex items-center gap-3">
 			<div class="flex items-center gap-1.5">
 				<AlertTriangle class="h-3.5 w-3.5 text-peringatan" />
-				<span class="text-small font-medium text-peringatan">{m.pulse_action_needs_attention()}</span>
+				<span class="text-small font-medium text-peringatan"
+					>{m.pulse_action_needs_attention()}</span
+				>
 			</div>
 
 			{#if blockedCount > 0}

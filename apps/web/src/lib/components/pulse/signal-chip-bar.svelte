@@ -16,7 +16,13 @@
 	 * Resolved signals show outcome indicator (check/dash/x).
 	 */
 
-	import type { MyRelation, SignalCounts, ContentSignalType, SignalResolutionOutcome, SignalLabels } from '$lib/types';
+	import type {
+		MyRelation,
+		SignalCounts,
+		ContentSignalType,
+		SignalResolutionOutcome,
+		SignalLabels
+	} from '$lib/types';
 	import { getSignalStore } from '$lib/stores';
 	import { safeSlide as slide } from '$lib/utils/safe-slide';
 	import { quintOut } from 'svelte/easing';
@@ -53,7 +59,7 @@
 		myRelation,
 		signalCounts,
 		signalOutcomes,
-		moodColor = 'var(--c-batu)',
+		moodColor: _moodColor = 'var(--c-batu)',
 		onchipclick
 	}: Props = $props();
 
@@ -158,7 +164,13 @@
 	class="signal-bar"
 	class:signal-bar--expanded={expanded}
 	onclick={handleRowClick}
-	onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); expanded = !expanded; } }}
+	onkeydown={(e) => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			e.stopPropagation();
+			expanded = !expanded;
+		}
+	}}
 	role="toolbar"
 	tabindex="0"
 	aria-label="Sinyal tandang — ketuk untuk penjelasan"
@@ -213,7 +225,12 @@
 		aria-label="Penjelasan sinyal"
 		transition:slide={{ duration: 250, easing: quintOut }}
 		onclick={(e) => e.stopPropagation()}
-		onkeydown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); expanded = false; } }}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') {
+				e.stopPropagation();
+				expanded = false;
+			}
+		}}
 	>
 		{#each chips as chip (chip.id)}
 			<button
@@ -221,7 +238,10 @@
 				class:signal-row--active={chip.active}
 				class:signal-row--resolved={isTerminal(chip.outcome)}
 				style="--chip-active-color: {chip.activeColor}"
-				onclick={(e) => { e.stopPropagation(); handleChip(e, chip.id, chip.active); }}
+				onclick={(e) => {
+					e.stopPropagation();
+					handleChip(e, chip.id, chip.active);
+				}}
 				aria-label={chip.label}
 				aria-pressed={chip.active}
 				disabled={isTerminal(chip.outcome) || signalStore.sending}
@@ -234,7 +254,8 @@
 					<span class="signal-row-desc">{chip.desc}</span>
 				</div>
 				{#if chip.active && chip.outcome === 'pending'}
-					<span class="signal-pending-dot signal-pending-dot--row" aria-label="Menunggu hasil"></span>
+					<span class="signal-pending-dot signal-pending-dot--row" aria-label="Menunggu hasil"
+					></span>
 				{/if}
 				{#if chip.outcome === 'resolved_positive'}
 					<CheckIcon class="size-3.5 shrink-0 text-berhasil" />
@@ -381,8 +402,15 @@
 	}
 
 	@keyframes pending-pulse {
-		0%, 100% { opacity: 0.3; transform: scale(0.8); }
-		50% { opacity: 1; transform: scale(1.2); }
+		0%,
+		100% {
+			opacity: 0.3;
+			transform: scale(0.8);
+		}
+		50% {
+			opacity: 1;
+			transform: scale(1.2);
+		}
 	}
 
 	/* ── Expanded panel ───────────────────────────────────────────── */

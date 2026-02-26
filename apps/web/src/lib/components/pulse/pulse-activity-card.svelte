@@ -56,7 +56,7 @@
 <div
 	role={onclick ? 'button' : 'article'}
 	tabindex={onclick ? 0 : undefined}
-	onclick={onclick}
+	{onclick}
 	onkeydown={onclick ? handleKeydown : undefined}
 	class="group rounded-xl border p-4 transition {selected
 		? 'border-primary/40 bg-primary/5 shadow-sm'
@@ -82,10 +82,7 @@
 			<!-- Meta row -->
 			<div class="mt-3 flex flex-wrap items-center gap-2 text-small text-muted-foreground">
 				{#if witness.track_hint}
-					<Badge
-						variant={trackVariantMap[witness.track_hint] ?? 'secondary'}
-						class="text-xs"
-					>
+					<Badge variant={trackVariantMap[witness.track_hint] ?? 'secondary'} class="text-xs">
 						{witness.track_hint}
 					</Badge>
 				{/if}

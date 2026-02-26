@@ -36,12 +36,18 @@
 		<PanelPinnedCard>
 			{#snippet left()}
 				<div class="flex items-center gap-2.5">
-					<div class="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+					<div
+						class="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
+					>
 						<Activity class="size-3.5" />
 					</div>
 					<div class="min-w-0 flex-1">
-						<p class="truncate text-body font-bold leading-tight text-foreground">{dashboard.community_name}</p>
-						<p class="truncate text-caption text-muted-foreground">{m.komunitas_member_count({ count: String(dashboard.member_count) })}</p>
+						<p class="truncate text-body font-bold leading-tight text-foreground">
+							{dashboard.community_name}
+						</p>
+						<p class="truncate text-caption text-muted-foreground">
+							{m.komunitas_member_count({ count: String(dashboard.member_count) })}
+						</p>
 					</div>
 				</div>
 			{/snippet}
@@ -49,17 +55,38 @@
 				<div class="icj-col">
 					<div class="icj-row">
 						<span class="icj-label" style="color: var(--c-tandang-i)">I</span>
-						<div class="icj-bar-track"><div class="icj-bar-fill" style="width: {Math.round(dashboard.icj_summary.avg_integrity * 100)}%; background: var(--c-tandang-i)"></div></div>
+						<div class="icj-bar-track">
+							<div
+								class="icj-bar-fill"
+								style="width: {Math.round(
+									dashboard.icj_summary.avg_integrity * 100
+								)}%; background: var(--c-tandang-i)"
+							></div>
+						</div>
 						<span class="icj-value">{Math.round(dashboard.icj_summary.avg_integrity * 100)}</span>
 					</div>
 					<div class="icj-row">
 						<span class="icj-label" style="color: var(--c-tandang-c)">C</span>
-						<div class="icj-bar-track"><div class="icj-bar-fill" style="width: {Math.round(dashboard.icj_summary.avg_competence * 100)}%; background: var(--c-tandang-c)"></div></div>
+						<div class="icj-bar-track">
+							<div
+								class="icj-bar-fill"
+								style="width: {Math.round(
+									dashboard.icj_summary.avg_competence * 100
+								)}%; background: var(--c-tandang-c)"
+							></div>
+						</div>
 						<span class="icj-value">{Math.round(dashboard.icj_summary.avg_competence * 100)}</span>
 					</div>
 					<div class="icj-row">
 						<span class="icj-label" style="color: var(--c-tandang-j)">J</span>
-						<div class="icj-bar-track"><div class="icj-bar-fill" style="width: {Math.round(dashboard.icj_summary.avg_judgment * 100)}%; background: var(--c-tandang-j)"></div></div>
+						<div class="icj-bar-track">
+							<div
+								class="icj-bar-fill"
+								style="width: {Math.round(
+									dashboard.icj_summary.avg_judgment * 100
+								)}%; background: var(--c-tandang-j)"
+							></div>
+						</div>
 						<span class="icj-value">{Math.round(dashboard.icj_summary.avg_judgment * 100)}</span>
 					</div>
 				</div>

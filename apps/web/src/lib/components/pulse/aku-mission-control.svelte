@@ -93,9 +93,13 @@
 		<div class="mc-sep"></div>
 
 		<div class="mc-meta">
-			<span><span class="mc-meta-val">{profile.consistency.multiplier.toFixed(2)}×</span> multiplikasi</span>
+			<span
+				><span class="mc-meta-val">{profile.consistency.multiplier.toFixed(2)}×</span> multiplikasi</span
+			>
 			<span class="mc-dot">·</span>
-			<span><span class="mc-meta-val">{Math.round(profile.consistency.quality_avg * 100)}%</span> kualitas</span>
+			<span
+				><span class="mc-meta-val">{Math.round(profile.consistency.quality_avg * 100)}%</span> kualitas</span
+			>
 			<span class="mc-dot">·</span>
 			<span><span class="mc-meta-val">{profile.consistency.streak_weeks}w</span> streak</span>
 		</div>
@@ -127,12 +131,15 @@
 		<div class="mc-budget-row">
 			<div class="mc-budget-head">
 				<span class="mc-budget-name">{m.profil_vouch_budget_title()}</span>
-				<span class="mc-budget-count">{profile.vouch_budget.remaining}/{profile.vouch_budget.max_vouches}</span>
+				<span class="mc-budget-count"
+					>{profile.vouch_budget.remaining}/{profile.vouch_budget.max_vouches}</span
+				>
 			</div>
 			<div class="mc-budget-track">
 				<div
 					class="mc-budget-fill"
-					style="width: {(profile.vouch_budget.active_vouches / profile.vouch_budget.max_vouches) * 100}%;
+					style="width: {(profile.vouch_budget.active_vouches / profile.vouch_budget.max_vouches) *
+						100}%;
 					       background: {budgetFillColor}"
 				></div>
 			</div>
@@ -140,7 +147,9 @@
 		<div class="mc-budget-row">
 			<div class="mc-budget-head">
 				<span class="mc-budget-name">{m.profil_genesis_weight()}</span>
-				<span class="mc-budget-count">{profile.genesis.meaningful_interactions_this_month}/{profile.genesis.threshold}</span>
+				<span class="mc-budget-count"
+					>{profile.genesis.meaningful_interactions_this_month}/{profile.genesis.threshold}</span
+				>
 			</div>
 			<div class="mc-budget-track">
 				<div

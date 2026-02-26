@@ -88,7 +88,8 @@
 	</div>
 
 	<!-- Input bar -->
-	<div class="border-t bg-card/80 px-3 py-2"
+	<div
+		class="border-t bg-card/80 px-3 py-2"
 		style="border-color: color-mix(in srgb, var(--accent, gray) 15%, var(--color-border));"
 	>
 		<!-- Attachment previews -->
@@ -113,7 +114,10 @@
 			{/if}
 
 			<!-- Attachment picker -->
-			<TriageAttachmentPicker onFilesSelected={handleFilesSelected} disabled={pendingAttachments.length >= MAX_ATTACHMENTS} />
+			<TriageAttachmentPicker
+				onFilesSelected={handleFilesSelected}
+				disabled={pendingAttachments.length >= MAX_ATTACHMENTS}
+			/>
 
 			<!-- Message input -->
 			<textarea

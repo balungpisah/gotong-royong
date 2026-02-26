@@ -9,6 +9,7 @@
 	} from '$lib/types';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import { m } from '$lib/paraglide/messages';
+	import { dev } from '$app/environment';
 	import EntityPill from './entity-pill.svelte';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import EyeIcon from '@lucide/svelte/icons/eye';
@@ -93,7 +94,7 @@
 
 	/** Build outcome map for signal-chip-bar from resolved signals. */
 	const signalOutcomes = $derived.by(() => {
-		const map = new Map<ContentSignalType, SignalResolutionOutcome>();
+		const map: Map<ContentSignalType, SignalResolutionOutcome> = new Map();
 		for (const sig of resolutions) {
 			map.set(sig.signal_type, sig.outcome);
 		}
@@ -115,36 +116,38 @@
 
 	// ── Urgency badge mapping ───────────────────────────────────────
 	const urgencyVariantMap: Record<UrgencyBadge, BadgeVariant> = {
-		baru:    'destructive',
-		voting:  'warning',
+		baru: 'destructive',
+		voting: 'warning',
 		selesai: 'success',
-		ramai:   'info'
+		ramai: 'info'
 	};
 
 	const urgencyLabelMap: Record<UrgencyBadge, () => string> = {
-		baru:    () => m.pulse_feed_badge_baru(),
-		voting:  () => m.pulse_feed_badge_voting(),
+		baru: () => m.pulse_feed_badge_baru(),
+		voting: () => m.pulse_feed_badge_voting(),
 		selesai: () => m.pulse_feed_badge_selesai(),
-		ramai:   () => m.pulse_feed_badge_ramai()
+		ramai: () => m.pulse_feed_badge_ramai()
 	};
 
 	// ── Event type emoji ────────────────────────────────────────────
 	const eventEmojiMap: Record<string, string> = {
-		created:          '📢',
-		joined:           '🙋',
-		checkpoint:       '📍',
-		vote_opened:      '🗳️',
-		evidence:         '📎',
-		resolved:         '✅',
+		created: '📢',
+		joined: '🙋',
+		checkpoint: '📍',
+		vote_opened: '🗳️',
+		evidence: '📎',
+		resolved: '✅',
 		galang_milestone: '💰',
-		community_note:   '📝'
+		community_note: '📝'
 	};
 
 	// ── Pulse glow — card "breathes" when people are active ────────
 	const isAlive = $derived((item.active_now ?? 0) > 0);
 
 	// ── Countdown — real deadline urgency ───────────────────────────
-	function getCountdown(deadline: string | undefined): { label: string; urgency: 'chill' | 'warm' | 'hot' } | null {
+	function getCountdown(
+		deadline: string | undefined
+	): { label: string; urgency: 'chill' | 'warm' | 'hot' } | null {
 		if (!deadline) return null;
 		const remaining = new Date(deadline).getTime() - Date.now();
 		if (remaining <= 0) return { label: 'Berakhir!', urgency: 'hot' };
@@ -160,6 +163,7 @@
 	}
 
 	const countdown = $derived(getCountdown(item.deadline));
+	const showSeedBadge = $derived(dev && item.dev_meta?.is_seed === true);
 
 	// ── Quorum progress ────────────────────────────────────────────
 	const quorumPercent = $derived(
@@ -217,9 +221,7 @@
 	onkeydown={onclick ? handleKeydown : undefined}
 	data-witness-id={item.witness_id}
 	class="group relative overflow-hidden rounded-xl transition-all duration-200
-		{selected
-			? 'border-2 border-foreground/70'
-			: 'border border-border/20 hover:border-border/40'}
+		{selected ? 'border-2 border-foreground/70' : 'border border-border/20 hover:border-border/40'}
 		{onclick ? 'cursor-pointer' : ''}
 		{isAlive && !selected ? 'animate-pulse-glow' : ''}
 "
@@ -227,8 +229,12 @@
 		background: var(--color-card);
 		box-shadow: {selected ? selectedShadow : isAlive ? 'none' : restShadow};
 		scroll-margin-top: 5rem;"
-	onmouseenter={(e) => { if (!selected && !isAlive) e.currentTarget.style.boxShadow = hoverShadow; }}
-	onmouseleave={(e) => { if (!selected && !isAlive) e.currentTarget.style.boxShadow = restShadow; }}
+	onmouseenter={(e) => {
+		if (!selected && !isAlive) e.currentTarget.style.boxShadow = hoverShadow;
+	}}
+	onmouseleave={(e) => {
+		if (!selected && !isAlive) e.currentTarget.style.boxShadow = restShadow;
+	}}
 >
 	<!-- ── Cover image — edge-to-edge, optional ──────────────────── -->
 	{#if item.cover_url}
@@ -243,9 +249,14 @@
 
 	<!-- ── Card body ─────────────────────────────────────────────── -->
 	<div class="px-5 pt-4 pb-5 min-w-0 overflow-hidden">
-
 		<!-- Top row: urgency badge (with live count merged) + event emoji -->
 		<div class="mb-3 flex items-center gap-1.5">
+			{#if showSeedBadge}
+				<Badge variant="outline" class="text-[10px] px-1.5 py-0 border-dashed border-primary/50">
+					SEED
+				</Badge>
+			{/if}
+
 			{#if item.urgency}
 				<Badge variant={urgencyVariantMap[item.urgency]} class="text-[10px] px-1.5 py-0">
 					{urgencyLabelMap[item.urgency]()}
@@ -255,7 +266,9 @@
 			{#if isAlive}
 				<span class="inline-flex items-center gap-1 text-[10px] font-medium text-berhasil">
 					<span class="relative flex size-1.5">
-						<span class="absolute inline-flex size-full animate-ping rounded-full bg-berhasil/60 opacity-75"></span>
+						<span
+							class="absolute inline-flex size-full animate-ping rounded-full bg-berhasil/60 opacity-75"
+						></span>
 						<span class="relative inline-flex size-1.5 rounded-full bg-berhasil"></span>
 					</span>
 					{item.active_now} aktif
@@ -274,9 +287,21 @@
 			<div class="mb-3 flex flex-col gap-1.5">
 				{#if countdown}
 					<div class="flex items-center gap-1.5">
-						<ClockIcon class="size-3 {countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-waspada' : 'text-muted-foreground/60'}" />
-						<span class="text-small font-semibold
-							{countdown.urgency === 'hot' ? 'text-destructive' : countdown.urgency === 'warm' ? 'text-waspada' : 'text-muted-foreground/70'}">
+						<ClockIcon
+							class="size-3 {countdown.urgency === 'hot'
+								? 'text-destructive'
+								: countdown.urgency === 'warm'
+									? 'text-waspada'
+									: 'text-muted-foreground/60'}"
+						/>
+						<span
+							class="text-small font-semibold
+							{countdown.urgency === 'hot'
+								? 'text-destructive'
+								: countdown.urgency === 'warm'
+									? 'text-waspada'
+									: 'text-muted-foreground/70'}"
+						>
 							{item.deadline_label ?? 'Berakhir'}: {countdown.label}
 						</span>
 					</div>
@@ -329,7 +354,8 @@
 		<div class="mt-2 flex items-center gap-1.5">
 			<span class="text-small text-muted-foreground/60">{item.latest_event.verb}</span>
 			<span class="text-small text-muted-foreground/25">·</span>
-			<span class="text-small text-muted-foreground/45">{timeAgo(item.latest_event.timestamp)}</span>
+			<span class="text-small text-muted-foreground/45">{timeAgo(item.latest_event.timestamp)}</span
+			>
 		</div>
 
 		<!-- Body — AI-summarized narrative from the saksi conversation -->
@@ -353,8 +379,17 @@
 				class="mt-3 -mx-5 cursor-pointer border-y border-border/10 bg-foreground/[0.04] px-5 py-2 transition-colors hover:bg-foreground/[0.07]"
 				style="box-shadow: inset 0 2px 4px -1px color-mix(in srgb, {moodColor} 10%, transparent),
 						inset 0 -1px 2px 0 color-mix(in srgb, {moodColor} 6%, transparent);"
-				onclick={(e) => { e.stopPropagation(); peekExpanded = !peekExpanded; }}
-				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); peekExpanded = !peekExpanded; } }}
+				onclick={(e) => {
+					e.stopPropagation();
+					peekExpanded = !peekExpanded;
+				}}
+				onkeydown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						e.stopPropagation();
+						peekExpanded = !peekExpanded;
+					}
+				}}
 			>
 				<div class="flex items-start gap-2">
 					<MessageCircleIcon class="mt-0.5 size-3 shrink-0 text-foreground/50" />
@@ -370,13 +405,13 @@
 							{#each peekMessages as msg, i (i)}
 								<p class="text-[11.5px] leading-[1.5]" style="padding-bottom: 4px;">
 									<span class="font-semibold text-foreground/80">{msg.author}:</span>
-									<span class="text-foreground/60">{' '}{msg.text}</span>
+									<span class="text-foreground/60"> {msg.text}</span>
 								</p>
 							{/each}
 							{#each peekMessages as msg, i (`dup-${i}`)}
 								<p class="text-[11.5px] leading-[1.5]" style="padding-bottom: 4px;">
 									<span class="font-semibold text-foreground/80">{msg.author}:</span>
-									<span class="text-foreground/60">{' '}{msg.text}</span>
+									<span class="text-foreground/60"> {msg.text}</span>
 								</p>
 							{/each}
 						</div>
@@ -411,7 +446,9 @@
 
 		<!-- ── Resolution badge (completed witnesses only) ──────────── -->
 		{#if isTerminalWitness && resolutionCount > 0}
-			<div class="mt-2 flex items-center gap-1.5 rounded-md bg-berhasil/8 px-2.5 py-1.5 text-small text-berhasil">
+			<div
+				class="mt-2 flex items-center gap-1.5 rounded-md bg-berhasil/8 px-2.5 py-1.5 text-small text-berhasil"
+			>
 				<CheckCircle2Icon class="size-3.5 shrink-0" />
 				<span class="font-medium">{m.signal_resolution_count({ count: resolutionCount })}</span>
 			</div>
@@ -423,16 +460,20 @@
 			{#if item.members_preview.length > 0}
 				<div class="flex -space-x-1.5">
 					{#each item.members_preview.slice(0, 4) as member (member.user_id)}
-							<a
-								href="/profil/{member.user_id}"
-								aria-label="Profil {member.name}"
-								class="inline-flex rounded-full"
-								data-profile-link
-								data-profile-user-id={member.user_id}
-								onclick={(e) => e.stopPropagation()}
-							>
+						<a
+							href="/profil/{member.user_id}"
+							aria-label="Profil {member.name}"
+							class="inline-flex rounded-full"
+							data-profile-link
+							data-profile-user-id={member.user_id}
+							onclick={(e) => e.stopPropagation()}
+						>
 							<TandangAvatar
-								person={{ user_id: member.user_id, name: member.name, avatar_url: member.avatar_url }}
+								person={{
+									user_id: member.user_id,
+									name: member.name,
+									avatar_url: member.avatar_url
+								}}
 								size="xs"
 								interactive={false}
 								class="border-[1.5px] border-card"
@@ -455,7 +496,10 @@
 				class={isSupported
 					? 'bg-rose-500/12 text-rose-500 border border-rose-500/25 hover:bg-rose-500/18'
 					: 'text-muted-foreground/50 hover:text-rose-400 hover:bg-rose-500/8 border border-transparent'}
-				onclick={(e) => { e.stopPropagation(); feedStore.toggleDukung(item.witness_id); }}
+				onclick={(e) => {
+					e.stopPropagation();
+					feedStore.toggleDukung(item.witness_id);
+				}}
 				aria-label={isSupported ? 'Batal dukung' : 'Dukung'}
 				aria-pressed={isSupported}
 			>
@@ -468,7 +512,11 @@
 			<div class="flex-1"></div>
 
 			<!-- Actions (pantau: faint when idle, full on hover/active) -->
-			<div class="flex items-center gap-0.5 {item.monitored ? '' : 'opacity-30'} transition-opacity duration-150 group-hover:opacity-100">
+			<div
+				class="flex items-center gap-0.5 {item.monitored
+					? ''
+					: 'opacity-30'} transition-opacity duration-150 group-hover:opacity-100"
+			>
 				<Tip text={item.monitored ? 'Berhenti pantau' : 'Pantau'}>
 					<Button
 						variant="ghost"
@@ -476,7 +524,10 @@
 						class={item.monitored
 							? 'text-primary bg-primary/10 hover:bg-primary/20'
 							: 'text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground'}
-						onclick={(e) => { e.stopPropagation(); onToggleMonitor?.(); }}
+						onclick={(e) => {
+							e.stopPropagation();
+							onToggleMonitor?.();
+						}}
 						aria-label={item.monitored ? 'Berhenti pantau' : 'Pantau'}
 					>
 						<EyeIcon class="size-3" />
@@ -498,7 +549,10 @@
 						variant="ghost"
 						size="icon-sm"
 						class="text-muted-foreground/50 hover:bg-primary/10 hover:text-primary"
-						onclick={(e) => { e.stopPropagation(); onShare?.(); }}
+						onclick={(e) => {
+							e.stopPropagation();
+							onShare?.();
+						}}
 						aria-label="Bagikan"
 					>
 						<Share2Icon class="size-3" />

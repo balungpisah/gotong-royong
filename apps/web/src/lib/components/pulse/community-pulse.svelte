@@ -33,9 +33,7 @@
 	);
 
 	// Compute total for percentage bars
-	const signalTotal = $derived(
-		signalRows.reduce((sum, s) => sum + s.count, 0) || 1
-	);
+	const signalTotal = $derived(signalRows.reduce((sum, s) => sum + s.count, 0) || 1);
 
 	// Activity icon type → color mapping
 	const activityColors: Record<string, string> = {
@@ -85,7 +83,10 @@
 							<span class="text-caption">{m.pulse_stats_active()}</span>
 						</div>
 						<p class="mt-1 text-h2 font-bold text-foreground">{stats.active_witness_count}</p>
-						<p class="text-caption text-berhasil">+{stats.active_witness_delta} {m.common_this_week()}</p>
+						<p class="text-caption text-berhasil">
+							+{stats.active_witness_delta}
+							{m.common_this_week()}
+						</p>
 					</motion.div>
 
 					<motion.div
@@ -99,7 +100,9 @@
 							<span class="text-caption">{m.komunitas_messages_today()}</span>
 						</div>
 						<p class="mt-1 text-h2 font-bold text-foreground">{stats.messages_today}</p>
-						<p class="text-caption text-muted-foreground">{m.komunitas_conversations({ count: String(stats.conversations_today) })}</p>
+						<p class="text-caption text-muted-foreground">
+							{m.komunitas_conversations({ count: String(stats.conversations_today) })}
+						</p>
 					</motion.div>
 
 					<motion.div
@@ -145,10 +148,12 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.35, delay: 0.2 }}
 				>
-					<h3 class="text-small font-semibold text-foreground">{m.komunitas_participation_title()}</h3>
+					<h3 class="text-small font-semibold text-foreground">
+						{m.komunitas_participation_title()}
+					</h3>
 					<!-- Mini bar chart — single bar per day, no inner div -->
 					<div class="mt-3 flex items-end gap-1.5" style="height: 80px;">
-						{#each participation as point, i}
+						{#each participation as point, i (point.day)}
 							<motion.div
 								class="flex-1 rounded-t-sm bg-primary/60"
 								initial={{ height: 0 }}
@@ -158,7 +163,7 @@
 						{/each}
 					</div>
 					<div class="mt-1.5 flex justify-between text-small text-muted-foreground">
-						{#each participation as point}
+						{#each participation as point (point.day)}
 							<span>{point.day}</span>
 						{/each}
 					</div>
@@ -175,12 +180,18 @@
 				>
 					<h3 class="text-small font-semibold text-foreground">{m.komunitas_activity_title()}</h3>
 					<div class="mt-2 space-y-2">
-						{#each activity as item}
+						{#each activity as item, itemIdx (itemIdx)}
 							<div class="flex items-start gap-2.5 rounded-lg bg-muted/10 px-3 py-2">
-								<div class="mt-0.5 size-2 shrink-0 rounded-full {activityColors[item.icon_type] ?? 'bg-primary/50'}"></div>
+								<div
+									class="mt-0.5 size-2 shrink-0 rounded-full {activityColors[item.icon_type] ??
+										'bg-primary/50'}"
+								></div>
 								<div class="min-w-0 flex-1">
 									<p class="text-caption leading-relaxed text-foreground/80">{item.text}</p>
-									<p class="mt-0.5 text-small text-muted-foreground">{item.time_label} {m.time_ago_suffix()}</p>
+									<p class="mt-0.5 text-small text-muted-foreground">
+										{item.time_label}
+										{m.time_ago_suffix()}
+									</p>
 								</div>
 							</div>
 						{/each}
@@ -196,9 +207,11 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.35, delay: 0.5 }}
 				>
-					<h3 class="text-small font-semibold text-foreground">{m.komunitas_signals_this_week()}</h3>
+					<h3 class="text-small font-semibold text-foreground">
+						{m.komunitas_signals_this_week()}
+					</h3>
 					<div class="mt-3 space-y-2">
-						{#each signalRows as signal}
+						{#each signalRows as signal (signal.label)}
 							<div class="flex items-center gap-2">
 								<span class="w-24 text-caption text-muted-foreground">{signal.label}</span>
 								<div class="h-2 flex-1 rounded-full bg-muted/30">
@@ -207,7 +220,9 @@
 										style="width: {Math.round((signal.count / signalTotal) * 100)}%"
 									></div>
 								</div>
-								<span class="w-8 text-right text-caption font-medium text-foreground">{signal.count}</span>
+								<span class="w-8 text-right text-caption font-medium text-foreground"
+									>{signal.count}</span
+								>
 							</div>
 						{/each}
 					</div>

@@ -17,7 +17,11 @@
 	];
 </script>
 
-<div class="flex gap-2 overflow-x-auto pb-1 scrollbar-none" role="tablist" aria-label="Feed filters">
+<div
+	class="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
+	role="tablist"
+	aria-label="Feed filters"
+>
 	{#each filters as filter (filter.key)}
 		<button
 			role="tab"

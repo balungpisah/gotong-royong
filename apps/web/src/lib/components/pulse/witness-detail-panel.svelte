@@ -29,7 +29,15 @@
 		stempeling?: boolean;
 	}
 
-	let { detail, feedItem = null, onClose, onSendMessage, onStempel, sending = false, stempeling = false }: Props = $props();
+	let {
+		detail,
+		feedItem = null,
+		onClose,
+		onSendMessage,
+		onStempel,
+		sending = false,
+		stempeling = false
+	}: Props = $props();
 
 	// ---------------------------------------------------------------------------
 	// Maps
@@ -43,33 +51,25 @@
 		closed: 'sealed'
 	};
 
-	const trackVariantMap: Record<string, BadgeVariant> = {
-		tuntaskan: 'track-tuntaskan',
-		wujudkan: 'track-wujudkan',
-		telusuri: 'track-telusuri',
-		rayakan: 'track-rayakan',
-		musyawarah: 'track-musyawarah'
-	};
-
 	// ---------------------------------------------------------------------------
 	// Pinned card — sentiment color
 	// ---------------------------------------------------------------------------
 
 	const sentimentColorMap: Record<string, string> = {
-		angry:       'var(--c-bahaya)',
-		hopeful:     'var(--c-berhasil)',
-		urgent:      'var(--c-peringatan)',
+		angry: 'var(--c-bahaya)',
+		hopeful: 'var(--c-berhasil)',
+		urgent: 'var(--c-peringatan)',
 		celebratory: 'var(--t-rayakan)',
-		sad:         'var(--v-mid)',
-		curious:     'var(--t-telusuri)',
-		fun:         'var(--c-api-terang)'
+		sad: 'var(--v-mid)',
+		curious: 'var(--t-telusuri)',
+		fun: 'var(--c-api-terang)'
 	};
 
 	const trackColorMap: Record<string, string> = {
-		tuntaskan:  'var(--t-tuntaskan)',
-		wujudkan:   'var(--t-wujudkan)',
-		telusuri:   'var(--t-telusuri)',
-		rayakan:    'var(--t-rayakan)',
+		tuntaskan: 'var(--t-tuntaskan)',
+		wujudkan: 'var(--t-wujudkan)',
+		telusuri: 'var(--t-telusuri)',
+		rayakan: 'var(--t-rayakan)',
 		musyawarah: 'var(--t-musyawarah)'
 	};
 
@@ -82,14 +82,14 @@
 	);
 
 	const eventEmojiMap: Record<string, string> = {
-		created:          '📢',
-		joined:           '🙋',
-		checkpoint:       '📍',
-		vote_opened:      '🗳️',
-		evidence:         '📎',
-		resolved:         '✅',
+		created: '📢',
+		joined: '🙋',
+		checkpoint: '📍',
+		vote_opened: '🗳️',
+		evidence: '📎',
+		resolved: '✅',
 		galang_milestone: '💰',
-		community_note:   '📝'
+		community_note: '📝'
 	};
 
 	// ---------------------------------------------------------------------------
@@ -99,9 +99,10 @@
 	const phases = $derived(detail.plan?.branches?.[0]?.phases ?? []);
 
 	const currentPhaseIndex = $derived(
-		Math.max(0, phases.findIndex((p) =>
-			p.checkpoints.some((c) => c.status !== 'completed')
-		))
+		Math.max(
+			0,
+			phases.findIndex((p) => p.checkpoints.some((c) => c.status !== 'completed'))
+		)
 	);
 
 	// ---------------------------------------------------------------------------
@@ -116,7 +117,9 @@
 	$effect(() => {
 		if (phaseScrollEl && currentPhaseIndex >= 0) {
 			requestAnimationFrame(() => {
-				const activeRow = phaseScrollEl?.querySelector('[data-phase-current]') as HTMLElement | null;
+				const activeRow = phaseScrollEl?.querySelector(
+					'[data-phase-current]'
+				) as HTMLElement | null;
 				if (activeRow && phaseScrollEl) {
 					const top = activeRow.offsetTop - phaseScrollEl.offsetTop;
 					const center = top - phaseScrollEl.clientHeight / 2 + activeRow.clientHeight / 2;
@@ -207,277 +210,321 @@
 </script>
 
 {#key detail.witness_id}
-<div class="flex h-full flex-col overflow-hidden" style="--accent: {accentColor};">
-	<!-- ================================================================== -->
-	<!-- PINNED CARD — two-column: identity left, phase nav right           -->
-	<!-- ================================================================== -->
-	<div class="detail-header relative z-10 shrink-0 border-y border-border/60">
+	<div class="flex h-full flex-col overflow-hidden" style="--accent: {accentColor};">
+		<!-- ================================================================== -->
+		<!-- PINNED CARD — two-column: identity left, phase nav right           -->
+		<!-- ================================================================== -->
+		<div class="detail-header relative z-10 shrink-0 border-y border-border/60">
+			{#if feedItem}
+				<div class="pinned-card">
+					<!-- Close button — top right -->
+					{#if onClose}
+						<button
+							onclick={onClose}
+							class="absolute top-1.5 right-1.5 z-10 flex size-5 items-center justify-center rounded-md text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
+							aria-label="Tutup panel"
+						>
+							<X class="size-3" />
+						</button>
+					{/if}
 
-		{#if feedItem}
-			<div class="pinned-card">
-				<!-- Close button — top right -->
-				{#if onClose}
-					<button
-						onclick={onClose}
-						class="absolute top-1.5 right-1.5 z-10 flex size-5 items-center justify-center rounded-md text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
-						aria-label="Tutup panel"
-					>
-						<X class="size-3" />
-					</button>
-				{/if}
+					<div class="pinned-columns">
+						<!-- LEFT: identity — flex-col so initiator pins to bottom, aligned with last phase row -->
+						<div class="min-w-0 flex-1 flex flex-col gap-1">
+							<div class="flex items-start gap-1.5 pr-4">
+								<span class="mt-0.5 text-body select-none opacity-60">
+									{eventEmojiMap[feedItem.latest_event.event_type] ?? '📌'}
+								</span>
+								<div class="min-w-0 flex-1">
+									{#if feedItem.hook_line}
+										<p class="text-body font-bold leading-snug text-foreground line-clamp-2">
+											{feedItem.hook_line}
+										</p>
+										<p class="mt-0.5 text-small leading-snug text-muted-foreground/70 line-clamp-1">
+											{feedItem.title}
+										</p>
+									{:else}
+										<p class="text-body font-bold leading-snug text-foreground line-clamp-2">
+											{feedItem.title}
+										</p>
+									{/if}
+								</div>
+							</div>
 
-				<div class="pinned-columns">
-					<!-- LEFT: identity — flex-col so initiator pins to bottom, aligned with last phase row -->
-					<div class="min-w-0 flex-1 flex flex-col gap-1">
-						<div class="flex items-start gap-1.5 pr-4">
-							<span class="mt-0.5 text-body select-none opacity-60">
-								{eventEmojiMap[feedItem.latest_event.event_type] ?? '📌'}
-							</span>
-							<div class="min-w-0 flex-1">
-								{#if feedItem.hook_line}
-									<p class="text-body font-bold leading-snug text-foreground line-clamp-2">
-										{feedItem.hook_line}
-									</p>
-									<p class="mt-0.5 text-small leading-snug text-muted-foreground/70 line-clamp-1">
-										{feedItem.title}
-									</p>
-								{:else}
-									<p class="text-body font-bold leading-snug text-foreground line-clamp-2">
-										{feedItem.title}
-									</p>
+							{#if feedItem.entity_tags.length > 0}
+								<div class="flex flex-wrap items-center gap-1 opacity-80">
+									{#each feedItem.entity_tags as tag (tag.entity_id)}
+										<EntityPill {tag} />
+									{/each}
+								</div>
+							{/if}
+
+							<!-- Initiator signature — mt-auto pins to bottom, aligning with last phase row on right -->
+							<div class="flex items-center gap-1.5 mt-auto pt-1">
+								<StatusIndicator status={statusMap[detail.status] ?? 'active'} />
+								{#if initiator}
+									<a
+										href="/profil/{initiator.user_id}"
+										class="inline-flex items-center gap-1.5 rounded-md hover:bg-muted/30 px-1 -mx-1 transition-colors"
+										aria-label="Profil {initiator.name}"
+										data-initiator-profile-link
+										data-profile-user-id={initiator.user_id}
+									>
+										<TandangAvatar
+											person={initiator}
+											size="xs"
+											showTierDot={false}
+											interactive={false}
+										/>
+										<span
+											class="text-[13px] text-muted-foreground/60 truncate max-w-[160px]"
+											style="font-family: 'Caveat', cursive;">— {initiator.name}</span
+										>
+									</a>
+								{/if}
+								{#if rahasiaDisplay.show}
+									<Badge variant={rahasiaDisplay.variant} class="text-caption">
+										<ShieldAlert class="mr-0.5 size-2.5" />
+										{rahasiaDisplay.label}
+									</Badge>
 								{/if}
 							</div>
 						</div>
 
-						{#if feedItem.entity_tags.length > 0}
-							<div class="flex flex-wrap items-center gap-1 opacity-80">
-								{#each feedItem.entity_tags as tag (tag.entity_id)}
-									<EntityPill {tag} />
+						<!-- DIVIDER -->
+						<div
+							class="mx-2 w-px self-stretch"
+							style="background: color-mix(in srgb, var(--accent) 25%, var(--color-border));"
+						></div>
+
+						<!-- RIGHT: phase list nav -->
+						<div class="phase-list-col flex flex-col">
+							<!-- Sticky overview row -->
+							<button
+								class="phase-row phase-row-sticky sticky top-0 z-10"
+								class:phase-row-active={expandedItem === 'overview'}
+								onclick={() => toggleItem('overview')}
+							>
+								<span class="flex items-center gap-1.5">
+									<UsersIcon class="size-3 text-muted-foreground" />
+									<span class="text-small font-semibold text-foreground">Ikhtisar</span>
+								</span>
+								<span class="flex items-center gap-1.5 text-small text-muted-foreground/60">
+									<span>👥 {memberCount}</span>
+									<span>💬 {detail.message_count}</span>
+									<ChevronDown
+										class="size-3 transition-transform {expandedItem === 'overview'
+											? 'rotate-180'
+											: ''}"
+									/>
+								</span>
+							</button>
+
+							<!-- Phase items — scrollable -->
+							<div class="phase-scroll flex-1 overflow-y-auto" bind:this={phaseScrollEl}>
+								{#each phases as phase, i (phase.phase_id)}
+									{@const icon = phaseIcon(phase, i)}
+									{@const counts = checkpointCounts(phase)}
+									<button
+										class="phase-row"
+										class:phase-row-active={expandedItem === i}
+										class:phase-row-current={i === currentPhaseIndex}
+										data-phase-current={i === currentPhaseIndex ? '' : undefined}
+										onclick={() => toggleItem(i)}
+									>
+										<span class="flex items-center gap-1.5">
+											{#if icon === 'completed'}
+												<Check class="size-3 text-berhasil" />
+											{:else if icon === 'blocked'}
+												<Lock class="size-3 text-bahaya" />
+											{:else if icon === 'active'}
+												<CircleDot class="size-3 text-primary" />
+											{:else}
+												<Circle class="size-3 text-muted-foreground/40" />
+											{/if}
+											<span
+												class="truncate text-small {i === currentPhaseIndex
+													? 'font-semibold text-foreground'
+													: 'text-muted-foreground'}"
+											>
+												{phase.title}
+											</span>
+										</span>
+										<span class="shrink-0 text-caption tabular-nums text-muted-foreground/50">
+											{counts.done}/{counts.total}
+										</span>
+									</button>
 								{/each}
 							</div>
-						{/if}
-
-						<!-- Initiator signature — mt-auto pins to bottom, aligning with last phase row on right -->
-						<div class="flex items-center gap-1.5 mt-auto pt-1">
+						</div>
+					</div>
+				</div>
+			{:else}
+				<!-- Fallback header when no feed item available (e.g. deep link) -->
+				<div class="flex items-start gap-3 px-4 pt-3 pb-2">
+					<div class="min-w-0 flex-1">
+						<div class="flex items-center gap-2">
 							<StatusIndicator status={statusMap[detail.status] ?? 'active'} />
-							{#if initiator}
-								<a
-									href="/profil/{initiator.user_id}"
-									class="inline-flex items-center gap-1.5 rounded-md hover:bg-muted/30 px-1 -mx-1 transition-colors"
-									aria-label="Profil {initiator.name}"
-									data-initiator-profile-link
-									data-profile-user-id={initiator.user_id}
-								>
-									<TandangAvatar person={initiator} size="xs" showTierDot={false} interactive={false} />
-									<span class="text-[13px] text-muted-foreground/60 truncate max-w-[160px]" style="font-family: 'Caveat', cursive;">— {initiator.name}</span>
-								</a>
-							{/if}
-							{#if rahasiaDisplay.show}
-								<Badge variant={rahasiaDisplay.variant} class="text-caption">
-									<ShieldAlert class="mr-0.5 size-2.5" />
-									{rahasiaDisplay.label}
+							<h2 class="truncate text-body font-semibold text-foreground">
+								{detail.title}
+							</h2>
+						</div>
+					</div>
+					{#if onClose}
+						<button
+							onclick={onClose}
+							class="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+							aria-label="Tutup panel"
+						>
+							<X class="size-4" />
+						</button>
+					{/if}
+				</div>
+			{/if}
+		</div>
+
+		<!-- ================================================================== -->
+		<!-- EXPANSION DRAWER — detail of selected phase or overview            -->
+		<!-- ================================================================== -->
+		{#if expandedItem !== null}
+			<div class="shrink-0 border-b border-border/40" transition:slide={{ duration: 200 }}>
+				<div class="expansion-drawer px-4 py-2.5">
+					{#if expandedItem === 'overview'}
+						<!-- Overview: aggregate stats -->
+						<div class="space-y-1.5">
+							<p
+								class="drawer-title text-small font-semibold text-muted-foreground uppercase tracking-wide"
+							>
+								Ikhtisar
+							</p>
+							<div
+								class="flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-muted-foreground"
+							>
+								<span class="inline-flex items-center gap-1">
+									<UsersIcon class="size-3" />
+									{memberCount} anggota
+								</span>
+								<span class="inline-flex items-center gap-1">
+									<MessageCircle class="size-3" />
+									{detail.message_count} pesan
+								</span>
+								<span class="inline-flex items-center gap-1">
+									<Clock class="size-3" />
+									{timeSince}
+								</span>
+							</div>
+							{#if detail.unread_count > 0}
+								<Badge variant="danger" class="text-caption">
+									{detail.unread_count} pesan baru
 								</Badge>
 							{/if}
 						</div>
-					</div>
-
-					<!-- DIVIDER -->
-					<div class="mx-2 w-px self-stretch" style="background: color-mix(in srgb, var(--accent) 25%, var(--color-border));"></div>
-
-					<!-- RIGHT: phase list nav -->
-					<div class="phase-list-col flex flex-col">
-						<!-- Sticky overview row -->
-						<button
-							class="phase-row phase-row-sticky sticky top-0 z-10"
-							class:phase-row-active={expandedItem === 'overview'}
-							onclick={() => toggleItem('overview')}
-						>
-							<span class="flex items-center gap-1.5">
-								<UsersIcon class="size-3 text-muted-foreground" />
-								<span class="text-small font-semibold text-foreground">Ikhtisar</span>
-							</span>
-							<span class="flex items-center gap-1.5 text-small text-muted-foreground/60">
-								<span>👥 {memberCount}</span>
-								<span>💬 {detail.message_count}</span>
-								<ChevronDown
-									class="size-3 transition-transform {expandedItem === 'overview' ? 'rotate-180' : ''}"
-								/>
-							</span>
-						</button>
-
-						<!-- Phase items — scrollable -->
-						<div class="phase-scroll flex-1 overflow-y-auto" bind:this={phaseScrollEl}>
-							{#each phases as phase, i (phase.phase_id)}
-								{@const icon = phaseIcon(phase, i)}
-								{@const counts = checkpointCounts(phase)}
-								<button
-									class="phase-row"
-									class:phase-row-active={expandedItem === i}
-									class:phase-row-current={i === currentPhaseIndex}
-									data-phase-current={i === currentPhaseIndex ? '' : undefined}
-									onclick={() => toggleItem(i)}
-								>
-									<span class="flex items-center gap-1.5">
-										{#if icon === 'completed'}
-											<Check class="size-3 text-berhasil" />
-										{:else if icon === 'blocked'}
-											<Lock class="size-3 text-bahaya" />
-										{:else if icon === 'active'}
-											<CircleDot class="size-3 text-primary" />
+					{:else if typeof expandedItem === 'number' && phases[expandedItem]}
+						<!-- Phase detail: checkpoints -->
+						{@const phase = phases[expandedItem]}
+						{@const counts = checkpointCounts(phase)}
+						<div class="space-y-2">
+							<div class="drawer-title flex items-center justify-between">
+								<p class="text-small font-semibold text-foreground">
+									{phase.title}
+								</p>
+								<span class="text-caption tabular-nums text-muted-foreground">
+									{counts.done}/{counts.total}{counts.blocked > 0
+										? ` · ${counts.blocked} terblokir`
+										: ''}
+								</span>
+							</div>
+							{#if phase.objective}
+								<p class="text-caption leading-relaxed text-muted-foreground/70">
+									{phase.objective}
+								</p>
+							{/if}
+							<ul class="space-y-1">
+								{#each phase.checkpoints as cp (cp.checkpoint_id)}
+									<li class="flex items-start gap-1.5 text-small">
+										{#if cp.status === 'completed'}
+											<Check class="mt-0.5 size-3 shrink-0 text-berhasil" />
+											<span class="text-muted-foreground line-through">{cp.title}</span>
+										{:else if cp.status === 'blocked'}
+											<Lock class="mt-0.5 size-3 shrink-0 text-bahaya" />
+											<span class="text-bahaya">{cp.title}</span>
 										{:else}
-											<Circle class="size-3 text-muted-foreground/40" />
+											<Circle class="mt-0.5 size-3 shrink-0 text-muted-foreground/30" />
+											<span class="text-foreground">{cp.title}</span>
 										{/if}
-										<span class="truncate text-small {i === currentPhaseIndex ? 'font-semibold text-foreground' : 'text-muted-foreground'}">
-											{phase.title}
-										</span>
-									</span>
-									<span class="shrink-0 text-caption tabular-nums text-muted-foreground/50">
-										{counts.done}/{counts.total}
-									</span>
-								</button>
-							{/each}
+									</li>
+								{/each}
+							</ul>
 						</div>
-					</div>
+					{/if}
 				</div>
 			</div>
-		{:else}
-			<!-- Fallback header when no feed item available (e.g. deep link) -->
-			<div class="flex items-start gap-3 px-4 pt-3 pb-2">
-				<div class="min-w-0 flex-1">
-					<div class="flex items-center gap-2">
-						<StatusIndicator status={statusMap[detail.status] ?? 'active'} />
-						<h2 class="truncate text-body font-semibold text-foreground">
-							{detail.title}
-						</h2>
-					</div>
+		{/if}
+
+		<!-- ================================================================== -->
+		<!-- MOMENTUM TRAIL — phase dots, no finish line                        -->
+		<!-- ================================================================== -->
+		{#if phases.length > 0}
+			<div
+				class="momentum-strip shrink-0 flex items-center gap-1.5 px-4 py-1.5 border-b border-border/30"
+			>
+				<span class="text-caption font-medium text-muted-foreground/60"
+					>Fase {currentPhaseIndex + 1} aktif</span
+				>
+				<span class="text-muted-foreground/30">·</span>
+				<div class="flex items-center gap-1">
+					{#each phases as phase, i (phase.phase_id)}
+						{#if phase.status === 'completed'}
+							<!-- Completed — filled accent dot -->
+							<div
+								class="size-2 rounded-full"
+								style="background: color-mix(in srgb, var(--accent) 70%, var(--color-muted-foreground));"
+							></div>
+						{:else if i === currentPhaseIndex}
+							<!-- Active — pulsing accent dot with partial fill ring -->
+							<div class="relative flex items-center justify-center">
+								<div
+									class="size-2.5 rounded-full border-[1.5px] animate-pulse"
+									style="border-color: color-mix(in srgb, var(--accent) 60%, var(--color-primary));"
+								>
+									{#if activeCheckpointsTotal > 0}
+										<div
+											class="absolute inset-0 rounded-full"
+											style="background: conic-gradient(
+											color-mix(in srgb, var(--accent) 50%, var(--color-primary)) {(activeCheckpointsDone /
+												activeCheckpointsTotal) *
+												360}deg,
+											transparent {(activeCheckpointsDone / activeCheckpointsTotal) * 360}deg
+										); opacity: 0.4;"
+										></div>
+									{/if}
+								</div>
+							</div>
+						{:else}
+							<!-- Future — hollow muted dot -->
+							<div class="size-2 rounded-full border border-muted-foreground/25"></div>
+						{/if}
+					{/each}
 				</div>
-				{#if onClose}
-					<button
-						onclick={onClose}
-						class="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
-						aria-label="Tutup panel"
-					>
-						<X class="size-4" />
-					</button>
+				{#if completedPhases > 0}
+					<span class="text-caption text-muted-foreground/50">{completedPhases} selesai</span>
 				{/if}
 			</div>
 		{/if}
-	</div>
 
-	<!-- ================================================================== -->
-	<!-- EXPANSION DRAWER — detail of selected phase or overview            -->
-	<!-- ================================================================== -->
-	{#if expandedItem !== null}
-		<div class="shrink-0 border-b border-border/40" transition:slide={{ duration: 200 }}>
-			<div class="expansion-drawer px-4 py-2.5">
-				{#if expandedItem === 'overview'}
-					<!-- Overview: aggregate stats -->
-					<div class="space-y-1.5">
-						<p class="drawer-title text-small font-semibold text-muted-foreground uppercase tracking-wide">Ikhtisar</p>
-						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-muted-foreground">
-							<span class="inline-flex items-center gap-1">
-								<UsersIcon class="size-3" />
-								{memberCount} anggota
-							</span>
-							<span class="inline-flex items-center gap-1">
-								<MessageCircle class="size-3" />
-								{detail.message_count} pesan
-							</span>
-							<span class="inline-flex items-center gap-1">
-								<Clock class="size-3" />
-								{timeSince}
-							</span>
-						</div>
-						{#if detail.unread_count > 0}
-							<Badge variant="danger" class="text-caption">
-								{detail.unread_count} pesan baru
-							</Badge>
-						{/if}
-					</div>
-				{:else if typeof expandedItem === 'number' && phases[expandedItem]}
-					<!-- Phase detail: checkpoints -->
-					{@const phase = phases[expandedItem]}
-					{@const counts = checkpointCounts(phase)}
-					<div class="space-y-2">
-						<div class="drawer-title flex items-center justify-between">
-							<p class="text-small font-semibold text-foreground">
-								{phase.title}
-							</p>
-							<span class="text-caption tabular-nums text-muted-foreground">
-								{counts.done}/{counts.total}{counts.blocked > 0 ? ` · ${counts.blocked} terblokir` : ''}
-							</span>
-						</div>
-						{#if phase.objective}
-							<p class="text-caption leading-relaxed text-muted-foreground/70">{phase.objective}</p>
-						{/if}
-						<ul class="space-y-1">
-							{#each phase.checkpoints as cp (cp.checkpoint_id)}
-								<li class="flex items-start gap-1.5 text-small">
-									{#if cp.status === 'completed'}
-										<Check class="mt-0.5 size-3 shrink-0 text-berhasil" />
-										<span class="text-muted-foreground line-through">{cp.title}</span>
-									{:else if cp.status === 'blocked'}
-										<Lock class="mt-0.5 size-3 shrink-0 text-bahaya" />
-										<span class="text-bahaya">{cp.title}</span>
-									{:else}
-										<Circle class="mt-0.5 size-3 shrink-0 text-muted-foreground/30" />
-										<span class="text-foreground">{cp.title}</span>
-									{/if}
-								</li>
-							{/each}
-						</ul>
-					</div>
-				{/if}
-			</div>
+		<!-- ================================================================== -->
+		<!-- CHAT — sunken conversation well                                    -->
+		<!-- ================================================================== -->
+		<div class="chat-reveal">
+			<WitnessChatPanel
+				messages={detail.messages}
+				onSend={onSendMessage}
+				{onStempel}
+				{sending}
+				{stempeling}
+			/>
 		</div>
-	{/if}
-
-	<!-- ================================================================== -->
-	<!-- MOMENTUM TRAIL — phase dots, no finish line                        -->
-	<!-- ================================================================== -->
-	{#if phases.length > 0}
-		<div class="momentum-strip shrink-0 flex items-center gap-1.5 px-4 py-1.5 border-b border-border/30">
-			<span class="text-caption font-medium text-muted-foreground/60">Fase {currentPhaseIndex + 1} aktif</span>
-			<span class="text-muted-foreground/30">·</span>
-			<div class="flex items-center gap-1">
-				{#each phases as phase, i (phase.phase_id)}
-					{#if phase.status === 'completed'}
-						<!-- Completed — filled accent dot -->
-						<div class="size-2 rounded-full" style="background: color-mix(in srgb, var(--accent) 70%, var(--color-muted-foreground));"></div>
-					{:else if i === currentPhaseIndex}
-						<!-- Active — pulsing accent dot with partial fill ring -->
-						<div class="relative flex items-center justify-center">
-							<div class="size-2.5 rounded-full border-[1.5px] animate-pulse" style="border-color: color-mix(in srgb, var(--accent) 60%, var(--color-primary));">
-								{#if activeCheckpointsTotal > 0}
-									<div
-										class="absolute inset-0 rounded-full"
-										style="background: conic-gradient(
-											color-mix(in srgb, var(--accent) 50%, var(--color-primary)) {activeCheckpointsDone / activeCheckpointsTotal * 360}deg,
-											transparent {activeCheckpointsDone / activeCheckpointsTotal * 360}deg
-										); opacity: 0.4;"
-									></div>
-								{/if}
-							</div>
-						</div>
-					{:else}
-						<!-- Future — hollow muted dot -->
-						<div class="size-2 rounded-full border border-muted-foreground/25"></div>
-					{/if}
-				{/each}
-			</div>
-			{#if completedPhases > 0}
-				<span class="text-caption text-muted-foreground/50">{completedPhases} selesai</span>
-			{/if}
-		</div>
-	{/if}
-
-	<!-- ================================================================== -->
-	<!-- CHAT — sunken conversation well                                    -->
-	<!-- ================================================================== -->
-	<div class="chat-reveal">
-		<WitnessChatPanel messages={detail.messages} onSend={onSendMessage} {onStempel} {sending} {stempeling} />
 	</div>
-</div>
 {/key}
 
 <style>
@@ -534,8 +581,20 @@
 	.phase-scroll {
 		scrollbar-width: thin;
 		scrollbar-color: var(--color-border) transparent;
-		mask-image: linear-gradient(to bottom, transparent, black 8px, black calc(100% - 8px), transparent);
-		-webkit-mask-image: linear-gradient(to bottom, transparent, black 8px, black calc(100% - 8px), transparent);
+		mask-image: linear-gradient(
+			to bottom,
+			transparent,
+			black 8px,
+			black calc(100% - 8px),
+			transparent
+		);
+		-webkit-mask-image: linear-gradient(
+			to bottom,
+			transparent,
+			black 8px,
+			black calc(100% - 8px),
+			transparent
+		);
 	}
 
 	/* Each phase row — clickable, compact */

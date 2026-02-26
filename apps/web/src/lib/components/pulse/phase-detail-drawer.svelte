@@ -58,7 +58,7 @@
 			onclick={handleToggle}
 			role="button"
 			tabindex="0"
-			onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? handleToggle() : null}
+			onkeydown={(e) => (e.key === 'Enter' || e.key === ' ' ? handleToggle() : null)}
 		>
 			<div class="flex items-center gap-2">
 				<span class="text-small font-medium text-foreground">{phase.title}</span>
@@ -67,7 +67,9 @@
 				</Badge>
 			</div>
 			<ChevronDown
-				class="size-4 text-muted-foreground transition-transform duration-200 {open ? 'rotate-180' : ''}"
+				class="size-4 text-muted-foreground transition-transform duration-200 {open
+					? 'rotate-180'
+					: ''}"
 			/>
 		</div>
 
@@ -89,7 +91,9 @@
 							<li class="flex items-start gap-2 text-small">
 								<Icon class="mt-0.5 size-3.5 shrink-0 {colorClass}" />
 								<div class="min-w-0 flex-1">
-									<span class={completed ? 'text-muted-foreground line-through' : 'text-foreground'}>
+									<span
+										class={completed ? 'text-muted-foreground line-through' : 'text-foreground'}
+									>
 										{cp.title}
 									</span>
 									{#if cp.description}
