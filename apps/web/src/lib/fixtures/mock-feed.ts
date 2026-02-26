@@ -6,15 +6,10 @@
 
 import type {
 	FeedItem,
-	FeedEvent,
 	FeedMemberPreview,
 	EntityTag,
 	FollowableEntity,
-	RepostFrame,
-	SystemCardData,
-	MyRelation,
-	SignalCounts,
-	SignalLabels
+	SystemCardData
 } from '$lib/types';
 
 // ---------------------------------------------------------------------------
@@ -29,9 +24,18 @@ const ts = (minutesAgo: number): string => new Date(now - minutesAgo * 60 * 1000
 /** Returns an ISO timestamp N days in the past. */
 const tsDay = (daysAgo: number): string => ts(daysAgo * 24 * 60);
 
+// Silence unused warning - tsDay is a utility that may be used by consumers
+void tsDay;
+
 /** Returns an ISO timestamp N minutes in the FUTURE. */
 const tsFuture = (minutesAhead: number): string =>
 	new Date(now + minutesAhead * 60 * 1000).toISOString();
+
+const fixtureSeedMeta = {
+	is_seed: true,
+	seed_batch_id: 'fixture-taxonomy-v1',
+	seed_origin: 'fixture'
+} as const;
 
 // ---------------------------------------------------------------------------
 // Reusable member previews
@@ -95,7 +99,7 @@ const entityKarangTaruna: EntityTag = {
 	followed: false
 };
 
-const entitySDN3: EntityTag = {
+const _entitySDN3: EntityTag = {
 	entity_id: 'ent-004',
 	entity_type: 'lembaga',
 	label: 'SD Negeri 3 Menteng',
@@ -170,6 +174,7 @@ export const mockFeedItem1: FeedItem = {
 	entity_tags: [entityRT05, entityInfrastruktur],
 	urgency: 'baru',
 	source: 'ikutan',
+	dev_meta: fixtureSeedMeta,
 	hook_line: '3 bulan tanpa respons — warga turun tangan sendiri.',
 	sentiment: 'angry',
 	intensity: 4,
@@ -195,9 +200,18 @@ export const mockFeedItem1: FeedItem = {
 		perlu_dicek: { label: 'Perlu Dicek', desc: 'Informasi perlu diverifikasi kebenarannya' }
 	},
 	peek_messages: [
-		{ author: 'Ahmad', text: 'Sudah lapor ke RT tapi belum ada tindakan sama sekali. Motor anak saya jatuh minggu lalu gara-gara lubang ini.' },
-		{ author: 'Sari', text: 'Saya foto buktinya tadi pagi. Lubangnya makin lebar setelah hujan kemarin.' },
-		{ author: 'Budi', text: 'Gang sebelah juga rusak, mungkin satu area yang perlu diperbaiki sekaligus.' }
+		{
+			author: 'Ahmad',
+			text: 'Sudah lapor ke RT tapi belum ada tindakan sama sekali. Motor anak saya jatuh minggu lalu gara-gara lubang ini.'
+		},
+		{
+			author: 'Sari',
+			text: 'Saya foto buktinya tadi pagi. Lubangnya makin lebar setelah hujan kemarin.'
+		},
+		{
+			author: 'Budi',
+			text: 'Gang sebelah juga rusak, mungkin satu area yang perlu diperbaiki sekaligus.'
+		}
 	]
 };
 
@@ -226,6 +240,7 @@ export const mockFeedItem2: FeedItem = {
 	entity_tags: [entityRW03, entityKarangTaruna],
 	urgency: 'voting',
 	source: 'ikutan',
+	dev_meta: fixtureSeedMeta,
 	hook_line: 'Lahan kosong jadi taman bermain — setuju?',
 	sentiment: 'curious',
 	intensity: 3,
@@ -255,9 +270,18 @@ export const mockFeedItem2: FeedItem = {
 	quorum_target: 40,
 	quorum_current: 25,
 	peek_messages: [
-		{ author: 'Rina', text: 'Anak-anak SD butuh banget tempat main. Selama ini mereka main di jalan, bahaya.' },
-		{ author: 'Ahmad', text: 'Kalau jadi taman, siapa yang rawat? Perlu rencana pemeliharaan yang jelas.' },
-		{ author: 'Dewi', text: 'Saya usul ada area kebun kecil juga supaya anak-anak belajar menanam.' }
+		{
+			author: 'Rina',
+			text: 'Anak-anak SD butuh banget tempat main. Selama ini mereka main di jalan, bahaya.'
+		},
+		{
+			author: 'Ahmad',
+			text: 'Kalau jadi taman, siapa yang rawat? Perlu rencana pemeliharaan yang jelas.'
+		},
+		{
+			author: 'Dewi',
+			text: 'Saya usul ada area kebun kecil juga supaya anak-anak belajar menanam.'
+		}
 	]
 };
 
@@ -286,6 +310,7 @@ export const mockFeedItem3: FeedItem = {
 	members_preview: [memberBudi, memberAhmad, memberDewi],
 	entity_tags: [entityRT05, entityInfrastruktur],
 	source: 'terlibat',
+	dev_meta: fixtureSeedMeta,
 	hook_line: 'Dana cair Rp 120 juta tapi progress baru 30%.',
 	sentiment: 'curious',
 	intensity: 3,
@@ -310,9 +335,18 @@ export const mockFeedItem3: FeedItem = {
 		perlu_dicek: { label: 'Perlu Audit', desc: 'Penggunaan dana perlu diaudit lebih lanjut' }
 	},
 	peek_messages: [
-		{ author: 'Budi', text: 'Saya cek langsung ke lokasi. Material yang terpasang tidak sesuai spesifikasi RAB.' },
-		{ author: 'Ahmad', text: 'Kita minta laporan resmi dari kepala desa. Harus ada pertanggungjawaban.' },
-		{ author: 'Dewi', text: 'Saya bisa bantu dokumentasi foto setiap minggu supaya ada bukti progress.' }
+		{
+			author: 'Budi',
+			text: 'Saya cek langsung ke lokasi. Material yang terpasang tidak sesuai spesifikasi RAB.'
+		},
+		{
+			author: 'Ahmad',
+			text: 'Kita minta laporan resmi dari kepala desa. Harus ada pertanggungjawaban.'
+		},
+		{
+			author: 'Dewi',
+			text: 'Saya bisa bantu dokumentasi foto setiap minggu supaya ada bukti progress.'
+		}
 	]
 };
 
@@ -342,6 +376,7 @@ export const mockFeedItem4: FeedItem = {
 	members_preview: [memberSari, memberAhmad],
 	entity_tags: [entitySembako],
 	source: 'sekitar',
+	dev_meta: fixtureSeedMeta,
 	hook_line: 'Cabai rawit Rp 85.000/kg — naik 40% dalam seminggu.',
 	sentiment: 'curious',
 	intensity: 2,
@@ -381,7 +416,8 @@ export const mockFeedItem5: FeedItem = {
 		actor_role: 'pelapor',
 		timestamp: ts(240),
 		verb: 'meminta bantuan warga',
-		snippet: 'Butuh pendamping hukum pro-bono untuk sengketa tanah warisan yang sudah berjalan 6 bulan.'
+		snippet:
+			'Butuh pendamping hukum pro-bono untuk sengketa tanah warisan yang sudah berjalan 6 bulan.'
 	},
 	collapsed_count: 0,
 	member_count: 1,
@@ -389,6 +425,7 @@ export const mockFeedItem5: FeedItem = {
 	entity_tags: [entityHukum, entityRW03],
 	urgency: 'baru',
 	source: 'sekitar',
+	dev_meta: fixtureSeedMeta,
 	hook_line: 'Hak waris terancam — butuh pendamping hukum pro-bono.',
 	sentiment: 'sad',
 	intensity: 3,
@@ -405,7 +442,10 @@ export const mockFeedItem5: FeedItem = {
 		perlu_dicek: { label: 'Perlu Verifikasi', desc: 'Detail kasus perlu diverifikasi lebih lanjut' }
 	},
 	peek_messages: [
-		{ author: 'Rina', text: 'Sudah 6 bulan tanpa kemajuan. Kalau ada yang kenal pengacara atau LBH, tolong bantu hubungkan.' }
+		{
+			author: 'Rina',
+			text: 'Sudah 6 bulan tanpa kemajuan. Kalau ada yang kenal pengacara atau LBH, tolong bantu hubungkan.'
+		}
 	]
 };
 
@@ -434,6 +474,7 @@ export const mockFeedItem6: FeedItem = {
 	entity_tags: [entityRT05, entityInfrastruktur],
 	urgency: 'selesai',
 	source: 'ikutan',
+	dev_meta: fixtureSeedMeta,
 	hook_line: 'Kalau bersama, semua bisa! 45 warga turun tangan.',
 	sentiment: 'celebratory',
 	intensity: 5,
@@ -459,9 +500,18 @@ export const mockFeedItem6: FeedItem = {
 		perlu_dicek: { label: 'Sudah Beres', desc: 'Perbaikan sudah selesai dan berfungsi baik' }
 	},
 	peek_messages: [
-		{ author: 'Ahmad', text: 'Alhamdulillah akhirnya selesai! Terima kasih semua yang sudah turun tangan.' },
-		{ author: 'Sari', text: 'Ibu-ibu nyiapin makanan 2 hari penuh. Luar biasa semangat warga sini!' },
-		{ author: 'Budi', text: 'Motor sudah bisa lewat tanpa was-was. Terima kasih pak-pak yang kerja bakti!' }
+		{
+			author: 'Ahmad',
+			text: 'Alhamdulillah akhirnya selesai! Terima kasih semua yang sudah turun tangan.'
+		},
+		{
+			author: 'Sari',
+			text: 'Ibu-ibu nyiapin makanan 2 hari penuh. Luar biasa semangat warga sini!'
+		},
+		{
+			author: 'Budi',
+			text: 'Motor sudah bisa lewat tanpa was-was. Terima kasih pak-pak yang kerja bakti!'
+		}
 	]
 };
 
@@ -491,6 +541,7 @@ export const mockFeedItem7: FeedItem = {
 	entity_tags: [entityBencana, entityLingkungan],
 	urgency: 'baru',
 	source: 'sekitar',
+	dev_meta: fixtureSeedMeta,
 	hook_line: 'Siaga merah! Segera evakuasi barang ke lantai atas.',
 	sentiment: 'urgent',
 	intensity: 5,
@@ -515,9 +566,18 @@ export const mockFeedItem7: FeedItem = {
 		perlu_dicek: { label: 'Sudah Aman', desc: 'Kondisi sudah membaik di lokasi kamu' }
 	},
 	peek_messages: [
-		{ author: 'Budi', text: 'Air naik cepat banget! Warga bantaran sudah mulai evakuasi. Tolong yang punya perahu karet bantu!' },
-		{ author: 'Ahmad', text: 'Posko darurat sudah dibuka di Balai RT 05. Bawa selimut dan makanan siap saji.' },
-		{ author: 'Dewi', text: 'BMKG prediksi hujan deras lagi malam ini. Semua warga bantaran segera naik!' }
+		{
+			author: 'Budi',
+			text: 'Air naik cepat banget! Warga bantaran sudah mulai evakuasi. Tolong yang punya perahu karet bantu!'
+		},
+		{
+			author: 'Ahmad',
+			text: 'Posko darurat sudah dibuka di Balai RT 05. Bawa selimut dan makanan siap saji.'
+		},
+		{
+			author: 'Dewi',
+			text: 'BMKG prediksi hujan deras lagi malam ini. Semua warga bantaran segera naik!'
+		}
 	]
 };
 
@@ -547,6 +607,7 @@ export const mockFeedItem8: FeedItem = {
 	members_preview: [memberRina, memberBudi, memberAhmad],
 	entity_tags: [entityRT05, entityKeamanan],
 	source: 'terlibat',
+	dev_meta: fixtureSeedMeta,
 	hook_line: 'Rotasi jaga malam minggu ke-4 sudah ditetapkan.',
 	sentiment: 'hopeful',
 	intensity: 1,
@@ -565,7 +626,10 @@ export const mockFeedItem8: FeedItem = {
 	},
 	signal_labels: {
 		saksi: { label: 'Hadir', desc: 'Kamu hadir pada shift ronda yang ditentukan' },
-		perlu_dicek: { label: 'Jadwal Berubah', desc: 'Ada perubahan jadwal yang perlu dikoordinasikan' }
+		perlu_dicek: {
+			label: 'Jadwal Berubah',
+			desc: 'Ada perubahan jadwal yang perlu dikoordinasikan'
+		}
 	},
 	peek_messages: [
 		{ author: 'Rina', text: 'Minggu ini shift A: Pak Budi, Pak Ahmad, Mas Doni. Mulai jam 22:00.' },
@@ -599,6 +663,7 @@ export const mockFeedItem9: FeedItem = {
 	members_preview: [memberDewi, memberRina, memberSari],
 	entity_tags: [entityLingkungan, entityRW03],
 	source: 'terlibat',
+	dev_meta: fixtureSeedMeta,
 	repost: {
 		reposter_name: 'Sari Dewi',
 		reposter_avatar: 'https://placehold.co/40x40/2E7D32/white?text=SD',
@@ -628,11 +693,20 @@ export const mockFeedItem9: FeedItem = {
 	},
 	signal_labels: {
 		saksi: { label: 'Saya Terdampak', desc: 'Kamu mengalami masalah air bersih ini' },
-		perlu_dicek: { label: 'Perlu Verifikasi', desc: 'Hasil lab perlu diverifikasi pihak independen' }
+		perlu_dicek: {
+			label: 'Perlu Verifikasi',
+			desc: 'Hasil lab perlu diverifikasi pihak independen'
+		}
 	},
 	peek_messages: [
-		{ author: 'Dewi', text: 'Lab resmi UGM sudah konfirmasi. Ini bukti kuat untuk petisi kita ke DPRD.' },
-		{ author: 'Rina', text: 'Petisi sudah 200+ tanda tangan. Target kita 500 sebelum kirim ke dewan.' },
+		{
+			author: 'Dewi',
+			text: 'Lab resmi UGM sudah konfirmasi. Ini bukti kuat untuk petisi kita ke DPRD.'
+		},
+		{
+			author: 'Rina',
+			text: 'Petisi sudah 200+ tanda tangan. Target kita 500 sebelum kirim ke dewan.'
+		},
 		{ author: 'Sari', text: 'Saya hubungi wartawan Kompas, mereka tertarik liputan minggu depan.' }
 	]
 };
@@ -662,6 +736,7 @@ export const mockFeedItem10: FeedItem = {
 	members_preview: [memberRina, memberAhmad, memberBudi],
 	entity_tags: [entityRW03],
 	source: 'terlibat',
+	dev_meta: fixtureSeedMeta,
 	hook_line: 'Mediator bergabung — dua warga cari jalan tengah.',
 	sentiment: 'curious',
 	intensity: 2,
@@ -684,8 +759,14 @@ export const mockFeedItem10: FeedItem = {
 		perlu_dicek: { label: 'Perlu Klarifikasi', desc: 'Batas lahan perlu diukur ulang secara resmi' }
 	},
 	peek_messages: [
-		{ author: 'Rina', text: 'Saya sudah bicara dengan kedua pihak. Ada titik temu yang bisa diusahakan.' },
-		{ author: 'Ahmad', text: 'Kalau butuh surat ukur BPN, saya bisa bantu uruskan. Prosesnya sekitar 2 minggu.' }
+		{
+			author: 'Rina',
+			text: 'Saya sudah bicara dengan kedua pihak. Ada titik temu yang bisa diusahakan.'
+		},
+		{
+			author: 'Ahmad',
+			text: 'Kalau butuh surat ukur BPN, saya bisa bantu uruskan. Prosesnya sekitar 2 minggu.'
+		}
 	]
 };
 

@@ -309,9 +309,7 @@ export const mockTandangProfile1: TandangProfile = {
 		evidence_validated: 10,
 		votes_participated: 15
 	},
-	decay_warnings: [
-		{ domain: 'Verifikasi Lapangan', days_until_decay: 12 }
-	]
+	decay_warnings: [{ domain: 'Verifikasi Lapangan', days_until_decay: 12 }]
 };
 
 // ---------------------------------------------------------------------------
@@ -350,7 +348,7 @@ export const mockTandangProfile2: TandangProfile = {
 				{
 					skill_id: 'ESCO-ID-GR-002',
 					skill_name: 'Investigasi Warga',
-					score: 0.70,
+					score: 0.7,
 					decaying: false,
 					days_until_decay: null,
 					last_activity: tsDay(3),
@@ -408,7 +406,7 @@ export const mockTandangProfile2: TandangProfile = {
 			skill_id: 'ESCO-ID-GR-002',
 			skill_name: 'Investigasi Warga',
 			validated: true,
-			score: 0.70,
+			score: 0.7,
 			decaying: false,
 			days_until_decay: null
 		},
@@ -738,12 +736,12 @@ export const mockTandangProfile3: TandangProfile = {
 	scores: {
 		integrity: { value: 0.42 },
 		competence: {
-			aggregate: 0.30,
+			aggregate: 0.3,
 			domains: [
 				{
 					skill_id: 'ESCO-ID-GR-004',
 					skill_name: 'Verifikasi Lapangan',
-					score: 0.30,
+					score: 0.3,
 					decaying: true,
 					days_until_decay: 5,
 					last_activity: tsDay(25),
@@ -775,7 +773,7 @@ export const mockTandangProfile3: TandangProfile = {
 			skill_id: 'ESCO-ID-GR-004',
 			skill_name: 'Verifikasi Lapangan',
 			validated: true,
-			score: 0.30,
+			score: 0.3,
 			decaying: true,
 			days_until_decay: 5
 		},
@@ -909,9 +907,7 @@ export const mockTandangProfile3: TandangProfile = {
 		evidence_validated: 5,
 		votes_participated: 8
 	},
-	decay_warnings: [
-		{ domain: 'Verifikasi Lapangan', days_until_decay: 5 }
-	]
+	decay_warnings: [{ domain: 'Verifikasi Lapangan', days_until_decay: 5 }]
 };
 
 // ---------------------------------------------------------------------------
@@ -951,7 +947,7 @@ export const mockTandangProfile4: TandangProfile = {
 				{
 					skill_id: 'ESCO-ID-GR-002',
 					skill_name: 'Investigasi Warga',
-					score: 0.90,
+					score: 0.9,
 					decaying: false,
 					days_until_decay: null,
 					last_activity: tsDay(2),
@@ -993,7 +989,7 @@ export const mockTandangProfile4: TandangProfile = {
 		}
 	},
 	consistency: {
-		multiplier: 1.20,
+		multiplier: 1.2,
 		streak_days: 180,
 		streak_weeks: 25,
 		contributions_30d: 22,
@@ -1018,7 +1014,7 @@ export const mockTandangProfile4: TandangProfile = {
 			skill_id: 'ESCO-ID-GR-002',
 			skill_name: 'Investigasi Warga',
 			validated: true,
-			score: 0.90,
+			score: 0.9,
 			decaying: false,
 			days_until_decay: null
 		},
@@ -1450,7 +1446,7 @@ export const mockTandangProfile5: TandangProfile = {
 		streak_days: 1,
 		streak_weeks: 0,
 		contributions_30d: 1,
-		quality_avg: 0.30,
+		quality_avg: 0.3,
 		gap_days: 5
 	},
 	genesis: {

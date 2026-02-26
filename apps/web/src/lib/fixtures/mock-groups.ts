@@ -17,8 +17,10 @@ import { mockUsers } from './mock-users';
 // ---------------------------------------------------------------------------
 
 const now = Date.now();
-const tsDay = (daysAgo: number): string => new Date(now - daysAgo * 24 * 60 * 60 * 1000).toISOString();
-const tsHour = (hoursAgo: number): string => new Date(now - hoursAgo * 60 * 60 * 1000).toISOString();
+const tsDay = (daysAgo: number): string =>
+	new Date(now - daysAgo * 24 * 60 * 60 * 1000).toISOString();
+const tsHour = (hoursAgo: number): string =>
+	new Date(now - hoursAgo * 60 * 60 * 1000).toISOString();
 
 const userById = new Map(mockUsers.map((u) => [u.user_id, u]));
 const userInfo = (userId: string) => {
@@ -96,7 +98,12 @@ export const mockGroup2: GroupDetail = {
 		member('u-005', 'anggota', tsDay(18))
 	],
 	pending_requests: [
-		req('req-ent-004-001', 'u-001', 'Saya ingin membantu komunikasi agenda dan dokumentasi.', tsHour(6))
+		req(
+			'req-ent-004-001',
+			'u-001',
+			'Saya ingin membantu komunikasi agenda dan dokumentasi.',
+			tsHour(6)
+		)
 	],
 	my_role: null,
 	my_membership_status: 'pending'
@@ -149,7 +156,12 @@ export const mockGroup4: GroupDetail = {
 		member('u-999', 'anggota', tsDay(1))
 	].map((m) => (m.user_id === 'u-999' ? { ...m, name: 'Nisa Putri', avatar_url: undefined } : m)),
 	pending_requests: [
-		req('req-ent-102-001', 'u-005', 'Saya siap bantu koordinasi jadwal olahraga mingguan.', tsHour(10)),
+		req(
+			'req-ent-102-001',
+			'u-005',
+			'Saya siap bantu koordinasi jadwal olahraga mingguan.',
+			tsHour(10)
+		),
 		req('req-ent-102-002', 'u-003', 'Ingin ikut dan bantu dokumentasi kegiatan RW.', tsHour(30))
 	],
 	my_role: 'admin',
@@ -180,11 +192,16 @@ export const mockGroup5: GroupDetail = {
 	my_membership_status: 'none'
 };
 
-export const mockGroups: GroupDetail[] = [mockGroup1, mockGroup2, mockGroup3, mockGroup4, mockGroup5];
+export const mockGroups: GroupDetail[] = [
+	mockGroup1,
+	mockGroup2,
+	mockGroup3,
+	mockGroup4,
+	mockGroup5
+];
 
 export const mockGroupSummaries: GroupSummary[] = mockGroups.map((g) => {
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const { members, pending_requests, my_role, my_membership_status, ...summary } = g;
 	return summary;
 });
-

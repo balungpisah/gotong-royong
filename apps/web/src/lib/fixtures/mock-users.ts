@@ -191,9 +191,7 @@ export const mockUser5: UserProfile = {
 		social_influence: 20,
 		unpredictability: 25
 	},
-	recent_activity: [
-		{ text: 'Bergabung sebagai warga baru', timestamp: tsHour(24) }
-	]
+	recent_activity: [{ text: 'Bergabung sebagai warga baru', timestamp: tsHour(24) }]
 };
 
 // ---------------------------------------------------------------------------
