@@ -39,6 +39,22 @@ export type ContextBarState =
 export type EntryRoute = 'komunitas' | 'vault' | 'siaga' | 'catatan_komunitas' | 'kelola';
 export type TriageStatus = 'draft' | 'final';
 export type TriageKind = 'witness' | 'data';
+export type TriageConversationBlockId =
+	| 'chat_message'
+	| 'ai_inline_card'
+	| 'diff_card'
+	| 'vote_card'
+	| 'moderation_hold_card'
+	| 'duplicate_detection_card'
+	| 'credit_nudge_card';
+export type TriageStructuredBlockId =
+	| 'list'
+	| 'document'
+	| 'form'
+	| 'computed'
+	| 'display'
+	| 'vote'
+	| 'reference';
 export type TaxonomyCategoryCode =
 	| 'commodity_price'
 	| 'public_service'
@@ -90,6 +106,11 @@ export interface TriageCard {
 	intensity?: number;
 }
 
+export interface TriageBlocks {
+	conversation: TriageConversationBlockId[];
+	structured: TriageStructuredBlockId[];
+}
+
 /** Confidence level for the AI classification. */
 export interface TriageConfidence {
 	/** 0-1 confidence score. */
@@ -113,6 +134,8 @@ export interface TriageResult {
 	kind?: TriageKind;
 	/** Missing fields when status='draft'. */
 	missing_fields?: string[];
+	/** Declared conversation/structured blocks from operator output. */
+	blocks?: TriageBlocks;
 	/** Data taxonomy for controlled vocabulary classification. */
 	taxonomy?: TriageTaxonomy;
 	/** Structured program references (e.g., MBG). */

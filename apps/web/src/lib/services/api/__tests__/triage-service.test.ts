@@ -54,6 +54,10 @@ describe('ApiTriageService', () => {
 				bar_state: 'probing',
 				route: 'komunitas',
 				trajectory_type: 'aksi',
+				blocks: {
+					conversation: ['ai_inline_card', 'diff_card'],
+					structured: ['document', 'list', 'computed']
+				},
 				confidence: { score: 0.4, label: 'Komunitas · 40%' }
 			}
 		});
@@ -65,9 +69,36 @@ describe('ApiTriageService', () => {
 		expect(result.bar_state).toBe('probing');
 		expect(result.route).toBe('komunitas');
 		expect(result.trajectory_type).toBe('aksi');
+		expect(result.blocks?.conversation).toEqual(['ai_inline_card', 'diff_card']);
+		expect(result.blocks?.structured).toEqual(['document', 'list', 'computed']);
 		expect(post).toHaveBeenCalledWith('/triage/sessions', {
 			body: { content: 'jalan rusak', attachments: undefined }
 		});
+	});
+
+	it('drops invalid block declarations from backend result', async () => {
+		const { client, post } = makeApiClient();
+		const { service: fallback } = makeFallbackService();
+		post.mockResolvedValue({
+			session_id: 'triage-sess-1',
+			result: {
+				schema_version: 'triage.v1',
+				status: 'draft',
+				kind: 'witness',
+				bar_state: 'probing',
+				route: 'komunitas',
+				blocks: {
+					conversation: ['ai_inline_card', 'unknown_block'],
+					structured: ['document']
+				},
+				confidence: { score: 0.4, label: 'Komunitas · 40%' }
+			}
+		});
+
+		const service = new ApiTriageService(client, fallback);
+		const result = await service.startTriage('jalan rusak');
+
+		expect(result.blocks).toBeUndefined();
 	});
 
 	it('uses session id for follow-up message', async () => {

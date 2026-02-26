@@ -2021,6 +2021,11 @@ fn triage_result_from_operator_contract(contract: &TriageOperatorOutput, step: u
     if let Some(trajectory_type) = trajectory_type {
         payload["trajectory_type"] = json!(trajectory_type);
     }
+    if let Some(blocks) = &contract.blocks
+        && let Ok(blocks_value) = serde_json::to_value(blocks)
+    {
+        payload["blocks"] = blocks_value;
+    }
 
     let stempel_state = contract
         .routing
@@ -2168,6 +2173,7 @@ mod triage_operator_contract_tests {
         assert_eq!(result.get("bar_state"), Some(&json!("ready")));
         assert_eq!(result.get("route"), Some(&json!("komunitas")));
         assert!(result.get("proposed_plan").is_some_and(Value::is_object));
+        assert!(result.get("blocks").is_some_and(Value::is_object));
     }
 
     #[test]

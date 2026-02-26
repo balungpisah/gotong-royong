@@ -3946,6 +3946,15 @@ async fn triage_start_accepts_operator_output_final_contract() {
             .and_then(|value| value.as_str()),
         Some("plan-op-start-1")
     );
+    assert_eq!(
+        start_json
+            .get("result")
+            .and_then(|value| value.get("blocks"))
+            .and_then(|value| value.get("conversation"))
+            .and_then(|value| value.as_array())
+            .map(|items| items.len()),
+        Some(2)
+    );
 
     let create_request = Request::builder()
         .method("POST")
@@ -4078,6 +4087,15 @@ async fn triage_continue_accepts_operator_output_and_updates_session_route() {
             .and_then(|value| value.get("status"))
             .and_then(|value| value.as_str()),
         Some("final")
+    );
+    assert_eq!(
+        continue_json
+            .get("result")
+            .and_then(|value| value.get("blocks"))
+            .and_then(|value| value.get("structured"))
+            .and_then(|value| value.as_array())
+            .map(|items| items.len()),
+        Some(3)
     );
 
     let continue_request_2 = Request::builder()

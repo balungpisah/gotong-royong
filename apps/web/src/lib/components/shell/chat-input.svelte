@@ -131,6 +131,28 @@
 	const firstPhaseTitle = $derived(
 		triageStore.proposedPlan?.branches?.[0]?.phases?.[0]?.title ?? null
 	);
+	const declaredConversationBlocks = $derived(triageStore.blocks?.conversation ?? []);
+	const declaredStructuredBlocks = $derived(triageStore.blocks?.structured ?? []);
+
+	function blockLabel(blockId: string): string {
+		const labels: Record<string, string> = {
+			chat_message: 'Chat Message',
+			ai_inline_card: 'AI Inline',
+			diff_card: 'Diff Card',
+			vote_card: 'Vote Card',
+			moderation_hold_card: 'Moderation Hold',
+			duplicate_detection_card: 'Duplicate Detection',
+			credit_nudge_card: 'Credit Nudge',
+			list: 'List',
+			document: 'Document',
+			form: 'Form',
+			computed: 'Computed',
+			display: 'Display',
+			vote: 'Vote',
+			reference: 'Reference'
+		};
+		return labels[blockId] ?? blockId;
+	}
 
 	function autoResize() {
 		if (!textareaEl) return;
@@ -536,6 +558,23 @@
 										<p class="mt-1 text-small text-muted-foreground line-clamp-2">
 											{detail.description}
 										</p>
+										{#if declaredConversationBlocks.length > 0 || declaredStructuredBlocks.length > 0}
+											<div class="mt-2 rounded-lg border border-border/30 bg-muted/30 p-2">
+												<p class="text-small font-medium text-foreground">Operator blocks</p>
+												<div class="mt-1 flex flex-wrap gap-1">
+													{#each declaredConversationBlocks as blockId (blockId)}
+														<Badge variant="outline" class="text-[10px] uppercase">
+															CHAT · {blockLabel(blockId)}
+														</Badge>
+													{/each}
+													{#each declaredStructuredBlocks as blockId (blockId)}
+														<Badge variant="outline" class="text-[10px] uppercase">
+															STRUCT · {blockLabel(blockId)}
+														</Badge>
+													{/each}
+												</div>
+											</div>
+										{/if}
 									</div>
 								{/if}
 								<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
@@ -605,6 +644,23 @@
 												<span class="truncate">{firstPhaseTitle}</span>
 											{/if}
 										</div>
+										{#if declaredConversationBlocks.length > 0 || declaredStructuredBlocks.length > 0}
+											<div class="mt-2 rounded-lg border border-border/30 bg-muted/30 p-2">
+												<p class="text-small font-medium text-foreground">Operator blocks</p>
+												<div class="mt-1 flex flex-wrap gap-1">
+													{#each declaredConversationBlocks as blockId (blockId)}
+														<Badge variant="outline" class="text-[10px] uppercase">
+															CHAT · {blockLabel(blockId)}
+														</Badge>
+													{/each}
+													{#each declaredStructuredBlocks as blockId (blockId)}
+														<Badge variant="outline" class="text-[10px] uppercase">
+															STRUCT · {blockLabel(blockId)}
+														</Badge>
+													{/each}
+												</div>
+											</div>
+										{/if}
 									</div>
 								{/if}
 

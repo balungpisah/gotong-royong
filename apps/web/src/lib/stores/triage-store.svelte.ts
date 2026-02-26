@@ -32,6 +32,7 @@ export class TriageStore {
 			this.barState === 'siaga-ready'
 	);
 	proposedPlan = $derived(this.result?.proposed_plan ?? null);
+	blocks = $derived(this.result?.blocks ?? null);
 	confidence = $derived(this.result?.confidence ?? null);
 	trackHint = $derived(this.result?.track_hint ?? null);
 	seedHint = $derived(this.result?.seed_hint ?? null);

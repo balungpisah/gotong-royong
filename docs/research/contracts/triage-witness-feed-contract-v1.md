@@ -33,6 +33,10 @@ Every triage response includes:
     "status": "draft | final",
     "kind": "witness | data",
     "missing_fields": ["..."],
+    "blocks": {
+      "conversation": ["ai_inline_card", "diff_card"],
+      "structured": ["document", "list", "computed"]
+    },
     "taxonomy": {
       "category_code": "infrastructure",
       "category_label": "Laporan Warga",
@@ -76,6 +80,11 @@ Every triage response includes:
 `status` semantics:
 - `draft`: triage is incomplete; client should continue conversation.
 - `final`: triage is complete and can be materialized.
+
+`blocks` semantics:
+- optional in `draft`, required in `final` when triage is derived from `operator.v1`.
+- `conversation[]` declares chat-layer blocks (e.g. `ai_inline_card`, `diff_card`, `vote_card`).
+- `structured[]` declares structured-layer primitives (`list|document|form|computed|display|vote|reference`).
 
 `kind` semantics:
 - `witness`: lifecycle card candidate; valid input for `POST /v1/witnesses`.
