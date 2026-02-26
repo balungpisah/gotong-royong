@@ -35,7 +35,7 @@ use gotong_domain::{
     discovery::{
         DiscoveryService, FEED_SOURCE_CONTRIBUTION, FEED_SOURCE_ONTOLOGY_NOTE, FEED_SOURCE_VOUCH,
         FeedIngestInput, FeedListQuery, FeedSuggestion, FeedSuggestionsQuery, InAppNotification,
-        NotificationListQuery, PagedFeed, PagedNotifications, SearchListQuery, SearchPage,
+        NotificationListQuery, PagedNotifications, SearchListQuery, SearchPage,
         WeeklyDigest,
     },
     error::DomainError,
@@ -3618,6 +3618,69 @@ struct FeedFollowPreferenceResponse {
     followed: bool,
 }
 
+#[derive(Debug, Serialize)]
+struct FeedStreamResponse {
+    items: Vec<gotong_domain::discovery::FeedItem>,
+    stream: Vec<FeedStreamItemDto>,
+    next_cursor: Option<String>,
+    has_more: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FeedStreamItemDto {
+    Witness {
+        stream_id: String,
+        sort_timestamp: String,
+        data: gotong_domain::discovery::FeedItem,
+    },
+    System {
+        stream_id: String,
+        sort_timestamp: String,
+        data: FeedSystemCardDto,
+    },
+}
+
+#[derive(Debug, Serialize)]
+struct FeedSystemCardDto {
+    variant: String,
+    icon: String,
+    title: String,
+    description: Option<String>,
+    dismissible: bool,
+    payload: FeedSystemCardPayloadDto,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "variant", rename_all = "snake_case")]
+enum FeedSystemCardPayloadDto {
+    Suggestion {
+        entities: Vec<FeedSuggestionEntityDto>,
+    },
+    Tip {
+        tip_id: String,
+    },
+    Milestone {
+        metric_label: String,
+        metric_value: String,
+    },
+    Prompt {
+        cta_label: String,
+        cta_action: String,
+    },
+}
+
+#[derive(Debug, Serialize)]
+struct FeedSuggestionEntityDto {
+    entity_id: String,
+    entity_type: String,
+    label: String,
+    followed: bool,
+    description: Option<String>,
+    witness_count: usize,
+    follower_count: usize,
+}
+
 #[derive(Debug, Deserialize)]
 struct SearchListQueryParams {
     #[serde(alias = "query")]
@@ -3725,6 +3788,143 @@ fn apply_follow_preferences_to_payload(
             tag_obj.insert("followed".to_string(), Value::Bool(*followed));
         }
     }
+}
+
+fn sort_timestamp_ms(item: &gotong_domain::discovery::FeedItem) -> i64 {
+    if item.occurred_at_ms > 0 {
+        item.occurred_at_ms
+    } else {
+        item.created_at_ms
+    }
+}
+
+fn to_sort_timestamp_iso(epoch_ms: i64) -> String {
+    gotong_domain::util::format_ms_rfc3339(epoch_ms)
+}
+
+fn to_feed_suggestion_entity_dto(item: &FeedSuggestion) -> FeedSuggestionEntityDto {
+    FeedSuggestionEntityDto {
+        entity_id: item.entity_id.clone(),
+        entity_type: item.entity_type.clone(),
+        label: item.label.clone(),
+        followed: item.followed,
+        description: item.description.clone(),
+        witness_count: item.witness_count,
+        follower_count: item.follower_count,
+    }
+}
+
+fn build_feed_system_cards(
+    suggestions: &[FeedSuggestion],
+    witness_count: usize,
+) -> Vec<FeedSystemCardDto> {
+    let mut cards = Vec::new();
+
+    let suggestion_entities = suggestions
+        .iter()
+        .filter(|item| !item.followed)
+        .take(3)
+        .map(to_feed_suggestion_entity_dto)
+        .collect::<Vec<_>>();
+    if !suggestion_entities.is_empty() {
+        cards.push(FeedSystemCardDto {
+            variant: "suggestion".to_string(),
+            icon: "💡".to_string(),
+            title: "Ikuti topik yang relevan".to_string(),
+            description: Some("Dapatkan update tentang isu yang Anda pedulikan.".to_string()),
+            dismissible: true,
+            payload: FeedSystemCardPayloadDto::Suggestion {
+                entities: suggestion_entities,
+            },
+        });
+    }
+
+    cards.push(FeedSystemCardDto {
+        variant: "tip".to_string(),
+        icon: "📸".to_string(),
+        title: "Tahukah Anda?".to_string(),
+        description: Some(
+            "Anda bisa melampirkan foto dan video sebagai bukti untuk memperkuat laporan."
+                .to_string(),
+        ),
+        dismissible: true,
+        payload: FeedSystemCardPayloadDto::Tip {
+            tip_id: "tip-evidence-upload".to_string(),
+        },
+    });
+
+    if witness_count > 0 {
+        cards.push(FeedSystemCardDto {
+            variant: "milestone".to_string(),
+            icon: "🎉".to_string(),
+            title: "Komunitas makin aktif!".to_string(),
+            description: Some(
+                "Sinyal partisipasi warga meningkat dari aktivitas feed terbaru.".to_string(),
+            ),
+            dismissible: true,
+            payload: FeedSystemCardPayloadDto::Milestone {
+                metric_label: "Aktivitas saksi terlihat".to_string(),
+                metric_value: witness_count.to_string(),
+            },
+        });
+    } else {
+        cards.push(FeedSystemCardDto {
+            variant: "prompt".to_string(),
+            icon: "🧭".to_string(),
+            title: "Belum ada update baru".to_string(),
+            description: Some("Mulai saksi baru untuk memantik gotong royong.".to_string()),
+            dismissible: false,
+            payload: FeedSystemCardPayloadDto::Prompt {
+                cta_label: "Buat Saksi".to_string(),
+                cta_action: "create_witness".to_string(),
+            },
+        });
+    }
+
+    cards
+}
+
+fn build_feed_stream(
+    witness_items: Vec<gotong_domain::discovery::FeedItem>,
+    system_cards: Vec<FeedSystemCardDto>,
+) -> Vec<FeedStreamItemDto> {
+    const SYSTEM_CARD_INTERVAL: usize = 3;
+    let mut stream = Vec::with_capacity(witness_items.len() + system_cards.len());
+    let mut last_sort_timestamp = to_sort_timestamp_iso(gotong_domain::jobs::now_ms());
+    let mut system_index = 0usize;
+    let mut system_cards_iter = system_cards.into_iter();
+
+    for (idx, item) in witness_items.into_iter().enumerate() {
+        let sort_timestamp = to_sort_timestamp_iso(sort_timestamp_ms(&item));
+        last_sort_timestamp = sort_timestamp.clone();
+        stream.push(FeedStreamItemDto::Witness {
+            stream_id: format!("w-{}", item.feed_id),
+            sort_timestamp: sort_timestamp.clone(),
+            data: item,
+        });
+
+        if (idx + 1) % SYSTEM_CARD_INTERVAL == 0 {
+            if let Some(card) = system_cards_iter.next() {
+                stream.push(FeedStreamItemDto::System {
+                    stream_id: format!("sys-{system_index}"),
+                    sort_timestamp: sort_timestamp.clone(),
+                    data: card,
+                });
+                system_index += 1;
+            }
+        }
+    }
+
+    for card in system_cards_iter {
+        stream.push(FeedStreamItemDto::System {
+            stream_id: format!("sys-{system_index}"),
+            sort_timestamp: last_sort_timestamp.clone(),
+            data: card,
+        });
+        system_index += 1;
+    }
+
+    stream
 }
 
 async fn persist_feed_monitor_preference(
@@ -3993,22 +4193,29 @@ async fn list_discovery_feed(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthContext>,
     Query(query): Query<FeedListQueryParams>,
-) -> Result<Json<PagedFeed>, ApiError> {
+) -> Result<Json<FeedStreamResponse>, ApiError> {
     let actor = actor_identity(&auth)?;
     let actor_id = actor.user_id.clone();
+    let feed_scope_id = query.scope_id.clone();
+    let feed_privacy_level = query.privacy_level.clone();
+    let feed_from_ms = query.from_ms;
+    let feed_to_ms = query.to_ms;
+    let feed_limit = query.limit;
+    let feed_cursor = query.cursor.clone();
+    let feed_involvement_only = query.involvement_only.unwrap_or(false);
     let service = DiscoveryService::new(
         request_repos::feed_repo(&state, &auth),
         request_repos::notification_repo(&state, &auth),
     );
     let request = FeedListQuery {
         actor_id: actor_id.clone(),
-        cursor: query.cursor,
-        limit: query.limit,
-        scope_id: query.scope_id,
-        privacy_level: query.privacy_level,
-        from_ms: query.from_ms,
-        to_ms: query.to_ms,
-        involvement_only: query.involvement_only.unwrap_or(false),
+        cursor: feed_cursor,
+        limit: feed_limit,
+        scope_id: feed_scope_id.clone(),
+        privacy_level: feed_privacy_level.clone(),
+        from_ms: feed_from_ms,
+        to_ms: feed_to_ms,
+        involvement_only: feed_involvement_only,
     };
     let mut response = service.list_feed(request).await.map_err(map_domain_error)?;
 
@@ -4033,7 +4240,35 @@ async fn list_discovery_feed(
         item.payload = Some(Value::Object(payload));
     }
 
-    Ok(Json(response))
+    let mut suggestions = service
+        .list_feed_suggestions(FeedSuggestionsQuery {
+            actor_id: actor_id.clone(),
+            limit: Some(6),
+            scope_id: feed_scope_id,
+            privacy_level: feed_privacy_level,
+            from_ms: feed_from_ms,
+            to_ms: feed_to_ms,
+        })
+        .await
+        .map_err(map_domain_error)?;
+    for suggestion in &mut suggestions {
+        if let Some(followed) = follow_map.get(&suggestion.entity_id) {
+            suggestion.followed = *followed;
+        }
+    }
+
+    let next_cursor = response.next_cursor;
+    let witness_items = response.items;
+    let system_cards = build_feed_system_cards(&suggestions, witness_items.len());
+    let stream_items = build_feed_stream(witness_items.clone(), system_cards);
+    let has_more = next_cursor.is_some();
+
+    Ok(Json(FeedStreamResponse {
+        items: witness_items,
+        stream: stream_items,
+        next_cursor,
+        has_more,
+    }))
 }
 
 async fn list_discovery_feed_suggestions(
