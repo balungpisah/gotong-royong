@@ -2,6 +2,10 @@
 	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
+	import type { CardVariant, CardPadding } from '$lib/components/ui/card';
+
+	const variants: CardVariant[] = ['default', 'elevated', 'outlined', 'flat', 'glass'];
+	const paddings: CardPadding[] = ['default', 'compact', 'none'];
 
 	const trackBadges: { variant: BadgeVariant; label: string }[] = [
 		{ variant: 'track-tuntaskan', label: 'tuntaskan' },
@@ -10,48 +14,88 @@
 	];
 </script>
 
-<h1 class="mb-6 text-2xl font-bold">Card</h1>
+<h1 class="mb-2 text-h1 font-extrabold">Card</h1>
+<p class="mb-8 text-body text-muted-foreground">
+	7-part card system with 5 visual variants, 3 padding options, interactive and selected states.
+</p>
 
-<section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Basic Card</h2>
-	<div class="max-w-sm">
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>Card Title</Card.Title>
-				<Card.Description>Card description goes here.</Card.Description>
-			</Card.Header>
-			<Card.Content>
-				<p class="text-sm">This is the card content area.</p>
-			</Card.Content>
-			<Card.Footer>
-				<Button variant="outline" size="sm">Cancel</Button>
-				<Button size="sm">Save</Button>
-			</Card.Footer>
-		</Card.Root>
-	</div>
-</section>
-
-<section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Cards Grid</h2>
+<!-- Variant Matrix -->
+<section class="mb-10">
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Variants</h2>
 	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-		{#each trackBadges as item (item.variant)}
-			<Card.Root>
+		{#each variants as variant (variant)}
+			<Card.Root {variant} padding="compact">
 				<Card.Header>
-					<div class="flex items-center justify-between">
-						<Card.Title class="text-sm">{item.variant}</Card.Title>
-						<Badge variant={item.variant}>{item.label}</Badge>
-					</div>
+					<Card.Title class="text-small">{variant}</Card.Title>
+					<Card.Description>Card variant: {variant}</Card.Description>
 				</Card.Header>
 				<Card.Content>
-					<p class="text-xs text-muted-foreground">Example card with a track badge variant.</p>
+					<p class="text-small text-muted-foreground">Content area for the {variant} variant.</p>
 				</Card.Content>
 			</Card.Root>
 		{/each}
 	</div>
 </section>
 
-<section>
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Card with Actions</h2>
+<!-- Padding Options -->
+<section class="mb-10">
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Padding</h2>
+	<div class="grid gap-4 sm:grid-cols-3">
+		{#each paddings as padding (padding)}
+			<Card.Root {padding}>
+				<Card.Header>
+					<Card.Title class="text-small">padding="{padding}"</Card.Title>
+				</Card.Header>
+				<Card.Content>
+					<p class="text-small text-muted-foreground">
+						{padding === 'default'
+							? 'Standard spacing (py-6, px-6 on children)'
+							: padding === 'compact'
+								? 'Compact spacing (p-4) for dense layouts'
+								: 'No padding — full control to children'}
+					</p>
+				</Card.Content>
+			</Card.Root>
+		{/each}
+	</div>
+</section>
+
+<!-- Interactive -->
+<section class="mb-10">
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Interactive + States</h2>
+	<div class="grid gap-4 sm:grid-cols-3">
+		<Card.Root interactive padding="compact">
+			<Card.Header>
+				<Card.Title class="text-small">Interactive (idle)</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<p class="text-small text-muted-foreground">Hover me — cursor and border change.</p>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root interactive state="selected" padding="compact">
+			<Card.Header>
+				<Card.Title class="text-small">Selected</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<p class="text-small text-muted-foreground">Primary border + subtle background tint.</p>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root variant="elevated" interactive padding="compact">
+			<Card.Header>
+				<Card.Title class="text-small">Elevated + Interactive</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<p class="text-small text-muted-foreground">Shadow grows on hover.</p>
+			</Card.Content>
+		</Card.Root>
+	</div>
+</section>
+
+<!-- Full Composition -->
+<section class="mb-10">
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Full Composition</h2>
 	<div class="max-w-sm">
 		<Card.Root>
 			<Card.Header>
@@ -60,7 +104,7 @@
 			</Card.Header>
 			<Card.Content>
 				<div class="space-y-2">
-					<div class="flex items-center justify-between text-sm">
+					<div class="flex items-center justify-between text-body">
 						<span>Progress</span>
 						<span class="font-semibold">72%</span>
 					</div>
@@ -75,5 +119,25 @@
 				<Button variant="track-tuntaskan" size="sm">Take Action</Button>
 			</Card.Footer>
 		</Card.Root>
+	</div>
+</section>
+
+<!-- Track Badges Grid -->
+<section>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Cards Grid with Track Badges</h2>
+	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+		{#each trackBadges as item (item.variant)}
+			<Card.Root padding="compact">
+				<Card.Header>
+					<div class="flex items-center justify-between">
+						<Card.Title class="text-small">{item.variant}</Card.Title>
+						<Badge variant={item.variant}>{item.label}</Badge>
+					</div>
+				</Card.Header>
+				<Card.Content>
+					<p class="text-small text-muted-foreground">Example card with a track badge variant.</p>
+				</Card.Content>
+			</Card.Root>
+		{/each}
 	</div>
 </section>

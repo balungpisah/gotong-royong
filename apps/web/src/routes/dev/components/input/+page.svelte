@@ -3,17 +3,17 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 </script>
 
-<h1 class="mb-6 text-2xl font-bold">Input</h1>
+<h1 class="mb-6 text-h1 font-extrabold">Input</h1>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Default</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Default</h2>
 	<div class="max-w-sm space-y-4">
 		<Input placeholder="Default input" />
 	</div>
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">With Label + Hint</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">With Label + Hint</h2>
 	<div class="max-w-sm space-y-1">
 		<InputLabel for="demo-name">Full Name</InputLabel>
 		<Input id="demo-name" placeholder="Enter your name" />
@@ -22,7 +22,7 @@
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Error State</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Error State</h2>
 	<div class="max-w-sm space-y-1">
 		<InputLabel for="demo-email">Email</InputLabel>
 		<Input id="demo-email" type="email" aria-invalid="true" value="not-an-email" />
@@ -31,7 +31,7 @@
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Disabled</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Disabled</h2>
 	<div class="max-w-sm space-y-1">
 		<InputLabel for="demo-disabled">Disabled</InputLabel>
 		<Input id="demo-disabled" disabled value="Cannot edit" />
@@ -39,7 +39,7 @@
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">File Input</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">File Input</h2>
 	<div class="max-w-sm space-y-1">
 		<InputLabel for="demo-file">Upload File</InputLabel>
 		<Input id="demo-file" type="file" />
@@ -47,7 +47,7 @@
 </section>
 
 <section>
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Textarea</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Textarea</h2>
 	<div class="max-w-sm space-y-4">
 		<div class="space-y-1">
 			<InputLabel for="demo-textarea">Description</InputLabel>

@@ -25,10 +25,10 @@
 	const sizeShowcaseVariants: ButtonVariant[] = ['default', 'track-tuntaskan', 'vault'];
 </script>
 
-<h1 class="mb-6 text-2xl font-bold">Button</h1>
+<h1 class="mb-6 text-h1 font-extrabold">Button</h1>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Base Variants</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Base Variants</h2>
 	<div class="flex flex-wrap items-center gap-3">
 		{#each baseVariants as variant (variant)}
 			<Button {variant}>{variant}</Button>
@@ -38,7 +38,7 @@
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">DNA — Track Variants</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">DNA — Track Variants</h2>
 	<div class="flex flex-wrap items-center gap-3">
 		{#each dnaVariants.slice(0, 5) as variant (variant)}
 			<Button {variant}>{variant}</Button>
@@ -47,7 +47,7 @@
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">DNA — Mode Variants</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">DNA — Mode Variants</h2>
 	<div class="flex flex-wrap items-center gap-3">
 		<Button variant="vault">vault</Button>
 		<Button variant="siaga">siaga</Button>
@@ -55,7 +55,7 @@
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Sizes</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Sizes</h2>
 	{#each sizeShowcaseVariants as variant (variant)}
 		<div class="mb-3 flex flex-wrap items-center gap-3">
 			{#each sizes as size (size)}
@@ -66,7 +66,7 @@
 </section>
 
 <section>
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">As Link</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">As Link</h2>
 	<div class="flex flex-wrap items-center gap-3">
 		<Button href="#" variant="default">Default link</Button>
 		<Button href="#" variant="track-wujudkan">Track link</Button>

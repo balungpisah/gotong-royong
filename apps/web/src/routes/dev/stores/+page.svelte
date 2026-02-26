@@ -16,24 +16,24 @@
 
 <div class="space-y-8">
 	<div>
-		<h1 class="text-2xl font-bold text-foreground">Stores</h1>
-		<p class="text-sm text-muted-foreground">
+		<h1 class="text-h1 font-extrabold text-foreground">Stores</h1>
+		<p class="text-body text-muted-foreground">
 			Interactive state visualization for all Svelte 5 runes-based stores.
 		</p>
 	</div>
 
 	<!-- User Store -->
 	<section class="space-y-3">
-		<h2 class="text-lg font-semibold text-foreground">User Store</h2>
+		<h2 class="text-h2 font-bold text-foreground">User Store</h2>
 		<div class="flex gap-2">
 			<Button size="sm" onclick={() => userStore.loadCurrentUser()}>Load Current User</Button>
 			<Button size="sm" variant="outline" onclick={() => userStore.logout()}>Logout</Button>
 		</div>
 		<div class="rounded-lg border border-border bg-card p-4">
 			{#if userStore.loading}
-				<p class="text-sm text-muted-foreground">Memuat...</p>
+				<p class="text-body text-muted-foreground">Memuat...</p>
 			{:else if userStore.profile}
-				<div class="space-y-1 text-sm">
+				<div class="space-y-1 text-body">
 					<p><span class="font-medium">Nama:</span> {userStore.displayName}</p>
 					<p>
 						<span class="font-medium">Role:</span>
@@ -45,8 +45,8 @@
 						{userStore.isAuthenticated ? 'Ya' : 'Tidak'}
 					</p>
 					<details class="mt-2">
-						<summary class="cursor-pointer text-xs text-muted-foreground">Raw JSON</summary>
-						<pre class="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-xs">{JSON.stringify(
+						<summary class="cursor-pointer text-small text-muted-foreground">Raw JSON</summary>
+						<pre class="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-small">{JSON.stringify(
 								userStore.profile,
 								null,
 								2
@@ -54,17 +54,17 @@
 					</details>
 				</div>
 			{:else}
-				<p class="text-sm text-muted-foreground">Belum dimuat. Klik "Load Current User".</p>
+				<p class="text-body text-muted-foreground">Belum dimuat. Klik "Load Current User".</p>
 			{/if}
 			{#if userStore.error}
-				<p class="mt-2 text-sm text-destructive">{userStore.error}</p>
+				<p class="mt-2 text-body text-destructive">{userStore.error}</p>
 			{/if}
 		</div>
 	</section>
 
 	<!-- Witness Store -->
 	<section class="space-y-3">
-		<h2 class="text-lg font-semibold text-foreground">Witness Store</h2>
+		<h2 class="text-h2 font-bold text-foreground">Witness Store</h2>
 		<div class="flex flex-wrap gap-2">
 			<Button size="sm" onclick={() => witnessStore.loadList()}>Load Witnesses</Button>
 			<Button size="sm" variant="outline" onclick={() => witnessStore.loadDetail('witness-001')}>
@@ -82,7 +82,7 @@
 		<div class="grid gap-4 md:grid-cols-2">
 			<!-- List -->
 			<div class="rounded-lg border border-border bg-card p-4">
-				<h3 class="mb-2 text-sm font-medium text-foreground">
+				<h3 class="mb-2 text-h3 font-semibold text-foreground">
 					Witness List
 					{#if witnessStore.listLoading}
 						<Badge variant="outline" class="ml-2">Loading...</Badge>
@@ -92,7 +92,7 @@
 					<div class="space-y-2">
 						{#each witnessStore.witnesses as w (w.witness_id)}
 							<div
-								class="flex items-center justify-between rounded border border-border/50 px-3 py-2 text-xs"
+								class="flex items-center justify-between rounded border border-border/50 px-3 py-2 text-small"
 							>
 								<div>
 									<p class="font-medium">{w.title}</p>
@@ -104,28 +104,28 @@
 							</div>
 						{/each}
 					</div>
-					<div class="mt-3 flex gap-3 text-xs text-muted-foreground">
+					<div class="mt-3 flex gap-3 text-small text-muted-foreground">
 						<span>Active: {witnessStore.activeWitnesses.length}</span>
 						<span>Unread total: {witnessStore.unreadTotal}</span>
 					</div>
 				{:else}
-					<p class="text-sm text-muted-foreground">Belum dimuat.</p>
+					<p class="text-body text-muted-foreground">Belum dimuat.</p>
 				{/if}
 				{#if witnessStore.listError}
-					<p class="mt-2 text-sm text-destructive">{witnessStore.listError}</p>
+					<p class="mt-2 text-body text-destructive">{witnessStore.listError}</p>
 				{/if}
 			</div>
 
 			<!-- Detail -->
 			<div class="rounded-lg border border-border bg-card p-4">
-				<h3 class="mb-2 text-sm font-medium text-foreground">
+				<h3 class="mb-2 text-h3 font-semibold text-foreground">
 					Current Detail
 					{#if witnessStore.detailLoading}
 						<Badge variant="outline" class="ml-2">Loading...</Badge>
 					{/if}
 				</h3>
 				{#if witnessStore.current}
-					<div class="space-y-1 text-xs">
+					<div class="space-y-1 text-small">
 						<p><span class="font-medium">ID:</span> {witnessStore.current.witness_id}</p>
 						<p><span class="font-medium">Title:</span> {witnessStore.current.title}</p>
 						<p><span class="font-medium">Messages:</span> {witnessStore.currentMessages.length}</p>
@@ -137,18 +137,18 @@
 						<p><span class="font-medium">Blocks:</span> {witnessStore.current.blocks.length}</p>
 					</div>
 					<details class="mt-2">
-						<summary class="cursor-pointer text-xs text-muted-foreground">Messages JSON</summary>
-						<pre class="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-xs">{JSON.stringify(
+						<summary class="cursor-pointer text-small text-muted-foreground">Messages JSON</summary>
+						<pre class="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-small">{JSON.stringify(
 								witnessStore.currentMessages.map((m) => ({ id: m.message_id, type: m.type })),
 								null,
 								2
 							)}</pre>
 					</details>
 				{:else}
-					<p class="text-sm text-muted-foreground">Belum dimuat.</p>
+					<p class="text-body text-muted-foreground">Belum dimuat.</p>
 				{/if}
 				{#if witnessStore.detailError}
-					<p class="mt-2 text-sm text-destructive">{witnessStore.detailError}</p>
+					<p class="mt-2 text-body text-destructive">{witnessStore.detailError}</p>
 				{/if}
 			</div>
 		</div>
@@ -156,7 +156,7 @@
 
 	<!-- Notification Store -->
 	<section class="space-y-3">
-		<h2 class="text-lg font-semibold text-foreground">Notification Store</h2>
+		<h2 class="text-h2 font-bold text-foreground">Notification Store</h2>
 		<div class="flex gap-2">
 			<Button size="sm" onclick={() => notificationStore.loadNotifications()}
 				>Load Notifications</Button
@@ -167,9 +167,9 @@
 		</div>
 		<div class="rounded-lg border border-border bg-card p-4">
 			{#if notificationStore.loading}
-				<p class="text-sm text-muted-foreground">Memuat...</p>
+				<p class="text-body text-muted-foreground">Memuat...</p>
 			{:else if notificationStore.notifications.length > 0}
-				<div class="mb-3 flex gap-3 text-xs text-muted-foreground">
+				<div class="mb-3 flex gap-3 text-small text-muted-foreground">
 					<span>Total: {notificationStore.notifications.length}</span>
 					<span>
 						Unread:
@@ -184,7 +184,7 @@
 				<div class="space-y-1">
 					{#each notificationStore.notifications as n (n.notification_id)}
 						<div
-							class="flex items-center justify-between rounded px-3 py-1.5 text-xs {n.read
+							class="flex items-center justify-between rounded px-3 py-1.5 text-small {n.read
 								? 'text-muted-foreground'
 								: 'bg-muted/50 font-medium text-foreground'}"
 						>
@@ -206,17 +206,17 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="text-sm text-muted-foreground">Belum dimuat.</p>
+				<p class="text-body text-muted-foreground">Belum dimuat.</p>
 			{/if}
 			{#if notificationStore.error}
-				<p class="mt-2 text-sm text-destructive">{notificationStore.error}</p>
+				<p class="mt-2 text-body text-destructive">{notificationStore.error}</p>
 			{/if}
 		</div>
 	</section>
 
 	<!-- Triage Store -->
 	<section class="space-y-3">
-		<h2 class="text-lg font-semibold text-foreground">Triage Store</h2>
+		<h2 class="text-h2 font-bold text-foreground">Triage Store</h2>
 		<div class="flex gap-2">
 			<Button
 				size="sm"
@@ -236,9 +236,9 @@
 		</div>
 		<div class="rounded-lg border border-border bg-card p-4">
 			{#if triageStore.loading}
-				<p class="text-sm text-muted-foreground">Memuat...</p>
+				<p class="text-body text-muted-foreground">Memuat...</p>
 			{:else if triageStore.result}
-				<div class="space-y-1 text-sm">
+				<div class="space-y-1 text-body">
 					<p>
 						<span class="font-medium">Bar State:</span>
 						<Badge variant="outline">{triageStore.barState}</Badge>
@@ -255,10 +255,10 @@
 					{/if}
 				</div>
 			{:else}
-				<p class="text-sm text-muted-foreground">Belum dimulai. Klik "Start Triage".</p>
+				<p class="text-body text-muted-foreground">Belum dimulai. Klik "Start Triage".</p>
 			{/if}
 			{#if triageStore.error}
-				<p class="mt-2 text-sm text-destructive">{triageStore.error}</p>
+				<p class="mt-2 text-body text-destructive">{triageStore.error}</p>
 			{/if}
 		</div>
 	</section>

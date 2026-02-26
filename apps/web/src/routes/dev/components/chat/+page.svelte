@@ -5,8 +5,8 @@
 
 <div class="flex flex-col gap-6">
 	<div>
-		<h1 class="text-2xl font-bold">Chat Thread</h1>
-		<p class="mt-1 text-sm text-muted-foreground">
+		<h1 class="text-h1 font-extrabold">Chat Thread</h1>
+		<p class="mt-1 text-body text-muted-foreground">
 			All 7 chat message types rendered in a WhatsApp-style thread
 		</p>
 	</div>
@@ -18,8 +18,8 @@
 
 	<!-- Legend -->
 	<div class="rounded-lg border border-border bg-card p-4">
-		<h3 class="mb-2 text-sm font-bold">Message Types in This Thread</h3>
-		<div class="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+		<h3 class="mb-2 text-h3 font-semibold">Message Types in This Thread</h3>
+		<div class="grid grid-cols-2 gap-2 text-small text-muted-foreground sm:grid-cols-3">
 			<span>1. System Message (member_joined)</span>
 			<span>2. User Message (self)</span>
 			<span>3. AI Card (classification)</span>

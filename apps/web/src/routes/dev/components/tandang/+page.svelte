@@ -9,8 +9,8 @@
 
 <div class="flex flex-col gap-6">
 	<div>
-		<h1 class="text-2xl font-bold">Tandang Panel (Witness Detail)</h1>
-		<p class="mt-1 text-sm text-muted-foreground">
+		<h1 class="text-h1 font-extrabold">Tandang Panel (Witness Detail)</h1>
+		<p class="mt-1 text-body text-muted-foreground">
 			Full witness detail with Octalysis enrichment: progress bar, member presence, scarcity nudges, story narrative phases, celebration moments
 		</p>
 	</div>

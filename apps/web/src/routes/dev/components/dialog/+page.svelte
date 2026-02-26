@@ -4,10 +4,10 @@
 	import { Input, InputLabel } from '$lib/components/ui/input';
 </script>
 
-<h1 class="mb-6 text-2xl font-bold">Dialog</h1>
+<h1 class="mb-6 text-h1 font-extrabold">Dialog</h1>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Basic Dialog</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Basic Dialog</h2>
 	<Dialog.Root>
 		<Dialog.Trigger>
 			{#snippet child({ props })}
@@ -19,7 +19,7 @@
 				<Dialog.Title>Basic Dialog</Dialog.Title>
 				<Dialog.Description>This is a basic dialog with title and description.</Dialog.Description>
 			</Dialog.Header>
-			<p class="text-sm text-muted-foreground">Dialog body content goes here.</p>
+			<p class="text-body text-muted-foreground">Dialog body content goes here.</p>
 			<Dialog.Footer>
 				<Dialog.Close>
 					{#snippet child({ props })}
@@ -33,7 +33,7 @@
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Dialog with Form</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Dialog with Form</h2>
 	<Dialog.Root>
 		<Dialog.Trigger>
 			{#snippet child({ props })}
@@ -68,7 +68,7 @@
 </section>
 
 <section>
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Destructive Dialog</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Destructive Dialog</h2>
 	<Dialog.Root>
 		<Dialog.Trigger>
 			{#snippet child({ props })}

@@ -17,8 +17,8 @@
 
 <div class="flex flex-col gap-6">
 	<div>
-		<h1 class="text-2xl font-bold">Aku Panel — Header Preview</h1>
-		<p class="mt-1 text-sm text-muted-foreground">
+		<h1 class="text-h1 font-extrabold">Aku Panel — Header Preview</h1>
+		<p class="mt-1 text-body text-muted-foreground">
 			Uses <code>PanelPinnedCard</code> template. Compare with Tandang header.
 		</p>
 	</div>
@@ -36,7 +36,7 @@
 						<span class="absolute bottom-0 right-0 size-2 rounded-full bg-online ring-1 ring-background"></span>
 					</div>
 					<div class="min-w-0 flex-1">
-						<p class="truncate text-sm font-bold leading-tight text-foreground">{profile.name}</p>
+						<p class="truncate text-h3 font-semibold leading-tight text-foreground">{profile.name}</p>
 						<p class="truncate text-caption text-muted-foreground">
 							{#if profile.location}{profile.location} · {/if}{m.profil_member_since({ year: String(joinedYear) })}
 						</p>

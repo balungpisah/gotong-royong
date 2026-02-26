@@ -48,25 +48,25 @@
 
 <div class="flex flex-col gap-8">
 	<div>
-		<h1 class="text-2xl font-bold">Diff Card</h1>
-		<p class="mt-1 text-sm text-muted-foreground">
+		<h1 class="text-h1 font-extrabold">Diff Card</h1>
+		<p class="mt-1 text-body text-muted-foreground">
 			"Suggest-Don't-Overwrite" pattern — AI suggests changes via diff cards
 		</p>
 	</div>
 
 	<section class="flex flex-col gap-3">
-		<h2 class="border-b border-border pb-2 text-lg font-semibold">Full Diff Card</h2>
+		<h2 class="border-b border-border pb-2 text-h2 font-bold">Full Diff Card</h2>
 		<div class="max-w-lg">
 			<DiffCardRenderer diff={mockDiff} ondiffaction={handleDiffAction} />
 		</div>
 	</section>
 
 	<section class="flex flex-col gap-3">
-		<h2 class="border-b border-border pb-2 text-lg font-semibold">Operations Legend</h2>
-		<div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+		<h2 class="border-b border-border pb-2 text-h2 font-bold">Operations Legend</h2>
+		<div class="grid grid-cols-2 gap-3 text-body sm:grid-cols-4">
 			<div class="flex items-center gap-2">
 				<div
-					class="flex size-5 items-center justify-center rounded bg-berhasil-lembut text-berhasil text-xs"
+					class="flex size-5 items-center justify-center rounded bg-berhasil-lembut text-berhasil text-small"
 				>
 					+
 				</div>
@@ -74,7 +74,7 @@
 			</div>
 			<div class="flex items-center gap-2">
 				<div
-					class="flex size-5 items-center justify-center rounded bg-bahaya-lembut text-bahaya text-xs"
+					class="flex size-5 items-center justify-center rounded bg-bahaya-lembut text-bahaya text-small"
 				>
 					−
 				</div>
@@ -82,7 +82,7 @@
 			</div>
 			<div class="flex items-center gap-2">
 				<div
-					class="flex size-5 items-center justify-center rounded bg-peringatan-lembut text-peringatan text-xs"
+					class="flex size-5 items-center justify-center rounded bg-peringatan-lembut text-peringatan text-small"
 				>
 					✎
 				</div>
@@ -90,7 +90,7 @@
 			</div>
 			<div class="flex items-center gap-2">
 				<div
-					class="flex size-5 items-center justify-center rounded bg-keterangan-lembut text-keterangan text-xs"
+					class="flex size-5 items-center justify-center rounded bg-keterangan-lembut text-keterangan text-small"
 				>
 					↕
 				</div>

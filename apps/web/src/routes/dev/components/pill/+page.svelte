@@ -12,10 +12,10 @@
 	];
 </script>
 
-<h1 class="mb-6 text-2xl font-bold">Pill / Tag</h1>
+<h1 class="mb-6 text-h1 font-extrabold">Pill / Tag</h1>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Default Variants</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Default Variants</h2>
 	<div class="flex flex-wrap items-center gap-3">
 		{#each defaultVariants as variant (variant)}
 			<Pill {variant}>{variant}</Pill>
@@ -24,7 +24,7 @@
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Track Variants</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Track Variants</h2>
 	<div class="flex flex-wrap items-center gap-3">
 		{#each trackVariants as variant (variant)}
 			<Pill {variant}>{variant}</Pill>
@@ -33,7 +33,7 @@
 </section>
 
 <section>
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Removable</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Removable</h2>
 	<div class="flex flex-wrap items-center gap-3">
 		<Pill removable onremove={() => {}}>Removable default</Pill>
 		<Pill variant="active" removable onremove={() => {}}>Removable active</Pill>

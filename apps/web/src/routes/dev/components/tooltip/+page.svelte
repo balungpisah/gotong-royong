@@ -8,10 +8,10 @@
 	import { Button } from '$lib/components/ui/button';
 </script>
 
-<h1 class="mb-6 text-2xl font-bold">Tooltip</h1>
+<h1 class="mb-6 text-h1 font-extrabold">Tooltip</h1>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Positions</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Positions</h2>
 	<div class="flex flex-wrap items-center gap-6">
 		<TooltipProvider>
 			<Tooltip>
@@ -52,7 +52,7 @@
 </section>
 
 <section>
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">With DNA Buttons</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">With DNA Buttons</h2>
 	<div class="flex flex-wrap items-center gap-4">
 		<TooltipProvider>
 			<Tooltip>

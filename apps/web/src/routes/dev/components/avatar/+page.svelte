@@ -5,24 +5,24 @@
 	const sizes: AvatarSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
 </script>
 
-<h1 class="mb-6 text-2xl font-bold">Avatar</h1>
+<h1 class="mb-6 text-h1 font-extrabold">Avatar</h1>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Sizes</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Sizes</h2>
 	<div class="flex flex-wrap items-end gap-4">
 		{#each sizes as size (size)}
 			<div class="flex flex-col items-center gap-1">
 				<Avatar {size}>
 					<AvatarFallback>{size?.toUpperCase()}</AvatarFallback>
 				</Avatar>
-				<span class="text-xs text-muted-foreground">{size}</span>
+				<span class="text-small text-muted-foreground">{size}</span>
 			</div>
 		{/each}
 	</div>
 </section>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">With Image</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">With Image</h2>
 	<div class="flex flex-wrap items-end gap-4">
 		{#each sizes as size (size)}
 			<Avatar {size}>
@@ -37,7 +37,7 @@
 </section>
 
 <section>
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Avatar Group</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Avatar Group</h2>
 	<AvatarGroup>
 		<Avatar size="md">
 			<AvatarFallback>AB</AvatarFallback>

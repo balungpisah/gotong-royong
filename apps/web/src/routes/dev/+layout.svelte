@@ -30,38 +30,38 @@
 	<aside
 		class="sticky top-0 hidden h-screen w-56 shrink-0 overflow-y-auto border-r border-border bg-card p-4 md:block"
 	>
-		<a href="/dev/components" class="mb-4 block text-lg font-bold text-foreground">
+		<a href="/dev/components" class="mb-4 block text-h2 font-bold text-foreground">
 			Component Gallery
 		</a>
 		<nav class="flex flex-col gap-1">
 			{#each components as comp (comp.href)}
 				<a
 					href={comp.href}
-					class="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					class="rounded-md px-3 py-1.5 text-body text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 				>
 					{comp.name}
 				</a>
 			{/each}
 			<div class="mt-4 border-t border-border pt-4">
-				<p class="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+				<p class="mb-2 px-3 text-small font-semibold uppercase tracking-wider text-muted-foreground">
 					Renderers
 				</p>
 				{#each renderers as comp (comp.href)}
 					<a
 						href={comp.href}
-						class="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						class="rounded-md px-3 py-1.5 text-body text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 					>
 						{comp.name}
 					</a>
 				{/each}
 			</div>
 			<div class="mt-4 border-t border-border pt-4">
-				<p class="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+				<p class="mb-2 px-3 text-small font-semibold uppercase tracking-wider text-muted-foreground">
 					Stores
 				</p>
 				<a
 					href="/dev/stores"
-					class="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					class="rounded-md px-3 py-1.5 text-body text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 				>
 					State Inspector
 				</a>

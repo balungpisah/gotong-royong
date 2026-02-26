@@ -11,10 +11,10 @@
 	];
 </script>
 
-<h1 class="mb-6 text-2xl font-bold">Status Indicator</h1>
+<h1 class="mb-6 text-h1 font-extrabold">Status Indicator</h1>
 
 <section class="mb-8">
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">All States</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">All States</h2>
 	<div class="flex flex-wrap items-center gap-6">
 		{#each statuses as status (status)}
 			<StatusIndicator {status}>{status}</StatusIndicator>
@@ -23,7 +23,7 @@
 </section>
 
 <section>
-	<h2 class="mb-4 text-lg font-semibold text-muted-foreground">Dot Only (no label)</h2>
+	<h2 class="mb-4 text-h2 font-bold text-muted-foreground">Dot Only (no label)</h2>
 	<div class="flex flex-wrap items-center gap-4">
 		{#each statuses as status (status)}
 			<StatusIndicator {status} />
