@@ -830,6 +830,7 @@ mod tests {
             surreal_pass: "root".to_string(),
             redis_url: "redis://127.0.0.1:6379".to_string(),
             jwt_secret: "test-secret".to_string(),
+            auth_dev_bypass_enabled: false,
             s3_endpoint: "http://127.0.0.1:9000".to_string(),
             s3_bucket: "gotong-royong-evidence-test".to_string(),
             s3_region: "us-east-1".to_string(),

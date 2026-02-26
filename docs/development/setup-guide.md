@@ -67,6 +67,7 @@ CHAT_ATTACHMENT_S3_PREFIX=chat-attachments
 
 # Auth
 JWT_SECRET=dev_jwt_secret_32_chars_minimum
+AUTH_DEV_BYPASS_ENABLED=true
 GOTONG_ROYONG_WEBHOOK_SECRET=dev_webhook_secret_32_chars_minimum
 
 # Worker

@@ -52,6 +52,7 @@ fn test_config() -> AppConfig {
         surreal_pass: "root".to_string(),
         redis_url: "redis://127.0.0.1:6379".to_string(),
         jwt_secret: "test-secret".to_string(),
+        auth_dev_bypass_enabled: false,
         s3_endpoint: "http://127.0.0.1:9000".to_string(),
         s3_bucket: "gotong-royong-evidence-test".to_string(),
         s3_region: "us-east-1".to_string(),
@@ -2303,6 +2304,67 @@ async fn auth_me_requires_auth_and_matches_contract_shape() {
     assert_eq!(payload.get("role"), Some(&json!("moderator")));
     assert_eq!(payload.get("refresh_token"), Some(&serde_json::Value::Null));
     assert_eq!(payload.get("access_token"), Some(&json!(token)));
+}
+
+#[tokio::test]
+async fn auth_me_dev_bypass_allows_access_without_token_in_development() {
+    let mut config = test_config();
+    config.app_env = "development".to_string();
+    config.auth_dev_bypass_enabled = true;
+    let store = InMemoryIdempotencyStore::new("test");
+    let state = AppState::with_idempotency_store(config, Arc::new(store));
+    let app = routes::router(state);
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/v1/auth/me")
+        .body(Body::empty())
+        .expect("request");
+    let mut request = request;
+    request
+        .extensions_mut()
+        .insert(axum::extract::ConnectInfo(std::net::SocketAddr::from((
+            [127, 0, 0, 1],
+            4000,
+        ))));
+    let response = app.oneshot(request).await.expect("response");
+    let status = response.status();
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "unexpected response body: {}",
+        String::from_utf8_lossy(&body)
+    );
+    let payload: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(payload.get("user_id"), Some(&json!("dev-user")));
+    assert_eq!(payload.get("username"), Some(&json!("dev-user")));
+    assert_eq!(payload.get("role"), Some(&json!("user")));
+    assert_eq!(payload.get("refresh_token"), Some(&serde_json::Value::Null));
+    assert_eq!(
+        payload.get("access_token"),
+        Some(&json!("dev-bypass-token"))
+    );
+}
+
+#[tokio::test]
+async fn auth_me_dev_bypass_does_not_apply_outside_development() {
+    let mut config = test_config();
+    config.app_env = "test".to_string();
+    config.auth_dev_bypass_enabled = true;
+    let store = InMemoryIdempotencyStore::new("test");
+    let state = AppState::with_idempotency_store(config, Arc::new(store));
+    let app = routes::router(state);
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/v1/auth/me")
+        .body(Body::empty())
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_error_envelope(response, StatusCode::UNAUTHORIZED, "unauthorized").await;
 }
 
 #[tokio::test]

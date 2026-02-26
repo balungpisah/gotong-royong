@@ -60,6 +60,38 @@ impl AuthContext {
     }
 }
 
+const DEV_BYPASS_USER_ID: &str = "dev-user";
+const DEV_BYPASS_USERNAME: &str = "dev-user";
+const DEV_BYPASS_ACCESS_TOKEN: &str = "dev-bypass-token";
+
+fn dev_bypass_enabled(state: &AppState) -> bool {
+    state.config.auth_dev_bypass_enabled && state.config.app_env.eq_ignore_ascii_case("development")
+}
+
+fn dev_bypass_auth_context() -> AuthContext {
+    AuthContext {
+        user_id: Some(DEV_BYPASS_USER_ID.to_string()),
+        username: Some(DEV_BYPASS_USERNAME.to_string()),
+        access_token: Some(DEV_BYPASS_ACCESS_TOKEN.to_string()),
+        surreal_db_session: None,
+        role: Role::User,
+        is_authenticated: true,
+    }
+}
+
+fn insert_auth_context(req: &mut Request<Body>, state: &AppState, reason: &'static str) {
+    if dev_bypass_enabled(state) {
+        tracing::debug!(
+            reason,
+            "auth dev bypass enabled; injecting synthetic auth context"
+        );
+        req.extensions_mut().insert(dev_bypass_auth_context());
+        return;
+    }
+
+    req.extensions_mut().insert(AuthContext::anonymous());
+}
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct Claims {
@@ -147,7 +179,7 @@ pub async fn auth_middleware(
     let token = match auth_token(req.headers()) {
         Some(token) => token.to_string(),
         None => {
-            req.extensions_mut().insert(AuthContext::anonymous());
+            insert_auth_context(&mut req, &state, "missing_token");
             return next.run(req).await;
         }
     };
@@ -157,7 +189,7 @@ pub async fn auth_middleware(
             Ok(session) => session,
             Err(err) => {
                 tracing::warn!(error = %err, "invalid surreal auth token");
-                req.extensions_mut().insert(AuthContext::anonymous());
+                insert_auth_context(&mut req, &state, "invalid_surreal_token");
                 return next.run(req).await;
             }
         };
@@ -168,7 +200,7 @@ pub async fn auth_middleware(
                     platform_role = %session.identity.platform_role,
                     "token missing or invalid platform_role"
                 );
-                req.extensions_mut().insert(AuthContext::anonymous());
+                insert_auth_context(&mut req, &state, "invalid_platform_role");
                 return next.run(req).await;
             }
         };
@@ -196,7 +228,7 @@ pub async fn auth_middleware(
         Ok(data) => data,
         Err(err) => {
             tracing::warn!(error = %err, "invalid auth token");
-            req.extensions_mut().insert(AuthContext::anonymous());
+            insert_auth_context(&mut req, &state, "invalid_jwt");
             return next.run(req).await;
         }
     };
@@ -205,7 +237,7 @@ pub async fn auth_middleware(
         Some(role) => role,
         None => {
             tracing::warn!("token missing or invalid role");
-            req.extensions_mut().insert(AuthContext::anonymous());
+            insert_auth_context(&mut req, &state, "invalid_role_claim");
             return next.run(req).await;
         }
     };

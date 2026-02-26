@@ -13,6 +13,7 @@ pub struct AppConfig {
     pub surreal_pass: String,
     pub redis_url: String,
     pub jwt_secret: String,
+    pub auth_dev_bypass_enabled: bool,
     pub s3_endpoint: String,
     pub s3_bucket: String,
     pub s3_region: String,
@@ -67,6 +68,7 @@ impl AppConfig {
             .set_default("surreal_pass", "root")?
             .set_default("redis_url", "redis://127.0.0.1:6379")?
             .set_default("jwt_secret", "dev-secret")?
+            .set_default("auth_dev_bypass_enabled", false)?
             .set_default("s3_endpoint", "http://127.0.0.1:9000")?
             .set_default("s3_bucket", "gotong-royong-evidence-dev")?
             .set_default("s3_region", "us-east-1")?
