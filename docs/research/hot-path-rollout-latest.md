@@ -1,6 +1,6 @@
 # Hot-Path Rollout Report
 
-Date: 2026-02-25T18:05:25Z
+Date: 2026-02-26T07:50:53Z
 Namespace: `monitoring`
 Pack C Prometheus URL: `http://127.0.0.1:9090`
 Cluster status: `unreachable`
@@ -14,7 +14,7 @@ Overall result: `PASS`
 |---|---|---|
 | Pack C readiness gate | SKIPPED | 0s |
 | Pack C Stage A kickoff + go/no-go | PASS | 0s |
-| Pack C Stage B kickoff + go/no-go | PASS | 0s |
+| Pack C Stage B kickoff + go/no-go | PASS | 1s |
 | Pack C Stage C kickoff + go/no-go | PASS | 0s |
 | Chat attachment alerts plan | PASS | 0s |
 

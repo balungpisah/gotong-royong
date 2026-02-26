@@ -1,6 +1,6 @@
 # Pack C Stage A Kickoff Report
 
-Date: 2026-02-25T18:05:26Z
+Date: 2026-02-26T07:50:53Z
 Namespace: `monitoring`
 Observation window target: 24h
 Stage summary: Baseline rollout with fallback ON across all replicas.

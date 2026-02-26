@@ -1,6 +1,6 @@
 # Pack C Stage C Kickoff Report
 
-Date: 2026-02-25T18:05:26Z
+Date: 2026-02-26T07:50:54Z
 Namespace: `monitoring`
 Observation window target: 24h
 Stage summary: Full rollout with fallback OFF on all replicas.

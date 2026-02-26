@@ -317,7 +317,7 @@ Data from [krausest/js-framework-benchmark](https://krausest.github.io/js-framew
 | "Your SvelteKit Bun Project Still Runs on Node.js" | Analysis showing that even when using Bun as package manager, SvelteKit's dev server and build process still use Node.js internally | [DropANote](https://dropanote.de/en/blog/20250831-sveltekit-bun-project-still-runs-on-nodejs/) |
 | No official adapter | SvelteKit's `adapter-auto` does not include Bun as an option | Bun docs |
 
-**Verdict on Bun:** Use Bun as a development tool (package manager, dev server speed), but deploy with `@sveltejs/adapter-node` on Node.js. This is the hybrid approach — maximum dev speed with production stability.
+**Verdict on Bun:** Use Bun as both development tool and production runtime via `svelte-adapter-bun`. This keeps one runtime model across local, CI, and deployment.
 
 ### 6.5 Candidate C: Next.js 15 + React 19
 
@@ -466,7 +466,7 @@ The matrix above uses specific weight assumptions. Here's how shifting weights a
 | **Real-time** | Native WebSocket + sveltekit-sse | — | Direct connection to Axum WebSocket endpoints |
 | **PWA** | @vite-pwa/sveltekit | Latest | Service worker, offline caching, installability |
 | **Dev runtime** | Bun | Latest | Fast package installs, fast dev server |
-| **Prod runtime** | Node.js via @sveltejs/adapter-node | LTS | Stable, proven, official adapter |
+| **Prod runtime** | Bun via svelte-adapter-bun | Latest stable | Single-runtime model across environments |
 | **Testing** | Vitest + Playwright | Latest | Unit + E2E testing |
 | **Linting** | ESLint + Prettier + svelte-eslint-parser | Latest | Code quality and formatting |
 
@@ -477,10 +477,10 @@ The matrix above uses specific weight assumptions. Here's how shifting weights a
 - Context: Indonesian mobile users on 29 Mbps median, budget Android phones; Chat-First model with real-time threads and drawable phase panels
 - Consequence: 3–5 KB runtime vs 85–130 KB. Compile-time reactivity means no virtual DOM overhead for chat stream updates, inline AI cards, and phase panel transitions.
 
-**ADR-02: Bun for dev, Node.js for prod**
-- Decision: Use Bun as package manager and dev tool; deploy with adapter-node on Node.js
-- Context: svelte-adapter-bun is community-maintained with infrequent updates and known bugs; adapter-node is official and stable
-- Consequence: Fast developer experience without production risk
+**ADR-02: Bun for dev and prod**
+- Decision: Use Bun as package manager/dev tool and Bun runtime in production via `svelte-adapter-bun`
+- Context: Current runtime strategy prioritizes one-runtime consistency and operational simplicity from dev to production
+- Consequence: Simpler environment parity with fewer runtime-specific deployment differences
 
 **ADR-03: shadcn-svelte over custom components**
 - Decision: Use shadcn-svelte as the component foundation

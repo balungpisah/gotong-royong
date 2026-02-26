@@ -13,8 +13,10 @@ Verify frontend dev server can hit real backend APIs through Vite proxy (`GR_API
 - Runnable via:
   - `GR_API_PROXY_TARGET=http://127.0.0.1:<api-port> bun run test:e2e:live-api`
   - `just web-test-e2e-live-api target=http://127.0.0.1:<api-port>`
-- Current assertion bootstraps a real authenticated user via `POST /v1/auth/signup`, then checks frontend shell issues authenticated `/v1/auth/me`, `/v1/feed`, `/v1/notifications` calls via proxy with strict `200` responses.
-- Latest revalidation (2026-02-25): `just dev-db-up` + local `gotong-api` (`DATA_BACKEND=surrealdb`) on `:3210` + `GR_API_PROXY_TARGET=http://127.0.0.1:3210 bun run test:e2e:live-api` passed (`1 passed`).
+  - `PLAYWRIGHT_EXTERNAL_BASE_URL=https://<frontend-host> bun run test:e2e:live-api:external`
+  - `just web-test-e2e-live-api-external https://<frontend-host>`
+- Current assertion matrix bootstraps a real authenticated user via `POST /v1/auth/signup`, then covers live frontend host/proxy calls for hot-path reads (`/v1/auth/me`, `/v1/feed`, `/v1/notifications`), triage flow (`/v1/triage/sessions*`), witness create + permalink (`/v1/witnesses`, `/saksi/:witness_id`), signal flow (`/v1/witnesses/:witness_id/signals*`), group flow (`/v1/groups*`), and profile route/deep-link request verification (`/v1/tandang/me/profile` or `/v1/tandang/users/:user_id/profile`).
+- Latest revalidation (2026-02-25): `just dev-db-up` + local `gotong-api` (`DATA_BACKEND=surrealdb`) on `:3210` + `GR_API_PROXY_TARGET=http://127.0.0.1:3210 bun run test:e2e:live-api` passed (`3 passed`).
 
 ## Commands Run
 

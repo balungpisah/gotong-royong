@@ -19,13 +19,13 @@ This guide is the contributor baseline for `apps/web` during the frontend founda
 - Frontend lives at `apps/web`.
 - Framework baseline: SvelteKit 2 + Svelte 5 + TypeScript.
 - Local tooling baseline: Bun.
-- Current repo config uses `@sveltejs/adapter-auto` in `apps/web/svelte.config.js`.
-- Production runtime target remains Node adapter flow per the locked research plan.
+- Current repo config uses `svelte-adapter-bun` in `apps/web/svelte.config.js`.
+- Production runtime target is Bun via `svelte-adapter-bun`.
 
 ## Prerequisites
 
 - Bun `1.3.6+`
-- Node.js `22+` (Playwright tooling compatibility)
+- Node.js `22+` (optional fallback for ecosystem tooling)
 
 ## Setup
 
@@ -50,6 +50,7 @@ bunx playwright install chromium
 | `PUBLIC_GR_USE_API_TRIAGE` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
 | `PUBLIC_GR_USE_API_SIGNAL` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
 | `PUBLIC_GR_USE_API_GROUP` | No | `true` | `src/lib/services/index.ts` | Set `false` only for local dev/test mock runs; production runtime rejects false values. |
+| `PLAYWRIGHT_EXTERNAL_BASE_URL` | No | unset | `playwright.config.ts` | When set, Playwright targets an already deployed frontend host and skips starting local Vite dev server. |
 
 ## Daily Commands
 

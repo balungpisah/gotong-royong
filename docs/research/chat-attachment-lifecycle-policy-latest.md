@@ -1,6 +1,6 @@
 # Chat Attachment Lifecycle Policy Report
 
-Date: 2026-02-25T17:58:08Z
+Date: 2026-02-25T20:18:27Z
 Mode: `dry-run`
 Status: `PASS`
 

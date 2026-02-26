@@ -1,15 +1,15 @@
 # Surreal Release Gates Report
 
-Date: 2026-02-25T18:04:25Z
+Date: 2026-02-25T20:16:21Z
 Mode: `live`
 
 ## Command Status
 
 | Check | Status | Duration |
 |---|---|---|
-| SurrealDB go/no-go | PASS | 15s |
-| Chat attachment lifecycle verify | PASS | 1s |
-| Chat attachment S3 smoke | PASS | 36s |
+| SurrealDB go/no-go | PASS | 20s |
+| Chat attachment lifecycle verify | PASS | 2s |
+| Chat attachment S3 smoke | PASS | 102s |
 
 ## Related Artifacts
 

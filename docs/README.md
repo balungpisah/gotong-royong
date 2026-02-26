@@ -64,6 +64,7 @@ Canonical decision:
 - [Feed Participant-Edge Backfill](deployment/feed-participant-edge-backfill.md) - Historical backfill for Pack C participant edge read-model
 - [Feed Involvement Fallback Removal](deployment/feed-involvement-fallback-removal-runbook.md) - Pack C cutover runbook for switching edge-only mode safely
 - [Feed Involvement Alert Thresholds](deployment/feed-involvement-fallback-alert-thresholds.md) - Grafana/Alertmanager thresholds for Pack C rollout stages
+- [Frontend Live Cutover Runbook](deployment/frontend-live-cutover-runbook.md) - Staging/production frontend host live API cutover checklist
 - [Pack C Cutover Readiness Report](research/pack-c-cutover-readiness-latest.md) - Latest one-command pre-cutover gate report
 - [Pack C Stage A Kickoff Report](research/pack-c-stage-a-kickoff-latest.md) - Latest Stage A rollout kickoff and observation checklist artifact
 - [Pack C Stage B Kickoff Report](research/pack-c-stage-b-kickoff-latest.md) - Latest Stage B rollout kickoff and observation checklist artifact
@@ -73,6 +74,7 @@ Canonical decision:
 - [Pack C Stage C Go/No-Go Report](research/pack-c-stage-c-go-no-go-latest.md) - Latest full-cutover decision report from Prometheus thresholds
 - [Pack C Live Gate Follow-up](research/pack-c-live-gate-followup-latest.md) - Current blocker and rerun steps for live Prometheus-backed stage gating
 - [Frontend Hot-Path Integration Debt](research/frontend-hot-path-integration-debt.md) - Tracked debt during staged feed/chat API cutover
+- [Frontend Live Cutover Slice](research/frontend-live-cutover-001-latest.md) - Current status and gate workflow for deployed frontend live cutover
 - [Surreal Release Gates Report](research/release-gates-surreal-latest.md) - Latest combined live gate artifact (go/no-go + lifecycle verify + S3 smoke)
 - [Chat Attachment S3 Smoke Report](research/chat-attachment-s3-smoke-latest.md) - Latest live smoke artifact for S3-backed chat attachment path
 - [Chat Attachment Lifecycle Policy Report](research/chat-attachment-lifecycle-policy-latest.md) - Latest lifecycle rule plan/apply artifact for chat attachment prefix

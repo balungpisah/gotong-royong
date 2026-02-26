@@ -1,6 +1,6 @@
 # Pack C Stage B Kickoff Report
 
-Date: 2026-02-25T18:05:26Z
+Date: 2026-02-26T07:50:53Z
 Namespace: `monitoring`
 Observation window target: 4h
 Stage summary: Canary rollout with fallback OFF on a subset of replicas.

@@ -31,7 +31,7 @@ Out of scope:
 
 ## Non-Negotiable Constraints
 
-- Runtime profile: Bun for dev workflows, Node.js (`@sveltejs/adapter-node`) for production.
+- Runtime profile: Bun for both dev and production workflows (`svelte-adapter-bun`).
 - Auth default: direct JWT session handling first; introduce `@auth/sveltekit` only if multi-provider OAuth becomes a requirement.
 - Realtime model: WebSocket primary with SSE and polling fallback compatibility.
 - Performance guardrails: framework runtime < 10 KB gzipped, initial route JS < 50 KB gzipped, total JS (lazy-loaded) < 200 KB gzipped, LCP < 2.5s, TTI < 3.5s on 4G median (derived from `docs/research/FRONTEND-TECHNOLOGY-RESEARCH-REPORT.md` Section 4.2).
