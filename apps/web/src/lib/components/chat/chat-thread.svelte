@@ -87,9 +87,9 @@
 						<p>Ini tempat kamu dan anggota lain berdiskusi, berbagi informasi, dan bekerja sama menuntaskan saksi ini tahap demi tahap.</p>
 
 						<div class="space-y-1 rounded-md bg-primary/5 px-2.5 py-2">
-							<p class="font-medium text-foreground/70">✦ Tombol "Stempel"</p>
-							<p>AI tidak membaca setiap pesan secara langsung. Setelah berdiskusi dan merasa langkah saat ini sudah terpenuhi, ketuk tombol <strong class="text-foreground/60">✦ Stempel</strong> di samping kotak pesan.</p>
-							<p>AI akan membaca seluruh percakapan, mengevaluasi kemajuan, dan memperbarui fase — atau memberi tahu apa yang masih perlu dilengkapi.</p>
+							<p class="font-medium text-foreground/70">✦ Evaluasi fase</p>
+							<p>Status fase diperbarui berdasarkan event backend yang masuk ke ruang interaksi ini.</p>
+							<p>Tombol evaluasi manual akan ditampilkan kembali setelah kontrak backend Stempel tersedia.</p>
 						</div>
 
 						<div class="space-y-1">

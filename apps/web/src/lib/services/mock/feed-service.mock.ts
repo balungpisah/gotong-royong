@@ -21,4 +21,27 @@ export class MockFeedService implements FeedService {
 		await delay(120);
 		return this.suggestions.map((item) => ({ ...item }));
 	}
+
+	async setMonitorPreference(witnessId: string, monitored: boolean): Promise<void> {
+		await delay(80);
+		for (const item of this.feedItems) {
+			if (item.witness_id === witnessId) {
+				item.monitored = monitored;
+			}
+		}
+	}
+
+	async setEntityFollowPreference(entityId: string, followed: boolean): Promise<void> {
+		await delay(80);
+		for (const suggestion of this.suggestions) {
+			if (suggestion.entity_id === entityId) {
+				suggestion.followed = followed;
+			}
+		}
+		for (const item of this.feedItems) {
+			item.entity_tags = item.entity_tags.map((tag) =>
+				tag.entity_id === entityId ? { ...tag, followed } : tag
+			);
+		}
+	}
 }

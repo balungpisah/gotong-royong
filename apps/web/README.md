@@ -43,8 +43,22 @@ bun run test:e2e:live-api
 ```
 
 Notes:
+
 - Requires `gotong-api` running at `GR_API_PROXY_TARGET`.
-- Test bootstraps a real user by calling `POST /v1/auth/signup`, then asserts authenticated `200` responses for `/v1/auth/me`, `/v1/feed`, and `/v1/notifications`.
+- Test bootstraps a real user via `POST /v1/auth/signup`, then validates a broader live matrix:
+  - hot-path reads: `/v1/auth/me`, `/v1/feed`, `/v1/notifications`
+  - triage flow: `POST /v1/triage/sessions`, `POST /v1/triage/sessions/:session_id/messages`
+  - witness flow: `POST /v1/witnesses` + permalink load at `/saksi/:witness_id`
+  - signal flow: `/v1/witnesses/:witness_id/signals*`
+  - group flow: `/v1/groups*`
+  - profile route/deep-link: `/v1/tandang/me/profile` or `/v1/tandang/users/:user_id/profile`
+
+For deployed frontend hosts (no local Vite dev server), run:
+
+```sh
+PLAYWRIGHT_EXTERNAL_BASE_URL=https://<frontend-host> \
+bun run test:e2e:live-api:external
+```
 
 ## Baseline Structure
 

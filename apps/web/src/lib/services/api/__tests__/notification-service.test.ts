@@ -53,8 +53,73 @@ describe('ApiNotificationService', () => {
 			type: 'system',
 			title: 'Ada pembaruan',
 			body: 'Kontribusi kamu diverifikasi',
+			witness_id: 'contrib-1',
+			target_path: '/saksi/contrib-1',
 			read: false,
 			created_at: '2023-11-14T22:13:20.000Z'
+		});
+	});
+
+	it('maps witness target from payload and keeps explicit local target path', async () => {
+		const { client, get } = makeApiClient();
+		get.mockResolvedValueOnce({
+			items: [
+				{
+					notification_id: 'notif-2',
+					notification_type: 'mention',
+					source_type: 'system',
+					source_id: 'source-2',
+					title: 'Kamu disebut',
+					body: 'Buka diskusi saksi terkait',
+					payload: {
+						witness_id: 'witness-55',
+						target_path: '/saksi/witness-55?tab=chat'
+					},
+					created_at_ms: 1_700_000_111_000,
+					read_at_ms: null
+				}
+			]
+		});
+
+		const service = new ApiNotificationService(client);
+		const page = await service.list();
+
+		expect(page.items[0]).toMatchObject({
+			notification_id: 'notif-2',
+			type: 'mention',
+			witness_id: 'witness-55',
+			target_path: '/saksi/witness-55?tab=chat'
+		});
+	});
+
+	it('ignores unsafe external target path in payload', async () => {
+		const { client, get } = makeApiClient();
+		get.mockResolvedValueOnce({
+			items: [
+				{
+					notification_id: 'notif-3',
+					notification_type: 'system',
+					source_type: 'system',
+					source_id: 'source-3',
+					title: 'Unsafe link',
+					body: 'Harus fallback',
+					payload: {
+						witness_id: 'witness-99',
+						target_path: 'https://malicious.example/phish'
+					},
+					created_at_ms: 1_700_000_222_000,
+					read_at_ms: null
+				}
+			]
+		});
+
+		const service = new ApiNotificationService(client);
+		const page = await service.list();
+
+		expect(page.items[0]).toMatchObject({
+			notification_id: 'notif-3',
+			witness_id: 'witness-99',
+			target_path: '/saksi/witness-99'
 		});
 	});
 

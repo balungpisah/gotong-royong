@@ -2,13 +2,14 @@ import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4173;
 const HOST = '127.0.0.1';
-const baseURL = `http://${HOST}:${PORT}`;
+const EXTERNAL_BASE_URL = process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim();
+const baseURL = EXTERNAL_BASE_URL || `http://${HOST}:${PORT}`;
 const TEST_JWT_SECRET = process.env.JWT_SECRET ?? 'playwright-jwt-secret';
 const LIVE_API_MODE = process.env.PLAYWRIGHT_LIVE_API === 'true';
 
-if (LIVE_API_MODE && !process.env.GR_API_PROXY_TARGET) {
+if (LIVE_API_MODE && !EXTERNAL_BASE_URL && !process.env.GR_API_PROXY_TARGET) {
 	throw new Error(
-		'PLAYWRIGHT_LIVE_API=true requires GR_API_PROXY_TARGET to point at gotong-api.'
+		'PLAYWRIGHT_LIVE_API=true requires GR_API_PROXY_TARGET unless PLAYWRIGHT_EXTERNAL_BASE_URL is set.'
 	);
 }
 
@@ -23,23 +24,25 @@ export default defineConfig({
 		baseURL,
 		trace: 'retain-on-failure'
 	},
-	webServer: {
-		command: `bun run dev -- --host ${HOST} --port ${PORT}`,
-		url: `${baseURL}/masuk`,
-		env: {
-			...process.env,
-			JWT_SECRET: TEST_JWT_SECRET,
-			PUBLIC_GR_USE_API_NOTIFICATIONS: LIVE_API_MODE ? 'true' : 'false',
-			PUBLIC_GR_USE_API_FEED: LIVE_API_MODE ? 'true' : 'false',
-			PUBLIC_GR_USE_API_CHAT: LIVE_API_MODE ? 'true' : 'false',
-			PUBLIC_GR_USE_API_USER: 'true',
-			PUBLIC_GR_USE_API_TRIAGE: LIVE_API_MODE ? 'true' : 'false',
-			PUBLIC_GR_USE_API_SIGNAL: LIVE_API_MODE ? 'true' : 'false',
-			PUBLIC_GR_USE_API_GROUP: LIVE_API_MODE ? 'true' : 'false'
-		},
-		reuseExistingServer: !process.env.CI,
-		timeout: 120000
-	},
+	webServer: EXTERNAL_BASE_URL
+		? undefined
+		: {
+				command: `bun run dev -- --host ${HOST} --port ${PORT}`,
+				url: `${baseURL}/masuk`,
+				env: {
+					...process.env,
+					JWT_SECRET: TEST_JWT_SECRET,
+					PUBLIC_GR_USE_API_NOTIFICATIONS: LIVE_API_MODE ? 'true' : 'false',
+					PUBLIC_GR_USE_API_FEED: LIVE_API_MODE ? 'true' : 'false',
+					PUBLIC_GR_USE_API_CHAT: LIVE_API_MODE ? 'true' : 'false',
+					PUBLIC_GR_USE_API_USER: 'true',
+					PUBLIC_GR_USE_API_TRIAGE: LIVE_API_MODE ? 'true' : 'false',
+					PUBLIC_GR_USE_API_SIGNAL: LIVE_API_MODE ? 'true' : 'false',
+					PUBLIC_GR_USE_API_GROUP: LIVE_API_MODE ? 'true' : 'false'
+				},
+				reuseExistingServer: !process.env.CI,
+				timeout: 120000
+			},
 	projects: [
 		{
 			name: 'chromium',

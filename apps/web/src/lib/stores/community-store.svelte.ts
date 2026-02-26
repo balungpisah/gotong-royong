@@ -2,10 +2,11 @@
  * Community Store — manages community health stats and activity.
  *
  * Uses Svelte 5 runes ($state) for reactive state management.
- * Currently mock-backed — will be swapped to a CommunityService when backend is ready.
- * Follows the FeedStore mock-backed pattern (no service injection).
+ * Dashboard path is API-backed via CommunityService.
+ * Compact pulse cards still use fixtures until dedicated pulse contract lands.
  */
 
+import type { CommunityService } from '$lib/services/types';
 import type {
 	CommunityStats,
 	ParticipationDataPoint,
@@ -17,8 +18,7 @@ import {
 	mockCommunityStats,
 	mockParticipation,
 	mockCommunitySignals,
-	mockCommunityActivity,
-	mockCommunityDashboard
+	mockCommunityActivity
 } from '$lib/fixtures';
 
 export class CommunityStore {
@@ -52,6 +52,12 @@ export class CommunityStore {
 			: 0
 	);
 
+	private readonly service: CommunityService;
+
+	constructor(service: CommunityService) {
+		this.service = service;
+	}
+
 	// ---------------------------------------------------------------------------
 	// Actions
 	// ---------------------------------------------------------------------------
@@ -84,14 +90,12 @@ export class CommunityStore {
 
 	/**
 	 * Load full community dashboard data. Currently returns mock data.
-	 * TODO: Replace with CommunityService when backend is ready.
 	 */
 	async loadDashboard() {
 		this.dashboardLoading = true;
 		this.dashboardError = null;
 		try {
-			await new Promise((resolve) => setTimeout(resolve, 300));
-			this.dashboard = { ...mockCommunityDashboard };
+			this.dashboard = await this.service.getDashboard();
 		} catch (err) {
 			this.dashboardError = err instanceof Error ? err.message : 'Gagal memuat dashboard komunitas';
 		} finally {

@@ -178,12 +178,22 @@ export class FeedStore {
 
 	/**
 	 * Toggle monitor (pantau) state for a witness.
-	 * Client-local until monitor write endpoint is finalized.
 	 */
-	toggleMonitor(witnessId: string) {
-		this.items = this.items.map((item) =>
-			item.witness_id === witnessId ? { ...item, monitored: !item.monitored } : item
-		);
+	async toggleMonitor(witnessId: string) {
+		this.error = null;
+		const previousItems = this.items;
+		let nextValue = false;
+		this.items = this.items.map((item) => {
+			if (item.witness_id !== witnessId) return item;
+			nextValue = !item.monitored;
+			return { ...item, monitored: nextValue };
+		});
+		try {
+			await this.service.setMonitorPreference(witnessId, nextValue);
+		} catch (err) {
+			this.items = previousItems;
+			this.error = err instanceof Error ? err.message : 'Gagal menyimpan status pantau';
+		}
 	}
 
 	/**
@@ -193,9 +203,9 @@ export class FeedStore {
 	 * Uses the shouldAutoMonitor() contract to determine eligibility.
 	 * Only sets monitored=true (never removes — that's the user's choice).
 	 *
-	 * TODO: Move this server-side when monitor-write endpoint is available.
 	 */
 	autoMonitorOnAction(witnessId: string, updatedRelation: Partial<import('$lib/types').MyRelation>) {
+		let shouldPersistMonitor = false;
 		this.items = this.items.map((item) => {
 			if (item.witness_id !== witnessId) return item;
 
@@ -215,9 +225,18 @@ export class FeedStore {
 				...item,
 				my_relation: merged,
 				// Only auto-set to true, never auto-remove
-				monitored: item.monitored || shouldMonitor
+				monitored: (() => {
+					const nextMonitored = item.monitored || shouldMonitor;
+					if (!item.monitored && nextMonitored) {
+						shouldPersistMonitor = true;
+					}
+					return nextMonitored;
+				})()
 			};
 		});
+		if (shouldPersistMonitor) {
+			void this.service.setMonitorPreference(witnessId, true).catch(() => undefined);
+		}
 	}
 
 	/**
@@ -260,13 +279,25 @@ export class FeedStore {
 	/**
 	 * Toggle follow state for an entity.
 	 * Updates both feed item entity_tags and suggested entities.
-	 * Client-local until follow endpoint is finalized.
 	 */
 	async toggleFollow(entityId: string) {
+		this.error = null;
+		const previousSuggestions = this.suggestedEntities;
+		const previousItems = this.items;
+		const currentFollowed =
+			this.suggestedEntities.find((item) => item.entity_id === entityId)?.followed ??
+			this.items
+				.flatMap((item) => item.entity_tags)
+				.find((tag) => tag.entity_id === entityId)
+				?.followed ??
+			false;
+		const nextFollowed = !currentFollowed;
+
 		// Toggle in suggested entities
-		this.suggestedEntities = this.suggestedEntities.map((e) =>
-			e.entity_id === entityId ? { ...e, followed: !e.followed } : e
-		);
+		this.suggestedEntities = this.suggestedEntities.map((e) => {
+			if (e.entity_id !== entityId) return e;
+			return { ...e, followed: nextFollowed };
+		});
 
 		// Toggle in feed item entity tags
 		this.items = this.items.map((item) => ({
@@ -275,12 +306,23 @@ export class FeedStore {
 				tag.entity_id === entityId ? { ...tag, followed: !tag.followed } : tag
 			)
 		}));
+		try {
+			await this.service.setEntityFollowPreference(entityId, nextFollowed);
+		} catch (err) {
+			this.suggestedEntities = previousSuggestions;
+			this.items = previousItems;
+			this.error = err instanceof Error ? err.message : 'Gagal menyimpan status ikuti';
+		}
 	}
 
 	/**
 	 * Follow all suggested entities at once (onboarding bulk action).
 	 */
 	async followAllSuggested() {
+		this.error = null;
+		const previousSuggestions = this.suggestedEntities;
+		const previousItems = this.items;
+
 		this.suggestedEntities = this.suggestedEntities.map((e) => ({
 			...e,
 			followed: true
@@ -294,5 +336,16 @@ export class FeedStore {
 				suggestedIds.has(tag.entity_id) ? { ...tag, followed: true } : tag
 			)
 		}));
+		try {
+			await Promise.all(
+				[...suggestedIds].map((entityId) =>
+					this.service.setEntityFollowPreference(entityId, true)
+				)
+			);
+		} catch (err) {
+			this.suggestedEntities = previousSuggestions;
+			this.items = previousItems;
+			this.error = err instanceof Error ? err.message : 'Gagal menyimpan status ikuti';
+		}
 	}
 }

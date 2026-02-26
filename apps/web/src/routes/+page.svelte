@@ -14,8 +14,6 @@
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import Masonry from 'svelte-bricks';
 	import { shareFeedItem } from '$lib/utils/share';
-	import type { ChatMessage, AiCardMessage, SystemMessage } from '$lib/types';
-	import type { ListBlock } from '$lib/types/blocks';
 
 	const witnessStore = getWitnessStore();
 	const notificationStore = getNotificationStore();
@@ -55,7 +53,6 @@
 
 	let selectedWitnessId = $state<string | null>(null);
 	let messageSending = $state(false);
-	let stempeling = $state(false);
 
 	// Future: profile state for polymorphic context box
 	let selectedUserId = $state<string | null>(null);
@@ -133,57 +130,6 @@
 		// selectedFeedItem derived will auto-find the new feed item
 	}
 
-	function handleStempel() {
-		if (stempeling || !witnessStore.current) return;
-		stempeling = true;
-
-		// Simulate AI evaluation delay (2 seconds)
-		setTimeout(() => {
-			if (!witnessStore.current) {
-				stempeling = false;
-				return;
-			}
-
-			const now = new Date().toISOString();
-			const witnessId = witnessStore.current.witness_id;
-
-			const stempelBlock: ListBlock = {
-				type: 'list',
-				id: 'stempel-eval-001',
-				display: 'checklist',
-				title: 'Evaluasi Fase: Penggalangan Dana',
-				items: [
-					{ id: 'se-1', label: 'Target dana ditetapkan', status: 'completed', source: 'ai', locked_fields: [] },
-					{ id: 'se-2', label: 'Minimal 3 kontributor', status: 'completed', source: 'ai', locked_fields: [] },
-					{ id: 'se-3', label: 'Bukti transfer/kuitansi diunggah', status: 'open', source: 'ai', locked_fields: [] },
-					{ id: 'se-4', label: 'Rencana pencairan disetujui voting', status: 'open', source: 'ai', locked_fields: [] }
-				]
-			};
-
-			const aiCard: AiCardMessage = {
-				message_id: `stempel-${Date.now()}`,
-				timestamp: now,
-				witness_id: witnessId,
-				type: 'ai_card',
-				blocks: [stempelBlock],
-				badge: 'ringkasan',
-				title: '✦ Hasil Stempel — 2/4 terpenuhi'
-			};
-
-			const checkpoint: SystemMessage = {
-				message_id: `sys-stempel-${Date.now()}`,
-				timestamp: now,
-				witness_id: witnessId,
-				type: 'system',
-				subtype: 'checkpoint_completed',
-				content: '✦ Stempel: 2 dari 4 langkah terpenuhi — lanjutkan diskusi'
-			};
-
-			witnessStore.current.messages = [...witnessStore.current.messages, aiCard, checkpoint];
-			stempeling = false;
-		}, 2000);
-	}
-
 	// ---------------------------------------------------------------------------
 	// Masonry skeleton items (variable heights for visual preview)
 	// ---------------------------------------------------------------------------
@@ -203,6 +149,9 @@
 	// Keep natural feed order — the dark border on the selected card
 	// identifies it without reordering and disrupting scroll position.
 	const masonryStream = $derived.by<MasonryItem[]>(() => {
+		if (feedStore.filter !== 'semua') {
+			return feedStore.filteredStream;
+		}
 		return [triageEntry, ...feedStore.filteredStream];
 	});
 
@@ -257,9 +206,7 @@
 					feedItem={selectedFeedItem}
 					onClose={closeDetail}
 					onSendMessage={handleSendMessage}
-					onStempel={handleStempel}
 					sending={messageSending}
-					{stempeling}
 				/>
 			{:else if isDetailLoading}
 				<div class="flex h-full items-center justify-center">
@@ -411,10 +358,10 @@
 						Coba lagi
 					</button>
 				</div>
-			{:else if feedStore.filteredStream.length === 0}
-				<div
-					class="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/40 bg-muted/10 py-12 text-center"
-				>
+				{:else if masonryStream.length === 0}
+					<div
+						class="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/40 bg-muted/10 py-12 text-center"
+					>
 					<div
 						class="flex size-12 items-center justify-center rounded-full bg-muted/50 text-muted-foreground"
 					>
@@ -481,8 +428,6 @@
 		selectedUserId={selectedUserId}
 		onClose={closeDetail}
 		onSendMessage={handleSendMessage}
-		onStempel={handleStempel}
-		{stempeling}
 	/>
 	</div><!-- /flex row -->
 </div><!-- /outer wrapper -->

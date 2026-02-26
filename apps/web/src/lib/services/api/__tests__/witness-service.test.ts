@@ -31,6 +31,67 @@ const createApiClient = () => {
 };
 
 describe('ApiWitnessService', () => {
+	it('creates witness via API endpoint and returns created detail', async () => {
+		const fallback = createFallback();
+		const { client, get, post } = createApiClient();
+
+		get.mockImplementation(async (path: string) => {
+			if (path === '/chat/threads') return [];
+			throw new Error(`unexpected GET ${path}`);
+		});
+
+		post.mockImplementation(async (path: string) => {
+			if (path === '/witnesses') {
+				return {
+					witness_id: 'witness-100',
+					title: 'Jalan Rusak RT 05',
+					summary: 'Lubang besar belum diperbaiki',
+					author_id: 'u-001',
+					created_at_ms: 1_700_000_100_000
+				};
+			}
+			if (path === '/chat/threads') {
+				return { thread_id: 'thread-100', scope_id: 'witness-100' };
+			}
+			throw new Error(`unexpected POST ${path}`);
+		});
+
+		const service = new ApiWitnessService(client, fallback);
+		const detail = await service.create({
+			title: 'Jalan Rusak RT 05',
+			summary: 'Lubang besar belum diperbaiki',
+			route: 'komunitas',
+			track_hint: 'tuntaskan',
+			seed_hint: 'Keresahan',
+			confidence: { score: 0.92, label: 'Tuntaskan · 92%' },
+			rahasia_level: 'L0',
+			triage_result: {
+				bar_state: 'ready',
+				route: 'komunitas'
+			},
+			triage_messages: [
+				{ role: 'user', text: 'Jalan di RT 05 berlubang' },
+				{ role: 'ai', text: 'Siap, kita catat sebagai saksi komunitas.' }
+			]
+		});
+
+		expect(detail.witness_id).toBe('witness-100');
+		expect(detail.title).toBe('Jalan Rusak RT 05');
+		expect(detail.plan).toBeNull();
+		expect(detail.messages).toHaveLength(2);
+		expect(post).toHaveBeenCalledWith(
+			'/witnesses',
+			expect.objectContaining({
+				body: expect.objectContaining({
+					title: 'Jalan Rusak RT 05',
+					route: 'komunitas',
+					rahasia_level: 'L0'
+				})
+			})
+		);
+		expect(fallback.create).not.toHaveBeenCalled();
+	});
+
 	it('creates thread on first send and maps backend message', async () => {
 		const fallback = createFallback();
 		const { client, get, post } = createApiClient();

@@ -95,20 +95,22 @@
 		<TriageAttachmentPreview attachments={pendingAttachments} onRemove={handleRemoveAttachment} />
 
 		<div class="flex items-end gap-1.5">
-			<!-- Stempel — invoke AI to evaluate phase progress -->
-			<button
-				onclick={handleStempel}
-				disabled={stempeling}
-				class="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-primary/30 bg-primary/5 px-2 text-xs font-medium text-primary transition hover:bg-primary/10 active:scale-[0.97] disabled:opacity-50"
-				aria-label="Stempel — minta AI evaluasi kemajuan fase"
-			>
-				{#if stempeling}
-					<Loader2 class="size-3.5 animate-spin" />
-				{:else}
-					<span class="text-xs leading-none">✦</span>
-					<span>Stempel</span>
-				{/if}
-			</button>
+			{#if onStempel}
+				<!-- Stempel — invoke AI to evaluate phase progress -->
+				<button
+					onclick={handleStempel}
+					disabled={stempeling}
+					class="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-primary/30 bg-primary/5 px-2 text-xs font-medium text-primary transition hover:bg-primary/10 active:scale-[0.97] disabled:opacity-50"
+					aria-label="Stempel — minta AI evaluasi kemajuan fase"
+				>
+					{#if stempeling}
+						<Loader2 class="size-3.5 animate-spin" />
+					{:else}
+						<span class="text-xs leading-none">✦</span>
+						<span>Stempel</span>
+					{/if}
+				</button>
+			{/if}
 
 			<!-- Attachment picker -->
 			<TriageAttachmentPicker onFilesSelected={handleFilesSelected} disabled={pendingAttachments.length >= MAX_ATTACHMENTS} />

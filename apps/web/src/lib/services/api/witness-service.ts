@@ -5,6 +5,7 @@ import type {
 	PathPlan,
 	RahasiaLevel,
 	SeedHint,
+	SystemMessage,
 	UserMessage,
 	Witness,
 	WitnessCreateInput,
@@ -72,6 +73,17 @@ interface ApiChatMember {
 	role: 'owner' | 'admin' | 'member';
 	joined_at_ms: number;
 	left_at_ms?: number | null;
+}
+
+interface ApiWitnessCreateResponse {
+	witness_id?: string;
+	title?: string;
+	summary?: string | null;
+	track_hint?: string | null;
+	seed_hint?: string | null;
+	rahasia_level?: string | null;
+	author_id?: string;
+	created_at_ms?: number;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -198,6 +210,38 @@ const makeRequestId = (prefix: string) => {
 	return `${prefix}-${randomPart}`;
 };
 
+const buildCreatedWitnessMessages = (
+	input: WitnessCreateInput,
+	witnessId: string,
+	nowIso: string
+): ChatMessage[] =>
+	input.triage_messages.map((message, index) => {
+		if (message.role === 'user') {
+			return {
+				message_id: `msg-${witnessId}-${index}`,
+				timestamp: nowIso,
+				witness_id: witnessId,
+				type: 'user',
+				author: {
+					user_id: 'me',
+					name: 'Saya',
+					role: 'pelapor'
+				},
+				is_self: true,
+				content: message.text
+			} satisfies UserMessage;
+		}
+
+		return {
+			message_id: `msg-${witnessId}-${index}`,
+			timestamp: nowIso,
+			witness_id: witnessId,
+			type: 'system',
+			subtype: 'plan_updated',
+			content: message.text
+		} satisfies SystemMessage;
+	});
+
 interface ApiWitnessServiceOptions {
 	allowMockFallback?: boolean;
 }
@@ -226,9 +270,34 @@ export class ApiWitnessService implements WitnessService {
 	}
 
 	async create(input: WitnessCreateInput): Promise<WitnessDetail> {
-		const detail = await this.fallbackOrThrow(() => this.fallback.create(input));
-		void this.ensureThread(detail.witness_id, true).catch(() => undefined);
-		return detail;
+		try {
+			const response = await this.client.post<ApiWitnessCreateResponse>('/witnesses', {
+				headers: this.idempotencyHeaders('witness-create'),
+				body: {
+					title: input.title,
+					summary: input.summary,
+					route: input.route,
+					track_hint: input.track_hint,
+					seed_hint: input.seed_hint,
+					rahasia_level: input.rahasia_level,
+					triage_result: input.triage_result,
+					triage_messages: input.triage_messages
+				}
+			});
+
+			const witnessId = asString(response.witness_id);
+			if (!witnessId) {
+				throw new Error('invalid witness create response');
+			}
+
+			const detail = this.buildCreatedWitnessDetail(witnessId, input, response);
+			void this.ensureThread(detail.witness_id, true).catch(() => undefined);
+			return detail;
+		} catch (error) {
+			const detail = await this.fallbackOrThrow(() => this.fallback.create(input), error);
+			void this.ensureThread(detail.witness_id, true).catch(() => undefined);
+			return detail;
+		}
 	}
 
 	async list(opts?: {
@@ -462,6 +531,44 @@ export class ApiWitnessService implements WitnessService {
 		}
 
 		return results;
+	}
+
+	private buildCreatedWitnessDetail(
+		witnessId: string,
+		input: WitnessCreateInput,
+		response: ApiWitnessCreateResponse
+	): WitnessDetail {
+		const createdAt = toIso(asNumber(response.created_at_ms));
+		const messages = buildCreatedWitnessMessages(input, witnessId, createdAt);
+		const createdBy = asString(response.author_id) ?? 'me';
+
+		return {
+			witness_id: witnessId,
+			title: asString(response.title) ?? input.title,
+			summary: asString(response.summary) ?? input.summary,
+			track_hint: input.track_hint,
+			seed_hint: input.seed_hint,
+			status: 'open',
+			rahasia_level: input.rahasia_level,
+			created_at: createdAt,
+			updated_at: createdAt,
+			created_by: createdBy,
+			member_count: 1,
+			message_count: messages.length,
+			unread_count: 0,
+			messages,
+			plan: input.proposed_plan ?? null,
+			blocks: [],
+			members: [
+				{
+					user_id: createdBy,
+					name: createdBy === 'me' ? 'Saya' : createdBy,
+					role: 'pelapor',
+					joined_at: createdAt
+				}
+			],
+			triage: input.triage_result
+		};
 	}
 
 	private mapFeedItemToWitness(item: ApiFeedItem): Witness {

@@ -3,7 +3,7 @@
 	import { base } from '$app/paths';
 	import { m } from '$lib/paraglide/messages';
 	import { getNotificationStore } from '$lib/stores';
-	import type { NotificationType } from '$lib/types';
+	import type { AppNotification, NotificationType } from '$lib/types';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Separator } from '$lib/components/ui/separator';
@@ -49,11 +49,33 @@
 	// Actions
 	// ---------------------------------------------------------------------------
 
-	async function handleClick(notifId: string, witnessId?: string) {
+	function normalizeTargetPath(path: string | undefined): string | undefined {
+		if (!path) return undefined;
+		const trimmed = path.trim();
+		if (!trimmed) return undefined;
+		if (trimmed.startsWith('//') || /^[a-z][a-z0-9+\-.]*:\/\//i.test(trimmed)) {
+			return undefined;
+		}
+		return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+	}
+
+	function resolveNotificationPath(notification: AppNotification): string | undefined {
+		const targetPath = normalizeTargetPath(notification.target_path);
+		if (targetPath) {
+			return `${base}${targetPath}`;
+		}
+		if (!notification.witness_id) {
+			return undefined;
+		}
+		return `${base}/saksi/${encodeURIComponent(notification.witness_id)}`;
+	}
+
+	async function handleClick(notification: AppNotification) {
 		try {
-			await store.markRead(notifId);
-			if (witnessId) {
-				goto(`${base}/saksi/${witnessId}`);
+			await store.markRead(notification.notification_id);
+			const destination = resolveNotificationPath(notification);
+			if (destination) {
+				goto(destination);
 			}
 		} catch {
 			// store.error is already set by the store
@@ -164,7 +186,7 @@
 							initial={{ opacity: 0, y: 10 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.25, delay: i * 0.04 }}
-							onclick={() => handleClick(notif.notification_id, notif.witness_id)}
+							onclick={() => handleClick(notif)}
 						>
 							<!-- Unread dot -->
 							<div class="absolute left-2.5 top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary"></div>
@@ -210,7 +232,7 @@
 							initial={{ opacity: 0, y: 10 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.25, delay: (unread.length + i) * 0.04 }}
-							onclick={() => handleClick(notif.notification_id, notif.witness_id)}
+							onclick={() => handleClick(notif)}
 						>
 							<!-- Type icon -->
 							<div class="flex size-9 shrink-0 items-center justify-center rounded-lg {config.color} opacity-60">

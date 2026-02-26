@@ -432,4 +432,16 @@ export class ApiFeedService implements FeedService {
 			.map((item) => toFollowableEntity(item))
 			.filter((item): item is FollowableEntity => Boolean(item));
 	}
+
+	async setMonitorPreference(witnessId: string, monitored: boolean): Promise<void> {
+		await this.client.post(`/feed/preferences/monitor/${encodeURIComponent(witnessId)}`, {
+			body: { monitored }
+		});
+	}
+
+	async setEntityFollowPreference(entityId: string, followed: boolean): Promise<void> {
+		await this.client.post(`/feed/preferences/follow/${encodeURIComponent(entityId)}`, {
+			body: { followed }
+		});
+	}
 }

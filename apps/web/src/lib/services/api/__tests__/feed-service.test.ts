@@ -4,16 +4,17 @@ import { ApiFeedService } from '../feed-service';
 
 const makeApiClient = () => {
 	const get = vi.fn();
+	const post = vi.fn();
 	const client = {
 		request: vi.fn(),
 		get,
-		post: vi.fn(),
+		post,
 		put: vi.fn(),
 		patch: vi.fn(),
 		delete: vi.fn()
 	} as unknown as ApiClient;
 
-	return { client, get };
+	return { client, get, post };
 };
 
 describe('ApiFeedService', () => {
@@ -163,6 +164,22 @@ describe('ApiFeedService', () => {
 			followed: false,
 			witness_count: 3,
 			follower_count: 3
+		});
+	});
+
+	it('writes monitor/follow preferences to backend endpoints', async () => {
+		const { client, post } = makeApiClient();
+		post.mockResolvedValue({});
+
+		const service = new ApiFeedService(client);
+		await service.setMonitorPreference('witness-1', true);
+		await service.setEntityFollowPreference('ent-rt05', false);
+
+		expect(post).toHaveBeenNthCalledWith(1, '/feed/preferences/monitor/witness-1', {
+			body: { monitored: true }
+		});
+		expect(post).toHaveBeenNthCalledWith(2, '/feed/preferences/follow/ent-rt05', {
+			body: { followed: false }
 		});
 	});
 });

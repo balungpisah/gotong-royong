@@ -45,7 +45,7 @@
 	const feedStore = new FeedStore(services.feed);
 	const themeStore = new ThemeStore();
 	const preferencesStore = new PreferencesStore();
-	const communityStore = new CommunityStore();
+	const communityStore = new CommunityStore(services.community);
 	const signalStore = new SignalStore(services.signal);
 	const groupStore = new GroupStore(services.group);
 

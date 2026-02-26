@@ -30,7 +30,8 @@ import type {
 	GroupUpdateInput,
 	GroupMember,
 	MembershipRequest,
-	GroupMemberRole
+	GroupMemberRole,
+	CommunityDashboard
 } from '$lib/types';
 
 // ---------------------------------------------------------------------------
@@ -135,6 +136,8 @@ export interface NotificationService {
 export interface FeedService {
 	list(opts?: { cursor?: string; limit?: number }): Promise<Paginated<FeedItem>>;
 	listSuggestions(): Promise<FollowableEntity[]>;
+	setMonitorPreference(witnessId: string, monitored: boolean): Promise<void>;
+	setEntityFollowPreference(entityId: string, followed: boolean): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,4 +194,8 @@ export interface GroupService {
 	leave(groupId: string): Promise<void>;
 	removeMember(groupId: string, userId: string): Promise<void>;
 	updateMemberRole(groupId: string, userId: string, role: GroupMemberRole): Promise<void>;
+}
+
+export interface CommunityService {
+	getDashboard(opts?: { period?: string }): Promise<CommunityDashboard>;
 }

@@ -15,7 +15,8 @@ import type {
 	NotificationService,
 	FeedService,
 	SignalService,
-	GroupService
+	GroupService,
+	CommunityService
 } from './types';
 import {
 	MockWitnessService,
@@ -24,7 +25,8 @@ import {
 	MockNotificationService,
 	MockFeedService,
 	MockSignalService,
-	MockGroupService
+	MockGroupService,
+	MockCommunityService
 } from './mock';
 import {
 	ApiFeedService,
@@ -33,7 +35,8 @@ import {
 	ApiSignalService,
 	ApiTriageService,
 	ApiUserService,
-	ApiWitnessService
+	ApiWitnessService,
+	ApiCommunityService
 } from './api';
 
 // Re-export types for convenience
@@ -45,6 +48,7 @@ export type {
 	FeedService,
 	SignalService,
 	GroupService,
+	CommunityService,
 	Paginated
 } from './types';
 
@@ -64,6 +68,7 @@ export interface ServiceProvider {
 	feed: FeedService;
 	signal: SignalService;
 	group: GroupService;
+	community: CommunityService;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +101,7 @@ const USE_API_USER = parseApiToggle(env.PUBLIC_GR_USE_API_USER, true);
 const USE_API_TRIAGE = parseApiToggle(env.PUBLIC_GR_USE_API_TRIAGE, true);
 const USE_API_SIGNAL = parseApiToggle(env.PUBLIC_GR_USE_API_SIGNAL, true);
 const USE_API_GROUP = parseApiToggle(env.PUBLIC_GR_USE_API_GROUP, true);
+const USE_API_COMMUNITY = parseApiToggle(env.PUBLIC_GR_USE_API_COMMUNITY, true);
 
 const assertApiEnabledInProduction = (slice: string, enabled: boolean, envKey: string) => {
 	if (IS_PRODUCTION_RUNTIME && !enabled) {
@@ -116,6 +122,7 @@ assertApiEnabledInProduction('user', USE_API_USER, 'PUBLIC_GR_USE_API_USER');
 assertApiEnabledInProduction('triage', USE_API_TRIAGE, 'PUBLIC_GR_USE_API_TRIAGE');
 assertApiEnabledInProduction('signal', USE_API_SIGNAL, 'PUBLIC_GR_USE_API_SIGNAL');
 assertApiEnabledInProduction('group', USE_API_GROUP, 'PUBLIC_GR_USE_API_GROUP');
+assertApiEnabledInProduction('community', USE_API_COMMUNITY, 'PUBLIC_GR_USE_API_COMMUNITY');
 
 /**
  * Creates the service provider with mock or real implementations.
@@ -126,6 +133,7 @@ export function createServices(): ServiceProvider {
 	const mockTriage = new MockTriageService();
 	const mockSignal = new MockSignalService();
 	const mockGroup = new MockGroupService();
+	const mockCommunity = new MockCommunityService();
 
 	return {
 		witness: USE_API_CHAT
@@ -146,7 +154,8 @@ export function createServices(): ServiceProvider {
 			: mockSignal,
 		group: USE_API_GROUP
 			? new ApiGroupService(apiClient, mockGroup, { allowMockFallback: ALLOW_MOCK_FALLBACK })
-			: mockGroup
+			: mockGroup,
+		community: USE_API_COMMUNITY ? new ApiCommunityService(apiClient) : mockCommunity
 	};
 }
 

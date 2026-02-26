@@ -5,3 +5,4 @@ export { ApiUserService } from './user-service';
 export { ApiTriageService } from './triage-service';
 export { ApiSignalService } from './signal-service';
 export { ApiGroupService } from './group-service';
+export { ApiCommunityService } from './community-service';

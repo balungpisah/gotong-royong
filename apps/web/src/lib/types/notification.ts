@@ -21,6 +21,7 @@ export interface AppNotification {
 	title: string;
 	body: string;
 	witness_id?: string;
+	target_path?: string;
 	read: boolean;
 	created_at: string;
 }

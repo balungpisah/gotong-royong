@@ -25,34 +25,34 @@
 	const myGroupCount = $derived(groupStore.myGroupCount);
 </script>
 
-{#if store.dashboardLoading && !dashboard}
-	<div class="flex h-64 items-center justify-center">
-		<div class="flex flex-col items-center gap-3 text-muted-foreground">
-			<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
-			<p class="text-xs">{m.loading_community()}</p>
-		</div>
-	</div>
-{:else if dashboard}
-	<div class="mx-auto w-full max-w-3xl py-6">
-		<!-- Quick navigation -->
-		<div class="mb-6 px-4">
-			<a
-				href="/komunitas/kelompok"
-				class="block rounded-xl border border-border/40 bg-card p-4 transition hover:border-border"
-			>
-				<div class="flex items-start justify-between gap-3">
-					<div>
-						<p class="text-sm font-bold text-foreground">{m.group_nav_title()}</p>
-						<p class="mt-0.5 text-xs text-muted-foreground/80">{m.group_nav_subtitle()}</p>
-						<p class="mt-2 text-[11px] text-muted-foreground/70">{m.group_nav_count({ count: myGroupCount })}</p>
-					</div>
-					<div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-						<UsersIcon class="size-5" />
-					</div>
+<div class="mx-auto w-full max-w-3xl py-6">
+	<!-- Quick navigation -->
+	<div class="mb-6 px-4">
+		<a
+			href="/komunitas/kelompok"
+			class="block rounded-xl border border-border/40 bg-card p-4 transition hover:border-border"
+		>
+			<div class="flex items-start justify-between gap-3">
+				<div>
+					<p class="text-sm font-bold text-foreground">{m.group_nav_title()}</p>
+					<p class="mt-0.5 text-xs text-muted-foreground/80">{m.group_nav_subtitle()}</p>
+					<p class="mt-2 text-[11px] text-muted-foreground/70">{m.group_nav_count({ count: myGroupCount })}</p>
 				</div>
-			</a>
-		</div>
+				<div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+					<UsersIcon class="size-5" />
+				</div>
+			</div>
+		</a>
+	</div>
 
+	{#if store.dashboardLoading && !dashboard}
+		<div class="flex h-64 items-center justify-center">
+			<div class="flex flex-col items-center gap-3 text-muted-foreground">
+				<div class="size-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
+				<p class="text-xs">{m.loading_community()}</p>
+			</div>
+		</div>
+	{:else if dashboard}
 		<!-- Header: community info with surface treatment -->
 		<div class="page-header rounded-xl border border-border/30 px-4 py-4 mb-6">
 			<CommunityHeader {dashboard} />
@@ -70,12 +70,12 @@
 			<ActiveHighlights members={dashboard.active_highlights} />
 			<SignalFlowChart data={dashboard.signal_flow} />
 		</div>
-	</div>
-{:else if store.dashboardError}
-	<div class="flex h-64 flex-col items-center justify-center gap-3 text-center">
-		<p class="text-xs text-red-500">{store.dashboardError}</p>
-	</div>
-{/if}
+	{:else if store.dashboardError}
+		<div class="flex h-64 flex-col items-center justify-center gap-3 text-center">
+			<p class="text-xs text-red-500">{store.dashboardError}</p>
+		</div>
+	{/if}
+</div>
 
 <style>
 	.page-header {
