@@ -156,7 +156,8 @@ for i in $(seq 1 "$SEED_COUNT"); do
     --arg route "komunitas" \
     --arg rahasia_level "L0" \
     --arg entity_id "ent-${SEED_COMMUNITY_ID}" \
-    '{witness_id:$witness_id, route:$route, rahasia_level:$rahasia_level, status:"open", message_count:0, unread_count:0, entity_ids:[$entity_id]}')"
+    --arg seed_batch_id "$run_key" \
+    '{witness_id:$witness_id, route:$route, rahasia_level:$rahasia_level, status:"open", message_count:0, unread_count:0, entity_ids:[$entity_id], dev_meta:{is_seed:true, seed_origin:"db", seed_batch_id:$seed_batch_id}}')"
 
   sql_feed="CREATE discovery_feed_item CONTENT {
     feed_id: '${feed_id}',

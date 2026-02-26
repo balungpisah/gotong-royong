@@ -12,6 +12,10 @@ default:
 dev:
     cd {{web}} && bun run dev
 
+# Start web dev server with local auth bypass enabled (development only)
+dev-bypass-auth target="http://127.0.0.1:3100" user_id="dev-user":
+    cd {{web}} && GR_AUTH_DEV_BYPASS_ENABLED=1 GR_AUTH_DEV_BYPASS_USER_ID={{user_id}} GR_API_PROXY_TARGET={{target}} bun run dev
+
 # Type-check web with svelte-check
 check:
     cd {{web}} && bun run check
@@ -102,6 +106,9 @@ dev-worker-logs:
 
 dev-seed:
 	scripts/dev/seed-api.sh
+
+# Backward-compatible alias
+seed-api: dev-seed
 
 dev-monitoring-up: dev-api-up
 	docker compose -f compose.dev.yaml --profile monitoring up -d prometheus

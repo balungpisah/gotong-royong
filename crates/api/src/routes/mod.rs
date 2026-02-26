@@ -978,6 +978,13 @@ struct TriageOperatorRouting {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+struct TriageOperatorBlocks {
+    conversation: Vec<String>,
+    structured: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct TriageOperatorOutput {
     schema_version: String,
     operator: String,
@@ -988,6 +995,7 @@ struct TriageOperatorOutput {
     questions: Option<Vec<String>>,
     missing_fields: Option<Vec<String>>,
     routing: TriageOperatorRouting,
+    blocks: Option<TriageOperatorBlocks>,
     payload: Value,
 }
 
@@ -1394,6 +1402,47 @@ fn triage_operator_payload(
     }
 }
 
+fn triage_operator_blocks_payload(operator: &str) -> Value {
+    match operator {
+        "musyawarah" => json!({
+            "conversation": ["ai_inline_card", "diff_card", "vote_card"],
+            "structured": ["document", "list", "vote", "computed"]
+        }),
+        "siaga" => json!({
+            "conversation": ["ai_inline_card", "diff_card", "vote_card"],
+            "structured": ["form", "list", "computed"]
+        }),
+        "pantau" => json!({
+            "conversation": ["ai_inline_card", "diff_card"],
+            "structured": ["list", "document", "computed"]
+        }),
+        "program" => json!({
+            "conversation": ["ai_inline_card", "diff_card"],
+            "structured": ["list", "form", "computed"]
+        }),
+        "catat" => json!({
+            "conversation": ["ai_inline_card", "diff_card"],
+            "structured": ["form", "document", "reference"]
+        }),
+        "bantuan" => json!({
+            "conversation": ["ai_inline_card", "diff_card"],
+            "structured": ["form", "list", "computed"]
+        }),
+        "rayakan" => json!({
+            "conversation": ["ai_inline_card", "diff_card"],
+            "structured": ["display", "document", "reference"]
+        }),
+        "kelola" => json!({
+            "conversation": ["ai_inline_card", "diff_card"],
+            "structured": ["form", "list", "reference"]
+        }),
+        _ => json!({
+            "conversation": ["ai_inline_card", "diff_card"],
+            "structured": ["document", "list", "computed"]
+        }),
+    }
+}
+
 fn triage_operator_output_payload(route: &str, trajectory_type: Option<&str>, step: u8) -> Value {
     let operator = triage_operator_name(route, trajectory_type);
     let output_kind = triage_operator_output_kind(route, trajectory_type);
@@ -1471,6 +1520,7 @@ fn triage_operator_output_payload(route: &str, trajectory_type: Option<&str>, st
             json!([])
         },
         "routing": routing,
+        "blocks": triage_operator_blocks_payload(operator),
         "payload": triage_operator_payload(operator, route, trajectory_type, step)
     })
 }
@@ -1654,6 +1704,67 @@ fn triage_validate_operator_final_payload(contract: &TriageOperatorOutput) -> Re
     Ok(())
 }
 
+fn triage_validate_operator_blocks(contract: &TriageOperatorOutput) -> Result<(), String> {
+    let blocks = contract
+        .blocks
+        .as_ref()
+        .ok_or_else(|| "blocks is required".to_string())?;
+
+    if blocks.conversation.is_empty() {
+        return Err("blocks.conversation must contain at least one item".to_string());
+    }
+    if blocks.structured.is_empty() {
+        return Err("blocks.structured must contain at least one item".to_string());
+    }
+
+    let allowed_conversation = HashSet::from([
+        "chat_message",
+        "ai_inline_card",
+        "diff_card",
+        "vote_card",
+        "moderation_hold_card",
+        "duplicate_detection_card",
+        "credit_nudge_card",
+    ]);
+    let allowed_structured = HashSet::from([
+        "list",
+        "document",
+        "form",
+        "computed",
+        "display",
+        "vote",
+        "reference",
+    ]);
+
+    let mut seen_conversation = HashSet::new();
+    for item in &blocks.conversation {
+        if !allowed_conversation.contains(item.as_str()) {
+            return Err("blocks.conversation contains invalid block id".to_string());
+        }
+        if !seen_conversation.insert(item) {
+            return Err("blocks.conversation contains duplicate block id".to_string());
+        }
+    }
+
+    let mut seen_structured = HashSet::new();
+    for item in &blocks.structured {
+        if !allowed_structured.contains(item.as_str()) {
+            return Err("blocks.structured contains invalid block id".to_string());
+        }
+        if !seen_structured.insert(item) {
+            return Err("blocks.structured contains duplicate block id".to_string());
+        }
+    }
+
+    if blocks.conversation.iter().any(|item| item == "vote_card")
+        && !matches!(contract.operator.as_str(), "musyawarah" | "siaga")
+    {
+        return Err("blocks.vote_card is only allowed for musyawarah|siaga".to_string());
+    }
+
+    Ok(())
+}
+
 fn triage_validate_operator_output(contract: &TriageOperatorOutput) -> Result<(), String> {
     if contract.schema_version != OPERATOR_SCHEMA_VERSION {
         return Err(format!(
@@ -1765,6 +1876,9 @@ fn triage_validate_operator_output(contract: &TriageOperatorOutput) -> Result<()
     }
 
     if contract.triage_stage == "triage_draft" {
+        if contract.blocks.is_some() {
+            triage_validate_operator_blocks(contract)?;
+        }
         if contract
             .questions
             .as_ref()
@@ -1780,6 +1894,7 @@ fn triage_validate_operator_output(contract: &TriageOperatorOutput) -> Result<()
             return Err("triage_draft requires missing_fields[]".to_string());
         }
     } else {
+        triage_validate_operator_blocks(contract)?;
         if contract
             .questions
             .as_ref()
@@ -2072,6 +2187,10 @@ mod triage_operator_contract_tests {
                 "route": "komunitas",
                 "trajectory_type": "mufakat"
             },
+            "blocks": {
+                "conversation": ["ai_inline_card", "diff_card", "vote_card"],
+                "structured": ["document", "list", "vote", "computed"]
+            },
             "payload": {
                 "context": "proposal",
                 "decision_steps": []
@@ -2099,11 +2218,73 @@ mod triage_operator_contract_tests {
                 "route": "catatan_komunitas",
                 "trajectory_type": "data"
             },
+            "blocks": {
+                "conversation": ["ai_inline_card", "diff_card"],
+                "structured": ["form", "document", "reference"]
+            },
             "payload": {
                 "record_type": "data",
                 "claim": "Harga komoditas naik",
                 "observed_at": "2026-02-26T00:00:00Z",
                 "category": "harga_pangan"
+            }
+        });
+
+        let result = triage_result_from_operator_output(invalid, 3);
+        assert!(matches!(result, Err(ApiError::Internal)));
+    }
+
+    #[test]
+    fn operator_contract_rejects_final_output_without_blocks() {
+        let invalid = json!({
+            "schema_version": "operator.v1",
+            "operator": "masalah",
+            "triage_stage": "triage_final",
+            "output_kind": "witness",
+            "confidence": 0.89,
+            "checklist": [
+                { "field": "problem_scope", "filled": true, "required_for_final": true }
+            ],
+            "questions": [],
+            "missing_fields": [],
+            "routing": {
+                "route": "komunitas",
+                "trajectory_type": "aksi"
+            },
+            "payload": {
+                "trajectory": "A",
+                "path_plan": {
+                    "plan_id": "plan-test",
+                    "version": 1,
+                    "title": "Rencana",
+                    "summary": "Ringkas",
+                    "branches": [
+                        {
+                            "branch_id": "main",
+                            "label": "Utama",
+                            "parent_checkpoint_id": null,
+                            "phases": [
+                                {
+                                    "phase_id": "p1",
+                                    "title": "Validasi",
+                                    "objective": "Sepakati lingkup",
+                                    "status": "planned",
+                                    "source": "ai",
+                                    "locked_fields": [],
+                                    "checkpoints": [
+                                        {
+                                            "checkpoint_id": "c1",
+                                            "title": "Konteks dikunci",
+                                            "status": "open",
+                                            "source": "ai",
+                                            "locked_fields": []
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
             }
         });
 
@@ -5533,6 +5714,7 @@ struct DiscoveryUnreadCountResponse {
 
 const FEED_MONITOR_PREFERENCE_TABLE: &str = "feed_monitor_preference";
 const FEED_FOLLOW_PREFERENCE_TABLE: &str = "feed_follow_preference";
+const FEED_DB_SEED_SOURCE_PREFIX: &str = "seed-";
 
 fn feed_preference_key(actor_id: &str, target_id: &str) -> String {
     format!("{actor_id}:{target_id}")
@@ -5578,6 +5760,27 @@ fn ensure_payload_object(payload: Option<Value>) -> serde_json::Map<String, Valu
         Some(Value::Object(map)) => map,
         _ => serde_json::Map::new(),
     }
+}
+
+fn is_db_seed_source_id(source_id: &str) -> bool {
+    source_id
+        .trim()
+        .to_ascii_lowercase()
+        .starts_with(FEED_DB_SEED_SOURCE_PREFIX)
+}
+
+fn apply_db_seed_dev_meta(payload: &mut serde_json::Map<String, Value>, source_id: &str) {
+    if !is_db_seed_source_id(source_id) {
+        return;
+    }
+
+    let mut dev_meta = match payload.remove("dev_meta") {
+        Some(Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    dev_meta.insert("is_seed".to_string(), Value::Bool(true));
+    dev_meta.insert("seed_origin".to_string(), Value::String("db".to_string()));
+    payload.insert("dev_meta".to_string(), Value::Object(dev_meta));
 }
 
 fn apply_follow_preferences_to_payload(
@@ -6062,6 +6265,7 @@ async fn list_discovery_feed(
         let mut payload = ensure_payload_object(item.payload.take());
         payload.insert("witness_id".to_string(), Value::String(witness_id));
         payload.insert("monitored".to_string(), Value::Bool(monitored));
+        apply_db_seed_dev_meta(&mut payload, &item.source_id);
         apply_follow_preferences_to_payload(&mut payload, &follow_map);
         item.payload = Some(Value::Object(payload));
     }

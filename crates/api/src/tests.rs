@@ -2987,6 +2987,16 @@ async fn discovery_feed_and_search_endpoints() {
     assert!(feed_ids.iter().any(|id| *id == feed_a.feed_id));
     assert!(feed_ids.iter().any(|id| *id == feed_b.feed_id));
     assert_eq!(feed_ids.len(), 3);
+    assert!(feed_items.iter().all(|item| {
+        let Some(payload) = item.get("payload").and_then(|value| value.as_object()) else {
+            return false;
+        };
+        let Some(dev_meta) = payload.get("dev_meta").and_then(|value| value.as_object()) else {
+            return false;
+        };
+        dev_meta.get("is_seed") == Some(&json!(true))
+            && dev_meta.get("seed_origin") == Some(&json!("db"))
+    }));
 
     let search_request = Request::builder()
         .method("GET")
@@ -3303,6 +3313,7 @@ async fn discovery_feed_preference_endpoints_persist_monitor_and_follow_state() 
         first_payload.get("witness_id"),
         Some(&json!("witness-pref-1"))
     );
+    assert!(first_payload.get("dev_meta").is_none());
     let first_entity_tag = first_payload
         .get("enrichment")
         .and_then(|value| value.get("entity_tags"))
@@ -3873,6 +3884,10 @@ async fn triage_start_accepts_operator_output_final_contract() {
                 "seed_hint": "Keresahan",
                 "program_refs": []
             },
+            "blocks": {
+                "conversation": ["ai_inline_card", "diff_card"],
+                "structured": ["document", "list", "computed"]
+            },
             "payload": {
                 "trajectory": "A",
                 "path_plan": {
@@ -4009,6 +4024,10 @@ async fn triage_continue_accepts_operator_output_and_updates_session_route() {
                     "category_label": "Harga Komoditas",
                     "quality": "community_observation"
                 }
+            },
+            "blocks": {
+                "conversation": ["ai_inline_card", "diff_card"],
+                "structured": ["form", "document", "reference"]
             },
             "payload": {
                 "record_type": "data",

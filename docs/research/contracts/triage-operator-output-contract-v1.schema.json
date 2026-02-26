@@ -64,6 +64,7 @@
       }
     },
     "routing": { "$ref": "#/definitions/Routing" },
+    "blocks": { "$ref": "#/definitions/Blocks" },
     "payload": {
       "type": "object",
       "minProperties": 1
@@ -90,6 +91,7 @@
         "required": ["triage_stage"]
       },
       "then": {
+        "required": ["blocks"],
         "properties": {
           "missing_fields": { "maxItems": 0 },
           "questions": { "maxItems": 0 }
@@ -123,6 +125,37 @@
       "then": {
         "properties": {
           "output_kind": { "const": "data" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operator": {
+            "enum": [
+              "masalah",
+              "pantau",
+              "catat",
+              "bantuan",
+              "rayakan",
+              "program",
+              "kelola"
+            ]
+          }
+        },
+        "required": ["operator"]
+      },
+      "then": {
+        "properties": {
+          "blocks": {
+            "properties": {
+              "conversation": {
+                "not": {
+                  "contains": { "const": "vote_card" }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -338,6 +371,41 @@
           "items": { "$ref": "#/definitions/ProgramReference" }
         },
         "stempel_state": { "$ref": "#/definitions/StempelState" }
+      },
+      "additionalProperties": false
+    },
+    "ConversationBlock": {
+      "type": "string",
+      "enum": [
+        "chat_message",
+        "ai_inline_card",
+        "diff_card",
+        "vote_card",
+        "moderation_hold_card",
+        "duplicate_detection_card",
+        "credit_nudge_card"
+      ]
+    },
+    "StructuredBlock": {
+      "type": "string",
+      "enum": ["list", "document", "form", "computed", "display", "vote", "reference"]
+    },
+    "Blocks": {
+      "type": "object",
+      "required": ["conversation", "structured"],
+      "properties": {
+        "conversation": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/ConversationBlock" }
+        },
+        "structured": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/StructuredBlock" }
+        }
       },
       "additionalProperties": false
     },
