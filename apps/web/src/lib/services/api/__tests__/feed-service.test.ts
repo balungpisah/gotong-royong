@@ -23,34 +23,40 @@ describe('ApiFeedService', () => {
 		get.mockResolvedValueOnce({
 			items: [
 				{
-					feed_id: 'feed-1',
-					source_type: 'ontology_note',
-					source_id: 'note-1',
-					actor_id: 'user-1',
-					actor_username: 'Rina',
-					title: 'Judul dari backend',
-					summary: 'Ringkasan backend',
-					privacy_level: 'public',
-					occurred_at_ms: 1_700_000_000_000,
-					created_at_ms: 1_700_000_000_100,
-					participant_ids: ['user-2'],
-					payload: {
-						witness_id: 'witness-1',
-						monitored: true,
-						enrichment: {
-							title: 'Judul enrichment',
-							trajectory_type: 'data',
-							icon: 'scale',
-							hook_line: 'Hook kuat',
-							body: 'Body enrichment',
-							sentiment: 'curious',
-							intensity: 3,
-							entity_tags: [{ label: 'RT 05', entity_type: 'lingkungan' }]
+					kind: 'witness',
+					stream_id: 'w-feed-1',
+					sort_timestamp: '2023-11-14T22:13:20.000Z',
+					data: {
+						feed_id: 'feed-1',
+						source_type: 'ontology_note',
+						source_id: 'note-1',
+						actor_id: 'user-1',
+						actor_username: 'Rina',
+						title: 'Judul dari backend',
+						summary: 'Ringkasan backend',
+						privacy_level: 'public',
+						occurred_at_ms: 1_700_000_000_000,
+						created_at_ms: 1_700_000_000_100,
+						participant_ids: ['user-2'],
+						payload: {
+							witness_id: 'witness-1',
+							monitored: true,
+							enrichment: {
+								title: 'Judul enrichment',
+								trajectory_type: 'data',
+								icon: 'scale',
+								hook_line: 'Hook kuat',
+								body: 'Body enrichment',
+								sentiment: 'curious',
+								intensity: 3,
+								entity_tags: [{ label: 'RT 05', entity_type: 'lingkungan' }]
+							}
 						}
 					}
 				}
 			],
-			next_cursor: 'next-1'
+			next_cursor: 'next-1',
+			has_more: true
 		});
 
 		const service = new ApiFeedService(client);
@@ -65,6 +71,14 @@ describe('ApiFeedService', () => {
 		expect(page.total).toBe(1);
 		expect(page.cursor).toBe('next-1');
 		expect(page.items[0]).toMatchObject({
+			kind: 'witness',
+			stream_id: 'w-feed-1',
+			sort_timestamp: '2023-11-14T22:13:20.000Z'
+		});
+		if (page.items[0].kind !== 'witness') {
+			throw new Error('expected witness stream item');
+		}
+		expect(page.items[0].data).toMatchObject({
 			witness_id: 'witness-1',
 			title: 'Judul enrichment',
 			trajectory_type: 'data',
@@ -82,8 +96,8 @@ describe('ApiFeedService', () => {
 				actor_name: 'Rina'
 			}
 		});
-		expect(page.items[0].entity_tags).toHaveLength(1);
-		expect(page.items[0].latest_event.timestamp).toBe('2023-11-14T22:13:20.000Z');
+		expect(page.items[0].data.entity_tags).toHaveLength(1);
+		expect(page.items[0].data.latest_event.timestamp).toBe('2023-11-14T22:13:20.000Z');
 	});
 
 	it('applies fallback mapping when enrichment is absent', async () => {
@@ -91,17 +105,22 @@ describe('ApiFeedService', () => {
 		get.mockResolvedValueOnce({
 			items: [
 				{
-					feed_id: 'feed-2',
-					source_type: 'vouch',
-					source_id: 'source-2',
-					actor_id: 'user-9',
-					actor_username: 'Budi',
-					title: 'Ada vouch',
-					privacy_level: 'private',
-					occurred_at_ms: 1_700_000_001_000,
-					created_at_ms: 1_700_000_001_100,
-					participant_ids: [],
-					payload: {}
+					kind: 'witness',
+					stream_id: 'w-feed-2',
+					sort_timestamp: '2023-11-14T22:13:21.000Z',
+					data: {
+						feed_id: 'feed-2',
+						source_type: 'vouch',
+						source_id: 'source-2',
+						actor_id: 'user-9',
+						actor_username: 'Budi',
+						title: 'Ada vouch',
+						privacy_level: 'private',
+						occurred_at_ms: 1_700_000_001_000,
+						created_at_ms: 1_700_000_001_100,
+						participant_ids: [],
+						payload: {}
+					}
 				}
 			],
 			next_cursor: null
@@ -111,7 +130,11 @@ describe('ApiFeedService', () => {
 		const page = await service.list();
 
 		expect(page.cursor).toBeUndefined();
-		expect(page.items[0]).toMatchObject({
+		expect(page.items[0]).toMatchObject({ kind: 'witness' });
+		if (page.items[0].kind !== 'witness') {
+			throw new Error('expected witness stream item');
+		}
+		expect(page.items[0].data).toMatchObject({
 			witness_id: 'source-2',
 			title: 'Ada vouch',
 			trajectory_type: 'advokasi',

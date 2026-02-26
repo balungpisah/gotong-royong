@@ -76,7 +76,12 @@
 			href: '/dev/components/card',
 			desc: '5 variants × 3 paddings + interactive states'
 		},
-		{ name: 'Dialog', href: '/dev/components/dialog', desc: 'Modal dialog with overlay' }
+		{ name: 'Dialog', href: '/dev/components/dialog', desc: 'Modal dialog with overlay' },
+		{
+			name: 'Feed Cards',
+			href: '/dev/components/feed-cards',
+			desc: 'Registry-driven witness/system matrix from JSON scenarios'
+		}
 	];
 </script>
 

@@ -22,7 +22,8 @@
 		{ name: 'Blocks', href: '/dev/components/blocks' },
 		{ name: 'Chat', href: '/dev/components/chat' },
 		{ name: 'Plan', href: '/dev/components/plan' },
-		{ name: 'Diff Card', href: '/dev/components/diff-card' }
+		{ name: 'Diff Card', href: '/dev/components/diff-card' },
+		{ name: 'Feed Cards', href: '/dev/components/feed-cards' }
 	];
 </script>
 

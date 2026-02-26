@@ -342,10 +342,21 @@ test.describe('live API proxy smoke', () => {
 					});
 					expect(feedProbeResponse.ok()).toBeTruthy();
 					const feedProbeBody = (await feedProbeResponse.json()) as {
-						items?: Array<{ source_id?: string; payload?: { witness_id?: string } }>;
+						items?: Array<
+							| {
+									kind?: 'witness' | 'system';
+									data?: { source_id?: string; payload?: { witness_id?: string } };
+							  }
+							| { source_id?: string; payload?: { witness_id?: string } }
+						>;
 					};
-					const feedCandidate = feedProbeBody.items?.[0];
-					witnessId = feedCandidate?.payload?.witness_id ?? feedCandidate?.source_id;
+					const feedCandidate = feedProbeBody.items?.find((item) =>
+						'kind' in item ? item.kind === 'witness' : true
+					);
+					const feedData = (feedCandidate && 'kind' in feedCandidate
+						? feedCandidate.data
+						: feedCandidate) as { source_id?: string; payload?: { witness_id?: string } } | undefined;
+					witnessId = feedData?.payload?.witness_id ?? feedData?.source_id;
 				}
 			}
 		}

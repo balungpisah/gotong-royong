@@ -22,7 +22,7 @@ bun run build
 ## Service Toggles
 
 - `PUBLIC_GR_USE_API_NOTIFICATIONS=true` enables real notifications from `/v1/notifications`.
-- `PUBLIC_GR_USE_API_FEED=true` enables real feed items from `/v1/feed`.
+- `PUBLIC_GR_USE_API_FEED=true` enables real feed stream (`items` + polymorphic `stream`) from `/v1/feed`.
 - `PUBLIC_GR_USE_API_CHAT=true` enables witness chat send/poll via `/v1/chat/threads/*`.
 - `PUBLIC_GR_USE_API_USER=true` enables user profile reads via `/v1/auth/me` + `/v1/tandang/me/profile` + `/v1/tandang/users/:user_id/profile`.
 - `PUBLIC_GR_USE_API_TRIAGE=true` enables triage session flows via `/v1/triage/sessions*`.
