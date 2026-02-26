@@ -9,7 +9,7 @@
  * @see docs/design/specs/ui-ux-spec/29-llm-architecture.md §28.5
  */
 
-import type { Block, SourceTag } from './blocks';
+import type { SourceTag } from './blocks';
 
 // ---------------------------------------------------------------------------
 // Diff Operations

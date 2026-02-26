@@ -23,17 +23,17 @@ import type { EntityType } from './feed';
  * One-off (Data Item):    data, vault, bantuan, pencapaian, siaga
  */
 export type TrajectoryType =
-	| 'aksi'        // A: collective action      — amber
-	| 'advokasi'    // B: advocacy/escalation     — rose
-	| 'pantau'      // D: watchdog/monitor        — indigo
-	| 'mufakat'     // F: proposal/musyawarah     — teal
-	| 'mediasi'     // L: dispute resolution      — violet
-	| 'program'     // M: ongoing program         — emerald
-	| 'data'        // C: community data/survey   — sky
-	| 'vault'       // E: private sealed record   — slate
-	| 'bantuan'     // G: help request            — amber (lighter)
-	| 'pencapaian'  // I: celebration             — yellow
-	| 'siaga';      // J: alert/warning           — red
+	| 'aksi' // A: collective action      — amber
+	| 'advokasi' // B: advocacy/escalation     — rose
+	| 'pantau' // D: watchdog/monitor        — indigo
+	| 'mufakat' // F: proposal/musyawarah     — teal
+	| 'mediasi' // L: dispute resolution      — violet
+	| 'program' // M: ongoing program         — emerald
+	| 'data' // C: community data/survey   — sky
+	| 'vault' // E: private sealed record   — slate
+	| 'bantuan' // G: help request            — amber (lighter)
+	| 'pencapaian' // I: celebration             — yellow
+	| 'siaga'; // J: alert/warning           — red
 
 // ---------------------------------------------------------------------------
 // Sentiment

@@ -8,7 +8,7 @@
  * @see docs/design/specs/UI-GUIDELINE-v1.0.md §2.5, §2.6
  */
 
-import type { Block, SourceTag } from './blocks';
+import type { Block } from './blocks';
 import type { DiffCard } from './diff-card';
 
 // ---------------------------------------------------------------------------
@@ -30,13 +30,13 @@ export interface MessageAuthor {
 // ---------------------------------------------------------------------------
 
 export type ChatMessageType =
-	| 'user'        // Regular chat bubble (left or right aligned)
-	| 'ai_card'     // AI inline card (suggestion, summary, alert)
-	| 'diff_card'   // Diff card (suggest-don't-overwrite)
-	| 'vote_card'   // Inline vote
-	| 'system'      // System message (centered, muted)
-	| 'evidence'    // Evidence submission card
-	| 'galang';     // Financial transaction system message
+	| 'user' // Regular chat bubble (left or right aligned)
+	| 'ai_card' // AI inline card (suggestion, summary, alert)
+	| 'diff_card' // Diff card (suggest-don't-overwrite)
+	| 'vote_card' // Inline vote
+	| 'system' // System message (centered, muted)
+	| 'evidence' // Evidence submission card
+	| 'galang'; // Financial transaction system message
 
 // ---------------------------------------------------------------------------
 // Base Message
@@ -74,12 +74,12 @@ export interface UserMessage extends ChatMessageBase {
 
 /** AI badge variants shown in seed cards and chat. */
 export type AiBadgeVariant =
-	| 'classified'     // 🤖 Tuntaskan · 92%
-	| 'suggested'      // 🤖 Wujudkan? · 74%
-	| 'stalled'        // ⚠ Macet 48j
-	| 'dampak'         // 🌱 Dampak
-	| 'ringkasan'      // 📝 Ringkasan
-	| 'duplikat';      // ⚠ Duplikat
+	| 'classified' // 🤖 Tuntaskan · 92%
+	| 'suggested' // 🤖 Wujudkan? · 74%
+	| 'stalled' // ⚠ Macet 48j
+	| 'dampak' // 🌱 Dampak
+	| 'ringkasan' // 📝 Ringkasan
+	| 'duplikat'; // ⚠ Duplikat
 
 export interface AiCardMessage extends ChatMessageBase {
 	type: 'ai_card';

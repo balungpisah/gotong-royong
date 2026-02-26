@@ -62,4 +62,3 @@ export interface GroupCreateInput {
 }
 
 export type GroupUpdateInput = Partial<Pick<GroupSummary, 'name' | 'description' | 'join_policy'>>;
-

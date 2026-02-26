@@ -8,7 +8,7 @@
  */
 
 import type { WitnessStatus, WitnessMemberRole } from './witness';
-import type { RahasiaLevel } from './triage';
+import type { ProgramReference, RahasiaLevel, TriageStempelState } from './triage';
 import type { TrajectoryType, Sentiment, SignalLabels } from './card-enrichment';
 
 // ── Feed Event Types ──────────────────────────────────────────────
@@ -44,9 +44,9 @@ export interface FeedEvent {
  *  Each maps to a tandang reputation signal (I/C/J).
  *  Contextual PoR wording is resolved at render time based on card type. */
 export type SignalChipType =
-	| 'vouch'       // 🤝 Saya Vouch — positive trust signal → I+C
-	| 'skeptis'     // 🤔 Skeptis — healthy doubt signal → J
-	| 'saksi'        // 👁️ PoR chip — contextual: Saya Saksi / Sudah Beres / Bukti Valid → I
+	| 'vouch' // 🤝 Saya Vouch — positive trust signal → I+C
+	| 'skeptis' // 🤔 Skeptis — healthy doubt signal → J
+	| 'saksi' // 👁️ PoR chip — contextual: Saya Saksi / Sudah Beres / Bukti Valid → I
 	| 'perlu_dicek' // ⚠️ Perlu Dicek — quality flag → I+J
 	| 'inline_vote'; // 🗳️ Ya/Tidak — inline voting (vote_opened cards only)
 
@@ -54,19 +54,29 @@ export type SignalChipType =
 
 /** Why a witness reached its terminal state. */
 export type WitnessCloseReason =
-	| 'selesai'       // resolved successfully
-	| 'tidak_valid'   // content was false/invalid
-	| 'duplikat'      // merged into another witness
-	| 'kedaluwarsa'   // expired
-	| 'ditarik';      // creator withdrew
+	| 'selesai' // resolved successfully
+	| 'tidak_valid' // content was false/invalid
+	| 'duplikat' // merged into another witness
+	| 'kedaluwarsa' // expired
+	| 'ditarik'; // creator withdrew
 
 /** How a signal was resolved after witness completion. */
 export type SignalResolutionOutcome =
-	| 'pending'            // witness still active
-	| 'resolved_positive'  // signal aligned with outcome
-	| 'resolved_negative'  // signal contradicted outcome
-	| 'resolved_neutral'   // ambiguous outcome, no credit swing
-	| 'expired';           // witness closed without clear outcome
+	| 'pending' // witness still active
+	| 'resolved_positive' // signal aligned with outcome
+	| 'resolved_negative' // signal contradicted outcome
+	| 'resolved_neutral' // ambiguous outcome, no credit swing
+	| 'expired'; // witness closed without clear outcome
+
+/** Terminal impact verification window after completion. */
+export interface ImpactVerification {
+	status: 'not_open' | 'open' | 'verified' | 'disputed';
+	opened_at_ms?: number;
+	closes_at_ms?: number;
+	yes_count: number;
+	no_count: number;
+	min_vouches: number;
+}
 
 /** Content-directed signal types (excludes vouch — that's person-directed).
  *  bagus removed — renamed to "Dukung" and moved to FeedStore as a social action. */
@@ -118,6 +128,13 @@ export type FeedSource = 'ikutan' | 'terlibat' | 'sekitar';
 
 /** Feed filter tab values. */
 export type FeedFilter = 'semua' | 'ikutan' | 'terlibat' | 'sekitar' | 'pantauan' | 'discover';
+
+/** Development-only metadata for seeded fixture/db cards. */
+export interface FeedDevMeta {
+	is_seed: boolean;
+	seed_batch_id?: string;
+	seed_origin?: 'fixture' | 'db' | 'operator_stub';
+}
 
 /** A single feed card — one per witness, latest event as headline. */
 export interface FeedItem {
@@ -177,6 +194,12 @@ export interface FeedItem {
 	deadline?: string;
 	/** Label explaining the deadline, e.g. "Voting ditutup", "Fase berakhir". */
 	deadline_label?: string;
+	/** Structured references to public programs linked to this card. */
+	program_refs?: ProgramReference[];
+	/** Consensus lock state for mufakat-like trajectories. */
+	stempel_state?: TriageStempelState;
+	/** Terminal impact verification status and counters. */
+	impact_verification?: ImpactVerification;
 
 	// ── Pantau (Monitor/Watchlist) ───────────────────────────────
 	/** Whether the current user is monitoring this witness. Client-side toggle. */
@@ -185,6 +208,8 @@ export interface FeedItem {
 	quorum_target?: number;
 	/** Quorum: how many participants currently. */
 	quorum_current?: number;
+	/** Dev/test marker for seeded cards. Never required for production cards. */
+	dev_meta?: FeedDevMeta;
 }
 
 /** Preview of a witness member for the avatar stack (max 5). */
@@ -351,13 +376,13 @@ export interface PromptPayload {
 
 /** The 7 user actions that trigger automatic monitoring. */
 export type AutoPantauTrigger =
-	| 'created'        // User created the witness
-	| 'joined'         // User joined (any role)
-	| 'vouched'        // User vouched (any vouch_type: positive, skeptical, conditional, mentorship)
-	| 'witnessed'      // User is a saksi (eyewitness)
-	| 'flagged'        // User flagged (perlu_dicek)
-	| 'evidence'       // User submitted evidence
-	| 'voted';         // User voted (yes or no)
+	| 'created' // User created the witness
+	| 'joined' // User joined (any role)
+	| 'vouched' // User vouched (any vouch_type: positive, skeptical, conditional, mentorship)
+	| 'witnessed' // User is a saksi (eyewitness)
+	| 'flagged' // User flagged (perlu_dicek)
+	| 'evidence' // User submitted evidence
+	| 'voted'; // User voted (yes or no)
 
 /** Actions that do NOT auto-monitor (manual eye-icon tap only). */
 // - supported (Dukung ❤️) — too lightweight, would flood Pantauan
@@ -375,9 +400,9 @@ export type AutoPantauTrigger =
 export function shouldAutoMonitor(relation?: MyRelation): boolean {
 	if (!relation) return false;
 	return (
-		relation.vouched ||       // covers all vouch_types incl. skeptical
-		relation.witnessed ||     // saksi
-		relation.flagged ||       // perlu_dicek
+		relation.vouched || // covers all vouch_types incl. skeptical
+		relation.witnessed || // saksi
+		relation.flagged || // perlu_dicek
 		relation.vote_cast != null // voted yes or no
 	);
 }

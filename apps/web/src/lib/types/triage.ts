@@ -22,14 +22,14 @@ import type { KelolaPayload } from './operator';
  * The bar morphs as confidence builds.
  */
 export type ContextBarState =
-	| 'listening'     // Empty bar, wave indicator — AI listening
-	| 'probing'       // Bar + signal bars — AI asking follow-up
-	| 'leaning'       // Tappable track pill — AI has initial guess
-	| 'ready'         // Full card: track + confidence + seed type — path plan proposed
-	| 'vault-ready'   // Dark card (vault palette) — directed to Catatan Saksi
-	| 'siaga-ready'   // Red pulsing card — emergency detected
-	| 'split-ready'   // Split card — story can split to 2 flows
-	| 'manual';       // Grid: 5 track hints + vault — user tapped "Pilih sendiri"
+	| 'listening' // Empty bar, wave indicator — AI listening
+	| 'probing' // Bar + signal bars — AI asking follow-up
+	| 'leaning' // Tappable track pill — AI has initial guess
+	| 'ready' // Full card: track + confidence + seed type — path plan proposed
+	| 'vault-ready' // Dark card (vault palette) — directed to Catatan Saksi
+	| 'siaga-ready' // Red pulsing card — emergency detected
+	| 'split-ready' // Split card — story can split to 2 flows
+	| 'manual'; // Grid: 5 track hints + vault — user tapped "Pilih sendiri"
 
 // ---------------------------------------------------------------------------
 // Triage Result
@@ -37,6 +37,58 @@ export type ContextBarState =
 
 /** Entry route determined by triage. */
 export type EntryRoute = 'komunitas' | 'vault' | 'siaga' | 'catatan_komunitas' | 'kelola';
+export type TriageStatus = 'draft' | 'final';
+export type TriageKind = 'witness' | 'data';
+export type TaxonomyCategoryCode =
+	| 'commodity_price'
+	| 'public_service'
+	| 'training'
+	| 'employment'
+	| 'health'
+	| 'education'
+	| 'infrastructure'
+	| 'safety_alert'
+	| 'environment'
+	| 'community_event'
+	| 'other_custom';
+export type TaxonomyQuality = 'official_source' | 'community_observation' | 'unverified_claim';
+export type StempelLifecycleState = 'draft' | 'proposed' | 'objection_window' | 'locked';
+
+export interface TriageTaxonomy {
+	category_code: TaxonomyCategoryCode;
+	category_label: string;
+	custom_label?: string;
+	quality: TaxonomyQuality;
+}
+
+export interface ProgramReference {
+	program_id: string;
+	label: string;
+	source: string;
+	confidence: number;
+}
+
+export interface TriageStempelState {
+	state: StempelLifecycleState;
+	proposed_at_ms?: number;
+	objection_deadline_ms?: number;
+	locked_at_ms?: number;
+	min_participants: number;
+	participant_count: number;
+	objection_count: number;
+	latest_objection_at_ms?: number;
+	latest_objection_reason?: string;
+}
+
+export interface TriageCard {
+	icon?: string;
+	trajectory_type?: TrajectoryType;
+	title?: string;
+	hook_line?: string;
+	body?: string;
+	sentiment?: string;
+	intensity?: number;
+}
 
 /** Confidence level for the AI classification. */
 export interface TriageConfidence {
@@ -53,10 +105,26 @@ export interface TriageConfidence {
 export interface TriageResult {
 	/** Backend triage session id for follow-up turns. */
 	session_id?: string;
+	/** Strict contract version. */
+	schema_version?: string;
+	/** Draft/final readiness state for create actions. */
+	status?: TriageStatus;
+	/** Final output kind produced by triage. */
+	kind?: TriageKind;
+	/** Missing fields when status='draft'. */
+	missing_fields?: string[];
+	/** Data taxonomy for controlled vocabulary classification. */
+	taxonomy?: TriageTaxonomy;
+	/** Structured program references (e.g., MBG). */
+	program_refs?: ProgramReference[];
+	/** Backend-governed stempel consensus state. */
+	stempel_state?: TriageStempelState;
 	/** Current context bar state. */
 	bar_state: ContextBarState;
 	/** Determined entry route. */
 	route: EntryRoute;
+	/** Short human-readable triage summary from backend. */
+	summary_text?: string;
 	/** Suggested track hint (optional — metadata only). */
 	track_hint?: TrackHint;
 	/** Seed type hint. */
@@ -67,6 +135,8 @@ export interface TriageResult {
 	trajectory_type?: TrajectoryType;
 	/** AI-generated card enrichment (icon, title, hook_line, sentiment). */
 	card_enrichment?: CardEnrichment;
+	/** Canonical renderable card payload from backend triage. */
+	card?: TriageCard;
 	/** Token budget tracking — drives the "Sisa Energi AI" energy bar. */
 	budget?: TriageBudget;
 	/** Proposed path plan (when bar_state is 'ready'). */

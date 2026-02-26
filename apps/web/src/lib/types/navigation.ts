@@ -48,10 +48,52 @@ export interface TagSuggestion {
 
 /** The default tab configuration — 5 feed layer tabs + discover. */
 export const DEFAULT_TABS: TabConfig[] = [
-	{ id: 'feed-semua', label: 'Semua', iconName: 'activity', tag: null, pinned: true, feedFilter: 'semua' },
-	{ id: 'feed-ikutan', label: 'Diikuti', iconName: 'bookmark', tag: null, pinned: true, feedFilter: 'ikutan' },
-	{ id: 'feed-terlibat', label: 'Terlibat', iconName: 'bell', tag: null, pinned: true, feedFilter: 'terlibat' },
-	{ id: 'feed-sekitar', label: 'Sekitar', iconName: 'globe', tag: null, pinned: true, feedFilter: 'sekitar' },
-	{ id: 'feed-pantauan', label: 'Pantauan', iconName: 'eye', tag: null, pinned: true, feedFilter: 'pantauan' },
-	{ id: 'feed-discover', label: 'Jelajahi', iconName: 'compass', tag: null, pinned: true, feedFilter: 'discover' }
+	{
+		id: 'feed-semua',
+		label: 'Semua',
+		iconName: 'activity',
+		tag: null,
+		pinned: true,
+		feedFilter: 'semua'
+	},
+	{
+		id: 'feed-ikutan',
+		label: 'Diikuti',
+		iconName: 'bookmark',
+		tag: null,
+		pinned: true,
+		feedFilter: 'ikutan'
+	},
+	{
+		id: 'feed-terlibat',
+		label: 'Terlibat',
+		iconName: 'bell',
+		tag: null,
+		pinned: true,
+		feedFilter: 'terlibat'
+	},
+	{
+		id: 'feed-sekitar',
+		label: 'Sekitar',
+		iconName: 'globe',
+		tag: null,
+		pinned: true,
+		feedFilter: 'sekitar'
+	},
+	{
+		id: 'feed-pantauan',
+		label: 'Pantauan',
+		iconName: 'eye',
+		tag: null,
+		pinned: true,
+		feedFilter: 'pantauan'
+	},
+	{
+		id: 'feed-discover',
+		label: 'Jelajahi',
+		iconName: 'compass',
+		tag: null,
+		pinned: true,
+		feedFilter: 'discover'
+	}
 ];

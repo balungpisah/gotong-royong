@@ -18,13 +18,7 @@ import type { SourceTag, TrackHint } from './blocks';
 // ---------------------------------------------------------------------------
 
 /** Status for phases and checkpoints. */
-export type PlanItemStatus =
-	| 'planned'
-	| 'active'
-	| 'open'
-	| 'completed'
-	| 'blocked'
-	| 'skipped';
+export type PlanItemStatus = 'planned' | 'active' | 'open' | 'completed' | 'blocked' | 'skipped';
 
 // ---------------------------------------------------------------------------
 // Seed Hints
@@ -34,12 +28,7 @@ export type PlanItemStatus =
  * Optional seed type hint — the emotional/contextual origin of the witness.
  * Used by AI-00 triage but does not force a lifecycle.
  */
-export type SeedHint =
-	| 'Keresahan'
-	| 'Aspirasi'
-	| 'Kejadian'
-	| 'Rencana'
-	| 'Pertanyaan';
+export type SeedHint = 'Keresahan' | 'Aspirasi' | 'Kejadian' | 'Rencana' | 'Pertanyaan';
 
 // ---------------------------------------------------------------------------
 // Checkpoint
@@ -61,6 +50,16 @@ export interface Checkpoint {
 // Phase
 // ---------------------------------------------------------------------------
 
+export type AssistNeedUrgency = 'low' | 'medium' | 'high';
+
+export interface PhaseAssistNeed {
+	esco_skill_uri: string;
+	skill_label: string;
+	reason: string;
+	urgency: AssistNeedUrgency;
+	min_people: number;
+}
+
 export interface Phase {
 	phase_id: string;
 	title: string;
@@ -69,6 +68,8 @@ export interface Phase {
 	source: SourceTag;
 	locked_fields: string[];
 	checkpoints: Checkpoint[];
+	/** Optional ESCO-coded support requirements for this phase. */
+	assist_needs?: PhaseAssistNeed[];
 }
 
 // ---------------------------------------------------------------------------

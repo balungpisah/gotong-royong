@@ -13,10 +13,10 @@
 // ---------------------------------------------------------------------------
 
 export type TriggerMode =
-	| 'manual'          // User taps 🔄 Perbarui → diff card in chat
-	| 'milestone'       // Keyword/pattern at breakpoints → stage transition suggestion
-	| 'time_triggered'  // Scheduled interval → alert in chat
-	| 'passive';        // Continuous monitoring → badge/indicator only
+	| 'manual' // User taps 🔄 Perbarui → diff card in chat
+	| 'milestone' // Keyword/pattern at breakpoints → stage transition suggestion
+	| 'time_triggered' // Scheduled interval → alert in chat
+	| 'passive'; // Continuous monitoring → badge/indicator only
 
 /**
  * A trigger event that causes the LLM to produce output.
@@ -43,13 +43,13 @@ export interface TriggerEvent {
  * Not all are LLM — some are backend/Tandang.
  */
 export type AiTouchPoint =
-	| 'AI-00'   // Conversational Triage (Bagikan)
-	| 'AI-01'   // Track & Seed Hint Classifier
-	| 'AI-02'   // Redaction LLM
-	| 'AI-03'   // Duplicate Detector
-	| 'AI-04'   // Content Moderation
-	| 'AI-05'   // Gaming Detection
-	| 'AI-06'   // Criteria Suggestion
-	| 'AI-07'   // Discussion Summary
-	| 'AI-08'   // Media Redaction
-	| 'AI-09';  // Credit Accreditation
+	| 'AI-00' // Conversational Triage (Bagikan)
+	| 'AI-01' // Track & Seed Hint Classifier
+	| 'AI-02' // Redaction LLM
+	| 'AI-03' // Duplicate Detector
+	| 'AI-04' // Content Moderation
+	| 'AI-05' // Gaming Detection
+	| 'AI-06' // Criteria Suggestion
+	| 'AI-07' // Discussion Summary
+	| 'AI-08' // Media Redaction
+	| 'AI-09'; // Credit Accreditation

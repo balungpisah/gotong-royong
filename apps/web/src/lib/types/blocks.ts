@@ -99,14 +99,7 @@ export interface DocumentBlock {
 // Form Block
 // ---------------------------------------------------------------------------
 
-export type FormFieldType =
-	| 'text'
-	| 'number'
-	| 'date'
-	| 'select'
-	| 'textarea'
-	| 'toggle'
-	| 'file';
+export type FormFieldType = 'text' | 'number' | 'date' | 'select' | 'textarea' | 'toggle' | 'file';
 
 export interface FormField extends SourceMeta {
 	id: string;
@@ -143,12 +136,7 @@ export interface FormBlock {
 // Computed Block
 // ---------------------------------------------------------------------------
 
-export type ComputedDisplay =
-	| 'progress'
-	| 'status'
-	| 'score'
-	| 'counter'
-	| 'confidence';
+export type ComputedDisplay = 'progress' | 'status' | 'score' | 'counter' | 'confidence';
 
 /**
  * `computed` — Read-only derived data (progress bar, status indicator).
@@ -187,6 +175,7 @@ export interface DisplayBlock {
 		type: 'image' | 'video';
 		url: string;
 		alt?: string;
+		captions_url?: string;
 	}[];
 	/** Optional metadata (author, date, etc.) */
 	meta?: Record<string, unknown>;

@@ -30,6 +30,8 @@ export type {
 	PlanItemStatus,
 	SeedHint,
 	Checkpoint,
+	AssistNeedUrgency,
+	PhaseAssistNeed,
 	Phase,
 	Branch,
 	PathPlan,
@@ -70,6 +72,14 @@ export type {
 export type {
 	ContextBarState,
 	EntryRoute,
+	TriageStatus,
+	TriageKind,
+	TaxonomyCategoryCode,
+	TaxonomyQuality,
+	StempelLifecycleState,
+	TriageTaxonomy,
+	ProgramReference,
+	TriageStempelState,
 	TriageConfidence,
 	TriageResult,
 	TrajectoryComplexity,
@@ -167,6 +177,7 @@ export type {
 	UrgencyBadge,
 	FeedSource,
 	FeedFilter,
+	FeedDevMeta,
 	FeedItem,
 	FeedMemberPreview,
 	RepostFrame,
@@ -195,7 +206,8 @@ export type {
 	WitnessCloseReason,
 	SignalResolutionOutcome,
 	ContentSignalType,
-	ContentSignal
+	ContentSignal,
+	ImpactVerification
 } from './feed';
 export { shouldAutoMonitor } from './feed';
 
