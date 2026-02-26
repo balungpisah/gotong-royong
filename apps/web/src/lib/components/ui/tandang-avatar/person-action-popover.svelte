@@ -52,7 +52,9 @@
 	<!-- Person header -->
 	<div class="flex items-center gap-2.5">
 		<!-- Mini avatar -->
-		<div class="size-9 shrink-0 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+		<div
+			class="size-9 shrink-0 rounded-full bg-muted flex items-center justify-center overflow-hidden"
+		>
 			{#if person.avatar_url}
 				<img src={person.avatar_url} alt={person.name} class="size-full object-cover" />
 			{:else}
@@ -63,7 +65,8 @@
 			<p class="truncate text-sm font-semibold text-foreground">{person.name}</p>
 			{#if person.tier !== undefined}
 				<p class="text-caption" style="color: {tierColor};">
-					{tierPips} {tierName}
+					{tierPips}
+					{tierName}
 				</p>
 			{/if}
 		</div>
@@ -75,8 +78,8 @@
 			onclick={() => onvouch?.(person.user_id)}
 			class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-micro font-medium transition-colors
 				{isVouched
-					? 'bg-signal-vouch/20 text-signal-vouch'
-					: 'bg-muted/30 text-foreground/70 hover:bg-signal-vouch/10 hover:text-signal-vouch'}"
+				? 'bg-signal-vouch/20 text-signal-vouch'
+				: 'bg-muted/30 text-foreground/70 hover:bg-signal-vouch/10 hover:text-signal-vouch'}"
 		>
 			<HandshakeIcon class="size-3 shrink-0" />
 			{m.tandang_aku_jamin()}
@@ -85,8 +88,8 @@
 			onclick={() => onskeptis?.(person.user_id)}
 			class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-micro font-medium transition-colors
 				{isSkeptical
-					? 'bg-signal-skeptis/20 text-signal-skeptis'
-					: 'bg-muted/30 text-foreground/70 hover:bg-signal-skeptis/10 hover:text-signal-skeptis'}"
+				? 'bg-signal-skeptis/20 text-signal-skeptis'
+				: 'bg-muted/30 text-foreground/70 hover:bg-signal-skeptis/10 hover:text-signal-skeptis'}"
 		>
 			<CircleHelpIcon class="size-3 shrink-0" />
 			{m.tandang_skeptis()}

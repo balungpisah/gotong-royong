@@ -95,78 +95,78 @@
 
 	const ICON_REGISTRY: Record<string, Component<{ class?: string }>> = {
 		// Infrastructure & Public Services
-		'construction': Construction,
+		construction: Construction,
 		'building-2': Building2,
-		'landmark': Landmark,
-		'house': House,
+		landmark: Landmark,
+		house: House,
 		'traffic-cone': TrafficCone,
 
 		// Nature & Environment
 		'tree-pine': TreePine,
-		'droplets': Droplets,
-		'leaf': Leaf,
-		'sun': Sun,
+		droplets: Droplets,
+		leaf: Leaf,
+		sun: Sun,
 		'cloud-rain': CloudRain,
-		'mountain': Mountain,
-		'waves': Waves,
+		mountain: Mountain,
+		waves: Waves,
 
 		// Legal & Governance
-		'scale': Scale,
-		'gavel': Gavel,
+		scale: Scale,
+		gavel: Gavel,
 		'file-text': FileText,
 		'clipboard-list': ClipboardList,
 		'scroll-text': ScrollText,
-		'shield': Shield,
+		shield: Shield,
 
 		// Community & People
-		'users': Users,
-		'handshake': Handshake,
-		'heart': Heart,
-		'baby': Baby,
-		'megaphone': Megaphone,
+		users: Users,
+		handshake: Handshake,
+		heart: Heart,
+		baby: Baby,
+		megaphone: Megaphone,
 		'message-circle': MessageCircle,
 
 		// Health & Safety
 		'heart-pulse': HeartPulse,
-		'siren': Siren,
-		'flame': Flame,
+		siren: Siren,
+		flame: Flame,
 		'shield-alert': ShieldAlert,
 		'alert-triangle': AlertTriangle,
 		'circle-alert': CircleAlert,
 
 		// Economy & Trade
-		'banknote': Banknote,
+		banknote: Banknote,
 		'shopping-cart': ShoppingCart,
-		'store': Store,
+		store: Store,
 		'trending-up': TrendingUp,
-		'receipt': Receipt,
+		receipt: Receipt,
 
 		// Education & Knowledge
 		'book-open': BookOpen,
 		'graduation-cap': GraduationCap,
-		'lightbulb': Lightbulb,
+		lightbulb: Lightbulb,
 
 		// Transport & Movement
-		'car': Car,
-		'bike': Bike,
+		car: Car,
+		bike: Bike,
 		'map-pin': MapPin,
-		'route': Route,
+		route: Route,
 
 		// Celebration & Achievement
 		'party-popper': PartyPopper,
-		'trophy': Trophy,
-		'star': Star,
-		'medal': Medal,
+		trophy: Trophy,
+		star: Star,
+		medal: Medal,
 
 		// Data & Monitoring
-		'eye': Eye,
+		eye: Eye,
 		'bar-chart-3': BarChart3,
-		'lock': Lock,
-		'clock': Clock,
-		'calendar': Calendar,
+		lock: Lock,
+		clock: Clock,
+		calendar: Calendar,
 
 		// Management
-		'settings': Settings,
+		settings: Settings,
 
 		// Fallback
 		'help-circle': HelpCircle
@@ -205,7 +205,10 @@
 
 	// ── Resolution ───────────────────────────────────────────────────
 
-	function resolveIcon(iconName: string, trajectoryFallback?: string): Component<{ class?: string }> {
+	function resolveIcon(
+		iconName: string,
+		trajectoryFallback?: string
+	): Component<{ class?: string }> {
 		// 1. Try exact name match
 		if (ICON_REGISTRY[iconName]) return ICON_REGISTRY[iconName];
 

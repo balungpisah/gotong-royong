@@ -10,11 +10,6 @@
 	}: WithElementRef<HTMLAttributes<HTMLParagraphElement>> = $props();
 </script>
 
-<p
-	bind:this={ref}
-	data-slot="input-hint"
-	class={cn('text-xs text-kayu', className)}
-	{...restProps}
->
+<p bind:this={ref} data-slot="input-hint" class={cn('text-xs text-kayu', className)} {...restProps}>
 	{@render children?.()}
 </p>

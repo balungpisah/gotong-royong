@@ -16,7 +16,9 @@
 	} = $props();
 
 	const percentage = $derived(Math.round((value / max) * 100));
-	const fillColor = $derived(percentage >= 70 ? 'bg-api' : percentage >= 40 ? 'bg-peringatan' : 'bg-bahaya');
+	const fillColor = $derived(
+		percentage >= 70 ? 'bg-api' : percentage >= 40 ? 'bg-peringatan' : 'bg-bahaya'
+	);
 </script>
 
 <div

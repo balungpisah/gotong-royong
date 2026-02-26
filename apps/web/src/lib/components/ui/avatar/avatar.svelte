@@ -21,12 +21,12 @@
 </script>
 
 <script lang="ts">
-	import { Avatar as AvatarPrimitive } from "bits-ui";
-	import { cn } from "$lib/utils";
+	import { Avatar as AvatarPrimitive } from 'bits-ui';
+	import { cn } from '$lib/utils';
 
 	let {
 		ref = $bindable(null),
-		loadingStatus = $bindable("loading"),
+		loadingStatus = $bindable('loading'),
 		class: className,
 		size = 'md' as AvatarSize,
 		...restProps

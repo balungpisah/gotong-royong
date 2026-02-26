@@ -33,9 +33,7 @@
 	const interactive = $derived(interactiveProp ?? !isSelf);
 
 	// Default showTierDot to true when tier is available and size > xs
-	const showTierDot = $derived(
-		showTierDotProp ?? (person.tier !== undefined && size !== 'xs')
-	);
+	const showTierDot = $derived(showTierDotProp ?? (person.tier !== undefined && size !== 'xs'));
 
 	const initials = $derived.by(() => {
 		const words = person.name.trim().split(/\s+/);
@@ -48,7 +46,8 @@
 	// --- Ring styles by relation state ---
 	const ringColor = $derived.by(() => {
 		if (isSelf) return '';
-		if (relation?.vouched && relation?.vouched_back) return 'ring-signal-vouch shadow-[0_0_6px_var(--c-signal-vouch)]';
+		if (relation?.vouched && relation?.vouched_back)
+			return 'ring-signal-vouch shadow-[0_0_6px_var(--c-signal-vouch)]';
 		if (relation?.vouched) return 'ring-signal-vouch';
 		if (relation?.skeptical) return 'ring-signal-skeptis';
 		return 'ring-transparent';
@@ -92,8 +91,14 @@
 
 {#if interactive}
 	<Popover.Root bind:open={popoverOpen}>
-		<Popover.Trigger onclick={(e: MouseEvent) => e.stopPropagation()} class={cn("relative inline-flex shrink-0 cursor-pointer rounded-full focus:outline-none", className)}>
-			<Avatar.Root {size} class={cn(ringClass, "transition-shadow duration-200")}>
+		<Popover.Trigger
+			onclick={(e: MouseEvent) => e.stopPropagation()}
+			class={cn(
+				'relative inline-flex shrink-0 cursor-pointer rounded-full focus:outline-none',
+				className
+			)}
+		>
+			<Avatar.Root {size} class={cn(ringClass, 'transition-shadow duration-200')}>
 				{#if person.avatar_url}
 					<Avatar.Image src={person.avatar_url} alt={person.name} />
 				{/if}
@@ -111,8 +116,8 @@
 		</Popover.Content>
 	</Popover.Root>
 {:else}
-	<span class={cn("relative inline-flex shrink-0 rounded-full", className)}>
-		<Avatar.Root {size} class={cn(ringClass, "transition-shadow duration-200")}>
+	<span class={cn('relative inline-flex shrink-0 rounded-full', className)}>
+		<Avatar.Root {size} class={cn(ringClass, 'transition-shadow duration-200')}>
 			{#if person.avatar_url}
 				<Avatar.Image src={person.avatar_url} alt={person.name} />
 			{/if}
