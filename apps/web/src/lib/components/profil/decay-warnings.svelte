@@ -30,8 +30,10 @@
 				{m.profil_decay_description()}
 			</p>
 			<div class="mt-2 flex flex-wrap gap-1.5">
-				{#each warnings as warning}
-					<span class="rounded-full bg-waspada-lembut px-2.5 py-0.5 text-small font-medium text-waspada">
+				{#each warnings as warning (warning.domain)}
+					<span
+						class="rounded-full bg-waspada-lembut px-2.5 py-0.5 text-small font-medium text-waspada"
+					>
 						{warning.domain}
 						{#if warning.days_until_decay <= 7}
 							<span class="text-waspada">({warning.days_until_decay}h)</span>

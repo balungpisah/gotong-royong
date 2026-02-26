@@ -14,13 +14,19 @@
 	let mounted = $state(false);
 
 	$effect(() => {
-		const t = setTimeout(() => { mounted = true; }, 50);
+		const t = setTimeout(() => {
+			mounted = true;
+		}, 50);
 		return () => clearTimeout(t);
 	});
 
 	const ringData = $derived([
 		{ label: m.icj_integrity_label(), color: 'var(--c-tandang-i)', value: scores.integrity.value },
-		{ label: m.icj_competence_label(), color: 'var(--c-tandang-c)', value: scores.competence.aggregate },
+		{
+			label: m.icj_competence_label(),
+			color: 'var(--c-tandang-c)',
+			value: scores.competence.aggregate
+		},
 		{ label: m.icj_judgment_label(), color: 'var(--c-tandang-j)', value: scores.judgment.value }
 	]);
 </script>
@@ -36,7 +42,7 @@
 
 <!-- Dimension labels below chart -->
 <div class="mt-1 flex items-center justify-around">
-	{#each ringData as ring}
+	{#each ringData as ring (ring.label)}
 		<span class="text-caption text-muted-foreground">{ring.label}</span>
 	{/each}
 </div>
@@ -54,7 +60,7 @@
 
 	{#if expanded}
 		<div class="mt-2 space-y-1.5">
-			{#each scores.competence.domains as domain}
+			{#each scores.competence.domains as domain (domain.skill_name)}
 				<div class="flex items-center gap-2">
 					<span class="w-28 truncate text-caption">{domain.skill_name}</span>
 					<div class="h-1.5 flex-1 rounded-full bg-muted/30">

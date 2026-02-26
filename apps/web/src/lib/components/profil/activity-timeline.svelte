@@ -62,7 +62,7 @@
 		<h3 class="mb-4 text-small font-semibold text-foreground">{m.profil_contribution_trail()}</h3>
 
 		<div class="relative border-l-2 border-primary/20 pl-4 space-y-4">
-			{#each visibleItems as item, i}
+			{#each visibleItems as item, i (item.timestamp)}
 				{@const Icon = iconMap[item.type] ?? FileText}
 				<motion.div
 					initial={{ opacity: 0, x: -4 }}

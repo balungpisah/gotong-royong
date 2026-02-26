@@ -24,7 +24,7 @@
 	const GAP = 8;
 </script>
 
-{#each $data as ring, i}
+{#each $data as ring, i (ring.label)}
 	{@const cellW = $width / $data.length}
 	{@const cx = cellW * i + cellW / 2}
 	{@const cy = $height / 2}
@@ -34,25 +34,33 @@
 
 	<!-- Background ring -->
 	<circle
-		cx={cx} cy={cy} r={R}
+		{cx}
+		{cy}
+		r={R}
 		fill="none"
-		stroke="var(--color-muted)" stroke-opacity="0.15"
+		stroke="var(--color-muted)"
+		stroke-opacity="0.15"
 		stroke-width={SW}
 	/>
 	<!-- Animated progress arc -->
 	<circle
-		cx={cx} cy={cy} r={R}
+		{cx}
+		{cy}
+		r={R}
 		fill="none"
 		stroke={ring.color}
 		stroke-width={SW}
 		stroke-linecap="round"
 		stroke-dasharray={C}
-		style="stroke-dashoffset: {mounted ? C * (1 - ring.value) : C}; transition: stroke-dashoffset 1s ease-out {i * 0.15}s;"
+		style="stroke-dashoffset: {mounted
+			? C * (1 - ring.value)
+			: C}; transition: stroke-dashoffset 1s ease-out {i * 0.15}s;"
 		transform="rotate(-90 {cx} {cy})"
 	/>
 	<!-- Score number -->
 	<text
-		x={cx} y={cy}
+		x={cx}
+		y={cy}
 		text-anchor="middle"
 		dominant-baseline="central"
 		fill="var(--color-foreground)"

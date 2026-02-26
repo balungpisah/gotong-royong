@@ -29,7 +29,7 @@
 					<span class="font-medium">{m.profil_skills_validated()}</span>
 				</p>
 				<div class="space-y-2">
-					{#each validated as skill, i}
+					{#each validated as skill, i (skill.skill_name)}
 						<motion.div
 							initial={{ opacity: 0, x: -6 }}
 							animate={{ opacity: 1, x: 0 }}
@@ -74,7 +74,7 @@
 					<span class="font-medium">{m.profil_skills_declared()}</span>
 				</p>
 				<div class="flex flex-wrap gap-1.5">
-					{#each declared as skill, i}
+					{#each declared as skill, i (skill.skill_name)}
 						<motion.div
 							initial={{ opacity: 0, scale: 0.9 }}
 							animate={{ opacity: 1, scale: 1 }}

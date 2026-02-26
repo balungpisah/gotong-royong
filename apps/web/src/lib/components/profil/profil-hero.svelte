@@ -14,14 +14,6 @@
 
 	const isCompact = $derived(size === 'compact');
 
-	const initials = $derived(() => {
-		const words = profile.name.trim().split(/\s+/);
-		return words
-			.slice(0, 2)
-			.map((w) => w[0]?.toUpperCase() ?? '')
-			.join('');
-	});
-
 	const joinedYear = $derived(new Date(profile.joined_at).getFullYear());
 
 	const avatarOpacity = $derived(() => {
@@ -44,10 +36,6 @@
 	const tierColor = $derived(tierColors[profile.tier.level] ?? '#9E9E9E');
 
 	const showFlameBadge = $derived(profile.consistency.streak_days > 7);
-
-	const showRoleBadge = $derived(
-		isSelf
-	);
 </script>
 
 <motion.div
@@ -59,19 +47,30 @@
 		<!-- Avatar -->
 		<div class="relative shrink-0" style="opacity: {avatarOpacity()}">
 			<TandangAvatar
-				person={{ user_id: profile.user_id, name: profile.name, avatar_url: profile.avatar_url, tier: profile.tier.level }}
+				person={{
+					user_id: profile.user_id,
+					name: profile.name,
+					avatar_url: profile.avatar_url,
+					tier: profile.tier.level
+				}}
 				size={isCompact ? 'lg' : 'xl'}
-				isSelf={isSelf}
+				{isSelf}
 			/>
 			<!-- Online indicator -->
-			<span class="absolute bottom-0.5 right-0.5 size-3 rounded-full bg-online ring-2 ring-background"></span>
+			<span
+				class="absolute bottom-0.5 right-0.5 size-3 rounded-full bg-online ring-2 ring-background"
+			></span>
 		</div>
 
 		<!-- Info -->
 		<div class="flex-1 min-w-0">
-			<h2 class="{isCompact ? 'text-h3' : 'text-h2'} font-bold text-foreground truncate">{profile.name}</h2>
+			<h2 class="{isCompact ? 'text-h3' : 'text-h2'} font-bold text-foreground truncate">
+				{profile.name}
+			</h2>
 			<p class="text-caption text-muted-foreground mt-0.5">
-				{#if profile.location}{profile.location} · {/if}{#if isCompact && profile.community_name}{profile.community_name} · {/if}{m.profil_member_since({ year: String(joinedYear) })}
+				{#if profile.location}{profile.location} ·
+				{/if}{#if isCompact && profile.community_name}{profile.community_name} ·
+				{/if}{m.profil_member_since({ year: String(joinedYear) })}
 			</p>
 
 			<!-- Badge row -->
@@ -87,14 +86,18 @@
 
 				<!-- Percentile badge (compact mode) -->
 				{#if isCompact && profile.tier.percentile > 0}
-					<span class="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-caption font-medium text-primary">
+					<span
+						class="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-caption font-medium text-primary"
+					>
 						{m.profil_percentile({ pct: String(profile.tier.percentile) })}
 					</span>
 				{/if}
 
 				<!-- Flame badge -->
 				{#if showFlameBadge}
-					<span class="inline-flex items-center gap-0.5 rounded-full bg-peringatan/10 px-2.5 py-0.5 text-caption font-medium text-peringatan">
+					<span
+						class="inline-flex items-center gap-0.5 rounded-full bg-peringatan/10 px-2.5 py-0.5 text-caption font-medium text-peringatan"
+					>
 						🔥 {profile.consistency.streak_days}h
 					</span>
 				{/if}

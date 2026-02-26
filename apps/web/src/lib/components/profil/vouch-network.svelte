@@ -18,20 +18,10 @@
 
 	const SHOW_LIMIT = 5;
 
-	const visibleVouchedBy = $derived(
-		showAllVouchedBy ? vouchedBy : vouchedBy.slice(0, SHOW_LIMIT)
-	);
+	const visibleVouchedBy = $derived(showAllVouchedBy ? vouchedBy : vouchedBy.slice(0, SHOW_LIMIT));
 	const visibleVouchingFor = $derived(
 		showAllVouchingFor ? vouchingFor : vouchingFor.slice(0, SHOW_LIMIT)
 	);
-
-	const tierColors: Record<number, string> = {
-		0: 'var(--c-tier-0)',
-		1: 'var(--c-tier-1)',
-		2: 'var(--c-tier-2)',
-		3: 'var(--c-tier-3)',
-		4: 'var(--c-tier-4)'
-	};
 
 	const vouchTypeLabels = $derived({
 		positive: m.vouch_type_positive(),
@@ -50,15 +40,6 @@
 		mentorship: 'bg-signal-dukung/10 text-signal-dukung',
 		project_scoped: 'bg-tandang/10 text-tandang'
 	};
-
-	function getInitials(name: string): string {
-		return name
-			.trim()
-			.split(/\s+/)
-			.slice(0, 2)
-			.map((w) => w[0]?.toUpperCase() ?? '')
-			.join('');
-	}
 
 	function relativeDate(iso: string): string {
 		const diff = Date.now() - new Date(iso).getTime();
@@ -87,7 +68,12 @@
 		<!-- Vouch budget bar -->
 		<div class="space-y-1">
 			<div class="flex items-center justify-between text-caption text-muted-foreground">
-				<span>{m.profil_vouch_active({ active: String(budget.active_vouches), max: String(budget.max_vouches) })}</span>
+				<span
+					>{m.profil_vouch_active({
+						active: String(budget.active_vouches),
+						max: String(budget.max_vouches)
+					})}</span
+				>
 				<span>{m.profil_vouch_remaining({ count: String(budget.remaining) })}</span>
 			</div>
 			<div class="h-1.5 rounded-full bg-muted/30">
@@ -102,12 +88,14 @@
 		<div>
 			<p class="mb-2 text-caption font-semibold text-foreground/80">
 				{m.profil_vouched_by()}
-				<span class="ml-1 rounded-full bg-muted/20 px-1.5 py-0.5 text-caption font-normal text-muted-foreground">
+				<span
+					class="ml-1 rounded-full bg-muted/20 px-1.5 py-0.5 text-caption font-normal text-muted-foreground"
+				>
 					{vouchedBy.length}
 				</span>
 			</p>
 			<div class="space-y-2">
-				{#each visibleVouchedBy as v, i}
+				{#each visibleVouchedBy as v, i (v.user_id)}
 					<motion.div
 						initial={{ opacity: 0, x: -4 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -116,7 +104,12 @@
 						<div class="flex items-center gap-2">
 							<!-- Avatar -->
 							<TandangAvatar
-								person={{ user_id: v.user_id, name: v.user_name, avatar_url: v.user_avatar_url, tier: v.user_tier }}
+								person={{
+									user_id: v.user_id,
+									name: v.user_name,
+									avatar_url: v.user_avatar_url,
+									tier: v.user_tier
+								}}
 								size="sm"
 								showTierDot
 							/>
@@ -131,7 +124,9 @@
 							</div>
 							<!-- Vouch type badge -->
 							<span
-								class="shrink-0 rounded-full px-2 py-0.5 text-caption font-medium {vouchTypeBadgeStyle[v.vouch_type]}"
+								class="shrink-0 rounded-full px-2 py-0.5 text-caption font-medium {vouchTypeBadgeStyle[
+									v.vouch_type
+								]}"
 							>
 								{vouchTypeLabels[v.vouch_type]}
 							</span>
@@ -141,11 +136,13 @@
 			</div>
 			{#if vouchedBy.length > SHOW_LIMIT}
 				<Button
-	variant="ghost"
+					variant="ghost"
 					onclick={() => (showAllVouchedBy = !showAllVouchedBy)}
 					class="mt-2 h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 				>
-					{showAllVouchedBy ? m.common_collapse() : m.common_view_all({ count: String(vouchedBy.length) })}
+					{showAllVouchedBy
+						? m.common_collapse()
+						: m.common_view_all({ count: String(vouchedBy.length) })}
 				</Button>
 			{/if}
 		</div>
@@ -156,12 +153,14 @@
 		<div>
 			<p class="mb-2 text-caption font-semibold text-foreground/80">
 				{m.profil_vouching_for()}
-				<span class="ml-1 rounded-full bg-muted/20 px-1.5 py-0.5 text-caption font-normal text-muted-foreground">
+				<span
+					class="ml-1 rounded-full bg-muted/20 px-1.5 py-0.5 text-caption font-normal text-muted-foreground"
+				>
 					{vouchingFor.length}
 				</span>
 			</p>
 			<div class="space-y-2">
-				{#each visibleVouchingFor as v, i}
+				{#each visibleVouchingFor as v, i (v.user_id)}
 					<motion.div
 						initial={{ opacity: 0, x: -4 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -169,7 +168,12 @@
 					>
 						<div class="flex items-center gap-2">
 							<TandangAvatar
-								person={{ user_id: v.user_id, name: v.user_name, avatar_url: v.user_avatar_url, tier: v.user_tier }}
+								person={{
+									user_id: v.user_id,
+									name: v.user_name,
+									avatar_url: v.user_avatar_url,
+									tier: v.user_tier
+								}}
 								size="sm"
 								showTierDot
 							/>
@@ -182,7 +186,9 @@
 								</span>
 							</div>
 							<span
-								class="shrink-0 rounded-full px-2 py-0.5 text-caption font-medium {vouchTypeBadgeStyle[v.vouch_type]}"
+								class="shrink-0 rounded-full px-2 py-0.5 text-caption font-medium {vouchTypeBadgeStyle[
+									v.vouch_type
+								]}"
 							>
 								{vouchTypeLabels[v.vouch_type]}
 							</span>
@@ -192,11 +198,13 @@
 			</div>
 			{#if vouchingFor.length > SHOW_LIMIT}
 				<Button
-	variant="ghost"
+					variant="ghost"
 					onclick={() => (showAllVouchingFor = !showAllVouchingFor)}
 					class="mt-2 h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 				>
-					{showAllVouchingFor ? m.common_collapse() : m.common_view_all({ count: String(vouchingFor.length) })}
+					{showAllVouchingFor
+						? m.common_collapse()
+						: m.common_view_all({ count: String(vouchingFor.length) })}
 				</Button>
 			{/if}
 		</div>

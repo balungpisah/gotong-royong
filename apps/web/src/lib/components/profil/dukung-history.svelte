@@ -36,7 +36,11 @@
 
 	function formatDate(iso: string): string {
 		const locale = getLocale() === 'en' ? 'en-US' : 'id-ID';
-		return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+		return new Date(iso).toLocaleDateString(locale, {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		});
 	}
 </script>
 
@@ -49,7 +53,9 @@
 		<div class="flex items-center justify-between">
 			<h3 class="text-small font-semibold text-foreground">{m.profil_dukung_title()}</h3>
 			{#if successRate !== undefined && successRate !== null}
-				<span class="rounded-full bg-berhasil-lembut px-2 py-0.5 text-caption font-medium text-berhasil">
+				<span
+					class="rounded-full bg-berhasil-lembut px-2 py-0.5 text-caption font-medium text-berhasil"
+				>
 					{m.profil_dukung_success_rate({ pct: String(Math.round(successRate * 100)) })}
 				</span>
 			{/if}
@@ -60,17 +66,23 @@
 			<div class="mt-3">
 				<div class="flex items-center gap-1.5 text-muted-foreground">
 					<ThumbsUp class="size-3" />
-					<span class="text-caption font-medium">{m.dukung_given_count({ count: String(given.length) })}</span>
+					<span class="text-caption font-medium"
+						>{m.dukung_given_count({ count: String(given.length) })}</span
+					>
 				</div>
 				<div class="mt-2 space-y-1.5">
-					{#each visibleGiven as record}
+					{#each visibleGiven as record (record.created_at)}
 						<div class="flex items-center justify-between rounded-lg bg-muted/20 px-3 py-2">
 							<div class="min-w-0 flex-1">
 								<p class="truncate text-caption text-foreground/80">{record.witness_title}</p>
 								<p class="text-caption text-muted-foreground">{formatDate(record.created_at)}</p>
 							</div>
 							{#if record.outcome}
-								<span class="ml-2 shrink-0 rounded-full px-2 py-0.5 text-caption font-medium {outcomeColors[record.outcome] ?? ''}">
+								<span
+									class="ml-2 shrink-0 rounded-full px-2 py-0.5 text-caption font-medium {outcomeColors[
+										record.outcome
+									] ?? ''}"
+								>
 									{outcomeLabels[record.outcome] ?? record.outcome}
 								</span>
 							{/if}
@@ -79,11 +91,13 @@
 				</div>
 				{#if given.length > SHOW_LIMIT}
 					<Button
-	variant="ghost"
+						variant="ghost"
 						onclick={() => (showAllGiven = !showAllGiven)}
 						class="mt-2 h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 					>
-						{showAllGiven ? m.common_close() : m.common_more({ count: String(given.length - SHOW_LIMIT) })}
+						{showAllGiven
+							? m.common_close()
+							: m.common_more({ count: String(given.length - SHOW_LIMIT) })}
 					</Button>
 				{/if}
 			</div>
@@ -94,17 +108,23 @@
 			<div class="mt-4">
 				<div class="flex items-center gap-1.5 text-muted-foreground">
 					<Heart class="size-3" />
-					<span class="text-caption font-medium">{m.dukung_received_count({ count: String(received.length) })}</span>
+					<span class="text-caption font-medium"
+						>{m.dukung_received_count({ count: String(received.length) })}</span
+					>
 				</div>
 				<div class="mt-2 space-y-1.5">
-					{#each visibleReceived as record}
+					{#each visibleReceived as record (record.created_at)}
 						<div class="flex items-center justify-between rounded-lg bg-muted/20 px-3 py-2">
 							<div class="min-w-0 flex-1">
 								<p class="truncate text-caption text-foreground/80">{record.witness_title}</p>
 								<p class="text-caption text-muted-foreground">{formatDate(record.created_at)}</p>
 							</div>
 							{#if record.outcome}
-								<span class="ml-2 shrink-0 rounded-full px-2 py-0.5 text-caption font-medium {outcomeColors[record.outcome] ?? ''}">
+								<span
+									class="ml-2 shrink-0 rounded-full px-2 py-0.5 text-caption font-medium {outcomeColors[
+										record.outcome
+									] ?? ''}"
+								>
 									{outcomeLabels[record.outcome] ?? record.outcome}
 								</span>
 							{/if}
@@ -113,11 +133,13 @@
 				</div>
 				{#if received.length > SHOW_LIMIT}
 					<Button
-	variant="ghost"
+						variant="ghost"
 						onclick={() => (showAllReceived = !showAllReceived)}
 						class="mt-2 h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 					>
-						{showAllReceived ? m.common_close() : m.common_more({ count: String(received.length - SHOW_LIMIT) })}
+						{showAllReceived
+							? m.common_close()
+							: m.common_more({ count: String(received.length - SHOW_LIMIT) })}
 					</Button>
 				{/if}
 			</div>

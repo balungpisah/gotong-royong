@@ -106,7 +106,7 @@
 		aria-label="ICJ Radar Chart"
 	>
 		<!-- Background rings -->
-		{#each rings as pts}
+		{#each rings as pts, ri (ri)}
 			<polygon
 				points={pts}
 				fill="none"
@@ -117,7 +117,7 @@
 		{/each}
 
 		<!-- Axis lines -->
-		{#each axisLines as line}
+		{#each axisLines as line, li (li)}
 			<line
 				x1={line.x1}
 				y1={line.y1}
@@ -140,12 +140,12 @@
 		/>
 
 		<!-- Score dots -->
-		{#each vertexPoints as pt}
+		{#each vertexPoints as pt, vi (vi)}
 			<circle cx={pt.x} cy={pt.y} r="4" fill={pt.color} opacity="0.9" />
 		{/each}
 
 		<!-- Labels -->
-		{#each labelPoints as lp}
+		{#each labelPoints as lp, lpi (lpi)}
 			<text
 				x={lp.x}
 				y={lp.y}

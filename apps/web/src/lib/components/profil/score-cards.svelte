@@ -41,7 +41,7 @@
 	{#if variant === 'bars'}
 		<!-- Compact horizontal bars variant -->
 		<div class="space-y-2.5">
-			{#each cards as card, i}
+			{#each cards as card, i (card.label)}
 				<motion.div
 					initial={{ opacity: 0, x: -8 }}
 					animate={{ opacity: 1, x: 0 }}
@@ -49,21 +49,25 @@
 				>
 					<div class="flex items-center gap-3">
 						<span class="size-2 shrink-0 rounded-full" style="background: {card.color};"></span>
-						<span class="w-20 shrink-0 text-caption font-medium text-muted-foreground">{card.label}</span>
+						<span class="w-20 shrink-0 text-caption font-medium text-muted-foreground"
+							>{card.label}</span
+						>
 						<div class="h-2 flex-1 rounded-full bg-muted/30">
 							<div
 								class="h-full rounded-full transition-all duration-500"
 								style="width: {card.value * 100}%; background: {card.color};"
 							></div>
 						</div>
-						<span class="w-8 text-right text-body font-bold text-foreground">{(card.value * 100).toFixed(0)}</span>
+						<span class="w-8 text-right text-body font-bold text-foreground"
+							>{(card.value * 100).toFixed(0)}</span
+						>
 					</div>
 
 					<!-- Competence domain breakdown (inline) -->
 					{#if i === 1}
 						<div class="ml-5 mt-1.5">
 							<Button
-	variant="ghost"
+								variant="ghost"
 								onclick={() => (expanded = !expanded)}
 								class="h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 							>
@@ -72,7 +76,7 @@
 
 							{#if expanded}
 								<div class="mt-1.5 space-y-1.5">
-									{#each scores.competence.domains as domain}
+									{#each scores.competence.domains as domain (domain.skill_name)}
 										<div class="flex items-center gap-2">
 											<span class="w-28 truncate text-caption">
 												{domain.skill_name}
@@ -103,20 +107,21 @@
 	{:else}
 		<!-- Original cards variant -->
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-			{#each cards as card, i}
+			{#each cards as card, i (card.label)}
 				<motion.div
 					initial={{ opacity: 0, y: 8 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.3, delay: 0.05 * i }}
 				>
-					<Card.Root padding="compact" class="shadow-sm" style="border-top: 4px solid {card.color};">
+					<Card.Root
+						padding="compact"
+						class="shadow-sm"
+						style="border-top: 4px solid {card.color};"
+					>
 						<div class="text-caption font-medium text-muted-foreground">
 							{card.label}
 						</div>
-						<div
-							class="mt-1 text-h1 font-bold"
-							style="color: {card.color};"
-						>
+						<div class="mt-1 text-h1 font-bold" style="color: {card.color};">
 							{(card.value * 100).toFixed(0)}
 						</div>
 						<div class="mt-1.5 h-1.5 rounded-full bg-muted/30">
@@ -130,7 +135,7 @@
 						{#if i === 1}
 							<div class="mt-3">
 								<Button
-	variant="ghost"
+									variant="ghost"
 									onclick={() => (expanded = !expanded)}
 									class="h-auto p-0 text-caption text-muted-foreground hover:text-foreground"
 								>
@@ -139,7 +144,7 @@
 
 								{#if expanded}
 									<div class="mt-2 space-y-1.5">
-										{#each scores.competence.domains as domain}
+										{#each scores.competence.domains as domain (domain.skill_name)}
 											<div class="flex items-center gap-2">
 												<span class="w-40 truncate text-caption">
 													{domain.skill_name}
