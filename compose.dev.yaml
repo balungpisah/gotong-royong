@@ -1,6 +1,83 @@
 name: gotong-royong-dev
 
 services:
+  gotong-api:
+    profiles: ["api"]
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      APP_ENV: "${APP_ENV:-development}"
+      PORT: 3100
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      DATA_BACKEND: surrealdb
+      SURREAL_ENDPOINT: ws://surrealdb:8000
+      SURREAL_NS: "${SURREAL_NS:-gotong}"
+      SURREAL_DB: "${SURREAL_DB:-chat}"
+      SURREAL_USER: "${SURREAL_USER:-root}"
+      SURREAL_PASS: "${SURREAL_PASS:-root}"
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "${JWT_SECRET:-dev-secret}"
+      CHAT_REALTIME_TRANSPORT: "${CHAT_REALTIME_TRANSPORT:-local}"
+      CHAT_REALTIME_CHANNEL_PREFIX: "${CHAT_REALTIME_CHANNEL_PREFIX:-gotong:chat:realtime}"
+      CHAT_ATTACHMENT_STORAGE_BACKEND: "${CHAT_ATTACHMENT_STORAGE_BACKEND:-local}"
+      S3_ENDPOINT: "${S3_ENDPOINT:-http://minio:9000}"
+      S3_BUCKET: "${S3_BUCKET:-gotong-royong-evidence-dev}"
+      S3_ACCESS_KEY: "${S3_ACCESS_KEY:-minioadmin}"
+      S3_SECRET_KEY: "${S3_SECRET_KEY:-minioadmin}"
+      S3_REGION: "${S3_REGION:-us-east-1}"
+      WEBHOOK_ENABLED: "${WEBHOOK_ENABLED:-false}"
+    ports:
+      - "${API_PORT:-3100}:3100"
+    depends_on:
+      surrealdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3100/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  gotong-worker:
+    profiles: ["worker"]
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      APP_ENV: "${APP_ENV:-development}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      DATA_BACKEND: surrealdb
+      SURREAL_ENDPOINT: ws://surrealdb:8000
+      SURREAL_NS: "${SURREAL_NS:-gotong}"
+      SURREAL_DB: "${SURREAL_DB:-chat}"
+      SURREAL_USER: "${SURREAL_USER:-root}"
+      SURREAL_PASS: "${SURREAL_PASS:-root}"
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "${JWT_SECRET:-dev-secret}"
+      CHAT_REALTIME_TRANSPORT: "${CHAT_REALTIME_TRANSPORT:-local}"
+      CHAT_REALTIME_CHANNEL_PREFIX: "${CHAT_REALTIME_CHANNEL_PREFIX:-gotong:chat:realtime}"
+      WEBHOOK_ENABLED: "${WEBHOOK_ENABLED:-false}"
+      WORKER_QUEUE_PREFIX: "${WORKER_QUEUE_PREFIX:-gotong:jobs}"
+    depends_on:
+      surrealdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Optional local monitoring stack.
+  # Enable with: `docker compose -f compose.dev.yaml --profile monitoring up -d`
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./deploy/monitoring/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+
   surrealdb:
     image: surrealdb/surrealdb:v3.0.0
     command:

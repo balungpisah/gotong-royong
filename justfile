@@ -10,38 +10,42 @@ default:
 
 # Start web dev server
 dev:
-    cd {{web}} && npm run dev
+    cd {{web}} && bun run dev
 
 # Type-check web with svelte-check
 check:
-    cd {{web}} && npx svelte-check
+    cd {{web}} && bun run check
 
 # Run web unit tests
 web-test:
-    cd {{web}} && npx vitest run
+    cd {{web}} && bun run test:unit
 
 # Run Playwright live API proxy smoke against a running backend
 web-test-e2e-live-api target="http://127.0.0.1:3100":
     cd {{web}} && GR_API_PROXY_TARGET={{target}} bun run test:e2e:live-api
 
+# Run Playwright live API smoke against an already deployed frontend host
+web-test-e2e-live-api-external base_url:
+    cd {{web}} && PLAYWRIGHT_EXTERNAL_BASE_URL={{base_url}} bun run test:e2e:live-api:external
+
 # Production build web
 web-build:
-    cd {{web}} && npx vite build
+    cd {{web}} && bun run build
 
 # Format web with prettier
 web-fmt:
-    cd {{web}} && npx prettier --write .
+    cd {{web}} && bun run format
 
 # All web checks: type-check + test + build
 web-verify: check web-test web-build
 
 # Preview production build
 preview:
-    cd {{web}} && npx vite preview
+    cd {{web}} && bun run preview
 
 # Install web dependencies
 web-install:
-    cd {{web}} && npm install
+    cd {{web}} && bun install
 
 # ── Rust (API / Worker) ──────────────────────────────────────────────
 
@@ -77,6 +81,39 @@ dev-db-up:
 
 dev-db-down:
 	scripts/dev/down.sh
+
+dev-api-up: dev-db-up
+	docker compose -f compose.dev.yaml --profile api up -d --build gotong-api
+
+dev-api-down:
+	docker compose -f compose.dev.yaml stop gotong-api
+
+dev-api-logs:
+	docker compose -f compose.dev.yaml logs -f gotong-api
+
+dev-worker-up: dev-db-up
+	docker compose -f compose.dev.yaml --profile worker up -d --build gotong-worker
+
+dev-worker-down:
+	docker compose -f compose.dev.yaml stop gotong-worker
+
+dev-worker-logs:
+	docker compose -f compose.dev.yaml logs -f gotong-worker
+
+dev-monitoring-up: dev-api-up
+	docker compose -f compose.dev.yaml --profile monitoring up -d prometheus
+
+dev-monitoring-down:
+	docker compose -f compose.dev.yaml stop prometheus
+
+dev-monitoring-logs:
+	docker compose -f compose.dev.yaml logs -f prometheus
+
+dev-full-up:
+	docker compose -f compose.dev.yaml --profile api --profile worker --profile monitoring up -d --build gotong-api gotong-worker prometheus
+
+dev-full-down:
+	docker compose -f compose.dev.yaml down
 
 surreal-probe:
 	SURREAL_BIN=scripts/tools/surreal-docker.sh \
@@ -134,6 +171,18 @@ chat-attachment-branch-protection-check repo branch="main":
 
 chat-attachment-branch-protection-plan repo branch="main":
 	scripts/deploy/verify_surreal_release_gate_branch_protection.sh --repo {{repo}} --branch {{branch}} --dry-run
+
+frontend-live-cutover-gate:
+	scripts/deploy/frontend_live_cutover_gate.sh --dry-run
+
+frontend-live-cutover-gate-live frontend_url:
+	scripts/deploy/frontend_live_cutover_gate.sh --frontend-url {{frontend_url}}
+
+frontend-live-cutover-rollout env frontend_url:
+	scripts/deploy/frontend_live_cutover_rollout.sh --env {{env}} --frontend-url {{frontend_url}}
+
+frontend-live-cutover-rollout-dry-run env="staging":
+	scripts/deploy/frontend_live_cutover_rollout.sh --env {{env}} --dry-run
 
 smoke-feed-involvement-edge-cutover-live:
 	scripts/smoke/feed_involvement_edge_cutover_live.sh

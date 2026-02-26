@@ -1,0 +1,47 @@
+FROM rust:1.88-bookworm AS builder
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY crates ./crates
+COPY src ./src
+
+RUN cargo build --release -p gotong-api
+
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN useradd --create-home --uid 10001 appuser
+
+COPY --from=builder /app/target/release/gotong-api /usr/local/bin/gotong-api
+
+USER appuser
+
+ENV APP_ENV=development \
+    PORT=3100 \
+    LOG_LEVEL=info \
+    DATA_BACKEND=surrealdb \
+    SURREAL_ENDPOINT=ws://surrealdb:8000 \
+    SURREAL_NS=gotong \
+    SURREAL_DB=chat \
+    SURREAL_USER=root \
+    SURREAL_PASS=root \
+    REDIS_URL=redis://redis:6379 \
+    JWT_SECRET=dev-secret \
+    CHAT_REALTIME_TRANSPORT=local \
+    CHAT_REALTIME_CHANNEL_PREFIX=gotong:chat:realtime \
+    WEBHOOK_ENABLED=false
+
+EXPOSE 3100
+
+ENTRYPOINT ["gotong-api"]
