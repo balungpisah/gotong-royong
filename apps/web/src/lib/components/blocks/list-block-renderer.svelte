@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ListBlock, ListItem } from '$lib/types';
+	import type { ListBlock } from '$lib/types';
 	import { cn } from '$lib/utils';
 	import { SourceBadge } from '$lib/components/ui/source-badge';
 	import { Badge } from '$lib/components/ui/badge';
@@ -37,7 +37,12 @@
 				<StatusIcon class={cn('mt-0.5 size-4 shrink-0', statusColors[item.status])} />
 				<div class="flex-1">
 					<div class="flex items-center gap-2">
-						<span class={cn('text-body', item.status === 'completed' && 'line-through text-muted-foreground')}>
+						<span
+							class={cn(
+								'text-body',
+								item.status === 'completed' && 'line-through text-muted-foreground'
+							)}
+						>
 							{item.label}
 						</span>
 						<SourceBadge source={item.source} />
@@ -48,7 +53,12 @@
 								{@const ChildIcon = statusIcons[child.status]}
 								<div class="flex items-center gap-2">
 									<ChildIcon class={cn('size-3.5 shrink-0', statusColors[child.status])} />
-									<span class={cn('text-small', child.status === 'completed' && 'line-through text-muted-foreground')}>
+									<span
+										class={cn(
+											'text-small',
+											child.status === 'completed' && 'line-through text-muted-foreground'
+										)}
+									>
 										{child.label}
 									</span>
 									<SourceBadge source={child.source} />
@@ -75,7 +85,13 @@
 					<tr class="border-b border-border/50 last:border-0">
 						<td class="px-3 py-2">{item.label}</td>
 						<td class="px-3 py-2">
-							<Badge variant={item.status === 'completed' ? 'success' : item.status === 'blocked' ? 'danger' : 'secondary'}>
+							<Badge
+								variant={item.status === 'completed'
+									? 'success'
+									: item.status === 'blocked'
+										? 'danger'
+										: 'secondary'}
+							>
 								{item.status}
 							</Badge>
 						</td>
@@ -90,8 +106,18 @@
 		{#each block.items as item (item.id)}
 			{@const StatusIcon = statusIcons[item.status]}
 			<div class={cn('relative pb-6 last:pb-0')}>
-				<div class={cn('absolute -left-[31px] flex size-5 items-center justify-center rounded-full border-2 border-background',
-					item.status === 'completed' ? 'bg-berhasil' : item.status === 'open' ? 'bg-api' : item.status === 'blocked' ? 'bg-bahaya' : 'bg-batu')}>
+				<div
+					class={cn(
+						'absolute -left-[31px] flex size-5 items-center justify-center rounded-full border-2 border-background',
+						item.status === 'completed'
+							? 'bg-berhasil'
+							: item.status === 'open'
+								? 'bg-api'
+								: item.status === 'blocked'
+									? 'bg-bahaya'
+									: 'bg-batu'
+					)}
+				>
 					<StatusIcon class="size-3 text-white" />
 				</div>
 				<div>

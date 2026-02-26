@@ -18,7 +18,10 @@
 	{#each block.fields as field (field.id)}
 		<div class="flex flex-col gap-1.5">
 			<div class="flex items-center gap-2">
-				<label for={field.id} class="text-caption font-bold uppercase tracking-wide text-foreground">
+				<label
+					for={field.id}
+					class="text-caption font-bold uppercase tracking-wide text-foreground"
+				>
 					{field.label}
 				</label>
 				<SourceBadge source={field.source} />
@@ -52,18 +55,14 @@
 					class={cn(field.protected && 'opacity-60')}
 				>
 					{#if field.options}
-						{#each field.options as opt}
+						{#each field.options as opt (opt.value)}
 							<option value={opt.value}>{opt.label}</option>
 						{/each}
 					{/if}
 				</Select>
 			{:else if field.field_type === 'toggle'}
 				<div class="flex items-center gap-2">
-					<Switch
-						id={field.id}
-						checked={Boolean(field.value)}
-						disabled={field.protected}
-					/>
+					<Switch id={field.id} checked={Boolean(field.value)} disabled={field.protected} />
 					<span class="text-body text-muted-foreground">
 						{field.value ? 'Aktif' : 'Nonaktif'}
 					</span>

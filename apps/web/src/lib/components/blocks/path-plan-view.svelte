@@ -10,13 +10,11 @@
 
 	let { plan }: { plan: PathPlan } = $props();
 
-	let activeBranchId = $state('');
+	let activeBranchId = $derived.by(() => plan.branches[0]?.branch_id || '');
 
-	$effect(() => {
-		activeBranchId = plan.branches[0]?.branch_id || '';
-	});
-
-	const activeBranch = $derived(plan.branches.find(b => b.branch_id === activeBranchId) || plan.branches[0]);
+	const activeBranch = $derived(
+		plan.branches.find((b) => b.branch_id === activeBranchId) || plan.branches[0]
+	);
 
 	const colors = $derived(resolveTrajectoryColor(plan.track_hint));
 
@@ -29,7 +27,10 @@
 	};
 </script>
 
-<div class={cn('flex flex-col gap-4', colors && colors.border, colors && 'border-l-4 pl-4')} data-slot="path-plan-view">
+<div
+	class={cn('flex flex-col gap-4', colors && colors.border, colors && 'border-l-4 pl-4')}
+	data-slot="path-plan-view"
+>
 	<!-- Header -->
 	<div class="flex flex-col gap-2">
 		<div class="flex items-start justify-between gap-2">
@@ -39,10 +40,14 @@
 		<p class="text-body text-muted-foreground">{plan.summary}</p>
 		<div class="flex flex-wrap gap-2">
 			{#if plan.track_hint}
-				<Badge variant={`track-${plan.track_hint}` as any} class="text-[10px]">{plan.track_hint}</Badge>
+				<Badge variant={`track-${plan.track_hint}` as any} class="text-[10px]"
+					>{plan.track_hint}</Badge
+				>
 			{/if}
 			{#if plan.seed_hint}
-				<Badge variant="confidence" class="text-[10px]">{seedHintLabels[plan.seed_hint] || plan.seed_hint}</Badge>
+				<Badge variant="confidence" class="text-[10px]"
+					>{seedHintLabels[plan.seed_hint] || plan.seed_hint}</Badge
+				>
 			{/if}
 		</div>
 	</div>
@@ -54,8 +59,8 @@
 			{#each plan.branches as branch (branch.branch_id)}
 				<Button
 					size="pill"
-					variant={branch.branch_id === activeBranchId ? "default" : "secondary"}
-					onclick={() => activeBranchId = branch.branch_id}
+					variant={branch.branch_id === activeBranchId ? 'default' : 'secondary'}
+					onclick={() => (activeBranchId = branch.branch_id)}
 				>
 					{branch.label}
 				</Button>

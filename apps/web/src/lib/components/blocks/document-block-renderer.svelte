@@ -16,14 +16,18 @@
 		<div class="relative rounded-md border border-border/50 bg-card p-3">
 			<div class="mb-2 flex items-center gap-2">
 				{#if section.heading}
-					<h4 class="text-small font-bold uppercase tracking-wide text-foreground">{section.heading}</h4>
+					<h4 class="text-small font-bold uppercase tracking-wide text-foreground">
+						{section.heading}
+					</h4>
 				{/if}
 				<SourceBadge source={section.source} />
 				{#if section.locked_fields.length > 0}
 					<Lock class="size-3 text-peringatan" />
 				{/if}
 			</div>
-			<div class="prose prose-sm max-w-none text-foreground prose-headings:text-foreground prose-p:text-foreground prose-a:text-api prose-strong:text-foreground">
+			<div
+				class="prose prose-sm max-w-none text-foreground prose-headings:text-foreground prose-p:text-foreground prose-a:text-api prose-strong:text-foreground"
+			>
 				{@html renderMarkdown(section.content)}
 			</div>
 		</div>

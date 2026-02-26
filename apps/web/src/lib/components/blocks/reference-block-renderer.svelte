@@ -5,7 +5,10 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 
-	let { block, onnavigate }: { block: ReferenceBlock; onnavigate?: (refId: string, refType: string) => void } = $props();
+	let {
+		block,
+		onnavigate
+	}: { block: ReferenceBlock; onnavigate?: (refId: string, refType: string) => void } = $props();
 
 	const refTypeLabels: Record<string, string> = {
 		seed: 'Saksi',
@@ -28,7 +31,10 @@
 >
 	<div class="flex-1">
 		<div class="mb-1 flex items-center gap-2">
-			<Badge variant={block.track_hint ? `track-${block.track_hint}` as any : 'secondary'} class="text-[10px]">
+			<Badge
+				variant={block.track_hint ? (`track-${block.track_hint}` as any) : 'secondary'}
+				class="text-[10px]"
+			>
 				{refTypeLabels[block.ref_type] || block.ref_type}
 			</Badge>
 		</div>

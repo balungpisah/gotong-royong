@@ -14,11 +14,16 @@
 
 	const statusVariant = (status: string) => {
 		switch (status) {
-			case 'completed': return 'success' as const;
-			case 'active': return 'step' as const;
-			case 'blocked': return 'danger' as const;
-			case 'skipped': return 'secondary' as const;
-			default: return 'step-future' as const;
+			case 'completed':
+				return 'success' as const;
+			case 'active':
+				return 'step' as const;
+			case 'blocked':
+				return 'danger' as const;
+			case 'skipped':
+				return 'secondary' as const;
+			default:
+				return 'step-future' as const;
 		}
 	};
 
@@ -66,7 +71,12 @@
 				<CpIcon class={cn('mt-0.5 size-4 shrink-0', statusColors[cp.status] || 'text-batu')} />
 				<div class="flex-1">
 					<div class="flex items-center gap-2">
-						<span class={cn('text-body', cp.status === 'completed' && 'line-through text-muted-foreground')}>
+						<span
+							class={cn(
+								'text-body',
+								cp.status === 'completed' && 'line-through text-muted-foreground'
+							)}
+						>
 							{cp.title}
 						</span>
 						{#if cp.evidence_required}

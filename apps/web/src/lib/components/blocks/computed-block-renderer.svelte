@@ -6,7 +6,9 @@
 
 	let { block }: { block: ComputedBlock } = $props();
 
-	const percentage = $derived(block.max ? Math.round((block.value / block.max) * 100) : block.value);
+	const percentage = $derived(
+		block.max ? Math.round((block.value / block.max) * 100) : block.value
+	);
 </script>
 
 <div class="flex flex-col gap-2" data-slot="computed-block">
@@ -23,13 +25,21 @@
 		</div>
 		<div class="h-1 w-full overflow-hidden rounded-full bg-batu">
 			<div
-				class={cn('h-full rounded-full transition-all', percentage >= 70 ? 'bg-api' : 'bg-peringatan')}
+				class={cn(
+					'h-full rounded-full transition-all',
+					percentage >= 70 ? 'bg-api' : 'bg-peringatan'
+				)}
 				style="width: {percentage}%"
 			></div>
 		</div>
 	{:else if block.display === 'status'}
 		<div class="flex items-center gap-3">
-			<div class={cn('size-2.5 rounded-full', percentage >= 70 ? 'bg-berhasil' : percentage >= 40 ? 'bg-peringatan' : 'bg-bahaya')}></div>
+			<div
+				class={cn(
+					'size-2.5 rounded-full',
+					percentage >= 70 ? 'bg-berhasil' : percentage >= 40 ? 'bg-peringatan' : 'bg-bahaya'
+				)}
+			></div>
 			<span class="text-body font-medium">{block.label}</span>
 			<span class="text-body text-muted-foreground">{block.value}{block.unit || ''}</span>
 		</div>
@@ -37,7 +47,9 @@
 		<div class="flex flex-col items-center gap-1 rounded-lg border border-border bg-card p-4">
 			<span class="text-display font-extrabold text-api">{block.value}</span>
 			{#if block.unit}
-				<span class="text-small font-medium uppercase tracking-wide text-muted-foreground">{block.unit}</span>
+				<span class="text-small font-medium uppercase tracking-wide text-muted-foreground"
+					>{block.unit}</span
+				>
 			{/if}
 			<span class="text-body text-foreground">{block.label}</span>
 		</div>

@@ -4,32 +4,46 @@
 	import { Tooltip, TooltipContent, TooltipTrigger } from '$lib/components/ui/tooltip';
 	import { Button } from '$lib/components/ui/button';
 
-	let { phases, onphaseselect }: { phases: Phase[]; onphaseselect?: (phaseId: string) => void } = $props();
+	let { phases, onphaseselect }: { phases: Phase[]; onphaseselect?: (phaseId: string) => void } =
+		$props();
 
 	const statusDotClass = (status: string) => {
 		switch (status) {
-			case 'completed': return 'bg-berhasil border-berhasil';
-			case 'active': return 'bg-api border-api';
-			case 'blocked': return 'bg-bahaya border-bahaya';
-			case 'skipped': return 'bg-batu border-batu';
-			default: return 'bg-transparent border-batu'; // planned, open
+			case 'completed':
+				return 'bg-berhasil border-berhasil';
+			case 'active':
+				return 'bg-api border-api';
+			case 'blocked':
+				return 'bg-bahaya border-bahaya';
+			case 'skipped':
+				return 'bg-batu border-batu';
+			default:
+				return 'bg-transparent border-batu'; // planned, open
 		}
 	};
 
 	const statusLineClass = (status: string) => {
 		switch (status) {
-			case 'completed': return 'bg-berhasil';
-			default: return 'bg-batu/30';
+			case 'completed':
+				return 'bg-berhasil';
+			default:
+				return 'bg-batu/30';
 		}
 	};
-
 </script>
 
-<div class="flex items-center gap-0" data-slot="phase-breadcrumb" role="navigation" aria-label="Fase rencana">
+<div
+	class="flex items-center gap-0"
+	data-slot="phase-breadcrumb"
+	role="navigation"
+	aria-label="Fase rencana"
+>
 	{#each phases as phase, i (phase.phase_id)}
 		<!-- Connecting line (not before first) -->
 		{#if i > 0}
-			<div class={cn('h-0.5 flex-1 min-w-[20px] max-w-[60px]', statusLineClass(phases[i - 1].status))}></div>
+			<div
+				class={cn('h-0.5 flex-1 min-w-[20px] max-w-[60px]', statusLineClass(phases[i - 1].status))}
+			></div>
 		{/if}
 
 		<!-- Phase dot -->
@@ -51,10 +65,16 @@
 							phase.status === 'active' && 'ring-2 ring-api/30 ring-offset-1 ring-offset-background'
 						)}
 					></div>
-					<span class={cn(
-						'max-w-[60px] truncate text-small font-medium',
-						phase.status === 'active' ? 'text-api' : phase.status === 'completed' ? 'text-berhasil' : 'text-muted-foreground'
-					)}>
+					<span
+						class={cn(
+							'max-w-[60px] truncate text-small font-medium',
+							phase.status === 'active'
+								? 'text-api'
+								: phase.status === 'completed'
+									? 'text-berhasil'
+									: 'text-muted-foreground'
+						)}
+					>
 						{phase.title}
 					</span>
 				</Button>
@@ -62,7 +82,9 @@
 			<TooltipContent>
 				<p class="font-semibold">{phase.title}</p>
 				<p class="text-small opacity-80">{phase.objective}</p>
-				<p class="mt-1 text-small capitalize">{phase.status} · {phase.checkpoints.length} titik periksa</p>
+				<p class="mt-1 text-small capitalize">
+					{phase.status} · {phase.checkpoints.length} titik periksa
+				</p>
 			</TooltipContent>
 		</Tooltip>
 	{/each}

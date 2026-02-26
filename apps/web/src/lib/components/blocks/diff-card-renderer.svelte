@@ -10,7 +10,11 @@
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 
-	let { diff, ondiffaction, bare = false }: { diff: DiffCard; ondiffaction?: (action: DiffAction) => void; bare?: boolean } = $props();
+	let {
+		diff,
+		ondiffaction,
+		bare = false
+	}: { diff: DiffCard; ondiffaction?: (action: DiffAction) => void; bare?: boolean } = $props();
 
 	let showEvidence = $state(false);
 
@@ -23,7 +27,13 @@
 	};
 </script>
 
-<div class={cn('flex flex-col gap-3', !bare && 'rounded-lg border border-dashed border-api/40 bg-api/5 p-4')} data-slot="diff-card">
+<div
+	class={cn(
+		'flex flex-col gap-3',
+		!bare && 'rounded-lg border border-dashed border-api/40 bg-api/5 p-4'
+	)}
+	data-slot="diff-card"
+>
 	<!-- Header -->
 	<div class="flex items-start justify-between gap-2">
 		<div>
@@ -39,14 +49,14 @@
 	{#if diff.evidence?.length}
 		<button
 			class="flex items-center gap-1 text-small text-muted-foreground hover:text-foreground"
-			onclick={() => showEvidence = !showEvidence}
+			onclick={() => (showEvidence = !showEvidence)}
 		>
 			<ChevronDown class={cn('size-3 transition-transform', showEvidence && 'rotate-180')} />
 			<span>Berdasarkan {diff.evidence.length} bukti</span>
 		</button>
 		{#if showEvidence}
 			<div class="flex flex-col gap-1 rounded-md bg-card p-2">
-				{#each diff.evidence as ev}
+				{#each diff.evidence as ev, evIdx (evIdx)}
 					<p class="text-small italic text-muted-foreground">"{ev}"</p>
 				{/each}
 			</div>
@@ -55,10 +65,20 @@
 
 	<!-- Items -->
 	<div class="flex flex-col gap-2">
-		{#each diff.items as item, i}
+		{#each diff.items as item (item.label)}
 			{@const OpIcon = opIcons[item.operation]}
-			<div class={cn('flex items-start gap-2 rounded-md border border-border/50 bg-card p-2', item.protected && 'opacity-60')}>
-				<div class={cn('flex size-5 shrink-0 items-center justify-center rounded', opColors[item.operation])}>
+			<div
+				class={cn(
+					'flex items-start gap-2 rounded-md border border-border/50 bg-card p-2',
+					item.protected && 'opacity-60'
+				)}
+			>
+				<div
+					class={cn(
+						'flex size-5 shrink-0 items-center justify-center rounded',
+						opColors[item.operation]
+					)}
+				>
 					<OpIcon class="size-3" />
 				</div>
 				<div class="flex-1">
@@ -71,9 +91,13 @@
 					<p class="text-small text-muted-foreground">{item.path}</p>
 					{#if item.operation === 'modify' && item.old_value !== undefined}
 						<div class="mt-1 flex items-center gap-2 text-small">
-							<span class="rounded bg-bahaya-lembut px-1 text-bahaya line-through">{String(item.old_value)}</span>
+							<span class="rounded bg-bahaya-lembut px-1 text-bahaya line-through"
+								>{String(item.old_value)}</span
+							>
 							<span>→</span>
-							<span class="rounded bg-berhasil-lembut px-1 text-berhasil">{String(item.new_value)}</span>
+							<span class="rounded bg-berhasil-lembut px-1 text-berhasil"
+								>{String(item.new_value)}</span
+							>
 						</div>
 					{/if}
 				</div>
@@ -89,8 +113,6 @@
 		<Button size="sm" variant="outline" onclick={() => ondiffaction?.('review')}>
 			Tinjau Satu-satu
 		</Button>
-		<Button size="sm" variant="ghost" onclick={() => ondiffaction?.('dismiss')}>
-			Abaikan
-		</Button>
+		<Button size="sm" variant="ghost" onclick={() => ondiffaction?.('dismiss')}>Abaikan</Button>
 	</div>
 </div>
