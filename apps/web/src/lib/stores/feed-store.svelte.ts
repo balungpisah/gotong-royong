@@ -17,6 +17,7 @@ import type {
 } from '$lib/types';
 import type { FeedService } from '$lib/services/types';
 import { shouldAutoMonitor } from '$lib/types/feed';
+import { SvelteSet } from 'svelte/reactivity';
 
 const isSuggestionSystemItem = (
 	item: FeedStreamItem
@@ -49,7 +50,7 @@ export class FeedStore {
 	// Dismiss state
 	// ---------------------------------------------------------------------------
 
-	dismissed = $state<Set<string>>(new Set());
+	dismissed = $state<SvelteSet<string>>(new SvelteSet());
 
 	// ---------------------------------------------------------------------------
 	// Suggestion state (onboarding)
@@ -276,9 +277,7 @@ export class FeedStore {
 				signal_counts: item.signal_counts
 					? {
 							...item.signal_counts,
-							dukung_count: wasSupported
-								? Math.max(0, currentCount - 1)
-								: currentCount + 1
+							dukung_count: wasSupported ? Math.max(0, currentCount - 1) : currentCount + 1
 						}
 					: undefined
 			};
@@ -287,7 +286,7 @@ export class FeedStore {
 
 	/** Dismiss a system card so it doesn't appear again. */
 	dismissCard(streamId: string) {
-		this.dismissed = new Set([...this.dismissed, streamId]);
+		this.dismissed = new SvelteSet([...this.dismissed, streamId]);
 	}
 
 	/**
@@ -300,15 +299,12 @@ export class FeedStore {
 		const previousItems = this.streamItems;
 		const currentFollowed =
 			this.suggestedEntities.find((item) => item.entity_id === entityId)?.followed ??
-			this.items
-				.flatMap((item) => item.entity_tags)
-				.find((tag) => tag.entity_id === entityId)
+			this.items.flatMap((item) => item.entity_tags).find((tag) => tag.entity_id === entityId)
 				?.followed ??
 			this.streamItems
 				.filter((item) => isSuggestionSystemItem(item))
 				.flatMap((item) => item.data.payload.entities)
-				.find((entity) => entity.entity_id === entityId)
-				?.followed ??
+				.find((entity) => entity.entity_id === entityId)?.followed ??
 			false;
 		const nextFollowed = !currentFollowed;
 
@@ -344,9 +340,7 @@ export class FeedStore {
 
 		try {
 			await Promise.all(
-				[...suggestedIds].map((entityId) =>
-					this.service.setEntityFollowPreference(entityId, true)
-				)
+				[...suggestedIds].map((entityId) => this.service.setEntityFollowPreference(entityId, true))
 			);
 		} catch (err) {
 			this.suggestedEntities = previousSuggestions;

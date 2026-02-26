@@ -6,7 +6,6 @@
 
 import type { TabConfig, TagSuggestion, NavigationTag } from '../types';
 import { DEFAULT_TABS, WELL_KNOWN_TAGS } from '../types/navigation';
-import { iconNameForTag } from '../utils';
 
 export class NavigationStore {
 	// ---------------------------------------------------------------------------

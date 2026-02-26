@@ -47,8 +47,11 @@ export class CommunityStore {
 	weather = $derived(this.dashboard?.weather ?? null);
 	signalTotal = $derived(
 		this.signals
-			? this.signals.vouch + this.signals.skeptis + this.signals.proof_of_resolve +
-				this.signals.dukung + this.signals.perlu_dicek
+			? this.signals.vouch +
+					this.signals.skeptis +
+					this.signals.proof_of_resolve +
+					this.signals.dukung +
+					this.signals.perlu_dicek
 			: 0
 	);
 

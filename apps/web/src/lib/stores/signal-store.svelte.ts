@@ -15,6 +15,7 @@ import type {
 	SignalCounts,
 	WitnessCloseReason
 } from '$lib/types';
+import { SvelteMap } from 'svelte/reactivity';
 
 export class SignalStore {
 	private service: SignalService;
@@ -23,10 +24,10 @@ export class SignalStore {
 	// State — per-witness, keyed by witness_id
 	// ---------------------------------------------------------------------------
 
-	relations = $state<Map<string, MyRelation>>(new Map());
-	counts = $state<Map<string, SignalCounts>>(new Map());
-	resolutions = $state<Map<string, ContentSignal[]>>(new Map());
-	errors = $state<Map<string, string>>(new Map());
+	relations = $state<SvelteMap<string, MyRelation>>(new SvelteMap());
+	counts = $state<SvelteMap<string, SignalCounts>>(new SvelteMap());
+	resolutions = $state<SvelteMap<string, ContentSignal[]>>(new SvelteMap());
+	errors = $state<SvelteMap<string, string>>(new SvelteMap());
 	sending = $state(false);
 
 	constructor(service: SignalService) {
@@ -55,13 +56,13 @@ export class SignalStore {
 
 	clearError(witnessId: string): void {
 		if (!this.errors.has(witnessId)) return;
-		const next = new Map(this.errors);
+		const next = new SvelteMap(this.errors);
 		next.delete(witnessId);
 		this.errors = next;
 	}
 
 	private setError(witnessId: string, message: string): void {
-		this.errors = new Map(this.errors).set(witnessId, message);
+		this.errors = new SvelteMap(this.errors).set(witnessId, message);
 	}
 
 	private toErrorMessage(err: unknown, fallback: string): string {
@@ -75,7 +76,7 @@ export class SignalStore {
 	async loadRelation(witnessId: string): Promise<void> {
 		try {
 			const relation = await this.service.getMyRelation(witnessId);
-			this.relations = new Map(this.relations).set(witnessId, relation);
+			this.relations = new SvelteMap(this.relations).set(witnessId, relation);
 		} catch (err) {
 			this.setError(witnessId, this.toErrorMessage(err, 'Gagal memuat status sinyal'));
 			throw err;
@@ -85,7 +86,7 @@ export class SignalStore {
 	async loadCounts(witnessId: string): Promise<void> {
 		try {
 			const counts = await this.service.getSignalCounts(witnessId);
-			this.counts = new Map(this.counts).set(witnessId, counts);
+			this.counts = new SvelteMap(this.counts).set(witnessId, counts);
 		} catch (err) {
 			this.setError(witnessId, this.toErrorMessage(err, 'Gagal memuat hitungan sinyal'));
 			throw err;
@@ -95,7 +96,7 @@ export class SignalStore {
 	async loadResolutions(witnessId: string): Promise<void> {
 		try {
 			const resolved = await this.service.getResolutions(witnessId);
-			this.resolutions = new Map(this.resolutions).set(witnessId, resolved);
+			this.resolutions = new SvelteMap(this.resolutions).set(witnessId, resolved);
 		} catch (err) {
 			this.setError(witnessId, this.toErrorMessage(err, 'Gagal memuat riwayat sinyal'));
 			throw err;
@@ -112,7 +113,10 @@ export class SignalStore {
 	// Actions — send / remove signals
 	// ---------------------------------------------------------------------------
 
-	async sendSignal(witnessId: string, signalType: ContentSignalType): Promise<ContentSignal | null> {
+	async sendSignal(
+		witnessId: string,
+		signalType: ContentSignalType
+	): Promise<ContentSignal | null> {
 		if (this.sending) return null;
 		this.sending = true;
 		this.clearError(witnessId);
@@ -156,9 +160,7 @@ export class SignalStore {
 	 */
 	async toggleSignal(witnessId: string, signalType: ContentSignalType): Promise<boolean> {
 		const relation = this.getRelation(witnessId);
-		const isActive = signalType === 'saksi'
-			? relation?.witnessed
-			: relation?.flagged;
+		const isActive = signalType === 'saksi' ? relation?.witnessed : relation?.flagged;
 		if (this.sending) return Boolean(isActive);
 
 		if (isActive) {
@@ -181,7 +183,7 @@ export class SignalStore {
 		if (!this.service.simulateResolution) return [];
 
 		const resolved = await this.service.simulateResolution(witnessId, closeReason);
-		this.resolutions = new Map(this.resolutions).set(witnessId, [
+		this.resolutions = new SvelteMap(this.resolutions).set(witnessId, [
 			...(this.resolutions.get(witnessId) ?? []),
 			...resolved
 		]);

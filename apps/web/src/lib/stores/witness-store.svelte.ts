@@ -6,7 +6,13 @@
  */
 
 import type { WitnessService } from '$lib/services/types';
-import type { Witness, WitnessDetail, WitnessStatus, WitnessCreateInput, DiffResponse } from '$lib/types';
+import type {
+	Witness,
+	WitnessDetail,
+	WitnessStatus,
+	WitnessCreateInput,
+	DiffResponse
+} from '$lib/types';
 
 export class WitnessStore {
 	// ---------------------------------------------------------------------------
@@ -61,7 +67,14 @@ export class WitnessStore {
 		try {
 			const detail = await this.service.create(input);
 			// Prepend summary to list
-			const { messages, plan, blocks, members, triage, ...summary } = detail;
+			const {
+				messages: _messages,
+				plan: _plan,
+				blocks: _blocks,
+				members: _members,
+				triage: _triage,
+				...summary
+			} = detail;
 			this.witnesses = [summary, ...this.witnesses];
 			// Set as current detail
 			this.current = detail;

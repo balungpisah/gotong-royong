@@ -23,8 +23,13 @@ export class TriageStore {
 	// ---------------------------------------------------------------------------
 
 	barState = $derived(this.result?.bar_state ?? 'listening');
+	status = $derived(this.result?.status ?? 'draft');
+	kind = $derived(this.result?.kind ?? null);
 	isReady = $derived(
-		this.barState === 'ready' || this.barState === 'vault-ready' || this.barState === 'siaga-ready'
+		this.status === 'final' ||
+			this.barState === 'ready' ||
+			this.barState === 'vault-ready' ||
+			this.barState === 'siaga-ready'
 	);
 	proposedPlan = $derived(this.result?.proposed_plan ?? null);
 	confidence = $derived(this.result?.confidence ?? null);

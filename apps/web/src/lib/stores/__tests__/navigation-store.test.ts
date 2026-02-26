@@ -87,13 +87,6 @@ class NavigationStoreLogic {
 	}
 
 	loadSuggestions() {
-		const TAG_ICON_MAP: Record<string, string> = {
-			tuntaskan: 'flame',
-			wujudkan: 'lightbulb',
-			telusuri: 'search',
-			rayakan: 'party-popper',
-			musyawarah: 'users'
-		};
 		const existingTags = new Set(this.tabs.map((t) => t.tag).filter(Boolean));
 		this.suggestions = WELL_KNOWN_TAGS.filter((tag) => !existingTags.has(tag)).map((tag) => ({
 			tag,

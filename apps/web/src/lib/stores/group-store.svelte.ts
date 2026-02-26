@@ -6,7 +6,13 @@
  */
 
 import type { GroupService } from '$lib/services/types';
-import type { GroupCreateInput, GroupDetail, GroupMemberRole, GroupSummary, GroupUpdateInput } from '$lib/types';
+import type {
+	GroupCreateInput,
+	GroupDetail,
+	GroupMemberRole,
+	GroupSummary,
+	GroupUpdateInput
+} from '$lib/types';
 
 type StoreErrors = Partial<{
 	list: string;
@@ -116,7 +122,13 @@ export class GroupStore {
 		try {
 			const detail = await this.service.create(input);
 			this.current = detail;
-			const { members, pending_requests, my_role, my_membership_status, ...summary } = detail;
+			const {
+				members: _members,
+				pending_requests: _pending,
+				my_role: _role,
+				my_membership_status: _status,
+				...summary
+			} = detail;
 			this.myGroups = upsertById(this.myGroups, summary);
 			// Only discoverable groups appear in public list.
 			if (detail.join_policy !== 'undangan') {
@@ -139,8 +151,17 @@ export class GroupStore {
 		try {
 			const detail = await this.service.update(groupId, input);
 			this.current = detail;
-			const { members, pending_requests, my_role, my_membership_status, ...summary } = detail;
-			this.groups = detail.join_policy === 'undangan' ? removeById(this.groups, groupId) : upsertById(this.groups, summary);
+			const {
+				members: _members,
+				pending_requests: _pending,
+				my_role: _role,
+				my_membership_status: _status,
+				...summary
+			} = detail;
+			this.groups =
+				detail.join_policy === 'undangan'
+					? removeById(this.groups, groupId)
+					: upsertById(this.groups, summary);
 			this.myGroups = upsertById(this.myGroups, summary);
 		} catch (err) {
 			this.errors = {
@@ -156,7 +177,13 @@ export class GroupStore {
 			await this.service.join(groupId);
 			const detail = await this.service.get(groupId);
 			this.current = detail;
-			const { members, pending_requests, my_role, my_membership_status, ...summary } = detail;
+			const {
+				members: _members,
+				pending_requests: _pending,
+				my_role: _role,
+				my_membership_status: _status,
+				...summary
+			} = detail;
 			this.myGroups = upsertById(this.myGroups, summary);
 		} catch (err) {
 			this.errors = {
