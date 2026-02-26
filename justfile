@@ -100,6 +100,9 @@ dev-worker-down:
 dev-worker-logs:
 	docker compose -f compose.dev.yaml logs -f gotong-worker
 
+dev-seed:
+	scripts/dev/seed-api.sh
+
 dev-monitoring-up: dev-api-up
 	docker compose -f compose.dev.yaml --profile monitoring up -d prometheus
 

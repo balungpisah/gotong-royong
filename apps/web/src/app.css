@@ -5,7 +5,13 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-	/* Tanah Inti */
+	/* ═══════════════════════════════════════════════════════════════════════════
+	 * DESIGN TOKENS — Single source of truth for the Gotong Royong design system.
+	 * Change a token here → every component using it updates automatically.
+	 * All tokens are exposed to Tailwind via @theme inline below.
+	 * ═══════════════════════════════════════════════════════════════════════════ */
+
+	/* ─── Colors: Tanah Inti (Earth Foundation) ─── */
 	--c-tanah-gelap: #3e2723;
 	--c-tanah: #5d4037;
 	--c-kayu: #8d6e63;
@@ -14,13 +20,13 @@
 	--c-kapas: #f5ede3;
 	--c-susu: #fffbf5;
 
-	/* Aksi (Api) */
+	/* ─── Colors: Aksi (Api / Action Fire) ─── */
 	--c-api: #c05621;
 	--c-api-terang: #d2691e;
 	--c-api-dalam: #a0461a;
 	--c-bara: #fff3e0;
 
-	/* Semantik */
+	/* ─── Colors: Semantik (System Feedback) ─── */
 	--c-berhasil: #2e7d32;
 	--c-berhasil-lembut: #e8f5e9;
 	--c-peringatan: #e65100;
@@ -30,7 +36,7 @@
 	--c-keterangan: #4e342e;
 	--c-keterangan-lembut: #efebe9;
 
-	/* Track Accents */
+	/* ─── Colors: Track Accents (5 Trajectory Tracks) ─── */
 	--t-tuntaskan: #c05621;
 	--t-tuntaskan-soft: #fff3e0;
 	--t-tuntaskan-muted: #ffecd2;
@@ -47,7 +53,7 @@
 	--t-musyawarah-soft: #efebe9;
 	--t-musyawarah-muted: #d7ccc8;
 
-	/* Vault */
+	/* ─── Colors: Vault (Private Space) ─── */
 	--v-deep: #263238;
 	--v-surface: #37474f;
 	--v-mid: #546e7a;
@@ -55,34 +61,34 @@
 	--v-light: #b0bec5;
 	--v-wash: #eceff1;
 
-	/* Siaga */
+	/* ─── Colors: Siaga (Emergency) ─── */
 	--s-deep: #b71c1c;
 	--s-pulse: #d32f2f;
 	--s-accent: #ff5252;
 	--s-soft: #ffebee;
 	--s-border: #ffcdd2;
 
-	/* Tandang */
+	/* ─── Colors: Tandang (Reputation) ─── */
 	--c-tandang: #00695c;
 	--c-tandang-i: #f57f17;
 	--c-tandang-c: #00695c;
 	--c-tandang-j: #7b1fa2;
 
-	/* Tier levels */
+	/* ─── Colors: Tier Levels ─── */
 	--c-tier-0: #9e9e9e;
 	--c-tier-1: #795548;
 	--c-tier-2: #00695c;
 	--c-tier-3: #1e88e5;
 	--c-tier-4: #ffd700;
 
-	/* Signal types */
+	/* ─── Colors: Signal Types ─── */
 	--c-signal-vouch: #22c55e;
 	--c-signal-skeptis: #f59e0b;
 	--c-signal-dukung: #a855f7;
 	--c-signal-proof: #3b82f6;
 	--c-signal-dicek: #f87171;
 
-	/* Status */
+	/* ─── Colors: Status ─── */
 	--c-online: #22c55e;
 	--c-waspada: #f59e0b;
 	--c-waspada-lembut: #fef3c7;
@@ -101,7 +107,7 @@
 	--fw-bold: 700;
 	--fw-extra: 800;
 
-	/* Spacing */
+	/* ─── Spacing (4px grid) ─── */
 	--sp-1: 4px;
 	--sp-2: 8px;
 	--sp-3: 12px;
@@ -113,14 +119,14 @@
 	--sp-12: 48px;
 	--sp-16: 64px;
 
-	/* Radius */
+	/* ─── Border Radius ─── */
 	--r-sm: 6px;
 	--r-md: 10px;
 	--r-lg: 14px;
 	--r-xl: 20px;
 	--r-full: 9999px;
 
-	/* Brown-tinted shadows */
+	/* ─── Shadows (brown-tinted for warmth) ─── */
 	--shadow-sm: 0 1px 4px rgba(62, 39, 35, 0.06);
 	--shadow-md: 0 2px 12px rgba(62, 39, 35, 0.08);
 	--shadow-lg: 0 4px 24px rgba(62, 39, 35, 0.12);
@@ -140,7 +146,7 @@
 
 	--stagger-gap: 50ms;
 
-	/* shadcn semantic bridge */
+	/* ─── Semantic Bridge (shadcn ↔ DNA tokens) ─── */
 	--radius: var(--r-md);
 	--background: var(--c-kapas);
 	--foreground: var(--c-tanah-gelap);
@@ -333,17 +339,35 @@
 	--spacing-12: var(--sp-12);
 	--spacing-16: var(--sp-16);
 
-	/* Typography — custom sizes that Tailwind doesn't provide.
-	 * Tailwind natives cover the rest: text-xs (12/16), text-sm (14/20),
-	 * text-base (16/24), text-xl (20/28), text-2xl (24/32), text-3xl (30/36). */
+	/* ─── Typography Scale (8-step Design DNA) ───
+	 * All 8 sizes are available as text-* utilities (e.g., text-h2, text-body).
+	 * Use ONLY these tokens — avoid raw Tailwind text-xs/text-sm/text-base/etc.
+	 *
+	 *   text-display  32px/40px  fw-extra  — Hero numbers, splash
+	 *   text-h1       26px/32px  fw-extra  — Page titles
+	 *   text-h2       20px/28px  fw-bold   — Section headings
+	 *   text-h3       16px/24px  fw-semi   — Card titles, sub-headings
+	 *   text-body     14px/20px  fw-regular — Main body text
+	 *   text-small    12px/16px  fw-semi   — Metadata, secondary
+	 *   text-caption  11px/16px  fw-semi   — Labels, captions
+	 *   text-micro     9px/12px  fw-bold   — Badge text, uppercase labels
+	 */
+	--font-size-display: 32px;
+	--font-size-display--line-height: 40px;
+	--font-size-h1: 26px;
+	--font-size-h1--line-height: 32px;
+	--font-size-h2: 20px;
+	--font-size-h2--line-height: 28px;
+	--font-size-h3: 16px;
+	--font-size-h3--line-height: 24px;
+	--font-size-body: 14px;
+	--font-size-body--line-height: 20px;
+	--font-size-small: 12px;
+	--font-size-small--line-height: 16px;
 	--font-size-caption: 11px;
 	--font-size-caption--line-height: 16px;
 	--font-size-micro: 9px;
 	--font-size-micro--line-height: 12px;
-	--font-size-h1: 26px;
-	--font-size-h1--line-height: 32px;
-	--font-size-display: 32px;
-	--font-size-display--line-height: 40px;
 
 	/* Motion tokens for Tailwind */
 	--ease-spring: var(--ease-spring);

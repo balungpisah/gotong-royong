@@ -143,6 +143,17 @@ curl -fsS http://127.0.0.1:9000/minio/health/live
 
 ## Seed / Probe Data
 
+Seed local API-visible sample feed data for frontend development:
+
+```bash
+just dev-seed
+```
+
+Notes:
+- Uses `http://127.0.0.1:3100` by default (`API_BASE_URL=http://127.0.0.1:<port> just dev-seed` to override).
+- Bootstraps a real seed account via `/v1/auth/signup`, then falls back to `/v1/auth/signin` on reruns.
+- Optional overrides: `SEED_EMAIL`, `SEED_PASSWORD`, `SEED_USERNAME`, `SEED_COUNT`.
+
 Run the Surreal pattern probe used by research:
 
 ```bash
