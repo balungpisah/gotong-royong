@@ -1,6 +1,6 @@
 # AI Endpoint Map (Canonical v1)
 
-Last updated: 2026-02-26
+Last updated: 2026-02-27
 Owner: AI orchestration + API contracts
 
 This document is the single source of truth for runtime AI endpoint registration.
@@ -44,6 +44,7 @@ Every registered endpoint must define all fields below:
 |---|---|---|---|---|---|
 | `AI-ENDPOINT-TRIAGE-001` | `POST /v1/triage/sessions` | `TRIAGE-001 @ v0.2.0` | `masalah|musyawarah|pantau|catat|bantuan|rayakan|siaga|program|kelola` | `ACTIVE` | `2026-02-26` |
 | `AI-ENDPOINT-TRIAGE-002` | `POST /v1/triage/sessions/:session_id/messages` | `TRIAGE-001 @ v0.2.0` | `masalah|musyawarah|pantau|catat|bantuan|rayakan|siaga|program|kelola` | `ACTIVE` | `2026-02-26` |
+| `AI-ENDPOINT-TRIAGE-003` | `POST /v1/triage/operator` | `TRIAGE-001 @ v0.2.0 (stub boundary)` | `masalah|musyawarah|pantau|catat|bantuan|rayakan|siaga|program|kelola` | `PARTIAL` | `2026-02-27` |
 | `AI-ENDPOINT-EP03-001` | `POST /v1/edge-pod/ai/03/duplicate-detection` | `DUPLICATE-001 @ v0.2.0` | `N/A` | `ACTIVE` | `2026-02-26` |
 | `AI-ENDPOINT-EP05-001` | `POST /v1/edge-pod/ai/05/gaming-risk` | `GAMING-001 @ v0.2.0` | `N/A` | `ACTIVE` | `2026-02-26` |
 | `AI-ENDPOINT-EP08-001` | `POST /v1/edge-pod/ai/08/sensitive-media` | `SENSITIVE-001 @ v0.2.0` | `N/A` | `ACTIVE` | `2026-02-26` |
@@ -112,7 +113,35 @@ Every registered endpoint must define all fields below:
   - `crates/api/src/routes/mod.rs`
   - `crates/api/src/tests.rs`
 
-### 3.3 `AI-ENDPOINT-EP03-001`
+### 3.3 `AI-ENDPOINT-TRIAGE-003`
+
+- `endpoint_id`: `AI-ENDPOINT-TRIAGE-003`
+- `route_method`: `POST /v1/triage/operator`
+- `owner`: frontend + API cutover slice
+- `prompt_id_version`: `TRIAGE-001 @ v0.2.0 (stub boundary)`
+- `operator_skill`: `masalah|musyawarah|pantau|catat|bantuan|rayakan|siaga|program|kelola`
+- `input_contract`:
+  - temporary stub request: `{ content, step?, route?, trajectory_type? }`
+  - output envelope contract: `docs/research/contracts/triage-operator-output-contract-v1.md`
+- `output_contract`:
+  - `docs/research/contracts/triage-operator-output-contract-v1.schema.json` (`operator.v1`)
+- `validation_gate`:
+  - route-level input checks and contract validation in `crates/api/src/routes/mod.rs` (`triage_operator_stub`, `triage_validate_operator_output`)
+- `fallback_behavior`:
+  - endpoint is disabled by default and returns `404 not_found` unless `TRIAGE_OPERATOR_STUB_ENABLED=true`
+  - when enabled, returns deterministic synthesized `operator_output` payloads for integration testing
+- `observability`:
+  - generic HTTP metrics via `gotong_api_http_requests_total`, `gotong_api_http_errors_total`
+  - parse/validation failures logged in triage operator stub path
+- `idempotency_ordering`:
+  - stateless deterministic stub; no idempotency persistence required
+- `status`: `PARTIAL`
+- `last_verified`: `2026-02-27`
+- `code_references`:
+  - `crates/api/src/routes/mod.rs`
+  - `crates/api/src/tests.rs`
+
+### 3.4 `AI-ENDPOINT-EP03-001`
 
 - `endpoint_id`: `AI-ENDPOINT-EP03-001`
 - `route_method`: `POST /v1/edge-pod/ai/03/duplicate-detection`
@@ -133,7 +162,7 @@ Every registered endpoint must define all fields below:
   - `crates/api/src/routes/edgepod.rs`
   - `docs/research/contracts/edgepod-endpoint-contracts.contract-map.md`
 
-### 3.4 `AI-ENDPOINT-EP05-001`
+### 3.5 `AI-ENDPOINT-EP05-001`
 
 - `endpoint_id`: `AI-ENDPOINT-EP05-001`
 - `route_method`: `POST /v1/edge-pod/ai/05/gaming-risk`
@@ -153,7 +182,7 @@ Every registered endpoint must define all fields below:
 - `code_references`:
   - `crates/api/src/routes/edgepod.rs`
 
-### 3.5 `AI-ENDPOINT-EP08-001`
+### 3.6 `AI-ENDPOINT-EP08-001`
 
 - `endpoint_id`: `AI-ENDPOINT-EP08-001`
 - `route_method`: `POST /v1/edge-pod/ai/08/sensitive-media`
@@ -173,7 +202,7 @@ Every registered endpoint must define all fields below:
 - `code_references`:
   - `crates/api/src/routes/edgepod.rs`
 
-### 3.6 `AI-ENDPOINT-EP09-001`
+### 3.7 `AI-ENDPOINT-EP09-001`
 
 - `endpoint_id`: `AI-ENDPOINT-EP09-001`
 - `route_method`: `POST /v1/edge-pod/ai/09/credit-recommendation`
@@ -194,7 +223,7 @@ Every registered endpoint must define all fields below:
 - `code_references`:
   - `crates/api/src/routes/edgepod.rs`
 
-### 3.7 `AI-ENDPOINT-EP11-001`
+### 3.8 `AI-ENDPOINT-EP11-001`
 
 - `endpoint_id`: `AI-ENDPOINT-EP11-001`
 - `route_method`: `POST /v1/edge-pod/ai/siaga/evaluate`

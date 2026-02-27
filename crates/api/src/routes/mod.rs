@@ -233,6 +233,7 @@ pub fn router(state: AppState) -> Router {
             post(mark_notification_read),
         )
         .route("/v1/notifications", get(list_discovery_notifications))
+        .route("/v1/triage/operator", post(triage_operator_stub))
         .route("/v1/triage/sessions", post(start_triage_session))
         .route(
             "/v1/triage/sessions/:session_id/messages",
@@ -774,6 +775,17 @@ struct ContinueTriageSessionRequest {
     #[validate(length(max = 10), nested)]
     attachments: Option<Vec<TriageAttachmentInput>>,
     operator_output: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+struct TriageOperatorStubRequest {
+    #[validate(length(min = 1, max = 4_000))]
+    content: String,
+    step: Option<u8>,
+    #[validate(length(min = 1, max = 64))]
+    route: Option<String>,
+    #[validate(length(min = 1, max = 64))]
+    trajectory_type: Option<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -1771,7 +1783,10 @@ fn triage_operator_structured_payload(
                 .iter()
                 .enumerate()
                 .map(|(i, entry)| {
-                    let name = entry.get("name").and_then(Value::as_str).unwrap_or("Sumber Daya");
+                    let name = entry
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("Sumber Daya");
                     let reason = entry
                         .get("match_reason")
                         .and_then(Value::as_str)
@@ -2691,7 +2706,8 @@ fn triage_result_from_operator_contract(contract: &TriageOperatorOutput, step: u
         {
             payload["conversation_payload"] = conversation_payload;
         }
-    } else if let Some(conversation_payload) = triage_operator_conversation_payload(contract, None) {
+    } else if let Some(conversation_payload) = triage_operator_conversation_payload(contract, None)
+    {
         payload["conversation_payload"] = conversation_payload;
     }
 
@@ -2842,8 +2858,16 @@ mod triage_operator_contract_tests {
         assert_eq!(result.get("route"), Some(&json!("komunitas")));
         assert!(result.get("proposed_plan").is_some_and(Value::is_object));
         assert!(result.get("blocks").is_some_and(Value::is_object));
-        assert!(result.get("structured_payload").is_some_and(Value::is_array));
-        assert!(result.get("conversation_payload").is_some_and(Value::is_array));
+        assert!(
+            result
+                .get("structured_payload")
+                .is_some_and(Value::is_array)
+        );
+        assert!(
+            result
+                .get("conversation_payload")
+                .is_some_and(Value::is_array)
+        );
     }
 
     #[test]
@@ -2986,6 +3010,91 @@ fn compact_triage_sessions(sessions: &mut HashMap<String, TriageSessionState>, n
     for (session_id, _) in ordered.into_iter().take(remove_count) {
         sessions.remove(&session_id);
     }
+}
+
+async fn triage_operator_stub(
+    State(state): State<AppState>,
+    Extension(_auth): Extension<AuthContext>,
+    Json(payload): Json<TriageOperatorStubRequest>,
+) -> Result<Json<Value>, ApiError> {
+    validation::validate(&payload)?;
+    if !state.config.triage_operator_stub_enabled {
+        return Err(ApiError::NotFound);
+    }
+
+    let detected = detect_triage_route(&payload.content);
+    let route = payload
+        .route
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(detected.route)
+        .to_string();
+    if !matches!(
+        route.as_str(),
+        "komunitas" | "vault" | "siaga" | "catatan_komunitas" | "kelola"
+    ) {
+        return Err(ApiError::Validation("route is invalid".to_string()));
+    }
+
+    let trajectory_type = payload
+        .trajectory_type
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .or_else(|| detected.trajectory_type.map(str::to_string));
+    if route == "kelola" && trajectory_type.is_some() {
+        return Err(ApiError::Validation(
+            "trajectory_type must be omitted for route=kelola".to_string(),
+        ));
+    }
+    if let Some(trajectory_type) = trajectory_type.as_deref()
+        && !matches!(
+            trajectory_type,
+            "aksi"
+                | "advokasi"
+                | "pantau"
+                | "mufakat"
+                | "mediasi"
+                | "program"
+                | "data"
+                | "vault"
+                | "bantuan"
+                | "pencapaian"
+                | "siaga"
+        )
+    {
+        return Err(ApiError::Validation(
+            "trajectory_type is invalid".to_string(),
+        ));
+    }
+
+    let step = payload.step.unwrap_or(1);
+    if !(1..=3).contains(&step) {
+        return Err(ApiError::Validation(
+            "step must be between 1 and 3".to_string(),
+        ));
+    }
+
+    let operator_output = triage_operator_output_payload(&route, trajectory_type.as_deref(), step);
+    let contract: TriageOperatorOutput =
+        serde_json::from_value(operator_output.clone()).map_err(|error| {
+            tracing::error!(error = %error, "triage operator stub output parse failed");
+            ApiError::Internal
+        })?;
+    triage_validate_operator_output(&contract).map_err(|error| {
+        tracing::error!(error = %error, "triage operator stub output validation failed");
+        ApiError::Internal
+    })?;
+
+    Ok(Json(json!({
+        "schema_version": OPERATOR_SCHEMA_VERSION,
+        "route": route,
+        "trajectory_type": trajectory_type,
+        "step": step,
+        "operator_output": operator_output
+    })))
 }
 
 async fn start_triage_session(

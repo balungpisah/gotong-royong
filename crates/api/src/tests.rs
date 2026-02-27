@@ -90,6 +90,7 @@ fn test_config() -> AppConfig {
         markov_cache_gameplay_ttl_ms: 45_000,
         markov_cache_gameplay_stale_while_revalidate_ms: 180_000,
         discovery_feed_involvement_fallback_enabled: true,
+        triage_operator_stub_enabled: false,
     }
 }
 
@@ -2399,6 +2400,93 @@ async fn hot_path_routes_require_auth_with_standard_error_envelope() {
         .expect("triage request");
     let triage_response = app.clone().oneshot(triage_request).await.expect("response");
     assert_error_envelope(triage_response, StatusCode::UNAUTHORIZED, "unauthorized").await;
+
+    let triage_operator_request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/operator")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"content":"cek triage operator"}"#))
+        .expect("triage operator request");
+    let triage_operator_response = app
+        .clone()
+        .oneshot(triage_operator_request)
+        .await
+        .expect("response");
+    assert_error_envelope(
+        triage_operator_response,
+        StatusCode::UNAUTHORIZED,
+        "unauthorized",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn triage_operator_stub_returns_not_found_when_disabled() {
+    let app = test_app();
+    let token = test_token("test-secret");
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/operator")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(
+            json!({
+                "content": "Saya mau bahas musyawarah warga"
+            })
+            .to_string(),
+        ))
+        .expect("request");
+    let response = app.oneshot(request).await.expect("response");
+    assert_error_envelope(response, StatusCode::NOT_FOUND, "not_found").await;
+}
+
+#[tokio::test]
+async fn triage_operator_stub_returns_deterministic_output_when_enabled() {
+    let mut config = test_config();
+    config.triage_operator_stub_enabled = true;
+    let store = InMemoryIdempotencyStore::new("test");
+    let state = AppState::with_idempotency_store(config, Arc::new(store));
+    let app = routes::router(state);
+    let token = test_token("test-secret");
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/triage/operator")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(
+            json!({
+                "content": "Saya mau musyawarah soal jadwal ronda malam",
+                "step": 3,
+                "route": "komunitas",
+                "trajectory_type": "mufakat"
+            })
+            .to_string(),
+        ))
+        .expect("request");
+    let response = app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let payload: serde_json::Value = serde_json::from_slice(&body).expect("json");
+
+    assert_eq!(payload.get("schema_version"), Some(&json!("operator.v1")));
+    assert_eq!(payload.get("route"), Some(&json!("komunitas")));
+    assert_eq!(payload.get("trajectory_type"), Some(&json!("mufakat")));
+    assert_eq!(payload.get("step"), Some(&json!(3)));
+
+    let operator_output = payload
+        .get("operator_output")
+        .and_then(|value| value.as_object())
+        .expect("operator_output object");
+    assert_eq!(operator_output.get("operator"), Some(&json!("musyawarah")));
+    assert_eq!(
+        operator_output.get("triage_stage"),
+        Some(&json!("triage_final"))
+    );
+    assert_eq!(operator_output.get("output_kind"), Some(&json!("witness")));
 }
 
 #[tokio::test]

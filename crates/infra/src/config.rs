@@ -51,6 +51,7 @@ pub struct AppConfig {
     pub markov_cache_gameplay_ttl_ms: u64,
     pub markov_cache_gameplay_stale_while_revalidate_ms: u64,
     pub discovery_feed_involvement_fallback_enabled: bool,
+    pub triage_operator_stub_enabled: bool,
 }
 
 impl AppConfig {
@@ -115,6 +116,7 @@ impl AppConfig {
                 180_000u64,
             )?
             .set_default("discovery_feed_involvement_fallback_enabled", true)?
+            .set_default("triage_operator_stub_enabled", false)?
             .add_source(config::Environment::default().separator("__"))
             .build()?;
         let config = cfg.try_deserialize::<AppConfig>()?;
