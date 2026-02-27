@@ -1,0 +1,279 @@
+[
+  {
+    "slug": "aksi-jalan-rusak",
+    "source_type": "contribution",
+    "route": "komunitas",
+    "title": "Jalan lingkungan rusak berat di RT 05",
+    "summary": "Warga melaporkan jalan rusak dan meminta tindak lanjut gotong royong.",
+    "payload": {
+      "source": "ikutan",
+      "event_verb": "melaporkan masalah prioritas",
+      "enrichment": {
+        "trajectory_type": "aksi",
+        "icon": "construction",
+        "hook_line": "Jalan rusak menghambat aktivitas harian warga.",
+        "body": "Lubang jalan melebar setelah hujan. Warga mendorong aksi cepat agar aman untuk anak sekolah.",
+        "sentiment": "urgent",
+        "intensity": 4,
+        "entity_tags": [
+          { "entity_type": "lingkungan", "label": "RT 05 Menteng" },
+          { "entity_type": "topik", "label": "Infrastruktur" }
+        ]
+      },
+      "signal_counts": {
+        "vouch_positive": 4,
+        "vouch_skeptical": 1,
+        "witness_count": 6,
+        "dukung_count": 2,
+        "flags": 0
+      }
+    }
+  },
+  {
+    "slug": "advokasi-air-bersih",
+    "source_type": "vouch",
+    "route": "komunitas",
+    "title": "Advokasi akses air bersih untuk RW 03",
+    "summary": "Komunitas menggalang dukungan agar akses air bersih diprioritaskan.",
+    "payload": {
+      "source": "terlibat",
+      "event_verb": "menguatkan advokasi warga",
+      "enrichment": {
+        "trajectory_type": "advokasi",
+        "icon": "megaphone",
+        "hook_line": "Dukungan warga meningkat untuk advokasi air bersih.",
+        "body": "Perwakilan warga menyiapkan dokumen dukungan dan jadwal audiensi ke kelurahan.",
+        "sentiment": "hopeful",
+        "intensity": 3,
+        "entity_tags": [
+          { "entity_type": "lingkungan", "label": "RW 03 Menteng" },
+          { "entity_type": "topik", "label": "Layanan Publik" }
+        ]
+      },
+      "my_relation": {
+        "vouched": true,
+        "vouch_type": "positive",
+        "witnessed": false,
+        "flagged": false,
+        "supported": true
+      }
+    }
+  },
+  {
+    "slug": "pantau-drainase",
+    "source_type": "moderation",
+    "route": "komunitas",
+    "title": "Pantau tindak lanjut perbaikan drainase",
+    "summary": "Status perbaikan drainase masih menunggu jadwal lapangan.",
+    "payload": {
+      "source": "sekitar",
+      "event_verb": "memperbarui status pemantauan",
+      "enrichment": {
+        "trajectory_type": "pantau",
+        "icon": "eye",
+        "hook_line": "Pantauan aktif untuk memastikan progres lapangan.",
+        "body": "Warga meminta pembaruan mingguan dan bukti foto setelah pekerjaan dimulai.",
+        "sentiment": "curious",
+        "intensity": 2,
+        "entity_tags": [
+          { "entity_type": "topik", "label": "Drainase" }
+        ]
+      }
+    }
+  },
+  {
+    "slug": "mufakat-ronda",
+    "source_type": "contribution",
+    "route": "komunitas",
+    "title": "Musyawarah jadwal ronda malam",
+    "summary": "Warga menimbang opsi jadwal ronda bersama.",
+    "payload": {
+      "source": "ikutan",
+      "event_verb": "membuka musyawarah warga",
+      "deadline": "2026-03-10T12:00:00Z",
+      "deadline_label": "Sisa 3 hari",
+      "quorum_target": 20,
+      "quorum_current": 13,
+      "enrichment": {
+        "trajectory_type": "mufakat",
+        "icon": "users",
+        "hook_line": "Perlu keputusan bersama untuk jadwal ronda.",
+        "body": "Dua opsi jadwal diajukan dan warga diminta menyepakati slot yang paling realistis.",
+        "sentiment": "curious",
+        "intensity": 3,
+        "entity_tags": [
+          { "entity_type": "kelompok", "label": "Karang Taruna RT 05" }
+        ]
+      }
+    }
+  },
+  {
+    "slug": "mediasi-lapak",
+    "source_type": "contribution",
+    "route": "komunitas",
+    "title": "Mediasi penggunaan lapak pasar warga",
+    "summary": "Dua pihak meminta fasilitasi mediasi atas jadwal penggunaan lapak.",
+    "payload": {
+      "source": "ikutan",
+      "event_verb": "mengusulkan mediasi komunitas",
+      "enrichment": {
+        "trajectory_type": "mediasi",
+        "icon": "handshake",
+        "hook_line": "Forum mediasi dibuka agar kesepahaman tercapai.",
+        "body": "Koordinator lingkungan mengundang pihak terkait untuk menyepakati aturan giliran yang adil.",
+        "sentiment": "hopeful",
+        "intensity": 2,
+        "entity_tags": [
+          { "entity_type": "topik", "label": "Musyawarah" }
+        ]
+      }
+    }
+  },
+  {
+    "slug": "program-kerja-bakti",
+    "source_type": "contribution",
+    "route": "komunitas",
+    "title": "Program kerja bakti bulanan dimulai",
+    "summary": "Rotasi petugas dan titik kerja bakti disusun untuk tiga bulan ke depan.",
+    "payload": {
+      "source": "ikutan",
+      "event_verb": "menjadwalkan program komunitas",
+      "enrichment": {
+        "trajectory_type": "program",
+        "icon": "calendar",
+        "hook_line": "Program rutin siap dijalankan bergilir.",
+        "body": "Setiap RT menugaskan perwakilan untuk pembersihan saluran air dan area publik.",
+        "sentiment": "hopeful",
+        "intensity": 2,
+        "entity_tags": [
+          { "entity_type": "topik", "label": "Program Komunitas" },
+          { "entity_type": "lingkungan", "label": "RW 03 Menteng" }
+        ]
+      }
+    }
+  },
+  {
+    "slug": "data-harga-telur",
+    "source_type": "ontology_note",
+    "route": "catatan_komunitas",
+    "title": "Catatan data harga telur pasar pagi",
+    "summary": "Harga telur tercatat naik dibanding pekan lalu.",
+    "payload": {
+      "source": "sekitar",
+      "event_verb": "mencatat data komunitas",
+      "enrichment": {
+        "trajectory_type": "data",
+        "icon": "clipboard-list",
+        "hook_line": "Data harga sembako diperbarui dari observasi warga.",
+        "body": "Telur ayam ras tercatat di kisaran Rp32.000 per kilogram pada pasar pagi setempat.",
+        "sentiment": "curious",
+        "intensity": 1,
+        "entity_tags": [
+          { "entity_type": "topik", "label": "Harga Sembako" }
+        ]
+      }
+    }
+  },
+  {
+    "slug": "vault-catatan-privat",
+    "source_type": "vault",
+    "route": "vault",
+    "title": "Catatan saksi privat tersimpan",
+    "summary": "Ringkasan catatan privat tersimpan untuk rujukan terbatas.",
+    "payload": {
+      "source": "terlibat",
+      "event_verb": "menyimpan catatan saksi privat",
+      "enrichment": {
+        "trajectory_type": "vault",
+        "icon": "lock",
+        "hook_line": "Catatan privat diamankan untuk tindak lanjut internal.",
+        "body": "Detail sensitif disimpan dengan batas akses agar dapat dipakai saat verifikasi lanjutan.",
+        "sentiment": "curious",
+        "intensity": 1,
+        "entity_tags": [
+          { "entity_type": "topik", "label": "Catatan Saksi" }
+        ]
+      }
+    }
+  },
+  {
+    "slug": "bantuan-disabilitas",
+    "source_type": "contribution",
+    "route": "komunitas",
+    "title": "Permintaan bantuan akses kursi roda",
+    "summary": "Keluarga membutuhkan bantuan perbaikan akses rumah untuk kursi roda.",
+    "payload": {
+      "source": "ikutan",
+      "event_verb": "mengajukan bantuan komunitas",
+      "enrichment": {
+        "trajectory_type": "bantuan",
+        "icon": "heart",
+        "hook_line": "Permintaan bantuan butuh koordinator relawan.",
+        "body": "Relawan dibutuhkan untuk memasang jalur landai sederhana di depan rumah penerima bantuan.",
+        "sentiment": "hopeful",
+        "intensity": 3,
+        "entity_tags": [
+          { "entity_type": "topik", "label": "Bantuan Warga" }
+        ]
+      }
+    }
+  },
+  {
+    "slug": "pencapaian-bank-sampah",
+    "source_type": "contribution",
+    "route": "komunitas",
+    "title": "Pencapaian bank sampah RT 05",
+    "summary": "Program bank sampah berhasil menurunkan volume sampah campuran.",
+    "payload": {
+      "source": "terlibat",
+      "event_verb": "merayakan pencapaian komunitas",
+      "enrichment": {
+        "trajectory_type": "pencapaian",
+        "icon": "trophy",
+        "hook_line": "Pencapaian warga layak direplikasi ke RT lain.",
+        "body": "Dalam dua bulan, volume sampah campuran turun signifikan karena jadwal pemilahan rutin.",
+        "sentiment": "celebratory",
+        "intensity": 3,
+        "entity_tags": [
+          { "entity_type": "topik", "label": "Lingkungan Hidup" }
+        ]
+      },
+      "signal_counts": {
+        "vouch_positive": 9,
+        "vouch_skeptical": 0,
+        "witness_count": 3,
+        "dukung_count": 7,
+        "flags": 0
+      }
+    }
+  },
+  {
+    "slug": "siaga-banjir",
+    "source_type": "siaga",
+    "route": "siaga",
+    "title": "Siaga banjir area bantaran kali",
+    "summary": "Hujan deras berpotensi menaikkan debit air malam ini.",
+    "payload": {
+      "source": "sekitar",
+      "event_verb": "membagikan peringatan siaga",
+      "enrichment": {
+        "trajectory_type": "siaga",
+        "icon": "siren",
+        "hook_line": "Warga diminta siaga dan pantau titik rawan banjir.",
+        "body": "Koordinator lingkungan meminta warga menyiapkan jalur evakuasi ringan dan mengamankan dokumen penting.",
+        "sentiment": "urgent",
+        "intensity": 5,
+        "entity_tags": [
+          { "entity_type": "topik", "label": "Kesiagaan Bencana" }
+        ]
+      },
+      "signal_counts": {
+        "vouch_positive": 2,
+        "vouch_skeptical": 3,
+        "witness_count": 5,
+        "dukung_count": 1,
+        "flags": 0
+      }
+    }
+  }
+]

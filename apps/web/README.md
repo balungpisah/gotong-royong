@@ -47,7 +47,9 @@ bun run test:e2e:live-api
 Notes:
 
 - Requires `gotong-api` running at `GR_API_PROXY_TARGET`.
-- For non-empty local UI states, seed sample backend data from repo root: `just dev-seed` (or `API_BASE_URL=http://127.0.0.1:3100 just dev-seed`).
+- For non-empty local UI states, seed backend taxonomy matrix data from repo root:
+  - `just dev-seed`
+  - optional overrides: `API_BASE_URL=http://127.0.0.1:3100 SEED_COUNT=0 SEED_MATRIX_FILE=scripts/dev/seed-feed-matrix.json just dev-seed` (`SEED_COUNT=0` means seed all matrix rows).
 - Test bootstraps a real user via `POST /v1/auth/signup`, then validates a broader live matrix:
   - hot-path reads: `/v1/auth/me`, `/v1/feed`, `/v1/notifications`
   - triage flow: `POST /v1/triage/sessions`, `POST /v1/triage/sessions/:session_id/messages`

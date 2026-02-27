@@ -5,7 +5,7 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 : "${API_BASE_URL:=http://127.0.0.1:3100}"
-: "${SEED_COUNT:=4}"
+: "${SEED_COUNT:=0}"
 : "${SEED_PREFIX:=devseed}"
 : "${SEED_EMAIL:=${SEED_PREFIX}@example.com}"
 : "${SEED_PASSWORD:=secret123}"
@@ -18,6 +18,7 @@ cd "$ROOT_DIR"
 : "${SURREAL_DB:=chat}"
 : "${SURREAL_USER:=root}"
 : "${SURREAL_PASS:=root}"
+: "${SEED_MATRIX_FILE:=${ROOT_DIR}/scripts/dev/seed-feed-matrix.json}"
 
 require_cmd() {
   local cmd="$1"
@@ -31,8 +32,15 @@ require_cmd curl
 require_cmd jq
 require_cmd docker
 
-if ! [[ "$SEED_COUNT" =~ ^[0-9]+$ ]] || [[ "$SEED_COUNT" -lt 1 ]]; then
-  echo "SEED_COUNT must be a positive integer" >&2
+sql_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\'/\\\'}"
+  printf '%s' "$value"
+}
+
+if ! [[ "$SEED_COUNT" =~ ^[0-9]+$ ]]; then
+  echo "SEED_COUNT must be a non-negative integer (0 means all matrix rows)" >&2
   exit 1
 fi
 
@@ -142,55 +150,133 @@ echo "API base: ${API_BASE_URL}"
 ensure_seed_session
 
 run_key="${SEED_PREFIX}-$(date +%Y%m%d%H%M%S)"
+if [[ ! -f "$SEED_MATRIX_FILE" ]]; then
+  echo "Seed matrix file not found: ${SEED_MATRIX_FILE}" >&2
+  exit 1
+fi
 
-for i in $(seq 1 "$SEED_COUNT"); do
-  witness_id="${run_key}-witness-${i}"
-  feed_id="${run_key}-feed-${i}"
-  request_id="${run_key}-req-${i}"
+matrix_count="$(jq -r 'if type == "array" then length else -1 end' "$SEED_MATRIX_FILE")"
+if ! [[ "$matrix_count" =~ ^[0-9]+$ ]] || [[ "$matrix_count" -lt 1 ]]; then
+  echo "Seed matrix must be a non-empty JSON array: ${SEED_MATRIX_FILE}" >&2
+  exit 1
+fi
 
-  title="[${SEED_PREFIX}] Contoh Saksi #${i}"
-  summary="Data sampel lokal untuk pengembangan frontend (${witness_id})."
+seed_limit="$matrix_count"
+if [[ "$SEED_COUNT" -gt 0 ]]; then
+  if [[ "$SEED_COUNT" -lt "$matrix_count" ]]; then
+    seed_limit="$SEED_COUNT"
+  else
+    echo "SEED_COUNT=${SEED_COUNT} exceeds matrix size (${matrix_count}); seeding all rows."
+  fi
+fi
+
+echo "Seed matrix: ${SEED_MATRIX_FILE}"
+echo "Matrix rows: ${matrix_count} (seeding ${seed_limit})"
+
+seeded_count=0
+for idx in $(seq 0 $((seed_limit - 1))); do
+  entry="$(jq -c ".[$idx]" "$SEED_MATRIX_FILE")"
+  slug="$(jq -r '.slug // empty' <<<"$entry")"
+  if [[ -z "$slug" ]]; then
+    slug="item-$((idx + 1))"
+  fi
+  slug_safe="$(echo "$slug" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9_.-' '-' | sed 's/^-*//; s/-*$//')"
+  if [[ -z "$slug_safe" ]]; then
+    slug_safe="item-$((idx + 1))"
+  fi
+
+  source_type="$(jq -r '.source_type // "contribution"' <<<"$entry")"
+  route="$(jq -r '.route // "komunitas"' <<<"$entry")"
+  rahasia_level="$(jq -r '.rahasia_level // "L0"' <<<"$entry")"
+  scope_id="$(jq -r --arg default "$SEED_COMMUNITY_ID" '.scope_id // $default' <<<"$entry")"
+  privacy_level="$(jq -r '.privacy_level // "public"' <<<"$entry")"
+  title="$(jq -r '.title // empty' <<<"$entry")"
+  summary="$(jq -r '.summary // empty' <<<"$entry")"
+  payload_base="$(jq -c '.payload // {}' <<<"$entry")"
+
+  if [[ -z "$title" ]]; then
+    title="[${SEED_PREFIX}] Seed ${slug_safe}"
+  fi
+  if [[ -z "$summary" ]]; then
+    summary="Data sampel lokal untuk pengembangan frontend (${slug_safe})."
+  fi
+
+  witness_id="seed-${run_key}-${slug_safe}"
+  feed_id="${run_key}-feed-${slug_safe}"
+  request_id="${run_key}-req-${slug_safe}"
 
   feed_payload="$(jq -nc \
+    --argjson payload_base "$payload_base" \
     --arg witness_id "$witness_id" \
-    --arg route "komunitas" \
-    --arg rahasia_level "L0" \
+    --arg route "$route" \
+    --arg rahasia_level "$rahasia_level" \
     --arg entity_id "ent-${SEED_COMMUNITY_ID}" \
     --arg seed_batch_id "$run_key" \
-    '{witness_id:$witness_id, route:$route, rahasia_level:$rahasia_level, status:"open", message_count:0, unread_count:0, entity_ids:[$entity_id], dev_meta:{is_seed:true, seed_origin:"db", seed_batch_id:$seed_batch_id}}')"
+    '(
+      if ($payload_base | type) == "object" then $payload_base else {} end
+    ) + {
+      witness_id: $witness_id,
+      route: $route,
+      rahasia_level: $rahasia_level,
+      status: "open",
+      message_count: 0,
+      unread_count: 0,
+      entity_ids: (
+        if ($payload_base.entity_ids | type) == "array"
+        then $payload_base.entity_ids
+        else [$entity_id]
+        end
+      )
+    } | .dev_meta = {
+      is_seed: true,
+      seed_origin: "db",
+      seed_batch_id: $seed_batch_id
+    }')"
+
+  sql_feed_id="$(sql_escape "$feed_id")"
+  sql_source_type="$(sql_escape "$source_type")"
+  sql_witness_id="$(sql_escape "$witness_id")"
+  sql_seed_user_id="$(sql_escape "$seed_user_id")"
+  sql_seed_username="$(sql_escape "$SEED_USERNAME")"
+  sql_title="$(sql_escape "$title")"
+  sql_summary="$(sql_escape "$summary")"
+  sql_scope_id="$(sql_escape "$scope_id")"
+  sql_privacy_level="$(sql_escape "$privacy_level")"
+  sql_request_id="$(sql_escape "$request_id")"
 
   sql_feed="CREATE discovery_feed_item CONTENT {
-    feed_id: '${feed_id}',
-    source_type: 'contribution',
-    source_id: '${witness_id}',
-    actor_id: '${seed_user_id}',
-    actor_username: '${SEED_USERNAME}',
-    title: '${title}',
-    summary: '${summary}',
-    scope_id: '${SEED_COMMUNITY_ID}',
-    privacy_level: 'public',
+    feed_id: '${sql_feed_id}',
+    source_type: '${sql_source_type}',
+    source_id: '${sql_witness_id}',
+    actor_id: '${sql_seed_user_id}',
+    actor_username: '${sql_seed_username}',
+    title: '${sql_title}',
+    summary: '${sql_summary}',
+    scope_id: '${sql_scope_id}',
+    privacy_level: '${sql_privacy_level}',
     occurred_at: time::now(),
     created_at: time::now(),
-    request_id: '${request_id}',
-    correlation_id: '${request_id}',
-    participant_ids: ['${seed_user_id}'],
+    request_id: '${sql_request_id}',
+    correlation_id: '${sql_request_id}',
+    participant_ids: ['${sql_seed_user_id}'],
     payload: ${feed_payload}
   };
   CREATE feed_participant_edge CONTENT {
-    edge_id: '${seed_user_id}:${feed_id}',
-    actor_id: '${seed_user_id}',
-    feed_id: '${feed_id}',
+    edge_id: '${sql_seed_user_id}:${sql_feed_id}',
+    actor_id: '${sql_seed_user_id}',
+    feed_id: '${sql_feed_id}',
     occurred_at: time::now(),
-    scope_id: '${SEED_COMMUNITY_ID}',
-    privacy_level: 'public',
-    source_type: 'contribution',
-    source_id: '${witness_id}',
+    scope_id: '${sql_scope_id}',
+    privacy_level: '${sql_privacy_level}',
+    source_type: '${sql_source_type}',
+    source_id: '${sql_witness_id}',
     created_at: time::now(),
-    request_id: '${request_id}'
+    request_id: '${sql_request_id}'
   };"
 
   surreal_exec "$sql_feed"
-  echo "Seeded feed witness: ${witness_id}"
+  echo "Seeded feed item: ${witness_id} (${source_type})"
+  seeded_count=$((seeded_count + 1))
 done
 
 feed_out="$tmp_dir/feed.json"
@@ -205,5 +291,5 @@ feed_count="$(jq '.items | length' "$feed_out")"
 
 echo "=== Seed complete ==="
 echo "Seed user: ${SEED_EMAIL}"
-echo "Seeded records this run: ${SEED_COUNT}"
+echo "Seeded records this run: ${seeded_count}"
 echo "Feed items now visible: ${feed_count}"
