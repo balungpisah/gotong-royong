@@ -17,6 +17,9 @@ test-results/
 # Local tool state (if any)
 .omc/
 
+# Large binaries (download on-demand)
+docs/research/references/samples/surrealdb/bin/
+
 # Logs
 *.log
 
