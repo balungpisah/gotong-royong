@@ -5,7 +5,10 @@ import type {
 	CardEnrichment,
 	TriageBudget,
 	TrajectoryType,
-	KelolaPayload
+	KelolaPayload,
+	TriageBlocks,
+	Block,
+	TriageConversationMessage
 } from '$lib/types';
 import { mockPathPlan } from '$lib/fixtures';
 
@@ -315,6 +318,297 @@ function mockBudget(turn: number, totalTokens: number = 6000): TriageBudget {
 	};
 }
 
+interface MockPreviewPayload {
+	blocks: TriageBlocks;
+	structured_payload: Block[];
+	conversation_payload: TriageConversationMessage[];
+}
+
+function buildPreviewPayload(
+	route: TriageResult['route'],
+	trajectory: TrajectoryType | null,
+	title: string
+): MockPreviewPayload {
+	const now = new Date();
+	const timestamp = now.toISOString();
+	const endsAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+	const witnessId = `triage-preview-${route}`;
+
+	const makeAiCard = (
+		messageId: string,
+		blocks: Block[],
+		badge: 'classified' | 'suggested' | 'stalled' | 'dampak' | 'ringkasan' | 'duplikat' = 'classified'
+	): TriageConversationMessage => ({
+		message_id: messageId,
+		type: 'ai_card',
+		timestamp,
+		witness_id: witnessId,
+		title: `Rangkuman ${title}`,
+		badge,
+		blocks
+	});
+
+	const makeDiffCard = (
+		messageId: string,
+		targetType: 'list' | 'document' | 'form' | 'checkpoint' | 'phase',
+		targetId: string,
+		summary: string,
+		path: string,
+		label: string
+	): TriageConversationMessage => ({
+		message_id: messageId,
+		type: 'diff_card',
+		timestamp,
+		witness_id: witnessId,
+		diff: {
+			diff_id: `${targetId}-diff`,
+			target_type: targetType,
+			target_id: targetId,
+			summary,
+			items: [
+				{
+					operation: 'modify',
+					path,
+					label,
+					protected: false
+				}
+			],
+			source: 'ai',
+			generated_at: timestamp
+		}
+	});
+
+	if (route === 'catatan_komunitas' || trajectory === 'data') {
+		const docBlock: Block = {
+			type: 'document',
+			id: 'catat-doc',
+			title: 'Ringkasan Data Komunitas',
+			sections: [
+				{
+					id: 'catat-sec-1',
+					heading: 'Konteks',
+					content: 'Pencatatan data publik untuk agregasi komunitas.',
+					source: 'ai',
+					locked_fields: []
+				}
+			]
+		};
+		const formBlock: Block = {
+			type: 'form',
+			id: 'catat-form',
+			title: 'Form Input Data',
+			fields: [
+				{
+					id: 'category',
+					label: 'Kategori Data',
+					field_type: 'select',
+					value: 'commodity_price',
+					protected: false,
+					options: [
+						{ value: 'commodity_price', label: 'Harga Komoditas' },
+						{ value: 'public_service', label: 'Layanan Publik' },
+						{ value: 'training', label: 'Pelatihan' }
+					],
+					source: 'ai',
+					locked_fields: []
+				},
+				{
+					id: 'value',
+					label: 'Nilai',
+					field_type: 'number',
+					value: 85000,
+					placeholder: 'Masukkan angka',
+					protected: false,
+					source: 'ai',
+					locked_fields: []
+				},
+				{
+					id: 'source',
+					label: 'Sumber',
+					field_type: 'text',
+					value: 'Observasi warga',
+					protected: false,
+					source: 'human',
+					locked_fields: ['value']
+				}
+			]
+		};
+		const computedBlock: Block = {
+			type: 'computed',
+			id: 'catat-score',
+			display: 'confidence',
+			label: 'Kepercayaan Data',
+			value: 78,
+			max: 100,
+			unit: '%'
+		};
+
+		return {
+			blocks: {
+				conversation: ['chat_message', 'ai_inline_card', 'diff_card'],
+				structured: ['document', 'form', 'computed']
+			},
+			structured_payload: [docBlock, formBlock, computedBlock],
+			conversation_payload: [
+				makeAiCard('catat-ai', [docBlock, formBlock], 'ringkasan'),
+				makeDiffCard(
+					'catat-diff',
+					'form',
+					formBlock.id,
+					'Lengkapi sumber verifikasi data',
+					'fields[source]',
+					'Tambah tautan referensi resmi'
+				)
+			]
+		};
+	}
+
+	if (trajectory === 'mufakat') {
+		const docBlock: Block = {
+			type: 'document',
+			id: 'musyawarah-doc',
+			title: 'Isu Musyawarah',
+			sections: [
+				{
+					id: 'musyawarah-sec-1',
+					heading: 'Pertanyaan Utama',
+					content: 'Perlukah lahan kosong RT 03 dipakai untuk taman bermain anak?',
+					source: 'ai',
+					locked_fields: []
+				}
+			]
+		};
+		const voteBlock: Extract<Block, { type: 'vote' }> = {
+			type: 'vote',
+			id: 'musyawarah-vote',
+			question: 'Setuju jadikan lahan kosong sebagai taman bermain?',
+			vote_type: 'consensus',
+			options: [
+				{ id: 'setuju', label: 'Setuju', count: 8 },
+				{ id: 'revisi', label: 'Perlu Revisi', count: 2 }
+			],
+			quorum: 0.6,
+			total_eligible: 20,
+			total_voted: 10,
+			duration_hours: 24,
+			ends_at: endsAt
+		};
+		const listBlock: Block = {
+			type: 'list',
+			id: 'musyawarah-list',
+			display: 'checklist',
+			title: 'Poin Pembahasan',
+			items: [
+				{
+					id: 'm-item-1',
+					label: 'Konfirmasi lokasi dan ukuran lahan',
+					status: 'completed',
+					source: 'human',
+					locked_fields: []
+				},
+				{
+					id: 'm-item-2',
+					label: 'Pastikan jadwal kerja bakti',
+					status: 'open',
+					source: 'ai',
+					locked_fields: []
+				}
+			]
+		};
+
+		return {
+			blocks: {
+				conversation: ['chat_message', 'ai_inline_card', 'vote_card', 'diff_card'],
+				structured: ['document', 'list', 'vote']
+			},
+			structured_payload: [docBlock, listBlock, voteBlock],
+			conversation_payload: [
+				makeAiCard('musyawarah-ai', [docBlock, listBlock], 'suggested'),
+				{
+					message_id: 'musyawarah-vote-card',
+					type: 'vote_card',
+					timestamp,
+					witness_id: witnessId,
+					block: voteBlock
+				},
+				makeDiffCard(
+					'musyawarah-diff',
+					'document',
+					docBlock.id,
+					'Perjelas kriteria mufakat',
+					'sections[0].content',
+					'Tambahkan syarat keberatan tertulis'
+				)
+			]
+		};
+	}
+
+	const docBlock: Block = {
+		type: 'document',
+		id: 'aksi-doc',
+		title: 'Ringkasan Aksi',
+		sections: [
+			{
+				id: 'aksi-sec-1',
+				heading: 'Masalah',
+				content: 'Warga melaporkan dampak langsung dan butuh tindak lanjut kolaboratif.',
+				source: 'ai',
+				locked_fields: []
+			}
+		]
+	};
+	const listBlock: Block = {
+		type: 'list',
+		id: 'aksi-list',
+		display: 'checklist',
+		title: 'Rencana Tindak',
+		items: [
+			{
+				id: 'aksi-item-1',
+				label: 'Verifikasi lokasi dan bukti lapangan',
+				status: 'completed',
+				source: 'human',
+				locked_fields: []
+			},
+			{
+				id: 'aksi-item-2',
+				label: 'Koordinasi relawan inti',
+				status: 'open',
+				source: 'ai',
+				locked_fields: []
+			}
+		]
+	};
+	const computedBlock: Block = {
+		type: 'computed',
+		id: 'aksi-progress',
+		display: 'progress',
+		label: 'Kesiapan aksi',
+		value: 62,
+		max: 100,
+		unit: '%'
+	};
+
+	return {
+		blocks: {
+			conversation: ['chat_message', 'ai_inline_card', 'diff_card'],
+			structured: ['document', 'list', 'computed']
+		},
+		structured_payload: [docBlock, listBlock, computedBlock],
+		conversation_payload: [
+			makeAiCard('aksi-ai', [docBlock, listBlock], 'classified'),
+			makeDiffCard(
+				'aksi-diff',
+				'list',
+				listBlock.id,
+				'Usul penyesuaian urutan kerja',
+				'items[1].label',
+				'Naikkan prioritas koordinasi RT'
+			)
+		]
+	};
+}
+
 // ---------------------------------------------------------------------------
 // Mock Kelola response
 // ---------------------------------------------------------------------------
@@ -414,6 +708,7 @@ export class MockTriageService implements TriageService {
 				? TRAJECTORY_ENRICHMENTS[trajectory]
 				: TRAJECTORY_ENRICHMENTS.aksi;
 			const isWitness = trajectory && WITNESS_TRAJECTORIES.includes(trajectory);
+			const previewPayload = buildPreviewPayload(route, trajectory, enrichment.title);
 
 			const confidenceLabel = trajectory
 				? `${enrichment.title.split(',')[0]} · 92%`
@@ -429,6 +724,9 @@ export class MockTriageService implements TriageService {
 				seed_hint: 'Keresahan',
 				trajectory_type: trajectory ?? undefined,
 				card_enrichment: enrichment,
+				blocks: previewPayload.blocks,
+				structured_payload: previewPayload.structured_payload,
+				conversation_payload: previewPayload.conversation_payload,
 				confidence: { score: 0.92, label: confidenceLabel },
 				budget: mockBudget(this.currentStep + 1),
 				proposed_plan: isWitness ? { ...mockPathPlan, title: enrichment.title } : undefined

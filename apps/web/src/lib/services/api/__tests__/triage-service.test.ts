@@ -1,8 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from '$lib/api';
 import type { TriageResult } from '$lib/types';
 import type { TriageService } from '$lib/services/types';
-import { ApiTriageService } from '../triage-service';
+import {
+	ApiTriageService,
+	getTriageFallbackDiagnostics,
+	resetTriageFallbackDiagnostics,
+	TRIAGE_FALLBACK_FLAG_KEY
+} from '../triage-service';
 
 const makeApiClient = () => {
 	const post = vi.fn();
@@ -42,6 +47,11 @@ const makeFallbackService = () => {
 };
 
 describe('ApiTriageService', () => {
+	beforeEach(() => {
+		resetTriageFallbackDiagnostics();
+		delete (globalThis as Record<string, unknown>)[TRIAGE_FALLBACK_FLAG_KEY];
+	});
+
 	it('starts triage session and maps backend result', async () => {
 		const { client, post } = makeApiClient();
 		const { service: fallback } = makeFallbackService();
@@ -228,6 +238,16 @@ describe('ApiTriageService', () => {
 		await expect(service.updateTriage('session-mock', 'jawab')).resolves.toEqual(updateResult);
 		expect(fallback.startTriage).toHaveBeenCalled();
 		expect(fallback.updateTriage).toHaveBeenCalled();
+		expect(getTriageFallbackDiagnostics()).toEqual({
+			total: 2,
+			by_operation: {
+				start: 1,
+				update: 1,
+				update_no_session: 0
+			},
+			last_error_message: 'backend unavailable'
+		});
+		expect((globalThis as Record<string, unknown>)[TRIAGE_FALLBACK_FLAG_KEY]).toBe(true);
 	});
 
 	it('does not use mock fallback when disabled', async () => {
@@ -238,5 +258,25 @@ describe('ApiTriageService', () => {
 		const service = new ApiTriageService(client, fallback, { allowMockFallback: false });
 		await expect(service.startTriage('test')).rejects.toThrow('backend unavailable');
 		expect(fallback.startTriage).not.toHaveBeenCalled();
+		expect(getTriageFallbackDiagnostics().total).toBe(0);
+		expect((globalThis as Record<string, unknown>)[TRIAGE_FALLBACK_FLAG_KEY]).toBeUndefined();
+	});
+
+	it('tracks missing-session update fallback as guardrail signal', async () => {
+		const { client } = makeApiClient();
+		const { service: fallback, updateResult } = makeFallbackService();
+		const service = new ApiTriageService(client, fallback);
+
+		await expect(service.updateTriage('', 'lanjut')).resolves.toEqual(updateResult);
+		expect(fallback.updateTriage).toHaveBeenCalledWith('', 'lanjut', undefined);
+		expect(getTriageFallbackDiagnostics()).toEqual({
+			total: 1,
+			by_operation: {
+				start: 0,
+				update: 0,
+				update_no_session: 1
+			},
+			last_error_message: undefined
+		});
 	});
 });

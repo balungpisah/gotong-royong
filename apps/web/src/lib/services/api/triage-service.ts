@@ -22,6 +22,54 @@ interface ContinueTriageResponse {
 	result?: unknown;
 }
 
+export const TRIAGE_FALLBACK_FLAG_KEY = '__gr_triage_api_fallback_used__';
+
+type TriageFallbackOperation = 'start' | 'update' | 'update_no_session';
+
+interface TriageFallbackDiagnostics {
+	total: number;
+	by_operation: Record<TriageFallbackOperation, number>;
+	last_error_message?: string;
+}
+
+const createFallbackDiagnostics = (): TriageFallbackDiagnostics => ({
+	total: 0,
+	by_operation: {
+		start: 0,
+		update: 0,
+		update_no_session: 0
+	}
+});
+
+let fallbackDiagnostics = createFallbackDiagnostics();
+
+const fallbackFlagStore = (): Record<string, unknown> =>
+	(globalThis as unknown as Record<string, unknown>);
+
+const readErrorMessage = (error: unknown): string | undefined =>
+	error instanceof Error && error.message.trim().length > 0 ? error.message : undefined;
+
+const markFallbackUsage = (operation: TriageFallbackOperation, error?: unknown) => {
+	fallbackDiagnostics.total += 1;
+	fallbackDiagnostics.by_operation[operation] += 1;
+	const message = readErrorMessage(error);
+	if (message) {
+		fallbackDiagnostics.last_error_message = message;
+	}
+	fallbackFlagStore()[TRIAGE_FALLBACK_FLAG_KEY] = true;
+};
+
+export const getTriageFallbackDiagnostics = (): TriageFallbackDiagnostics => ({
+	total: fallbackDiagnostics.total,
+	by_operation: { ...fallbackDiagnostics.by_operation },
+	last_error_message: fallbackDiagnostics.last_error_message
+});
+
+export const resetTriageFallbackDiagnostics = () => {
+	fallbackDiagnostics = createFallbackDiagnostics();
+	delete fallbackFlagStore()[TRIAGE_FALLBACK_FLAG_KEY];
+};
+
 const BAR_STATES = new Set<ContextBarState>([
 	'listening',
 	'probing',
@@ -307,8 +355,13 @@ export class ApiTriageService implements TriageService {
 		this.allowMockFallback = options.allowMockFallback ?? true;
 	}
 
-	private fallbackOrThrow<T>(fallback: () => Promise<T>, error?: unknown): Promise<T> {
+	private fallbackOrThrow<T>(
+		fallback: () => Promise<T>,
+		operation: TriageFallbackOperation,
+		error?: unknown
+	): Promise<T> {
 		if (this.allowMockFallback) {
+			markFallbackUsage(operation, error);
 			return fallback();
 		}
 		if (error instanceof Error) {
@@ -338,6 +391,7 @@ export class ApiTriageService implements TriageService {
 		} catch (error) {
 			const fallbackResult = await this.fallbackOrThrow(
 				() => this.fallback.startTriage(content, attachments),
+				'start',
 				error
 			);
 			this.activeSessionId = fallbackResult.session_id ?? this.activeSessionId;
@@ -352,7 +406,10 @@ export class ApiTriageService implements TriageService {
 	): Promise<TriageResult> {
 		const targetSessionId = sessionId.trim() || this.activeSessionId;
 		if (!targetSessionId) {
-			return this.fallbackOrThrow(() => this.fallback.updateTriage(sessionId, answer, attachments));
+			return this.fallbackOrThrow(
+				() => this.fallback.updateTriage(sessionId, answer, attachments),
+				'update_no_session'
+			);
 		}
 
 		try {
@@ -377,6 +434,7 @@ export class ApiTriageService implements TriageService {
 		} catch (error) {
 			return this.fallbackOrThrow(
 				() => this.fallback.updateTriage(sessionId, answer, attachments),
+				'update',
 				error
 			);
 		}

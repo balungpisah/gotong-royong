@@ -648,8 +648,8 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 								</div>
 
 								<!-- Plan summary -->
-								{#if triageStore.proposedPlan}
-									<div class="px-3 py-2.5">
+								<div class="px-3 py-2.5">
+									{#if triageStore.proposedPlan}
 										<p class="text-body font-semibold text-foreground leading-tight">
 											{triageStore.proposedPlan.title}
 										</p>
@@ -666,35 +666,43 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 												<span class="truncate">{firstPhaseTitle}</span>
 											{/if}
 										</div>
-										{#if declaredConversationBlocks.length > 0 || declaredStructuredBlocks.length > 0}
-											<div class="mt-2 rounded-lg border border-border/30 bg-muted/30 p-2">
-												<p class="text-small font-medium text-foreground">Operator blocks</p>
-												<div class="mt-1 flex flex-wrap gap-1">
-													{#each declaredConversationBlocks as blockId (blockId)}
-														<Badge variant="outline" class="text-[10px] uppercase">
-															CHAT · {blockLabel(blockId)}
-														</Badge>
-													{/each}
-													{#each declaredStructuredBlocks as blockId (blockId)}
-														<Badge variant="outline" class="text-[10px] uppercase">
-															STRUCT · {blockLabel(blockId)}
-														</Badge>
-													{/each}
-												</div>
+									{:else}
+										<p class="text-body font-semibold text-foreground leading-tight">
+											{triageStore.result?.card_enrichment?.title ?? 'Output triase siap ditinjau'}
+										</p>
+										<p class="mt-1 text-small text-muted-foreground">
+											Payload operator tersedia dan siap dipublikasikan.
+										</p>
+									{/if}
+
+									{#if declaredConversationBlocks.length > 0 || declaredStructuredBlocks.length > 0}
+										<div class="mt-2 rounded-lg border border-border/30 bg-muted/30 p-2">
+											<p class="text-small font-medium text-foreground">Operator blocks</p>
+											<div class="mt-1 flex flex-wrap gap-1">
+												{#each declaredConversationBlocks as blockId (blockId)}
+													<Badge variant="outline" class="text-[10px] uppercase">
+														CHAT · {blockLabel(blockId)}
+													</Badge>
+												{/each}
+												{#each declaredStructuredBlocks as blockId (blockId)}
+													<Badge variant="outline" class="text-[10px] uppercase">
+														STRUCT · {blockLabel(blockId)}
+													</Badge>
+												{/each}
 											</div>
-										{/if}
-										{#if structuredPayload.length > 0}
-											<div class="mt-2 rounded-lg border border-border/30 bg-card px-2.5 py-2">
-												<p class="mb-1.5 text-small font-medium text-foreground">Structured preview</p>
-												<div class="space-y-2">
-													{#each structuredPayload as block (block.id)}
-														<BlockRenderer {block} />
-													{/each}
-												</div>
+										</div>
+									{/if}
+									{#if structuredPayload.length > 0}
+										<div class="mt-2 rounded-lg border border-border/30 bg-card px-2.5 py-2">
+											<p class="mb-1.5 text-small font-medium text-foreground">Structured preview</p>
+											<div class="space-y-2">
+												{#each structuredPayload as block (block.id)}
+													<BlockRenderer {block} />
+												{/each}
 											</div>
-										{/if}
-									</div>
-								{/if}
+										</div>
+									{/if}
+								</div>
 
 								<!-- Action buttons -->
 								<div class="flex items-center gap-2 border-t border-border/30 px-3 py-2.5">
