@@ -337,7 +337,13 @@ function buildPreviewPayload(
 	const makeAiCard = (
 		messageId: string,
 		blocks: Block[],
-		badge: 'classified' | 'suggested' | 'stalled' | 'dampak' | 'ringkasan' | 'duplikat' = 'classified'
+		badge:
+			| 'classified'
+			| 'suggested'
+			| 'stalled'
+			| 'dampak'
+			| 'ringkasan'
+			| 'duplikat' = 'classified'
 	): TriageConversationMessage => ({
 		message_id: messageId,
 		type: 'ai_card',

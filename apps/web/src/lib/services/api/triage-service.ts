@@ -44,7 +44,7 @@ const createFallbackDiagnostics = (): TriageFallbackDiagnostics => ({
 let fallbackDiagnostics = createFallbackDiagnostics();
 
 const fallbackFlagStore = (): Record<string, unknown> =>
-	(globalThis as unknown as Record<string, unknown>);
+	globalThis as unknown as Record<string, unknown>;
 
 const readErrorMessage = (error: unknown): string | undefined =>
 	error instanceof Error && error.message.trim().length > 0 ? error.message : undefined;
@@ -112,7 +112,15 @@ const TRIAGE_STRUCTURED_BLOCKS = new Set<TriageStructuredBlockId>([
 const SOURCE_TAGS = new Set(['ai', 'human', 'system']);
 const LIST_ITEM_STATUSES = new Set(['open', 'completed', 'blocked', 'skipped']);
 const LIST_DISPLAYS = new Set(['checklist', 'table', 'timeline', 'gallery']);
-const FORM_FIELD_TYPES = new Set(['text', 'number', 'date', 'select', 'textarea', 'toggle', 'file']);
+const FORM_FIELD_TYPES = new Set([
+	'text',
+	'number',
+	'date',
+	'select',
+	'textarea',
+	'toggle',
+	'file'
+]);
 const COMPUTED_DISPLAYS = new Set(['progress', 'status', 'score', 'counter', 'confidence']);
 const VOTE_TYPES = new Set(['standard', 'weighted', 'quorum_1_5x', 'consensus']);
 const REFERENCE_TYPES = new Set(['seed', 'plan', 'checkpoint', 'document']);
@@ -169,7 +177,11 @@ const isBlock = (value: unknown): value is Block => {
 
 	switch (type) {
 		case 'list':
-			return LIST_DISPLAYS.has(String(value.display)) && Array.isArray(value.items) && value.items.every(isListItem);
+			return (
+				LIST_DISPLAYS.has(String(value.display)) &&
+				Array.isArray(value.items) &&
+				value.items.every(isListItem)
+			);
 		case 'document':
 			return (
 				Array.isArray(value.sections) &&
@@ -238,11 +250,15 @@ const readStructuredPayload = (value: unknown): Block[] | undefined => {
 };
 
 const isChatMessageBase = (value: unknown): boolean =>
-	isRecord(value) && !!asString(value.message_id) && !!asString(value.timestamp) && !!asString(value.witness_id);
+	isRecord(value) &&
+	!!asString(value.message_id) &&
+	!!asString(value.timestamp) &&
+	!!asString(value.witness_id);
 
 const isAiCardMessage = (value: unknown): boolean => {
 	if (!isRecord(value) || value.type !== 'ai_card') return false;
-	if (!isChatMessageBase(value) || !Array.isArray(value.blocks) || !value.blocks.every(isBlock)) return false;
+	if (!isChatMessageBase(value) || !Array.isArray(value.blocks) || !value.blocks.every(isBlock))
+		return false;
 	if (value.badge !== undefined && !AI_BADGE_VARIANTS.has(String(value.badge))) return false;
 	return true;
 };
@@ -280,7 +296,9 @@ const isVoteCardMessage = (value: unknown): boolean => {
 	return isBlock(value.block) && value.block.type === 'vote';
 };
 
-const readConversationPayload = (value: unknown): TriageResult['conversation_payload'] | undefined => {
+const readConversationPayload = (
+	value: unknown
+): TriageResult['conversation_payload'] | undefined => {
 	if (!Array.isArray(value)) return undefined;
 	const parsed = value.filter(
 		(item): item is NonNullable<TriageResult['conversation_payload']>[number] =>
@@ -302,7 +320,10 @@ const readBlocks = (value: unknown): TriageResult['blocks'] | undefined => {
 		TRIAGE_STRUCTURED_BLOCKS.has(item as TriageStructuredBlockId)
 	);
 
-	if (conversation.length !== conversationRaw.length || structured.length !== structuredRaw.length) {
+	if (
+		conversation.length !== conversationRaw.length ||
+		structured.length !== structuredRaw.length
+	) {
 		return undefined;
 	}
 

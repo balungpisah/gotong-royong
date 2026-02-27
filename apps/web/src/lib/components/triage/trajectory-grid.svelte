@@ -41,6 +41,7 @@
 	interface IntentItem {
 		/** Primary trajectory type — used for color & icon only. */
 		color: TrajectoryColorKey;
+		testId: string;
 		name: string;
 		icon: string;
 		desc: string;
@@ -52,6 +53,7 @@
 	const INTENTS: IntentItem[] = $derived([
 		{
 			color: 'aksi',
+			testId: 'masalah',
 			name: m.triage_intent_masalah_name(),
 			icon: 'construction',
 			desc: m.triage_intent_masalah_desc(),
@@ -59,6 +61,7 @@
 		},
 		{
 			color: 'mufakat',
+			testId: 'musyawarah',
 			name: m.triage_intent_musyawarah_name(),
 			icon: 'users',
 			desc: m.triage_intent_musyawarah_desc(),
@@ -66,6 +69,7 @@
 		},
 		{
 			color: 'pantau',
+			testId: 'pantau',
 			name: m.triage_intent_pantau_name(),
 			icon: 'eye',
 			desc: m.triage_intent_pantau_desc(),
@@ -73,6 +77,7 @@
 		},
 		{
 			color: 'data',
+			testId: 'catat',
 			name: m.triage_intent_catat_name(),
 			icon: 'file-text',
 			desc: m.triage_intent_catat_desc(),
@@ -80,6 +85,7 @@
 		},
 		{
 			color: 'bantuan',
+			testId: 'bantuan',
 			name: m.triage_intent_bantuan_name(),
 			icon: 'heart',
 			desc: m.triage_intent_bantuan_desc(),
@@ -87,6 +93,7 @@
 		},
 		{
 			color: 'pencapaian',
+			testId: 'rayakan',
 			name: m.triage_intent_rayakan_name(),
 			icon: 'trophy',
 			desc: m.triage_intent_rayakan_desc(),
@@ -94,6 +101,7 @@
 		},
 		{
 			color: 'siaga',
+			testId: 'siaga',
 			name: m.triage_intent_siaga_name(),
 			icon: 'siren',
 			desc: m.triage_intent_siaga_desc(),
@@ -101,6 +109,7 @@
 		},
 		{
 			color: 'program',
+			testId: 'program',
 			name: m.triage_intent_program_name(),
 			icon: 'calendar',
 			desc: m.triage_intent_program_desc(),
@@ -108,6 +117,7 @@
 		},
 		{
 			color: 'kelola',
+			testId: 'kelola',
 			name: m.triage_intent_kelola_name(),
 			icon: 'settings',
 			desc: m.triage_intent_kelola_desc(),
@@ -117,7 +127,7 @@
 	]);
 </script>
 
-<div class="trajectory-grid flex flex-col gap-3 px-1 py-2">
+<div class="trajectory-grid flex flex-col gap-3 px-1 py-2" data-testid="triage-trajectory-grid">
 	<!-- Header -->
 	<div class="text-center">
 		<p class="text-body font-medium text-foreground">Apa yang ingin kamu lakukan?</p>
@@ -137,6 +147,7 @@
 					item.fullWidth && 'col-span-2'
 				)}
 				onclick={() => onSelect(item.primer)}
+				data-testid={`triage-trajectory-${item.testId}`}
 			>
 				<div class="flex size-8 shrink-0 items-center justify-center rounded-lg {colors.bgLight}">
 					<DynamicIcon
@@ -160,6 +171,7 @@
 	<!-- Free-text prompt — same visual weight as grid items -->
 	<div
 		class="flex items-center gap-2.5 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-3 py-2.5"
+		data-testid="triage-free-text-hint"
 	>
 		<div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
 			<DynamicIcon name="message-circle" class="size-4 text-primary" />

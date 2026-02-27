@@ -12,16 +12,17 @@
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import Plus from '@lucide/svelte/icons/plus';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
-import Settings from '@lucide/svelte/icons/settings';
-import TrajectoryGrid from '$lib/components/triage/trajectory-grid.svelte';
-import TriageAttachmentPicker from '$lib/components/triage/triage-attachment-picker.svelte';
-import TriageAttachmentPreview from '$lib/components/triage/triage-attachment-preview.svelte';
-import { BlockRenderer } from '$lib/components/blocks';
-import CardEnvelope from '$lib/components/chat/card-envelope.svelte';
-import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/types';
+	import Settings from '@lucide/svelte/icons/settings';
+	import TrajectoryGrid from '$lib/components/triage/trajectory-grid.svelte';
+	import TriageAttachmentPicker from '$lib/components/triage/triage-attachment-picker.svelte';
+	import TriageAttachmentPreview from '$lib/components/triage/triage-attachment-preview.svelte';
+	import { BlockRenderer } from '$lib/components/blocks';
+	import CardEnvelope from '$lib/components/chat/card-envelope.svelte';
+	import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/types';
 	import Zap from '@lucide/svelte/icons/zap';
 	import Video from '@lucide/svelte/icons/video';
 	import Mic from '@lucide/svelte/icons/mic';
+	import { onMount } from 'svelte';
 	import type { BadgeVariant } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 
@@ -38,8 +39,13 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 
 	let content = $state('');
 	let expanded = $state(false);
+	let hydrated = $state(false);
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let wrapperEl = $state<HTMLDivElement | null>(null);
+
+	onMount(() => {
+		hydrated = true;
+	});
 
 	/** Cooldown — prevents rapid re-submission after completing a triage session. */
 	const COOLDOWN_MS = 30_000;
@@ -317,7 +323,13 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 </script>
 
 <!-- Wrapper: keeps the compact card in flow, expanded panel is absolute -->
-<div class="relative" bind:this={wrapperEl}>
+<div
+	class="relative"
+	bind:this={wrapperEl}
+	data-testid="triage-shell"
+	data-state={expanded ? 'open' : 'closed'}
+	data-hydrated={hydrated ? 'true' : 'false'}
+>
 	<!-- Pulsing arrow — comically large, points at the start box -->
 	{#if !expanded && !hasSession}
 		<div class="onboarding-arrow" aria-hidden="true">
@@ -339,6 +351,7 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 		onkeydown={(e) => e.key === 'Enter' && expand()}
 		role="button"
 		tabindex="0"
+		data-testid="triage-opener"
 	>
 		<!-- "Mulai di sini" badge -->
 		<div class="mb-2.5">
@@ -373,6 +386,7 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 		class:pointer-events-none={!expanded}
 		onclick={handleBackdropClick}
 		onkeydown={() => {}}
+		data-testid="triage-backdrop"
 	></div>
 
 	<!-- Expanded panel — fixed centered overlay for focused writing -->
@@ -381,6 +395,8 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 		class:opacity-0={!expanded}
 		class:pointer-events-none={!expanded}
 		class:scale-95={!expanded}
+		data-testid="triage-panel"
+		data-state={expanded ? 'open' : 'closed'}
 	>
 		<!-- Header -->
 		<div class="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
@@ -423,6 +439,7 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 							class="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
 							aria-label={m.triage_restart()}
 							tabindex={expanded ? 0 : -1}
+							data-testid="triage-reset"
 						>
 							<RotateCcw class="size-3.5" />
 						</Button>
@@ -458,12 +475,13 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 			{:else if messages.length === 0}
 				<TrajectoryGrid onSelect={handleTrajectorySelect} />
 			{:else}
-				<div class="flex flex-col gap-3">
+				<div class="flex flex-col gap-3" data-testid="triage-messages">
 					{#each messages as msg}
 						{#if msg.role === 'user'}
 							<div class="flex justify-end">
 								<div
 									class="max-w-[80%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-body text-primary-foreground"
+									data-testid="triage-message-bubble"
 								>
 									{msg.text}
 									{#if msg.attachments?.length}
@@ -502,6 +520,7 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 								</div>
 								<div
 									class="max-w-[80%] rounded-2xl rounded-bl-md bg-muted/70 px-3 py-2 text-body text-foreground"
+									data-testid="triage-message-bubble"
 								>
 									{msg.text}
 								</div>
@@ -571,7 +590,10 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 											{detail.description}
 										</p>
 										{#if declaredConversationBlocks.length > 0 || declaredStructuredBlocks.length > 0}
-											<div class="mt-2 rounded-lg border border-border/30 bg-muted/30 p-2">
+											<div
+												class="mt-2 rounded-lg border border-border/30 bg-muted/30 p-2"
+												data-testid="triage-operator-blocks"
+											>
 												<p class="text-small font-medium text-foreground">Operator blocks</p>
 												<div class="mt-1 flex flex-wrap gap-1">
 													{#each declaredConversationBlocks as blockId (blockId)}
@@ -588,8 +610,13 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 											</div>
 										{/if}
 										{#if structuredPayload.length > 0}
-											<div class="mt-2 rounded-lg border border-border/30 bg-card px-2.5 py-2">
-												<p class="mb-1.5 text-small font-medium text-foreground">Structured preview</p>
+											<div
+												class="mt-2 rounded-lg border border-border/30 bg-card px-2.5 py-2"
+												data-testid="triage-structured-preview"
+											>
+												<p class="mb-1.5 text-small font-medium text-foreground">
+													Structured preview
+												</p>
 												<div class="space-y-2">
 													{#each structuredPayload as block (block.id)}
 														<BlockRenderer {block} />
@@ -676,7 +703,10 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 									{/if}
 
 									{#if declaredConversationBlocks.length > 0 || declaredStructuredBlocks.length > 0}
-										<div class="mt-2 rounded-lg border border-border/30 bg-muted/30 p-2">
+										<div
+											class="mt-2 rounded-lg border border-border/30 bg-muted/30 p-2"
+											data-testid="triage-operator-blocks"
+										>
 											<p class="text-small font-medium text-foreground">Operator blocks</p>
 											<div class="mt-1 flex flex-wrap gap-1">
 												{#each declaredConversationBlocks as blockId (blockId)}
@@ -693,8 +723,13 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 										</div>
 									{/if}
 									{#if structuredPayload.length > 0}
-										<div class="mt-2 rounded-lg border border-border/30 bg-card px-2.5 py-2">
-											<p class="mb-1.5 text-small font-medium text-foreground">Structured preview</p>
+										<div
+											class="mt-2 rounded-lg border border-border/30 bg-card px-2.5 py-2"
+											data-testid="triage-structured-preview"
+										>
+											<p class="mb-1.5 text-small font-medium text-foreground">
+												Structured preview
+											</p>
 											<div class="space-y-2">
 												{#each structuredPayload as block (block.id)}
 													<BlockRenderer {block} />
@@ -712,6 +747,7 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 											onclick={handleCreateWitness}
 											disabled={witnessStore.creating}
 											class="flex-1"
+											data-testid="triage-create-witness"
 										>
 											{#if witnessStore.creating}
 												<div
@@ -787,6 +823,7 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 						rows={1}
 						tabindex={expanded ? 0 : -1}
 						class="w-full resize-none rounded-lg border border-border/50 bg-background px-3 py-2 text-body text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+						data-testid="triage-input"
 					></textarea>
 				</div>
 
@@ -799,6 +836,7 @@ import type { WitnessCreateInput, TriageBudget, TriageAttachment } from '$lib/ty
 						tabindex={expanded ? 0 : -1}
 						class="shrink-0"
 						aria-label={m.shell_chat_send()}
+						data-testid="triage-send"
 					>
 						{#if triageStore.loading}
 							<div
