@@ -1,4 +1,4 @@
-# Gotong Royong
+> ## ⚠️ Archived Repository\n\n> This repository is archived and marked read-only.\n> Canonical active development now lives in [Meridian monorepo](https://github.com/sabrang-mdp/meridian).\n\n\n# Gotong Royong
 
 **Mutual Credit Platform with Proof of Reality (PoR) Evidence**
 
